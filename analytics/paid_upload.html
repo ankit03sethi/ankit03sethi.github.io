@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Add more products &middot; cursive</title>
+  <link rel="stylesheet" href="trial.css?v=2026052101" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><text x='32' y='42' font-family='Arial' font-size='30' fill='white' text-anchor='middle' font-weight='700'>365</text></svg>" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">365</div>
+      <div>
+        <div class="brand-title">cursive</div>
+        <div class="brand-sub">Add products</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="walletChipTop" class="wallet-chip">Wallet: &#8377;0.00</span>
+      <a href="./" class="btn btn-ghost">&larr; Back to dashboard</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <h1>Add products to your dashboard</h1>
+      <p class="lead">Upload a template with your products. <strong>&#8377;5 per product + 18% GST</strong>. One-time payment, no subscription.</p>
+
+      <div class="banner-info">
+        <strong>How pricing works:</strong> &#8377;5 per product row. 18% GST added on top. Example: 10 products = &#8377;50 + &#8377;9 GST = <strong>&#8377;59 total</strong>. Invoice PDF emailed after payment.
+      </div>
+
+      <h3 style="margin-top:24px;">Step 1 &mdash; Download the template</h3>
+      <p class="hint">Same 6 columns as the free trial: Country, State, Mobile, Email, Platform, Product Id.</p>
+      <div class="row">
+        <a id="dlBtn" class="btn btn-primary btn-block" href="cursive_Trial_Template.xlsx" download>Download Excel template</a>
+      </div>
+
+      <h3 style="margin-top:24px;">Step 2 &mdash; Upload your filled file</h3>
+      <label for="fileInput" class="drop-zone" id="dropZone">
+        <p><strong>Click to choose a file</strong> or drag and drop here</p>
+        <p class="small">Accepted: .xlsx</p>
+        <input id="fileInput" type="file" accept=".xlsx,.xls" style="display:none;" />
+      </label>
+
+      <div id="fileInfo" class="file-info hidden"></div>
+
+      <div class="row">
+        <button id="reviewBtn" class="btn btn-primary btn-block" disabled>Review &amp; pay</button>
+      </div>
+      <p id="uploadError"   class="error   hidden"></p>
+      <p id="uploadSuccess" class="success hidden"></p>
+    </div>
+  </main>
+
+  <!-- Payment modal -->
+  <div id="payModalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 style="margin-top:0">Review payment</h2>
+
+      <table class="pay-table">
+        <tr><td>Products</td><td class="num" id="payRows"></td></tr>
+        <tr><td>Rate per product</td><td class="num">&#8377;5.00</td></tr>
+        <tr><td>Subtotal</td><td class="num" id="paySubtotal"></td></tr>
+        <tr><td>GST (18%)</td><td class="num" id="payGst"></td></tr>
+        <tr class="pay-total"><td><strong>Total</strong></td><td class="num"><strong id="payTotal"></strong></td></tr>
+      </table>
+
+      <div class="wallet-status">
+        <span>Wallet balance</span>
+        <strong id="walletInModal">&#8377;0.00</strong>
+      </div>
+
+      <div class="gst-open">
+        <div class="gst-heading">GST invoice details <span class="muted">(optional &mdash; for input tax credit)</span></div>
+        <p class="hint">Fill these if you want a B2B GST invoice. Leave blank for a basic receipt.</p>
+
+        <label for="gstName">Business name</label>
+        <input id="gstName" type="text" placeholder="e.g. ABC Trading Co." />
+
+        <label for="gstNumber">Your GSTIN</label>
+        <input id="gstNumber" type="text" maxlength="15" placeholder="e.g. 29ABCDE1234F1Z5" style="text-transform:uppercase;" />
+
+        <label for="gstAddress">Billing address</label>
+        <textarea id="gstAddress" rows="3" placeholder="Street, city, state, PIN"></textarea>
+      </div>
+
+      <p id="modalError"   class="error   hidden"></p>
+      <p id="modalSuccess" class="success hidden"></p>
+
+      <!-- Step A: pay -->
+      <div class="row" id="payRow" style="margin-top:20px;">
+        <button id="cancelPayBtn" class="btn btn-ghost">Cancel</button>
+        <button id="payNowBtn" class="btn btn-primary grow">Pay now</button>
+      </div>
+
+      <!-- Step B: continue (shown after payment) -->
+      <div class="row hidden" id="continueRow" style="margin-top:20px;">
+        <button id="closePaidBtn" class="btn btn-ghost">Close</button>
+        <button id="continueBtn" class="btn btn-primary grow">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="contact-floating">
+    <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%20need%20help%20with%20paid%20upload" target="_blank" rel="noopener" class="contact-btn contact-whatsapp" title="WhatsApp +91 96257 37475" aria-label="WhatsApp">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.099-.471-.149-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.611-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.999-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+    </a>
+    <a href="mailto:Contact@cursive.world?subject=cursive%20paid%20upload%20help" class="contact-btn contact-email" title="Email Contact@cursive.world" aria-label="Email">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+    </a>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="trial.js"></script>
+  <script src="paid_upload.js?v=2026052101"></script>
+</body>
+</html>
