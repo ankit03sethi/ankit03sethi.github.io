@@ -11,7 +11,7 @@
 (function () {
   "use strict";
 
-  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyf3idQypXbdftkUCj6y1W1jaZiZYTcnv5PoiFycwbh2PL7Ppl8MN_GCGLAdErEdHY/exec";
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0clgO-1A4VDiwdj39bq5E6mo5dPA_LV8jvmZAluMRWSX0KwExiakZhTAoWLxOwvY/exec";
   var WHATSAPP_NUMBER = "919625737475";
 
   // ---- year in footer ----
