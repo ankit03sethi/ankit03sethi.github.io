@@ -20,8 +20,14 @@
   --radius: 16px;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body {
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+  overflow-x: hidden; margin: 0; padding: 0; }
 body {
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+  overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -40,6 +46,7 @@ body {
 
 /* ============= NAV ============= */
 .nav {
+  touch-action: pan-y;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -52,6 +59,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .nav-brand {
+  touch-action: pan-y;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -89,7 +97,8 @@ body {
 }
 .nav-cta:hover { background: var(--primary-dark); color: white !important; }
 @media (max-width: 720px) {
-  .nav { padding: 12px 16px; }
+  .nav {
+  touch-action: pan-y; padding: 12px 16px; }
   .nav-links a:not(.nav-cta) { display: none; }
 }
 
