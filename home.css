@@ -98,7 +98,7 @@ body {
 .nav-cta:hover { background: var(--primary-dark); color: white !important; }
 @media (max-width: 720px) {
   .nav {
-  touch-action: pan-y; padding: 12px 16px; }
+  touch-action: pan-y; overflow-x: hidden; padding: 12px 16px; }
   .nav-links a:not(.nav-cta) { display: none; }
 }
 
