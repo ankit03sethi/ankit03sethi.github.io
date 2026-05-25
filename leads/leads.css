@@ -10,6 +10,8 @@ a { color: #1f6feb; text-decoration: none; } a:hover { text-decoration: underlin
 .brand-box svg { display: block; }
 .brand-wordmark { font-family: 'Dancing Script', cursive; font-size: 46px; color: #1f6feb; font-weight: 700; letter-spacing: -1px; line-height: 0.9; }
 .brand-wordmark sup { font-family: system-ui, sans-serif; font-size: 0.22em; opacity: 0.5; font-weight: 400; margin-left: 1px; vertical-align: super; }
+.nav-sub { font-size: 12px; color: #667085; margin-top: 2px; }
+
 .topbar-right { display: flex; align-items: center; gap: 12px; }
 .email-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 11px; background: #f0f6ff; color: #1d4ed8; border: 1px solid #c7d9f7; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .btn-ghost { background: transparent; border: 1px solid #e5e7eb; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #475467; cursor: pointer; }
