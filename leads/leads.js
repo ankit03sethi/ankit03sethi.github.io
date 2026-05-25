@@ -636,4 +636,3 @@ function humanError(err) {
   if (/don't have admin access/i.test(msg)) return "This email isn't on the admin whitelist.";
   return msg;
 }
-                                                                                                                                                  
