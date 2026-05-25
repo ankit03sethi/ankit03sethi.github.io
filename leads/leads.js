@@ -251,17 +251,10 @@ function onPaneClick(e) {
   const action = a.dataset.action;
   const key = a.dataset.customerKey;
   if (action === "call" || action === "wa") {
-    // The link's native href still fires (tel: or wa.me). We additionally tag the stage.
-    const manual_status = action === "call" ? "clicked_call" : "clicked_wa";
-    callAdmin("set_lead_status", { customer_key: key, manual_status }).then(() => {
-      const idx = pipelineCache.findIndex(x => x.customer_key === key);
-      if (idx >= 0) {
-        pipelineCache[idx].manual_status = manual_status;
-        pipelineCache[idx].stage = manual_status === "clicked_call" ? "click_to_call" : "click_to_wa";
-      }
-      updateStageCounts();
-      renderStage();
-    }).catch(err => console.error("logging action failed", err));
+    // Admin clicking Call / WhatsApp only opens the link (native href).
+    // It does NOT change the lead's pipeline stage — those stages reflect
+    // customer behaviour, not operator actions.
+    return;
   } else if (action === "save") {
     onSaveRow(a, key);
   }
