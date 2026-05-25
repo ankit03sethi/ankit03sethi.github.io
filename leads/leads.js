@@ -31,7 +31,6 @@ const FOLLOW_SUBS = [
   { id: "never_visited",   title: "Never visited" },
   { id: "dont_call_again", title: "Don't call" },
   { id: "not_interested",  title: "Not interested" },
-  { id: "not_required",    title: "Not required" },
 ];
 
 const TALK_STATUS_OPTIONS = [
@@ -44,12 +43,11 @@ const TALK_STATUS_OPTIONS = [
   { value: "never_visited",   label: "Never visited" },
   { value: "dont_call_again", label: "Don't call again" },
   { value: "not_interested",  label: "Not interested" },
-  { value: "not_required",    label: "Not required" },
   { value: "won_offline",     label: "Won (paid offline)" },
 ];
 
 // State machine: from each sub-tab, only these statuses are valid next moves.
-// Mirrors status.xlsx uploaded by user.
+// Mirrors status.xlsx uploaded by user. "Not interested" is the terminal state.
 const STATUS_TRANSITIONS = {
   not_picked:      ["callback", "interested", "in_progress", "lost"],
   callback:        ["interested", "in_progress", "lost"],
@@ -57,9 +55,8 @@ const STATUS_TRANSITIONS = {
   in_progress:     ["lost", "never_visited"],
   lost:            ["never_visited", "dont_call_again"],
   never_visited:   ["dont_call_again", "not_interested"],
-  dont_call_again: ["not_interested", "not_required"],
-  not_interested:  ["not_required"],
-  not_required:    [],
+  dont_call_again: ["not_interested"],
+  not_interested:  [],
 };
 // For New-bucket leads (no talk_status yet) — show the 4 entry-point statuses.
 const NEW_BUCKET_STATUS_OPTIONS = ["not_picked", "callback", "interested", "in_progress"];
@@ -639,4 +636,4 @@ function humanError(err) {
   if (/don't have admin access/i.test(msg)) return "This email isn't on the admin whitelist.";
   return msg;
 }
-                             
+                                                                                                                                                     
