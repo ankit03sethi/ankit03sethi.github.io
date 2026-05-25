@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <title>cursive admin</title>
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%230f172a'/><polyline points='14 44 26 32 34 38 50 22' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="admin.css?v=2026052502" />
+  <link rel="stylesheet" href="admin.css?v=2026052510" />
 </head>
 <body>
 
@@ -27,7 +27,6 @@
   </div>
 </header>
 
-<!-- Auth view -->
 <main id="loginView" class="auth-wrap hidden">
   <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
     <h1>Admin sign in</h1>
@@ -41,7 +40,6 @@
   </form>
 </main>
 
-<!-- Dashboard -->
 <main id="dashView" class="dash hidden">
   <section class="kpi-strip" id="kpiStrip"></section>
 
@@ -52,7 +50,8 @@
   </div>
 
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="leads">Recent activity <span class="badge" id="badgeLeads">0</span></button>
+    <button class="tab active" data-tab="pipeline">Pipeline</button>
+    <button class="tab" data-tab="leads">All leads</button>
     <button class="tab" data-tab="pending">Pending payments <span class="badge" id="badgePending">0</span></button>
     <button class="tab" data-tab="completed">Completed</button>
     <button class="tab" data-tab="invoices">Invoices</button>
@@ -61,19 +60,16 @@
   </nav>
 
   <div class="panel">
-    <div id="paneLeads"     class="pane"></div>
-    <div id="panePending"   class="pane hidden"></div>
-    <div id="paneCompleted" class="pane hidden"></div>
-    <div id="paneInvoices"  class="pane hidden"></div>
-    <div id="paneWallets"   class="pane hidden"></div>
-    <div id="paneSearch"    class="pane hidden"></div>
+    <div id="panePipeline" class="pane"></div>
+    <div id="paneLeads"     class="pane hidden"></div>
+    <div id="panePending"   class="pane hidden std-panel"></div>
+    <div id="paneCompleted" class="pane hidden std-panel"></div>
+    <div id="paneInvoices"  class="pane hidden std-panel"></div>
+    <div id="paneWallets"   class="pane hidden std-panel"></div>
+    <div id="paneSearch"    class="pane hidden std-panel"></div>
   </div>
 
   <p style="margin-top:18px;color:#94a3b8;font-size:11px;text-align:center;">
     Powered by Supabase Edge Functions &middot; All times in your local timezone.
   </p>
 </main>
-
-<script type="module" src="admin.js?v=2026052503"></script>
-</body>
-</html>
