@@ -24,7 +24,29 @@ function AAA_RUN_REBUILD_ALL_LEADS() { return rebuildAllLeadsClean(); }
 function AAA_RUN_CLEANUP_OLD_TABS() { return cleanupObsoleteTabs(); }
 function AAA_RUN_MIGRATE_DATE_TIME() { return migrateAddDateTimeColumns(); }
 function AAA_RUN_BOOTSTRAP_ALL_TABS() { return bootstrapAllTabs(); }
+function AAA_RUN_PURGE_COMPLETED_PENDING() { return purgeCompletedPendingPayments(); }
 // =====================================================================
+
+/**
+ * Remove any rows from "Pending Payments" whose Status column (K)
+ * is one of: complete, paid, wallet_credited. Those rows are now in
+ * Completed Payments / Invoices and should not be shown as pending.
+ */
+function purgeCompletedPendingPayments() {
+  var sh = pendingPaymentsSheet_();
+  var data = sh.getDataRange().getValues();
+  if (data.length < 2) return "Nothing to purge.";
+  var done = { "complete": 1, "paid": 1, "wallet_credited": 1 };
+  var removed = 0;
+  // Delete from bottom up so row numbers stay stable
+  for (var r = data.length - 1; r >= 1; r--) {
+    var status = String(data[r][10] || "").trim().toLowerCase();
+    if (done[status]) { sh.deleteRow(r + 1); removed++; }
+  }
+  var msg = "Removed " + removed + " completed row(s) from Pending Payments.";
+  Logger.log(msg);
+  return msg;
+}
 
 /**
  * Force-create every tab the script uses with proper headers,
@@ -565,7 +587,8 @@ function paidUploadComplete_(p) {
     rows.length, subtotal, cgst, sgst, igst, total, paymentId, orderId
   ]);
   completedPaymentsSheet_().appendRow([new Date(), email, paymentId, orderId, total, rows.length, invoiceNumber]);
-  sh.getRange(rowIdx + 1, 11).setValue("complete");
+  // Remove from Pending Payments now that it has moved to Completed Payments
+  try { sh.deleteRow(rowIdx + 1); } catch (e) { Logger.log('Could not delete pending row: ' + e); }
 
   try {
     var pdfBlob = generateInvoicePdf_(invoice);
@@ -919,6 +942,16 @@ function walletCredit_(p) {
     return { ok: false, message: "Payment signature verification failed." };
   }
 
+  // Idempotency: if this Razorpay payment is already in Completed Payments, return current balance.
+  try {
+    var cp = completedPaymentsSheet_().getDataRange().getValues();
+    for (var ci = 1; ci < cp.length; ci++) {
+      if (String(cp[ci][2]) === paymentId) {
+        return { ok: true, balance: walletGetBalance_(email), amountPaid: Number(cp[ci][4] || 0), invoiceNumber: String(cp[ci][6] || "(already credited)") };
+      }
+    }
+  } catch (e) {}
+
   // Find pending record (unified schema: D=Reference, I=Amount, K=Status, L=Payload)
   var sh = pendingPaymentsSheet_();
   var data = sh.getDataRange().getValues();
@@ -927,11 +960,6 @@ function walletCredit_(p) {
     if (String(data[r][3]) === pendingId) { rowIdx = r; pendingData = data[r]; break; }
   }
   if (!pendingData) return { ok: false, message: "Pending payment not found." };
-
-  // Idempotency: if already credited, just return current balance.
-  if (String(pendingData[10] || "") === "wallet_credited") {
-    return { ok: true, balance: walletGetBalance_(email), amountPaid: Number(pendingData[8] || 0), invoiceNumber: "(already credited)" };
-  }
 
   var total = Number(pendingData[8]);
   if (!total || total <= 0) return { ok: false, message: "Invalid pending amount." };
@@ -994,8 +1022,8 @@ function walletCredit_(p) {
     Logger.log('Invoice generation/email failed: ' + mailErr.message);
   }
 
-  // Mark pending as credited (column K = Status)
-  sh.getRange(rowIdx + 1, 11).setValue("wallet_credited");
+  // Remove from Pending Payments now that wallet has been credited
+  try { sh.deleteRow(rowIdx + 1); } catch (e) { Logger.log('Could not delete pending row: ' + e); }
 
   // Log to All Leads as wallet_recharged event
   logAllLead_("analytics", "", customerMobile, email, "",
@@ -1890,11 +1918,12 @@ function servicePayComplete_(p) {
     var pdata = ps.getDataRange().getValues();
     for (var r = 1; r < pdata.length; r++) {
       if (String(pdata[r][3]) === orderRef || String(pdata[r][4]) === orderId) {
-        ps.getRange(r + 1, 11).setValue("paid");
         try {
           var pl = JSON.parse(String(pdata[r][11] || "{}"));
           appliedCode = String(pl.code || "");
         } catch (e) {}
+        // Remove from Pending Payments now that the service payment is complete
+        try { ps.deleteRow(r + 1); } catch (e2) { Logger.log('Could not delete pending row: ' + e2); }
         break;
       }
     }
