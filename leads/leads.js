@@ -29,7 +29,7 @@ const FOLLOW_SUBS = [
   { id: "in_progress",     title: "In progress" },
   { id: "lost",            title: "Lost" },
   { id: "never_visited",   title: "Never visited" },
-  { id: "dont_call_again", title: "Don't call" },
+  { id: "dont_call_again", title: "Don't call again" },
   { id: "not_interested",  title: "Not interested" },
 ];
 
@@ -636,4 +636,4 @@ function humanError(err) {
   if (/don't have admin access/i.test(msg)) return "This email isn't on the admin whitelist.";
   return msg;
 }
-                                                                                                                                                     
+                                                                                                                                               
