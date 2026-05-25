@@ -1,4 +1,4 @@
-// cursive /leads/ — 3-bucket pipeline: New / Follow-ups / Completed
+// cursive /leads/ — 3-bucket pipeline with append-only remarks log
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -12,7 +12,6 @@ const $ = (s) => document.querySelector(s);
 const show = (el) => el && el.classList.remove("hidden");
 const hide = (el) => el && el.classList.add("hidden");
 
-// Sub-tabs for NEW LEADS bucket
 const NEW_SUBS = [
   { id: "lead_captured", title: "Lead captured" },
   { id: "otp_sent",      title: "OTP sent" },
@@ -23,10 +22,9 @@ const NEW_SUBS = [
   { id: "tried_payment", title: "Tried payment" },
 ];
 
-// Sub-tabs for FOLLOW UPS bucket (by talk_status) — high-intent first
 const FOLLOW_SUBS = [
   { id: "not_picked",      title: "Call not picked" },
-  { id: "callback",        title: "Call me later" },     // synthetic — uses manual_status=callback
+  { id: "callback",        title: "Call me later" },
   { id: "interested",      title: "Interested" },
   { id: "in_progress",     title: "In progress" },
   { id: "never_visited",   title: "Said: never visited" },
@@ -46,14 +44,17 @@ const TALK_STATUS_OPTIONS = [
 ];
 
 let pipelineCache = [];
-let activeTop = "new";   // "new" | "follow" | "done"
+let activeTop = "new";
 let activeSub = "lead_captured";
+let remarkFilter = "";      // free-text contains filter
+let expandedRows = new Set(); // customer_keys with expanded remark history
+let remarksByKey = {};       // cache: customer_key -> [ {remark, created_at, created_by} ]
 
 window.addEventListener("DOMContentLoaded", async () => {
   $("#loginForm").addEventListener("submit", onLogin);
   $("#signOutBtn").addEventListener("click", onSignOut);
   $("#refreshBtn").addEventListener("click", () => refreshAll());
-  $("#searchBox").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
+  $("#searchBox").addEventListener("keydown", (e) => { if (e.key === "Enter") refreshAll(); });
 
   document.querySelectorAll(".top-tab").forEach((btn) =>
     btn.addEventListener("click", () => switchTop(btn.dataset.top))
@@ -121,36 +122,15 @@ async function refreshAll() {
   }
 }
 
-async function runSearch() {
-  const q = $("#searchBox").value.trim().toLowerCase();
-  if (!q) return refreshAll();
-  // Client-side filter on the cached pipeline
-  const filtered = pipelineCache.filter(l =>
-    (l.email || "").toLowerCase().includes(q) ||
-    (l.mobile || "").toLowerCase().includes(q) ||
-    (l.service_name || "").toLowerCase().includes(q) ||
-    (l.service_type || "").toLowerCase().includes(q)
-  );
-  $("#paneStage").innerHTML = renderTable(filtered, true, `Search: "${esc(q)}" — ${filtered.length} match(es). Showing across all buckets.`);
-  wireRowHandlers();
-}
-
 // ---------- Bucket logic ----------
 function bucketOf(lead) {
-  // Top precedence: actual paid event
   if (["payment_completed","wallet_recharged","wallet_debited"].includes(lead.latest_event)) return "done";
-  // Manual won
   if (lead.manual_status === "won" || lead.talk_status === "won_offline") return "done";
-  // Triaged (operator has set a talk_status, but not done) -> Follow ups
   if (lead.talk_status && lead.talk_status !== "won_offline") return "follow";
-  // Manual stage moves (callback) without talk_status -> still Follow ups
   if (lead.manual_status === "callback") return "follow";
-  // Otherwise -> new inbox
   return "new";
 }
-
 function newSubOf(lead) {
-  // For leads in the NEW bucket, which stage sub-tab?
   if (lead.manual_status === "callback") return "callback";
   if (lead.manual_status === "clicked_wa") return "click_to_wa";
   if (lead.manual_status === "clicked_call") return "click_to_call";
@@ -159,9 +139,7 @@ function newSubOf(lead) {
   if (lead.latest_event === "otp_sent")          return "otp_sent";
   return "lead_captured";
 }
-
 function followSubOf(lead) {
-  // Talk status takes precedence
   if (lead.talk_status) return lead.talk_status;
   if (lead.manual_status === "callback") return "callback";
   return "in_progress";
@@ -178,10 +156,10 @@ function updateTopCounts() {
 function switchTop(top) {
   activeTop = top;
   document.querySelectorAll(".top-tab").forEach((b) => b.classList.toggle("active", b.dataset.top === top));
-  // pick a default sub-tab for the bucket
   if (top === "new")    activeSub = "lead_captured";
   if (top === "follow") activeSub = "not_picked";
   if (top === "done")   activeSub = "all";
+  expandedRows.clear();
   renderActive();
 }
 
@@ -196,7 +174,6 @@ function renderSubTabs() {
   if (activeTop === "follow") subs = FOLLOW_SUBS;
   if (activeTop === "done")   subs = [{ id: "all", title: "All completed" }];
 
-  // Compute counts within this bucket
   const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
   const counts = {};
   subs.forEach((s) => counts[s.id] = 0);
@@ -208,17 +185,16 @@ function renderSubTabs() {
     if (k in counts) counts[k] += 1;
   });
 
-  $("#subTabs").innerHTML = subs.map((s, i) => `
+  $("#subTabs").innerHTML = subs.map((s) => `
     <button class="sub-tab ${(s.id === activeSub) ? "active" : ""}" data-sub="${esc(s.id)}">
       ${esc(s.title)}<span class="sub-count">${counts[s.id] || 0}</span>
     </button>
   `).join("");
 
   document.querySelectorAll(".sub-tab").forEach((btn) =>
-    btn.addEventListener("click", () => { activeSub = btn.dataset.sub; renderActive(); })
+    btn.addEventListener("click", () => { activeSub = btn.dataset.sub; expandedRows.clear(); renderActive(); })
   );
 
-  // If the active sub doesn't exist for this bucket, pick the first one
   if (!subs.find((s) => s.id === activeSub)) {
     activeSub = subs[0]?.id || "";
     renderSubTabs();
@@ -232,25 +208,79 @@ function renderPane() {
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
   if (activeTop === "done")   rows = inBucket;
 
-  if (!rows.length) {
-    $("#paneStage").innerHTML = `<div class="empty">No leads in this view.</div>`;
-    return;
+  // Apply optional remark filter
+  const qq = (remarkFilter || "").trim().toLowerCase();
+  if (qq) rows = rows.filter((l) => (l.remarks || "").toLowerCase().includes(qq));
+
+  // Search box also filters
+  const searchTerm = ($("#searchBox").value || "").trim().toLowerCase();
+  if (searchTerm) {
+    rows = rows.filter((l) =>
+      (l.email || "").toLowerCase().includes(searchTerm) ||
+      (l.mobile || "").toLowerCase().includes(searchTerm) ||
+      (l.service_name || "").toLowerCase().includes(searchTerm) ||
+      (l.service_type || "").toLowerCase().includes(searchTerm) ||
+      (l.remarks || "").toLowerCase().includes(searchTerm)
+    );
   }
-  $("#paneStage").innerHTML = renderTable(rows, activeTop === "done");
+
+  $("#paneStage").innerHTML = renderToolbar() + (rows.length
+    ? renderTable(rows, activeTop === "done")
+    : `<div class="empty">No leads in this view${qq ? ` matching remark "${esc(qq)}"` : ""}.</div>`);
+
+  wireToolbarHandlers();
   wireRowHandlers();
 }
 
-function renderTable(rows, readOnly, headerNote = "") {
-  return `${headerNote ? `<p style="margin:0 14px 10px;color:#475467;font-size:13px;">${headerNote}</p>` : ""}
-    <div class="table-scroll"><table class="data">
+function renderToolbar() {
+  // Build remark filter dropdown from distinct latest remarks in cache
+  const distinct = new Map(); // text -> count
+  pipelineCache.forEach((l) => {
+    const r = (l.remarks || "").trim();
+    if (r) distinct.set(r, (distinct.get(r) || 0) + 1);
+  });
+  const opts = Array.from(distinct.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 30)
+    .map(([txt, cnt]) => `<option value="${esc(txt)}" ${txt === remarkFilter ? "selected" : ""}>${esc(txt.slice(0, 50))} (${cnt})</option>`)
+    .join("");
+
+  return `<div class="filter-bar">
+    <span class="filter-lbl">Filter by remark:</span>
+    <input id="remarkFilterText" type="text" class="remark-filter-input" placeholder="Type to filter..." value="${esc(remarkFilter)}" />
+    <select id="remarkFilterSelect" class="remark-filter-select">
+      <option value="">All remarks</option>
+      ${opts}
+    </select>
+    ${remarkFilter ? `<button id="remarkFilterClear" class="remark-filter-clear">Clear</button>` : ""}
+  </div>`;
+}
+
+function wireToolbarHandlers() {
+  const txt = $("#remarkFilterText");
+  if (txt) {
+    txt.addEventListener("input", (e) => { remarkFilter = e.target.value; renderPane(); });
+  }
+  const sel = $("#remarkFilterSelect");
+  if (sel) {
+    sel.addEventListener("change", (e) => { remarkFilter = e.target.value; renderPane(); });
+  }
+  const clear = $("#remarkFilterClear");
+  if (clear) {
+    clear.addEventListener("click", () => { remarkFilter = ""; renderPane(); });
+  }
+}
+
+function renderTable(rows, readOnly) {
+  return `<div class="table-scroll"><table class="data">
     <thead><tr>
       <th>Service</th>
       <th>Contact</th>
       <th>Last activity</th>
       <th>Actions</th>
-      <th style="min-width:170px;">Call status</th>
-      <th style="min-width:200px;">Remarks</th>
-      ${readOnly ? "" : "<th>Save</th>"}
+      <th style="min-width:160px;">Call status</th>
+      <th style="min-width:260px;">Remarks (latest + history)</th>
+      ${readOnly ? "" : "<th>Save / Add</th>"}
     </tr></thead>
     <tbody>${rows.map((r) => rowHtml(r, readOnly)).join("")}</tbody>
   </table></div>`;
@@ -268,11 +298,12 @@ function rowHtml(l, readOnly) {
 
   const statusValue = l.talk_status || "";
   const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "—";
-
   const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call">Call</a>` : "";
   const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa">WhatsApp</a>` : "";
 
-  // Completed (read-only) row
+  const remarksCell = renderRemarksCell(l, readOnly);
+
+  // Read-only completed row
   if (readOnly) {
     return `<tr class="done">
       <td>
@@ -289,7 +320,7 @@ function rowHtml(l, readOnly) {
       </td>
       <td><div class="row-actions">${callBtn}${waBtn}</div></td>
       <td><span class="muted-small" style="font-weight:600;color:#0f172a;">${esc(statusLabel)}</span></td>
-      <td><span class="muted-small">${esc(l.remarks || "—")}</span></td>
+      <td>${remarksCell}</td>
     </tr>`;
   }
 
@@ -312,14 +343,64 @@ function rowHtml(l, readOnly) {
     <td>
       <select class="status-select" data-customer-key="${cur}">${statusOpts}</select>
     </td>
+    <td>${remarksCell}</td>
     <td>
-      <textarea class="remarks-input" data-customer-key="${cur}" placeholder="Notes..." rows="1">${esc(l.remarks || "")}</textarea>
-    </td>
-    <td>
-      <button class="row-save-btn" data-action="save" data-customer-key="${cur}">${statusValue ? "Update" : "Save"}</button>
+      <button class="row-save-btn" data-action="save-status" data-customer-key="${cur}">${statusValue ? "Update status" : "Save status"}</button>
       <div class="row-save-error" style="display:none;"></div>
     </td>
   </tr>`;
+}
+
+function renderRemarksCell(l, readOnly) {
+  const cur = esc(l.customer_key || "");
+  const latest = l.remarks || "";
+  const latestAt = l.latest_remark_at || l.manual_updated_at || "";
+  const count = Number(l.remarks_count || 0);
+  const isExpanded = expandedRows.has(l.customer_key);
+  const olderCount = Math.max(0, count - 1);
+
+  let html = "";
+
+  if (latest) {
+    html += `<div class="remark-latest">
+      <div class="remark-text">${esc(latest)}</div>
+      ${latestAt ? `<div class="remark-meta">${esc(fmtDate(latestAt))} ${esc(fmtTime(latestAt))}</div>` : ""}
+    </div>`;
+  } else {
+    html += `<div class="remark-empty muted-small">No remarks yet.</div>`;
+  }
+
+  if (olderCount > 0 && !isExpanded) {
+    html += `<button class="remark-expand" data-action="expand-remarks" data-customer-key="${cur}">+${olderCount} earlier remark${olderCount > 1 ? "s" : ""}</button>`;
+  }
+  if (isExpanded) {
+    const list = remarksByKey[l.customer_key] || [];
+    // skip the first one (already shown as latest)
+    const older = list.slice(1);
+    html += `<div class="remark-history">
+      ${older.map((r) => `<div class="remark-older">
+        <div class="remark-text">${esc(r.remark)}</div>
+        <div class="remark-meta">${esc(fmtDate(r.created_at))} ${esc(fmtTime(r.created_at))}${r.created_by ? ` &middot; ${esc(r.created_by)}` : ""}</div>
+      </div>`).join("")}
+      <button class="remark-collapse" data-action="collapse-remarks" data-customer-key="${cur}">Hide history</button>
+    </div>`;
+  }
+
+  if (!readOnly) {
+    html += `<div class="add-remark-wrap">
+      <button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>
+      <div class="add-remark-form hidden">
+        <textarea class="add-remark-input" placeholder="Type new remark..." rows="2"></textarea>
+        <div class="add-remark-actions">
+          <button class="add-remark-save" data-action="add-remark-save" data-customer-key="${cur}">Save</button>
+          <button class="add-remark-cancel" data-action="add-remark-cancel" data-customer-key="${cur}">Cancel</button>
+        </div>
+        <div class="add-remark-error" style="display:none;"></div>
+      </div>
+    </div>`;
+  }
+
+  return html;
 }
 
 function bucketReason(l) {
@@ -332,39 +413,102 @@ function bucketReason(l) {
 
 function wireRowHandlers() {
   $("#paneStage").addEventListener("click", async (e) => {
-    const btn = e.target.closest('[data-action="save"]');
-    if (!btn) return;
-    const tr = btn.closest("tr");
-    const key = btn.dataset.customerKey;
-    const sel = tr.querySelector("select.status-select");
-    const ta  = tr.querySelector("textarea.remarks-input");
-    const errBox = tr.querySelector(".row-save-error");
-    errBox.style.display = "none";
+    const target = e.target.closest("[data-action]");
+    if (!target) return;
+    const action = target.dataset.action;
+    const key = target.dataset.customerKey;
 
-    const talk_status = sel.value || null;
-    const remarks = ta.value || null;
-    if (!talk_status && !remarks) {
-      errBox.textContent = "Pick a status or type remarks before saving.";
-      errBox.style.display = "block";
+    if (action === "expand-remarks") {
+      // Fetch full remarks list and expand
+      target.disabled = true; target.textContent = "Loading...";
+      try {
+        const list = await callAdmin("lead_remarks", { customer_key: key });
+        remarksByKey[key] = list;
+        expandedRows.add(key);
+        renderPane();
+      } catch (err) {
+        target.disabled = false; target.textContent = "+ Show history (failed)";
+        console.error(err);
+      }
       return;
     }
-
-    btn.disabled = true; btn.textContent = "Saving...";
-    try {
-      await callAdmin("set_lead_status", { customer_key: key, talk_status, remarks });
-      // Update cache
-      const idx = pipelineCache.findIndex((x) => x.customer_key === key);
-      if (idx >= 0) {
-        pipelineCache[idx].talk_status = talk_status;
-        pipelineCache[idx].remarks = remarks;
+    if (action === "collapse-remarks") {
+      expandedRows.delete(key);
+      renderPane();
+      return;
+    }
+    if (action === "show-add-remark") {
+      const wrap = target.closest(".add-remark-wrap");
+      target.style.display = "none";
+      wrap.querySelector(".add-remark-form").classList.remove("hidden");
+      wrap.querySelector(".add-remark-input").focus();
+      return;
+    }
+    if (action === "add-remark-cancel") {
+      const wrap = target.closest(".add-remark-wrap");
+      wrap.querySelector(".add-remark-form").classList.add("hidden");
+      wrap.querySelector(".add-remark-input").value = "";
+      wrap.querySelector(".add-remark-error").style.display = "none";
+      wrap.querySelector(".add-remark-btn").style.display = "";
+      return;
+    }
+    if (action === "add-remark-save") {
+      const wrap = target.closest(".add-remark-wrap");
+      const input = wrap.querySelector(".add-remark-input");
+      const errBox = wrap.querySelector(".add-remark-error");
+      const text = (input.value || "").trim();
+      errBox.style.display = "none";
+      if (!text) {
+        errBox.textContent = "Type something before saving.";
+        errBox.style.display = "block";
+        return;
       }
-      // Re-render -> lead moves to its new bucket / sub-tab automatically
-      updateTopCounts();
-      renderActive();
-    } catch (err) {
-      btn.disabled = false; btn.textContent = "Save";
-      errBox.textContent = "Save failed: " + err.message;
-      errBox.style.display = "block";
+      target.disabled = true; target.textContent = "Saving...";
+      try {
+        const saved = await callAdmin("add_remark", { customer_key: key, remark: text });
+        // Update cache
+        const idx = pipelineCache.findIndex((x) => x.customer_key === key);
+        if (idx >= 0) {
+          pipelineCache[idx].remarks = saved.remark;
+          pipelineCache[idx].latest_remark_at = saved.created_at;
+          pipelineCache[idx].remarks_count = (pipelineCache[idx].remarks_count || 0) + 1;
+        }
+        // Append to remarks cache too
+        if (remarksByKey[key]) {
+          remarksByKey[key].unshift(saved);
+        }
+        renderPane();
+      } catch (err) {
+        target.disabled = false; target.textContent = "Save";
+        errBox.textContent = "Save failed: " + err.message;
+        errBox.style.display = "block";
+      }
+      return;
+    }
+    if (action === "save-status") {
+      const tr = target.closest("tr");
+      const sel = tr.querySelector("select.status-select");
+      const errBox = tr.querySelector(".row-save-error");
+      errBox.style.display = "none";
+      const talk_status = sel.value || null;
+      if (!talk_status) {
+        errBox.textContent = "Pick a status before saving.";
+        errBox.style.display = "block";
+        return;
+      }
+      target.disabled = true; target.textContent = "Saving...";
+      try {
+        await callAdmin("set_lead_status", { customer_key: key, talk_status });
+        const idx = pipelineCache.findIndex((x) => x.customer_key === key);
+        if (idx >= 0) pipelineCache[idx].talk_status = talk_status;
+        updateTopCounts();
+        renderActive();
+      } catch (err) {
+        target.disabled = false; target.textContent = "Save status";
+        errBox.textContent = "Save failed: " + err.message;
+        errBox.style.display = "block";
+      }
+      return;
     }
   });
 }
