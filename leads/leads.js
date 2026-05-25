@@ -46,16 +46,16 @@ const TALK_STATUS_OPTIONS = [
   { value: "won_offline",     label: "Won (paid offline)" },
 ];
 
-// State machine: from each sub-tab, only these statuses are valid next moves.
-// Mirrors status.xlsx uploaded by user. "Not interested" is the terminal state.
+// State machine: from each sub-tab, these are the valid next moves.
+// Mirrors status.xlsx column-wise: row 1 = tab, rows 3+ = allowed next statuses.
 const STATUS_TRANSITIONS = {
-  not_picked:      ["callback", "interested", "in_progress", "lost"],
-  callback:        ["interested", "in_progress", "lost"],
+  not_picked:      ["callback", "interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested"],
+  callback:        ["interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested"],
   interested:      ["in_progress", "lost"],
-  in_progress:     ["lost", "never_visited"],
-  lost:            ["never_visited", "dont_call_again"],
-  never_visited:   ["dont_call_again", "not_interested"],
-  dont_call_again: ["not_interested"],
+  in_progress:     ["lost"],
+  lost:            [],
+  never_visited:   [],
+  dont_call_again: [],
   not_interested:  [],
 };
 // For New-bucket leads (no talk_status yet) — show the 4 entry-point statuses.
@@ -636,4 +636,4 @@ function humanError(err) {
   if (/don't have admin access/i.test(msg)) return "This email isn't on the admin whitelist.";
   return msg;
 }
-                                                                                                                                               
+                                                                                                                                                  
