@@ -146,8 +146,20 @@ function followSubOf(lead) {
 }
 
 function updateTopCounts() {
+  // Follow Ups top-tab count is the sum of ACTIONABLE sub-tabs only
+  // (Call not picked, Call me later, Interested, In progress).
+  // "Dead" buckets (not_interested, dont_call_again, never_visited) stay in
+  // the Follow Ups view but do not inflate the top number.
+  const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress"]);
   const counts = { new: 0, follow: 0, done: 0 };
-  pipelineCache.forEach((l) => { counts[bucketOf(l)] += 1; });
+  pipelineCache.forEach((l) => {
+    const b = bucketOf(l);
+    if (b === "follow") {
+      if (activeFollowSubs.has(followSubOf(l))) counts.follow += 1;
+    } else {
+      counts[b] += 1;
+    }
+  });
   $("#topcnt_new").textContent    = counts.new;
   $("#topcnt_follow").textContent = counts.follow;
   $("#topcnt_done").textContent   = counts.done;
