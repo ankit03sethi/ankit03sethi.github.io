@@ -1,4 +1,4 @@
-// cursive /leads/ - 8-stage tabbed lead pipeline (Save button per row, lock on save)
+// cursive /leads/ — 3-bucket pipeline: New / Follow-ups / Completed
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -12,19 +12,30 @@ const $ = (s) => document.querySelector(s);
 const show = (el) => el && el.classList.remove("hidden");
 const hide = (el) => el && el.classList.add("hidden");
 
-const STAGES = [
-  { id: "lead_captured",    title: "Lead captured" },
-  { id: "otp_sent",         title: "OTP sent" },
-  { id: "otp_verified",     title: "OTP verified" },
-  { id: "callback",         title: "Callback" },
-  { id: "click_to_call",    title: "Click to Call" },
-  { id: "click_to_wa",      title: "Click to WhatsApp" },
-  { id: "tried_payment",    title: "Tried payment" },
-  { id: "payment_complete", title: "Payment complete" },
+// Sub-tabs for NEW LEADS bucket
+const NEW_SUBS = [
+  { id: "lead_captured", title: "Lead captured" },
+  { id: "otp_sent",      title: "OTP sent" },
+  { id: "otp_verified",  title: "OTP verified" },
+  { id: "callback",      title: "Callback" },
+  { id: "click_to_call", title: "Click to Call" },
+  { id: "click_to_wa",   title: "Click to WhatsApp" },
+  { id: "tried_payment", title: "Tried payment" },
+];
+
+// Sub-tabs for FOLLOW UPS bucket (by talk_status)
+const FOLLOW_SUBS = [
+  { id: "not_picked",      title: "Call not picked" },
+  { id: "in_progress",     title: "In progress" },
+  { id: "interested",      title: "Interested" },
+  { id: "callback",        title: "Callback later" },   // synthetic — uses manual_status=callback
+  { id: "never_visited",   title: "Said: never visited" },
+  { id: "dont_call_again", title: "Said: don't call" },
+  { id: "not_interested",  title: "Not interested" },
 ];
 
 const TALK_STATUS_OPTIONS = [
-  { value: "",                label: "-- select --" },
+  { value: "",                label: "— select —" },
   { value: "not_picked",      label: "Call not picked" },
   { value: "never_visited",   label: "Said: never visited site" },
   { value: "dont_call_again", label: "Said: don't call again" },
@@ -35,8 +46,8 @@ const TALK_STATUS_OPTIONS = [
 ];
 
 let pipelineCache = [];
-let activeStage = "lead_captured";
-let activeOtherTab = null;
+let activeTop = "new";   // "new" | "follow" | "done"
+let activeSub = "lead_captured";
 
 window.addEventListener("DOMContentLoaded", async () => {
   $("#loginForm").addEventListener("submit", onLogin);
@@ -44,18 +55,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("#refreshBtn").addEventListener("click", () => refreshAll());
   $("#searchBox").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
 
-  // Build stage tabs: count on top, title below
-  $("#stageTabs").innerHTML = STAGES.map((s, i) =>
-    `<button class="tab ${i === 0 ? "active" : ""}" data-stage="${s.id}">
-      <span class="big-count" id="cnt_${s.id}">0</span>
-      <span class="stage-title">${s.title}</span>
-    </button>`
-  ).join("");
-  document.querySelectorAll(".stage-tabs .tab").forEach((btn) =>
-    btn.addEventListener("click", () => switchStage(btn.dataset.stage))
-  );
-  document.querySelectorAll(".other-tabs .tab").forEach((btn) =>
-    btn.addEventListener("click", () => switchOther(btn.dataset.tab))
+  document.querySelectorAll(".top-tab").forEach((btn) =>
+    btn.addEventListener("click", () => switchTop(btn.dataset.top))
   );
 
   const { data: { session } } = await sb.auth.getSession();
@@ -92,30 +93,6 @@ async function bootDashboard() {
   await refreshAll();
 }
 
-async function refreshAll() {
-  await refreshPipeline();
-  if (activeOtherTab) refreshOther(activeOtherTab);
-}
-
-function switchStage(stage) {
-  activeStage = stage;
-  activeOtherTab = null;
-  document.querySelectorAll(".stage-tabs .tab").forEach((b) => b.classList.toggle("active", b.dataset.stage === stage));
-  document.querySelectorAll(".other-tabs .tab").forEach((b) => b.classList.remove("active"));
-  ["Stage","Pending","Invoices","Wallets","Search"].forEach(n => hide(document.getElementById("pane" + n)));
-  show($("#paneStage"));
-  renderStage();
-}
-function switchOther(tab) {
-  activeOtherTab = tab;
-  document.querySelectorAll(".other-tabs .tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  document.querySelectorAll(".stage-tabs .tab").forEach((b) => b.classList.remove("active"));
-  ["Stage","Pending","Invoices","Wallets","Search"].forEach(n => hide(document.getElementById("pane" + n)));
-  show(document.getElementById("pane" + cap(tab)));
-  refreshOther(tab);
-}
-function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
 async function callAdmin(kind, extra = {}) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) throw new Error("Not signed in.");
@@ -133,74 +110,153 @@ async function callAdmin(kind, extra = {}) {
   return json.data;
 }
 
-async function refreshPipeline() {
+async function refreshAll() {
   try {
     pipelineCache = await callAdmin("pipeline");
-    updateStageCounts();
     $("#lastRefreshed").textContent = "Last refreshed " + new Date().toLocaleTimeString();
-    if (!activeOtherTab) renderStage();
+    updateTopCounts();
+    renderActive();
   } catch (e) {
     $("#paneStage").innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`;
   }
 }
 
-async function refreshOther(tab) {
-  try {
-    if (tab === "pending")  { const d = await callAdmin("pending_payments");   renderPending(d);  $("#badgePending").textContent = d.length; }
-    if (tab === "invoices") { const d = await callAdmin("invoices",{limit:100}); renderInvoices(d); }
-    if (tab === "wallets")  { const d = await callAdmin("wallets");             renderWallets(d); }
-  } catch (e) {
-    const pane = document.getElementById("pane" + cap(tab));
-    if (pane) pane.innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`;
+async function runSearch() {
+  const q = $("#searchBox").value.trim().toLowerCase();
+  if (!q) return refreshAll();
+  // Client-side filter on the cached pipeline
+  const filtered = pipelineCache.filter(l =>
+    (l.email || "").toLowerCase().includes(q) ||
+    (l.mobile || "").toLowerCase().includes(q) ||
+    (l.service_name || "").toLowerCase().includes(q) ||
+    (l.service_type || "").toLowerCase().includes(q)
+  );
+  $("#paneStage").innerHTML = renderTable(filtered, true, `Search: "${esc(q)}" — ${filtered.length} match(es). Showing across all buckets.`);
+  wireRowHandlers();
+}
+
+// ---------- Bucket logic ----------
+function bucketOf(lead) {
+  // Top precedence: actual paid event
+  if (["payment_completed","wallet_recharged","wallet_debited"].includes(lead.latest_event)) return "done";
+  // Manual won
+  if (lead.manual_status === "won" || lead.talk_status === "won_offline") return "done";
+  // Triaged (operator has set a talk_status, but not done) -> Follow ups
+  if (lead.talk_status && lead.talk_status !== "won_offline") return "follow";
+  // Manual stage moves (callback) without talk_status -> still Follow ups
+  if (lead.manual_status === "callback") return "follow";
+  // Otherwise -> new inbox
+  return "new";
+}
+
+function newSubOf(lead) {
+  // For leads in the NEW bucket, which stage sub-tab?
+  if (lead.manual_status === "callback") return "callback";
+  if (lead.manual_status === "clicked_wa") return "click_to_wa";
+  if (lead.manual_status === "clicked_call") return "click_to_call";
+  if (lead.latest_event === "payment_initiated") return "tried_payment";
+  if (lead.latest_event === "otp_verified")      return "otp_verified";
+  if (lead.latest_event === "otp_sent")          return "otp_sent";
+  return "lead_captured";
+}
+
+function followSubOf(lead) {
+  // Talk status takes precedence
+  if (lead.talk_status) return lead.talk_status;
+  if (lead.manual_status === "callback") return "callback";
+  return "in_progress";
+}
+
+function updateTopCounts() {
+  const counts = { new: 0, follow: 0, done: 0 };
+  pipelineCache.forEach((l) => { counts[bucketOf(l)] += 1; });
+  $("#topcnt_new").textContent    = counts.new;
+  $("#topcnt_follow").textContent = counts.follow;
+  $("#topcnt_done").textContent   = counts.done;
+}
+
+function switchTop(top) {
+  activeTop = top;
+  document.querySelectorAll(".top-tab").forEach((b) => b.classList.toggle("active", b.dataset.top === top));
+  // pick a default sub-tab for the bucket
+  if (top === "new")    activeSub = "lead_captured";
+  if (top === "follow") activeSub = "not_picked";
+  if (top === "done")   activeSub = "all";
+  renderActive();
+}
+
+function renderActive() {
+  renderSubTabs();
+  renderPane();
+}
+
+function renderSubTabs() {
+  let subs = [];
+  if (activeTop === "new")    subs = NEW_SUBS;
+  if (activeTop === "follow") subs = FOLLOW_SUBS;
+  if (activeTop === "done")   subs = [{ id: "all", title: "All completed" }];
+
+  // Compute counts within this bucket
+  const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
+  const counts = {};
+  subs.forEach((s) => counts[s.id] = 0);
+  inBucket.forEach((l) => {
+    let k;
+    if (activeTop === "new")    k = newSubOf(l);
+    if (activeTop === "follow") k = followSubOf(l);
+    if (activeTop === "done")   k = "all";
+    if (k in counts) counts[k] += 1;
+  });
+
+  $("#subTabs").innerHTML = subs.map((s, i) => `
+    <button class="sub-tab ${(s.id === activeSub) ? "active" : ""}" data-sub="${esc(s.id)}">
+      ${esc(s.title)}<span class="sub-count">${counts[s.id] || 0}</span>
+    </button>
+  `).join("");
+
+  document.querySelectorAll(".sub-tab").forEach((btn) =>
+    btn.addEventListener("click", () => { activeSub = btn.dataset.sub; renderActive(); })
+  );
+
+  // If the active sub doesn't exist for this bucket, pick the first one
+  if (!subs.find((s) => s.id === activeSub)) {
+    activeSub = subs[0]?.id || "";
+    renderSubTabs();
   }
 }
 
-async function runSearch() {
-  const q = $("#searchBox").value.trim();
-  if (!q) return;
-  document.querySelector('.tab[data-tab="search"]').classList.remove("hidden");
-  switchOther("search");
-  $("#paneSearch").innerHTML = `<div class="empty">Searching...</div>`;
-  try { renderSearch(await callAdmin("search", { query: q })); }
-  catch (e) { $("#paneSearch").innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`; }
-}
+function renderPane() {
+  const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
+  let rows;
+  if (activeTop === "new")    rows = inBucket.filter((l) => newSubOf(l) === activeSub);
+  if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
+  if (activeTop === "done")   rows = inBucket;
 
-function updateStageCounts() {
-  const counts = {};
-  STAGES.forEach(s => counts[s.id] = 0);
-  pipelineCache.forEach(l => { counts[l.stage] = (counts[l.stage] || 0) + 1; });
-  STAGES.forEach(s => {
-    const el = document.getElementById("cnt_" + s.id);
-    if (el) el.textContent = counts[s.id] || 0;
-  });
-}
-
-function renderStage() {
-  const rows = pipelineCache.filter(l => l.stage === activeStage);
   if (!rows.length) {
-    $("#paneStage").innerHTML = `<div class="empty">No leads in this stage.</div>`;
+    $("#paneStage").innerHTML = `<div class="empty">No leads in this view.</div>`;
     return;
   }
-  $("#paneStage").innerHTML = `<div class="table-scroll"><table class="data">
+  $("#paneStage").innerHTML = renderTable(rows, activeTop === "done");
+  wireRowHandlers();
+}
+
+function renderTable(rows, readOnly, headerNote = "") {
+  return `${headerNote ? `<p style="margin:0 14px 10px;color:#475467;font-size:13px;">${headerNote}</p>` : ""}
+    <div class="table-scroll"><table class="data">
     <thead><tr>
       <th>Service</th>
       <th>Contact</th>
       <th>Last activity</th>
-      <th>Amount</th>
       <th>Actions</th>
       <th style="min-width:170px;">Call status</th>
       <th style="min-width:200px;">Remarks</th>
-      <th>Save</th>
+      ${readOnly ? "" : "<th>Save</th>"}
     </tr></thead>
-    <tbody>${rows.map(rowHtml).join("")}</tbody>
-  </table></div>
-  <p style="margin:10px 14px;color:#94a3b8;font-size:11px;">Click Save to lock the row. Once saved, status and remarks cannot be edited again.</p>`;
-
-  $("#paneStage").addEventListener("click", onPaneClick);
+    <tbody>${rows.map((r) => rowHtml(r, readOnly)).join("")}</tbody>
+  </table></div>`;
 }
 
-function rowHtml(l) {
-  const isLocked = !!l.talk_status; // server-side talk_status set = row is locked
+function rowHtml(l, readOnly) {
   const phone = (l.mobile || "").replace(/\D/g, "");
   const waPhone = phone.length === 10 ? "91" + phone : phone;
   const waText = encodeURIComponent(`Hi! This is cursive. I see you started ${l.service_name || l.service_type || ""} - quick chat?`);
@@ -211,15 +267,17 @@ function rowHtml(l) {
               : Math.round(ageHrs / 24) + "d";
 
   const statusValue = l.talk_status || "";
-  const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "-";
+  const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "—";
 
-  // ---------- LOCKED row: no clickable elements at all ----------
-  if (isLocked) {
-    return `<tr class="${l.is_stale ? "stale" : ""} locked" data-customer-key="${cur}">
+  const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call">Call</a>` : "";
+  const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa">WhatsApp</a>` : "";
+
+  // Completed (read-only) row
+  if (readOnly) {
+    return `<tr class="done">
       <td>
-        <div style="font-weight:600;">${esc(l.service_name || l.service_type || "-")}</div>
-        ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
-        <span class="locked-tag">saved</span>
+        <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
+        <span class="done-tag">${esc(bucketReason(l))}</span>
       </td>
       <td>
         ${l.email ? `<div>${esc(l.email)}</div>` : ""}
@@ -229,22 +287,17 @@ function rowHtml(l) {
         <div>${esc(ageStr)} ago</div>
         <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
       </td>
-      <td class="money">${l.amount ? inr(l.amount) : "-"}</td>
-      <td><span class="muted-small">-</span></td>
-      <td><span class="muted-small" style="font-weight:600;color:#475467;">${esc(statusLabel)}</span></td>
-      <td><span class="muted-small">${esc(l.remarks || "-")}</span></td>
-      <td><button class="row-save-btn saved" disabled>Saved</button></td>
+      <td><div class="row-actions">${callBtn}${waBtn}</div></td>
+      <td><span class="muted-small" style="font-weight:600;color:#0f172a;">${esc(statusLabel)}</span></td>
+      <td><span class="muted-small">${esc(l.remarks || "—")}</span></td>
     </tr>`;
   }
 
-  // ---------- EDITABLE row ----------
-  const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call" data-customer-key="${cur}">Call</a>` : "";
-  const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa" data-customer-key="${cur}">WhatsApp</a>` : "";
-  const statusOpts = TALK_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === statusValue ? "selected" : ""}>${esc(o.label)}</option>`).join("");
-
+  // Editable row
+  const statusOpts = TALK_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${o.value === statusValue ? "selected" : ""}>${esc(o.label)}</option>`).join("");
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
-      <div style="font-weight:600;">${esc(l.service_name || l.service_type || "-")}</div>
+      <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
     </td>
     <td>
@@ -255,129 +308,69 @@ function rowHtml(l) {
       <div>${esc(ageStr)} ago</div>
       <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
     </td>
-    <td class="money">${l.amount ? inr(l.amount) : "-"}</td>
     <td><div class="row-actions">${callBtn}${waBtn}</div></td>
     <td>
-      <select class="status-select" data-field="talk_status" data-customer-key="${cur}">${statusOpts}</select>
+      <select class="status-select" data-customer-key="${cur}">${statusOpts}</select>
     </td>
     <td>
-      <textarea class="remarks-input" data-field="remarks" data-customer-key="${cur}" placeholder="Notes..." rows="1">${esc(l.remarks || "")}</textarea>
+      <textarea class="remarks-input" data-customer-key="${cur}" placeholder="Notes..." rows="1">${esc(l.remarks || "")}</textarea>
     </td>
     <td>
-      <button class="row-save-btn" data-action="save" data-customer-key="${cur}">Save</button>
+      <button class="row-save-btn" data-action="save" data-customer-key="${cur}">${statusValue ? "Update" : "Save"}</button>
       <div class="row-save-error" style="display:none;"></div>
     </td>
   </tr>`;
 }
 
-function onPaneClick(e) {
-  const a = e.target.closest("[data-action]");
-  if (!a) return;
-  const action = a.dataset.action;
-  const key = a.dataset.customerKey;
-  if (action === "call" || action === "wa") {
-    // Admin clicking Call / WhatsApp only opens the link (native href).
-    // It does NOT change the lead's pipeline stage — those stages reflect
-    // customer behaviour, not operator actions.
-    return;
-  } else if (action === "save") {
-    onSaveRow(a, key);
-  }
+function bucketReason(l) {
+  if (l.talk_status === "won_offline") return "won (offline)";
+  if (l.manual_status === "won") return "won";
+  if (l.latest_event === "payment_completed") return "paid via Razorpay";
+  if (l.latest_event === "wallet_recharged") return "wallet recharged";
+  return "completed";
 }
 
-async function onSaveRow(btn, key) {
-  const tr = btn.closest("tr");
-  const sel = tr.querySelector("select.status-select");
-  const ta  = tr.querySelector("textarea.remarks-input");
-  const errBox = tr.querySelector(".row-save-error");
-  errBox.style.display = "none";
+function wireRowHandlers() {
+  $("#paneStage").addEventListener("click", async (e) => {
+    const btn = e.target.closest('[data-action="save"]');
+    if (!btn) return;
+    const tr = btn.closest("tr");
+    const key = btn.dataset.customerKey;
+    const sel = tr.querySelector("select.status-select");
+    const ta  = tr.querySelector("textarea.remarks-input");
+    const errBox = tr.querySelector(".row-save-error");
+    errBox.style.display = "none";
 
-  const talk_status = sel.value || null;
-  const remarks = ta.value || null;
-
-  if (!talk_status && !remarks) {
-    errBox.textContent = "Pick a status or type remarks before saving.";
-    errBox.style.display = "block";
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = "Saving...";
-  try {
-    await callAdmin("set_lead_status", { customer_key: key, talk_status, remarks });
-    // Update cache
-    const idx = pipelineCache.findIndex(x => x.customer_key === key);
-    if (idx >= 0) {
-      pipelineCache[idx].talk_status = talk_status;
-      pipelineCache[idx].remarks = remarks;
+    const talk_status = sel.value || null;
+    const remarks = ta.value || null;
+    if (!talk_status && !remarks) {
+      errBox.textContent = "Pick a status or type remarks before saving.";
+      errBox.style.display = "block";
+      return;
     }
-    // Re-render the stage so the saved row becomes fully non-interactive
-    // (Call/WhatsApp buttons removed, status + remarks become plain text).
-    renderStage();
-  } catch (err) {
-    btn.disabled = false;
-    btn.textContent = "Save";
-    errBox.textContent = "Save failed: " + err.message;
-    errBox.style.display = "block";
-  }
+
+    btn.disabled = true; btn.textContent = "Saving...";
+    try {
+      await callAdmin("set_lead_status", { customer_key: key, talk_status, remarks });
+      // Update cache
+      const idx = pipelineCache.findIndex((x) => x.customer_key === key);
+      if (idx >= 0) {
+        pipelineCache[idx].talk_status = talk_status;
+        pipelineCache[idx].remarks = remarks;
+      }
+      // Re-render -> lead moves to its new bucket / sub-tab automatically
+      updateTopCounts();
+      renderActive();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = "Save";
+      errBox.textContent = "Save failed: " + err.message;
+      errBox.style.display = "block";
+    }
+  });
 }
 
-function renderPending(rows) {
-  if (!rows.length) return ($("#panePending").innerHTML = `<div class="empty">No pending payments.</div>`);
-  $("#panePending").innerHTML = `<div class="table-scroll"><table class="data">
-    <thead><tr><th>Started</th><th>Type</th><th>Customer</th><th>Description</th><th>Amount</th><th>Razorpay order</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td><div>${fmtDate(r.created_at)}</div><div class="muted-small">${fmtTime(r.created_at)}</div></td>
-      <td>${esc(r.type)}</td>
-      <td>${r.email ? `<div>${esc(r.email)}</div>` : ""}${r.mobile ? `<div class="muted-small">${esc(r.mobile)}</div>` : ""}</td>
-      <td>${esc(r.description || "-")}</td>
-      <td class="money">${inr(r.amount)}</td>
-      <td><span class="mono">${esc(r.razorpay_order_id || "-")}</span></td>
-    </tr>`).join("")}</tbody></table></div>`;
-}
-function renderInvoices(rows) {
-  if (!rows.length) return ($("#paneInvoices").innerHTML = `<div class="empty">No invoices yet.</div>`);
-  $("#paneInvoices").innerHTML = `<div class="table-scroll"><table class="data">
-    <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>GST</th><th>Subtotal</th><th>Tax</th><th>Total</th><th>Emailed</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td>${fmtDate(r.created_at)}</td>
-      <td><span class="mono">${esc(r.invoice_number)}</span></td>
-      <td>${esc(r.email || "-")}</td>
-      <td>${r.customer_gst_name ? esc(r.customer_gst_name) : "<span class='muted-small'>-</span>"}</td>
-      <td class="money">${inr(r.subtotal)}</td>
-      <td class="money">${inr(Number(r.cgst) + Number(r.sgst) + Number(r.igst))}</td>
-      <td class="money green">${inr(r.total)}</td>
-      <td>${r.emailed_at ? "<span style='color:#047857;'>Yes</span>" : "<span class='muted-small'>-</span>"}</td>
-    </tr>`).join("")}</tbody></table></div>`;
-}
-function renderWallets(rows) {
-  if (!rows.length) return ($("#paneWallets").innerHTML = `<div class="empty">No wallet activity yet.</div>`);
-  $("#paneWallets").innerHTML = `<div class="table-scroll"><table class="data">
-    <thead><tr><th>Email</th><th>Mobile</th><th>Balance</th><th>Updated</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td>${esc(r.email)}</td>
-      <td>${esc(r.mobile || "-")}</td>
-      <td class="money ${Number(r.balance) > 0 ? "green" : ""}">${inr(r.balance)}</td>
-      <td>${fmtDate(r.updated_at)} <span class="muted-small">${fmtTime(r.updated_at)}</span></td>
-    </tr>`).join("")}</tbody></table></div>`;
-}
-function renderSearch(d) {
-  if (!d.leads.length && !d.invoices.length && !d.wallets.length && !d.completed.length) {
-    $("#paneSearch").innerHTML = `<div class="empty">No results for "<strong>${esc(d.query)}</strong>".</div>`;
-    return;
-  }
-  const sec = (title, rows, html) => rows.length ? `<h3 style="margin:18px 14px 8px;font-size:13px;color:#64748b;">${title} (${rows.length})</h3>${html(rows)}` : "";
-  $("#paneSearch").innerHTML = `
-    ${sec("Leads", d.leads, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.last_event_at)}</td><td>${esc(r.service_name || "")}</td><td>${esc(r.email || "")}</td><td>${esc(r.mobile || "")}</td><td class="money">${r.amount ? inr(r.amount) : ""}</td></tr>`).join("")}</tbody></table></div>`)}
-    ${sec("Completed payments", d.completed, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.completed_at)}</td><td>${esc(r.email || "")}</td><td>${esc(r.service_name || "")}</td><td class="money green">${inr(r.amount)}</td><td class="mono">${esc(r.invoice_number || "")}</td></tr>`).join("")}</tbody></table></div>`)}
-    ${sec("Invoices", d.invoices, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td class="mono">${esc(r.invoice_number)}</td><td>${esc(r.email || "")}</td><td class="money green">${inr(r.total)}</td></tr>`).join("")}</tbody></table></div>`)}
-    ${sec("Wallets", d.wallets, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${esc(r.email)}</td><td>${esc(r.mobile || "")}</td><td class="money ${Number(r.balance) > 0 ? "green" : ""}">${inr(r.balance)}</td></tr>`).join("")}</tbody></table></div>`)}
-  `;
-}
-
-function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function inr(n) { return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(Number(n || 0)); }
-function fmtDate(iso) { if (!iso) return "-"; return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtDate(iso) { if (!iso) return "—"; return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }); }
 function fmtTime(iso) { if (!iso) return ""; return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
 function humanError(err) {
   const msg = (err && err.message) || String(err);
