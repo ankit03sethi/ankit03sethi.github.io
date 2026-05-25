@@ -23,12 +23,12 @@ const NEW_SUBS = [
   { id: "tried_payment", title: "Tried payment" },
 ];
 
-// Sub-tabs for FOLLOW UPS bucket (by talk_status)
+// Sub-tabs for FOLLOW UPS bucket (by talk_status) — high-intent first
 const FOLLOW_SUBS = [
   { id: "not_picked",      title: "Call not picked" },
-  { id: "in_progress",     title: "In progress" },
+  { id: "callback",        title: "Call me later" },     // synthetic — uses manual_status=callback
   { id: "interested",      title: "Interested" },
-  { id: "callback",        title: "Callback later" },   // synthetic — uses manual_status=callback
+  { id: "in_progress",     title: "In progress" },
   { id: "never_visited",   title: "Said: never visited" },
   { id: "dont_call_again", title: "Said: don't call" },
   { id: "not_interested",  title: "Not interested" },
