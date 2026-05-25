@@ -1,4 +1,4 @@
-// cursive /admin/ - operator dashboard + pipeline
+// cursive /admin/ — 8-stage tabbed pipeline with status dropdown + remarks
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -13,25 +13,48 @@ const show = (el) => el && el.classList.remove("hidden");
 const hide = (el) => el && el.classList.add("hidden");
 
 const STAGES = [
-  { id: "pay_started", title: "Payment started", emoji: "🔥", hint: "Recover now" },
-  { id: "verified",    title: "Verified — call", emoji: "🟢", hint: "Hot lead" },
-  { id: "otp_sent",    title: "OTP sent",        emoji: "🟡", hint: "Awaiting verify" },
-  { id: "new",         title: "New lead",        emoji: "🔵", hint: "Just typed details" },
-  { id: "callback",    title: "Callback later",  emoji: "📅", hint: "Scheduled by you" },
-  { id: "paid",        title: "Paid",            emoji: "✅", hint: "Customer" },
-  { id: "lost",        title: "Lost",            emoji: "❌", hint: "Not interested / cold" },
+  { id: "lead_captured",    title: "Lead captured" },
+  { id: "otp_sent",         title: "OTP sent" },
+  { id: "otp_verified",     title: "OTP verified" },
+  { id: "callback",         title: "Callback requested" },
+  { id: "click_to_call",    title: "Click to Call" },
+  { id: "click_to_wa",      title: "Click to WhatsApp" },
+  { id: "tried_payment",    title: "Tried payment" },
+  { id: "payment_complete", title: "Payment complete" },
 ];
 
-let lastFetchByTab = {};
+const TALK_STATUS_OPTIONS = [
+  { value: "",                  label: "— select —",                cls: "" },
+  { value: "not_picked",        label: "Call not picked",           cls: "warn" },
+  { value: "never_visited",     label: "Said: never visited site",  cls: "bad" },
+  { value: "dont_call_again",   label: "Said: don't call again",    cls: "bad" },
+  { value: "in_progress",       label: "In progress",               cls: "set" },
+  { value: "interested",        label: "Interested",                cls: "set" },
+  { value: "not_interested",    label: "Not interested",            cls: "bad" },
+  { value: "won_offline",       label: "Won (paid offline)",        cls: "good" },
+];
+
 let pipelineCache = [];
-let hideStaleByDefault = false;
+let activeStage = "lead_captured";
+let activeOtherTab = null;
+let saveTimers = new Map();
 
 window.addEventListener("DOMContentLoaded", async () => {
   $("#loginForm").addEventListener("submit", onLogin);
   $("#signOutBtn").addEventListener("click", onSignOut);
-  $("#refreshBtn").addEventListener("click", () => refreshActiveTab(true));
+  $("#refreshBtn").addEventListener("click", () => refreshAll());
   $("#searchBox").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
-  document.querySelectorAll(".tab").forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+
+  // Build stage tabs
+  $("#stageTabs").innerHTML = STAGES.map((s, i) =>
+    `<button class="tab ${i === 0 ? "active" : ""}" data-stage="${s.id}">${s.title} <span class="badge" id="cnt_${s.id}">0</span></button>`
+  ).join("");
+  document.querySelectorAll(".stage-tabs .tab").forEach((btn) =>
+    btn.addEventListener("click", () => switchStage(btn.dataset.stage))
+  );
+  document.querySelectorAll(".other-tabs .tab").forEach((btn) =>
+    btn.addEventListener("click", () => switchOther(btn.dataset.tab))
+  );
 
   const { data: { session } } = await sb.auth.getSession();
   if (session) bootDashboard();
@@ -64,24 +87,32 @@ async function bootDashboard() {
   const { data: { user } } = await sb.auth.getUser();
   $("#emailChip").textContent = user?.email || "";
   show($("#emailChip")); show($("#signOutBtn"));
-  await Promise.all([ refreshSummary(), refreshTab("pipeline") ]);
+  await refreshAll();
 }
 
-function switchTab(tab) {
-  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["pipeline","leads","pending","completed","invoices","wallets","search"].forEach((t) => {
-    const el = document.getElementById("pane" + cap(t));
-    if (el) (t === tab ? show : hide)(el);
-  });
-  if (!lastFetchByTab[tab]) refreshTab(tab);
+async function refreshAll() {
+  await Promise.all([refreshSummary(), refreshPipeline()]);
+  if (activeOtherTab) refreshOther(activeOtherTab);
+}
+
+function switchStage(stage) {
+  activeStage = stage;
+  activeOtherTab = null;
+  document.querySelectorAll(".stage-tabs .tab").forEach((b) => b.classList.toggle("active", b.dataset.stage === stage));
+  document.querySelectorAll(".other-tabs .tab").forEach((b) => b.classList.remove("active"));
+  ["Stage","Pending","Invoices","Wallets","Search"].forEach(n => hide(document.getElementById("pane" + n)));
+  show($("#paneStage"));
+  renderStage();
+}
+function switchOther(tab) {
+  activeOtherTab = tab;
+  document.querySelectorAll(".other-tabs .tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".stage-tabs .tab").forEach((b) => b.classList.remove("active"));
+  ["Stage","Pending","Invoices","Wallets","Search"].forEach(n => hide(document.getElementById("pane" + n)));
+  show(document.getElementById("pane" + cap(tab)));
+  refreshOther(tab);
 }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-function refreshActiveTab(force) {
-  const tab = document.querySelector(".tab.active")?.dataset.tab || "pipeline";
-  if (force) lastFetchByTab[tab] = null;
-  refreshSummary();
-  refreshTab(tab);
-}
 
 async function callAdmin(kind, extra = {}) {
   const { data: { session } } = await sb.auth.getSession();
@@ -110,14 +141,21 @@ async function refreshSummary() {
   }
 }
 
-async function refreshTab(tab) {
+async function refreshPipeline() {
   try {
-    if (tab === "pipeline")    { pipelineCache = await callAdmin("pipeline"); lastFetchByTab.pipeline = pipelineCache; renderPipeline(); }
-    if (tab === "leads")       { const d = await callAdmin("leads", { limit: 100 });             lastFetchByTab.leads = d;    renderLeads(d); }
-    if (tab === "pending")     { const d = await callAdmin("pending_payments");                   lastFetchByTab.pending = d;  renderPending(d); $("#badgePending").textContent = d.length; }
-    if (tab === "completed")   { const d = await callAdmin("completed_payments", { limit: 100 }); lastFetchByTab.completed = d;renderCompleted(d); }
-    if (tab === "invoices")    { const d = await callAdmin("invoices",  { limit: 100 });          lastFetchByTab.invoices = d; renderInvoices(d); }
-    if (tab === "wallets")     { const d = await callAdmin("wallets");                             lastFetchByTab.wallets = d;  renderWallets(d); }
+    pipelineCache = await callAdmin("pipeline");
+    updateStageCounts();
+    if (!activeOtherTab) renderStage();
+  } catch (e) {
+    $("#paneStage").innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`;
+  }
+}
+
+async function refreshOther(tab) {
+  try {
+    if (tab === "pending")  { const d = await callAdmin("pending_payments");   renderPending(d);  $("#badgePending").textContent = d.length; }
+    if (tab === "invoices") { const d = await callAdmin("invoices",{limit:100}); renderInvoices(d); }
+    if (tab === "wallets")  { const d = await callAdmin("wallets");             renderWallets(d); }
   } catch (e) {
     const pane = document.getElementById("pane" + cap(tab));
     if (pane) pane.innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`;
@@ -128,7 +166,7 @@ async function runSearch() {
   const q = $("#searchBox").value.trim();
   if (!q) return;
   document.querySelector('.tab[data-tab="search"]').classList.remove("hidden");
-  switchTab("search");
+  switchOther("search");
   $("#paneSearch").innerHTML = `<div class="empty">Searching…</div>`;
   try { renderSearch(await callAdmin("search", { query: q })); }
   catch (e) { $("#paneSearch").innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`; }
@@ -145,127 +183,154 @@ function renderSummary(s) {
   `;
 }
 
-function renderPipeline() {
-  const filtered = hideStaleByDefault ? pipelineCache.filter(l => !l.is_stale) : pipelineCache;
-  const grouped = {};
-  STAGES.forEach(s => grouped[s.id] = []);
-  filtered.forEach(l => {
-    const s = l.stage || "new";
-    if (!grouped[s]) grouped[s] = [];
-    grouped[s].push(l);
-  });
-
-  const toolbar = `<div class="pipeline-toolbar">
-    <label><input type="checkbox" id="hideStaleChk" ${hideStaleByDefault ? "checked" : ""}> Hide stale (no activity in 3+ days)</label>
-    <span style="color:#94a3b8;">${filtered.length} of ${pipelineCache.length} leads shown</span>
-  </div>`;
-
-  const cols = STAGES.map(stage => {
-    const cards = grouped[stage.id] || [];
-    return `
-      <div class="kanban-col" data-stage="${stage.id}">
-        <div class="kanban-col-head">
-          <span class="title">${stage.emoji} ${esc(stage.title)}</span>
-          <span class="count">${cards.length}</span>
-        </div>
-        <div class="kanban-cards">
-          ${cards.length === 0 ? `<div class="card-empty">${esc(stage.hint)}</div>` : cards.map(renderCard).join("")}
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  $("#panePipeline").innerHTML = toolbar + `<div class="kanban">${cols}</div>`;
-
-  $("#hideStaleChk").addEventListener("change", (e) => {
-    hideStaleByDefault = e.target.checked;
-    renderPipeline();
-  });
-
-  $("#panePipeline").addEventListener("click", async (e) => {
-    const btn = e.target.closest("[data-set-status]");
-    if (!btn) return;
-    e.preventDefault();
-    const key = btn.dataset.customerKey;
-    const status = btn.dataset.setStatus === "clear" ? null : btn.dataset.setStatus;
-    btn.disabled = true; btn.textContent = "…";
-    try {
-      await callAdmin("set_lead_status", { customer_key: key, manual_status: status });
-      pipelineCache = pipelineCache.map(l => {
-        if (l.customer_key !== key) return l;
-        const newStage = status === "won" ? "paid" : status === "callback" ? "callback" : status === "not_interested" ? "lost" : computeAutoStage(l);
-        return { ...l, manual_status: status, stage: newStage };
-      });
-      renderPipeline();
-    } catch (err) {
-      alert("Could not update: " + err.message);
-      btn.disabled = false;
-    }
+function updateStageCounts() {
+  const counts = {};
+  STAGES.forEach(s => counts[s.id] = 0);
+  pipelineCache.forEach(l => { counts[l.stage] = (counts[l.stage] || 0) + 1; });
+  STAGES.forEach(s => {
+    const el = document.getElementById("cnt_" + s.id);
+    if (el) el.textContent = counts[s.id] || 0;
   });
 }
 
-function computeAutoStage(l) {
-  const e = l.latest_event;
-  if (e === "payment_completed" || e === "wallet_recharged" || e === "wallet_debited") return "paid";
-  if (e === "payment_initiated") return "pay_started";
-  if (e === "otp_verified")      return "verified";
-  if (e === "otp_sent")          return "otp_sent";
-  if (e === "lead_captured")     return "new";
-  return "new";
+function renderStage() {
+  const rows = pipelineCache.filter(l => l.stage === activeStage);
+  if (!rows.length) {
+    $("#paneStage").innerHTML = `<div class="empty">No leads in this stage.</div>`;
+    return;
+  }
+  const stageTitle = STAGES.find(s => s.id === activeStage)?.title || activeStage;
+  $("#paneStage").innerHTML = `<div class="table-scroll"><table class="data">
+    <thead><tr>
+      <th>Service</th>
+      <th>Contact</th>
+      <th>Last activity</th>
+      <th>Amount</th>
+      <th>Actions</th>
+      <th style="min-width:170px;">Call status</th>
+      <th style="min-width:200px;">Remarks</th>
+    </tr></thead>
+    <tbody>${rows.map(rowHtml).join("")}</tbody>
+  </table></div>
+  <p style="margin:10px 14px;color:#94a3b8;font-size:11px;">Status and remarks auto-save. Yellow rows = no activity for 3+ days.</p>`;
+
+  // Wire actions
+  $("#paneStage").addEventListener("click", onActionClick);
+  $("#paneStage").addEventListener("change", onStatusChange);
+  document.querySelectorAll("#paneStage textarea.remarks-input").forEach((ta) => {
+    ta.addEventListener("input", () => onRemarksInput(ta));
+    ta.addEventListener("blur", () => flushRemarks(ta));
+  });
 }
 
-function renderCard(l) {
-  const ageHrs = (Date.now() - new Date(l.last_event_at).getTime()) / 3600000;
-  const ageStr = ageHrs < 1 ? Math.round(ageHrs * 60) + "m ago"
-              : ageHrs < 24 ? Math.round(ageHrs) + "h ago"
-              : Math.round(ageHrs / 24) + "d ago";
+function rowHtml(l) {
   const phone = (l.mobile || "").replace(/\D/g, "");
   const waPhone = phone.length === 10 ? "91" + phone : phone;
-  const waText  = encodeURIComponent(`Hi! This is cursive. I see you started ${l.service_name || l.service_type} — quick chat?`);
-  const cur = l.customer_key || "";
+  const waText = encodeURIComponent(`Hi! This is cursive. I see you started ${l.service_name || l.service_type || ""} — quick chat?`);
+  const cur = esc(l.customer_key || "");
+  const ageHrs = (Date.now() - new Date(l.last_event_at).getTime()) / 3600000;
+  const ageStr = ageHrs < 1 ? Math.round(ageHrs * 60) + "m"
+              : ageHrs < 24 ? Math.round(ageHrs) + "h"
+              : Math.round(ageHrs / 24) + "d";
+  const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call" data-customer-key="${cur}">☎️ Call</a>` : "";
+  const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa" data-customer-key="${cur}">💬 WA</a>` : "";
 
-  const phoneRow = phone ? `<a href="tel:+${waPhone}" class="call" title="Call">☎️ ${esc(l.mobile)}</a>` : "";
-  const waRow = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" title="WhatsApp">💬 WhatsApp</a>` : "";
+  const statusValue = l.talk_status || "";
+  const statusOpts = TALK_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === statusValue ? "selected" : ""}>${esc(o.label)}</option>`).join("");
+  const statusCls = TALK_STATUS_OPTIONS.find(o => o.value === statusValue)?.cls || "";
 
-  let statusButtons = "";
-  if (l.manual_status) {
-    statusButtons = `<button class="status-btn status-clear" data-set-status="clear" data-customer-key="${esc(cur)}" title="Clear manual status">↺ ${esc(l.manual_status)}</button>`;
-  } else {
-    statusButtons = `<button class="status-btn status-won" data-set-status="won" data-customer-key="${esc(cur)}" title="Won">✓ Won</button>
-      <button class="status-btn status-call" data-set-status="callback" data-customer-key="${esc(cur)}" title="Callback">📅 Call later</button>
-      <button class="status-btn status-nope" data-set-status="not_interested" data-customer-key="${esc(cur)}" title="Not interested">✕ Not interested</button>`;
-  }
-
-  return `<div class="lead-card ${l.is_stale ? "stale" : ""}">
-    <div class="row1">
-      <span class="service">${esc(l.service_name || l.service_type || "Lead")}</span>
-      ${l.is_stale ? `<span class="stale-badge">⏰ stale</span>` : ""}
-    </div>
-    <div class="contact">
-      ${l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : ""}
-      ${l.mobile && !l.email ? `<span>${esc(l.mobile)}</span>` : ""}
-    </div>
-    <div class="meta">
-      <span>${esc(ageStr)} · ${l.events_count} event${l.events_count > 1 ? "s" : ""}</span>
-      ${l.amount ? `<span class="amount">${inr(l.amount)}</span>` : ""}
-    </div>
-    ${l.manual_notes ? `<div class="notes">${esc(l.manual_notes)}</div>` : ""}
-    <div class="actions">${phoneRow}${waRow}${statusButtons}</div>
-  </div>`;
+  return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
+    <td>
+      <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
+      ${l.is_stale ? `<span class="stale-tag">⏰ stale</span>` : ""}
+    </td>
+    <td>
+      ${l.email ? `<div><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div>` : ""}
+      ${l.mobile ? `<div class="muted-small">${esc(l.mobile)}</div>` : ""}
+    </td>
+    <td>
+      <div>${esc(ageStr)} ago</div>
+      <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
+    </td>
+    <td class="money">${l.amount ? inr(l.amount) : "—"}</td>
+    <td><div class="row-actions">${callBtn}${waBtn}</div></td>
+    <td>
+      <select class="status-select ${statusCls}" data-field="talk_status" data-customer-key="${cur}">${statusOpts}</select>
+    </td>
+    <td>
+      <textarea class="remarks-input" data-field="remarks" data-customer-key="${cur}" placeholder="Notes…" rows="1">${esc(l.remarks || "")}</textarea>
+      <span class="saved-mark" data-saved-for="${cur}-remarks">✓ saved</span>
+    </td>
+  </tr>`;
 }
 
-function renderLeads(rows) {
-  if (!rows.length) return ($("#paneLeads").innerHTML = `<div class="empty">No leads yet.</div>`);
-  $("#paneLeads").innerHTML = `<div class="std-panel"><div class="table-scroll"><table class="data">
-    <thead><tr><th>Last activity</th><th>Latest event</th><th>Service</th><th>Email / mobile</th><th>Amount</th><th>Events</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td><div>${fmtDate(r.last_event_at)}</div><div class="muted-small">${fmtTime(r.last_event_at)}</div></td>
-      <td><span class="event-pill ${esc(r.latest_event || "")}">${esc(r.latest_event || "—")}</span></td>
-      <td><div>${esc(r.service_name || r.service_type || "—")}</div></td>
-      <td>${r.email ? `<div>${esc(r.email)}</div>` : ""}${r.mobile ? `<div class="muted-small">${esc(r.mobile)}</div>` : ""}</td>
-      <td class="money">${r.amount ? inr(r.amount) : "—"}</td>
-      <td><span style="background:#eef2ff;color:#1d4ed8;padding:2px 9px;border-radius:999px;font-weight:700;font-size:11px;">${r.events_count}</span></td>
-    </tr>`).join("")}</tbody></table></div></div>`;
+function onActionClick(e) {
+  const a = e.target.closest("[data-action]");
+  if (!a) return;
+  const action = a.dataset.action;
+  const key = a.dataset.customerKey;
+  // The link's native href still fires; we just additionally log the action
+  const manual_status = action === "call" ? "clicked_call" : action === "wa" ? "clicked_wa" : null;
+  if (manual_status) {
+    callAdmin("set_lead_status", { customer_key: key, manual_status }).then(() => {
+      // Move lead to its new stage in the cache
+      const idx = pipelineCache.findIndex(x => x.customer_key === key);
+      if (idx >= 0) {
+        pipelineCache[idx].manual_status = manual_status;
+        pipelineCache[idx].stage = manual_status === "clicked_call" ? "click_to_call" : "click_to_wa";
+      }
+      updateStageCounts();
+      renderStage();
+    }).catch(err => console.error("logging action failed", err));
+  }
+}
+
+function onStatusChange(e) {
+  const sel = e.target.closest("select.status-select");
+  if (!sel) return;
+  const key = sel.dataset.customerKey;
+  const value = sel.value || null;
+  sel.disabled = true;
+  callAdmin("set_lead_status", { customer_key: key, talk_status: value }).then(() => {
+    const idx = pipelineCache.findIndex(x => x.customer_key === key);
+    if (idx >= 0) pipelineCache[idx].talk_status = value;
+    sel.disabled = false;
+    const cls = TALK_STATUS_OPTIONS.find(o => o.value === (value || ""))?.cls || "";
+    sel.className = "status-select " + cls;
+    flashSaved(sel.closest("tr"), key + "-status");
+  }).catch(err => {
+    sel.disabled = false;
+    alert("Could not save status: " + err.message);
+  });
+}
+
+function onRemarksInput(ta) {
+  const key = ta.dataset.customerKey;
+  if (saveTimers.has(key)) clearTimeout(saveTimers.get(key));
+  saveTimers.set(key, setTimeout(() => flushRemarks(ta), 800));
+}
+function flushRemarks(ta) {
+  const key = ta.dataset.customerKey;
+  const value = ta.value;
+  if (saveTimers.has(key)) { clearTimeout(saveTimers.get(key)); saveTimers.delete(key); }
+  ta.disabled = true;
+  callAdmin("set_lead_status", { customer_key: key, remarks: value }).then(() => {
+    const idx = pipelineCache.findIndex(x => x.customer_key === key);
+    if (idx >= 0) pipelineCache[idx].remarks = value;
+    ta.disabled = false;
+    flashSaved(ta.closest("tr"), key + "-remarks");
+  }).catch(err => {
+    ta.disabled = false;
+    console.error("save remarks failed", err);
+  });
+}
+function flashSaved(tr, savedKey) {
+  const mark = tr.querySelector(`[data-saved-for="${savedKey.replace(/[^-a-zA-Z0-9|@.]/g, "\\$&")}"]`);
+  // simpler: find any .saved-mark inside the row
+  const m = tr.querySelector(".saved-mark");
+  if (!m) return;
+  m.classList.add("show");
+  setTimeout(() => m.classList.remove("show"), 1200);
 }
 
 function renderPending(rows) {
@@ -274,26 +339,11 @@ function renderPending(rows) {
     <thead><tr><th>Started</th><th>Type</th><th>Customer</th><th>Description</th><th>Amount</th><th>Razorpay order</th></tr></thead>
     <tbody>${rows.map(r => `<tr>
       <td><div>${fmtDate(r.created_at)}</div><div class="muted-small">${fmtTime(r.created_at)}</div></td>
-      <td><span class="event-pill ${esc(r.type)}">${esc(r.type)}</span></td>
+      <td><span class="event-pill">${esc(r.type)}</span></td>
       <td>${r.email ? `<div>${esc(r.email)}</div>` : ""}${r.mobile ? `<div class="muted-small">${esc(r.mobile)}</div>` : ""}</td>
       <td>${esc(r.description || "—")}</td>
       <td class="money">${inr(r.amount)}</td>
       <td><span class="mono">${esc(r.razorpay_order_id || "—")}</span></td>
-    </tr>`).join("")}</tbody></table></div>`;
-}
-
-function renderCompleted(rows) {
-  if (!rows.length) return ($("#paneCompleted").innerHTML = `<div class="empty">No completed payments yet.</div>`);
-  $("#paneCompleted").innerHTML = `<div class="table-scroll"><table class="data">
-    <thead><tr><th>When</th><th>Type</th><th>Customer</th><th>Service</th><th>Amount</th><th>Invoice</th><th>Razorpay payment</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td><div>${fmtDate(r.completed_at)}</div><div class="muted-small">${fmtTime(r.completed_at)}</div></td>
-      <td><span class="event-pill ${esc(r.type)}">${esc(r.type)}</span></td>
-      <td>${esc(r.email || "—")}</td>
-      <td>${esc(r.service_name || "—")}</td>
-      <td class="money green">${inr(r.amount)}</td>
-      <td><span class="mono">${esc(r.invoice_number || "—")}</span></td>
-      <td><span class="mono">${esc(r.razorpay_payment_id || "—")}</span></td>
     </tr>`).join("")}</tbody></table></div>`;
 }
 
@@ -326,13 +376,13 @@ function renderWallets(rows) {
 }
 
 function renderSearch(d) {
-  const sec = (title, rows, html) => rows.length ? `<h3 style="margin:18px 14px 8px;font-size:13px;color:#64748b;">${title} (${rows.length})</h3>${html(rows)}` : "";
   if (!d.leads.length && !d.invoices.length && !d.wallets.length && !d.completed.length) {
     $("#paneSearch").innerHTML = `<div class="empty">No results for "<strong>${esc(d.query)}</strong>".</div>`;
     return;
   }
+  const sec = (title, rows, html) => rows.length ? `<h3 style="margin:18px 14px 8px;font-size:13px;color:#64748b;">${title} (${rows.length})</h3>${html(rows)}` : "";
   $("#paneSearch").innerHTML = `
-    ${sec("Leads", d.leads, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.last_event_at || r.created_at)}</td><td><span class="event-pill ${esc(r.latest_event || r.event_type || "")}">${esc(r.latest_event || r.event_type || "")}</span></td><td>${esc(r.service_name || "")}</td><td>${esc(r.email || "")}</td><td>${esc(r.mobile || "")}</td><td class="money">${r.amount ? inr(r.amount) : ""}</td></tr>`).join("")}</tbody></table></div>`)}
+    ${sec("Leads", d.leads, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.last_event_at)}</td><td>${esc(r.service_name || "")}</td><td>${esc(r.email || "")}</td><td>${esc(r.mobile || "")}</td><td class="money">${r.amount ? inr(r.amount) : ""}</td></tr>`).join("")}</tbody></table></div>`)}
     ${sec("Completed payments", d.completed, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.completed_at)}</td><td>${esc(r.email || "")}</td><td>${esc(r.service_name || "")}</td><td class="money green">${inr(r.amount)}</td><td class="mono">${esc(r.invoice_number || "")}</td></tr>`).join("")}</tbody></table></div>`)}
     ${sec("Invoices", d.invoices, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td class="mono">${esc(r.invoice_number)}</td><td>${esc(r.email || "")}</td><td class="money green">${inr(r.total)}</td></tr>`).join("")}</tbody></table></div>`)}
     ${sec("Wallets", d.wallets, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${esc(r.email)}</td><td>${esc(r.mobile || "")}</td><td class="money ${Number(r.balance) > 0 ? "green" : ""}">${inr(r.balance)}</td></tr>`).join("")}</tbody></table></div>`)}

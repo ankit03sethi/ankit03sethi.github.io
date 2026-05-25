@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <title>cursive admin</title>
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%230f172a'/><polyline points='14 44 26 32 34 38 50 22' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="admin.css?v=2026052512" />
+  <link rel="stylesheet" href="admin.css?v=2026052520" />
 </head>
 <body>
 
@@ -49,21 +49,17 @@
     <span class="last-refreshed" id="lastRefreshed"></span>
   </div>
 
-  <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="pipeline">Pipeline</button>
-    <button class="tab" data-tab="leads">All leads</button>
+  <nav class="tabs stage-tabs" id="stageTabs"></nav>
+  <nav class="tabs other-tabs" id="otherTabs">
     <button class="tab" data-tab="pending">Pending payments <span class="badge" id="badgePending">0</span></button>
-    <button class="tab" data-tab="completed">Completed</button>
     <button class="tab" data-tab="invoices">Invoices</button>
     <button class="tab" data-tab="wallets">Wallets</button>
     <button class="tab hidden" data-tab="search">Search results</button>
   </nav>
 
   <div class="panel">
-    <div id="panePipeline" class="pane"></div>
-    <div id="paneLeads"     class="pane hidden"></div>
+    <div id="paneStage"     class="pane"></div>
     <div id="panePending"   class="pane hidden std-panel"></div>
-    <div id="paneCompleted" class="pane hidden std-panel"></div>
     <div id="paneInvoices"  class="pane hidden std-panel"></div>
     <div id="paneWallets"   class="pane hidden std-panel"></div>
     <div id="paneSearch"    class="pane hidden std-panel"></div>
@@ -74,6 +70,6 @@
   </p>
 </main>
 
-<script type="module" src="admin.js?v=2026052512"></script>
+<script type="module" src="admin.js?v=2026052520"></script>
 </body>
 </html>
