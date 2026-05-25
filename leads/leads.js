@@ -27,21 +27,42 @@ const FOLLOW_SUBS = [
   { id: "callback",        title: "Call me later" },
   { id: "interested",      title: "Interested" },
   { id: "in_progress",     title: "In progress" },
+  { id: "lost",            title: "Lost" },
   { id: "never_visited",   title: "Said: never visited" },
   { id: "dont_call_again", title: "Said: don't call" },
   { id: "not_interested",  title: "Not interested" },
+  { id: "not_required",    title: "Not required" },
 ];
 
 const TALK_STATUS_OPTIONS = [
   { value: "",                label: "— select —" },
   { value: "not_picked",      label: "Call not picked" },
+  { value: "callback",        label: "Call me later" },
+  { value: "interested",      label: "Interested" },
+  { value: "in_progress",     label: "In progress" },
+  { value: "lost",            label: "Lost" },
   { value: "never_visited",   label: "Said: never visited site" },
   { value: "dont_call_again", label: "Said: don't call again" },
-  { value: "in_progress",     label: "In progress" },
-  { value: "interested",      label: "Interested" },
   { value: "not_interested",  label: "Not interested" },
+  { value: "not_required",    label: "Not required" },
   { value: "won_offline",     label: "Won (paid offline)" },
 ];
+
+// State machine: from each sub-tab, only these statuses are valid next moves.
+// Mirrors status.xlsx uploaded by user.
+const STATUS_TRANSITIONS = {
+  not_picked:      ["callback", "interested", "in_progress", "lost"],
+  callback:        ["interested", "in_progress", "lost"],
+  interested:      ["in_progress", "lost"],
+  in_progress:     ["lost", "never_visited"],
+  lost:            ["never_visited", "dont_call_again"],
+  never_visited:   ["dont_call_again", "not_interested"],
+  dont_call_again: ["not_interested", "not_required"],
+  not_interested:  ["not_required"],
+  not_required:    [],
+};
+// For New-bucket leads (no talk_status yet) — show the 4 entry-point statuses.
+const NEW_BUCKET_STATUS_OPTIONS = ["not_picked", "callback", "interested", "in_progress"];
 
 let pipelineCache = [];
 let activeTop = "new";
@@ -377,8 +398,13 @@ function rowHtml(l, readOnly) {
     </tr>`;
   }
 
-  // Editable row
-  const statusOpts = TALK_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${o.value === statusValue ? "selected" : ""}>${esc(o.label)}</option>`).join("");
+  // Editable row — dropdown options depend on current sub-tab (state machine)
+  const allowed = allowedStatusesFor(l);
+  const isTerminal = (activeTop === "follow") && allowed.length === 0;
+  const statusOpts = isTerminal
+    ? `<option value="">— no further moves —</option>`
+    : buildStatusOptionsHtml(allowed, statusValue);
+
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
@@ -394,14 +420,45 @@ function rowHtml(l, readOnly) {
     </td>
     <td><div class="row-actions">${callBtn}${waBtn}</div></td>
     <td>
-      <select class="status-select" data-customer-key="${cur}">${statusOpts}</select>
+      <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
     </td>
     <td>${remarksCell}</td>
     <td>
-      <button class="row-save-btn" data-action="save-status" data-customer-key="${cur}">${statusValue ? "Update status" : "Save status"}</button>
+      ${isTerminal
+        ? `<span class="muted-small">Terminal state</span>`
+        : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}">${statusValue ? "Update status" : "Save status"}</button>`}
       <div class="row-save-error" style="display:none;"></div>
     </td>
   </tr>`;
+}
+
+function allowedStatusesFor(lead) {
+  if (activeTop === "follow") {
+    // Per-tab state machine: only show valid next moves.
+    return STATUS_TRANSITIONS[activeSub] || [];
+  }
+  if (activeTop === "new") {
+    // Entry points into the Follow Ups bucket
+    return NEW_BUCKET_STATUS_OPTIONS.slice();
+  }
+  return [];
+}
+
+function buildStatusOptionsHtml(allowedIds, currentValue) {
+  // Always include placeholder + (if current value is set but not in allowed list, include it too as 'current')
+  const opts = [`<option value="">— select —</option>`];
+  // Show the current value (so the dropdown isn't blank for leads that landed here)
+  const currentOpt = TALK_STATUS_OPTIONS.find(o => o.value === currentValue);
+  if (currentOpt && currentOpt.value && !allowedIds.includes(currentValue)) {
+    opts.push(`<option value="${currentOpt.value}" selected disabled>${esc(currentOpt.label)} (current)</option>`);
+  }
+  allowedIds.forEach((id) => {
+    const o = TALK_STATUS_OPTIONS.find(x => x.value === id);
+    if (!o) return;
+    const sel = (id === currentValue) ? "selected" : "";
+    opts.push(`<option value="${o.value}" ${sel}>${esc(o.label)}</option>`);
+  });
+  return opts.join("");
 }
 
 function renderRemarksCell(l, readOnly) {
