@@ -201,6 +201,8 @@
   }
 
   function showDashboardUI() {
+    var lv = document.getElementById("landingView");
+    if (lv) lv.classList.add("hidden");
     document.getElementById("loginView").classList.add("hidden");
     document.getElementById("dashboardView").classList.remove("hidden");
     var whoEl = document.getElementById("who");
@@ -572,8 +574,4 @@
     var saved = readSession();
     if (!saved) { stopAutoRefresh(); return; }
     authenticate(saved.id, saved.password).then(function (res) {
-      if (res.ok) showDashboard(res, true);
-      else if (isInvalidAuth(res)) onLogout();
-    }).catch(function () {});
-  }
-})();
+      if (res.ok) showDashboard(res, t
