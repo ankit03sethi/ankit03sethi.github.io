@@ -172,6 +172,9 @@ function switchTop(top) {
   if (top === "follow") activeSub = "not_picked";
   if (top === "done")   activeSub = "all";
   expandedRows.clear();
+  // Clear filter when switching top tab so user starts fresh
+  remarkFilter = "";
+  $("#paneStage").innerHTML = "";
   renderActive();
 }
 
@@ -214,18 +217,32 @@ function renderSubTabs() {
 }
 
 function renderPane() {
+  // Render the SHELL (toolbar + rows container) only once per tab switch.
+  // Filter input changes only re-render the rows, preserving input focus.
+  const needShell = !$("#filterBar") || !$("#rowsContainer");
+  if (needShell) {
+    $("#paneStage").innerHTML = `<div id="filterBar"></div><div id="rowsContainer"></div>`;
+    renderToolbarInto($("#filterBar"));
+    wireToolbarHandlers();
+  } else {
+    // Refresh the dropdown options but DO NOT replace the text input
+    renderToolbarDropdownOnly();
+  }
+  renderRows();
+  wireRowHandlers();
+}
+
+function renderRows() {
   const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
   let rows;
   if (activeTop === "new")    rows = inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
   if (activeTop === "done")   rows = inBucket;
 
-  // Apply optional remark filter
   const qq = (remarkFilter || "").trim().toLowerCase();
   if (qq) rows = rows.filter((l) => (l.remarks || "").toLowerCase().includes(qq));
 
-  // Search box also filters
-  const searchTerm = ($("#searchBox").value || "").trim().toLowerCase();
+  const searchTerm = ($("#searchBox")?.value || "").trim().toLowerCase();
   if (searchTerm) {
     rows = rows.filter((l) =>
       (l.email || "").toLowerCase().includes(searchTerm) ||
@@ -236,50 +253,74 @@ function renderPane() {
     );
   }
 
-  $("#paneStage").innerHTML = renderToolbar() + (rows.length
+  $("#rowsContainer").innerHTML = rows.length
     ? renderTable(rows, activeTop === "done")
-    : `<div class="empty">No leads in this view${qq ? ` matching remark "${esc(qq)}"` : ""}.</div>`);
-
-  wireToolbarHandlers();
-  wireRowHandlers();
+    : `<div class="empty">No leads in this view${qq ? ` matching remark "${esc(qq)}"` : ""}.</div>`;
 }
 
-function renderToolbar() {
-  // Build remark filter dropdown from distinct latest remarks in cache
-  const distinct = new Map(); // text -> count
+function buildRemarkOptions() {
+  const distinct = new Map();
   pipelineCache.forEach((l) => {
     const r = (l.remarks || "").trim();
     if (r) distinct.set(r, (distinct.get(r) || 0) + 1);
   });
-  const opts = Array.from(distinct.entries())
+  return Array.from(distinct.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 30)
     .map(([txt, cnt]) => `<option value="${esc(txt)}" ${txt === remarkFilter ? "selected" : ""}>${esc(txt.slice(0, 50))} (${cnt})</option>`)
     .join("");
+}
 
-  return `<div class="filter-bar">
+function renderToolbarInto(el) {
+  el.innerHTML = `<div class="filter-bar">
     <span class="filter-lbl">Filter by remark:</span>
     <input id="remarkFilterText" type="text" class="remark-filter-input" placeholder="Type to filter..." value="${esc(remarkFilter)}" />
     <select id="remarkFilterSelect" class="remark-filter-select">
       <option value="">All remarks</option>
-      ${opts}
+      ${buildRemarkOptions()}
     </select>
-    ${remarkFilter ? `<button id="remarkFilterClear" class="remark-filter-clear">Clear</button>` : ""}
+    <button id="remarkFilterClear" class="remark-filter-clear" style="display:${remarkFilter ? "inline-block" : "none"};">Clear</button>
   </div>`;
+}
+
+function renderToolbarDropdownOnly() {
+  // Refresh the dropdown options on data change without touching the input
+  const sel = $("#remarkFilterSelect");
+  if (sel) sel.innerHTML = `<option value="">All remarks</option>` + buildRemarkOptions();
+  const clear = $("#remarkFilterClear");
+  if (clear) clear.style.display = remarkFilter ? "inline-block" : "none";
 }
 
 function wireToolbarHandlers() {
   const txt = $("#remarkFilterText");
   if (txt) {
-    txt.addEventListener("input", (e) => { remarkFilter = e.target.value; renderPane(); });
+    txt.addEventListener("input", (e) => {
+      remarkFilter = e.target.value;
+      renderRows();
+      const clear = $("#remarkFilterClear");
+      if (clear) clear.style.display = remarkFilter ? "inline-block" : "none";
+    });
   }
   const sel = $("#remarkFilterSelect");
   if (sel) {
-    sel.addEventListener("change", (e) => { remarkFilter = e.target.value; renderPane(); });
+    sel.addEventListener("change", (e) => {
+      remarkFilter = e.target.value;
+      const txtIn = $("#remarkFilterText");
+      if (txtIn) txtIn.value = remarkFilter;
+      renderRows();
+      const clear = $("#remarkFilterClear");
+      if (clear) clear.style.display = remarkFilter ? "inline-block" : "none";
+    });
   }
   const clear = $("#remarkFilterClear");
   if (clear) {
-    clear.addEventListener("click", () => { remarkFilter = ""; renderPane(); });
+    clear.addEventListener("click", () => {
+      remarkFilter = "";
+      const txtIn = $("#remarkFilterText");
+      if (txtIn) txtIn.value = "";
+      renderRows();
+      clear.style.display = "none";
+    });
   }
 }
 
@@ -423,7 +464,13 @@ function bucketReason(l) {
   return "completed";
 }
 
+let _paneClickAttached = false;
 function wireRowHandlers() {
+  // Attach exactly ONCE. Without this guard, every re-render adds a new
+  // listener and a single click fires multiple times (which is why one
+  // add-remark click was producing 50+ rows).
+  if (_paneClickAttached) return;
+  _paneClickAttached = true;
   $("#paneStage").addEventListener("click", async (e) => {
     const target = e.target.closest("[data-action]");
     if (!target) return;
