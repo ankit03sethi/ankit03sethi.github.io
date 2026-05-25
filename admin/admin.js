@@ -165,16 +165,55 @@ function renderSummaryError(e) {
 function renderLeads(rows) {
   if (!rows.length) return ($("#paneLeads").innerHTML = `<div class="empty">No leads yet.</div>`);
   $("#paneLeads").innerHTML = `<div class="table-scroll"><table class="data">
-    <thead><tr><th>When</th><th>Event</th><th>Service</th><th>Email / mobile</th><th>Amount</th><th>Channel</th></tr></thead>
+    <thead><tr><th>Last activity</th><th>Latest event</th><th>Service</th><th>Email / mobile</th><th>Amount</th><th>Events</th></tr></thead>
     <tbody>${rows.map(r => `
-      <tr>
-        <td><div>${fmtDate(r.created_at)}</div><div class="muted-small">${fmtTime(r.created_at)}</div></td>
-        <td><span class="event-pill ${esc(r.event_type || "")}">${esc(r.event_type || "—")}</span></td>
-        <td><div>${esc(r.service_name || r.service_type || "—")}</div>${r.description ? `<div class="muted-small">${esc(r.description)}</div>` : ""}</td>
+      <tr class="lead-row" data-email="${esc(r.email || "")}" data-mobile="${esc(r.mobile || "")}" data-service="${esc(r.service_type || "")}" style="cursor:pointer;">
+        <td><div>${fmtDate(r.last_event_at)}</div><div class="muted-small">${fmtTime(r.last_event_at)}${r.first_seen_at && r.first_seen_at !== r.last_event_at ? ` &middot; first seen ${fmtDate(r.first_seen_at)}` : ""}</div></td>
+        <td><span class="event-pill ${esc(r.latest_event || "")}">${esc(r.latest_event || "—")}</span></td>
+        <td><div>${esc(r.service_name || r.service_type || "—")}</div>${r.latest_description ? `<div class="muted-small">${esc(r.latest_description)}</div>` : ""}</td>
         <td>${r.email ? `<div>${esc(r.email)}</div>` : ""}${r.mobile ? `<div class="muted-small">${esc(r.mobile)}</div>` : ""}</td>
         <td class="money">${r.amount ? inr(r.amount) : "—"}</td>
-        <td><span class="muted-small">${esc(r.channel || "")}</span></td>
-      </tr>`).join("")}</tbody></table></div>`;
+        <td><span class="muted-small" style="background:#eef2ff;color:#1d4ed8;padding:2px 9px;border-radius:999px;font-weight:700;">${r.events_count}</span></td>
+      </tr>`).join("")}</tbody></table></div>
+    <p style="margin:12px 16px;color:#94a3b8;font-size:11px;">Tip: click any row to see the full event history for that customer.</p>`;
+
+  // Click-to-expand history
+  document.querySelectorAll(".lead-row").forEach((tr) => {
+    tr.addEventListener("click", async () => {
+      const email = tr.dataset.email;
+      const mobile = tr.dataset.mobile;
+      const serviceType = tr.dataset.service;
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains("history-row")) { next.remove(); return; }
+      const histTr = document.createElement("tr");
+      histTr.className = "history-row";
+      const td = document.createElement("td");
+      td.colSpan = 6;
+      td.style.cssText = "background:#f0f6ff;padding:14px 20px;";
+      td.innerHTML = `<div style="color:#475467;font-size:12px;">Loading history…</div>`;
+      histTr.appendChild(td);
+      tr.after(histTr);
+      try {
+        const events = await callAdmin("lead_history", { email, mobile, service_type: serviceType });
+        if (!events.length) { td.innerHTML = `<div class="muted-small">No detailed history.</div>`; return; }
+        td.innerHTML = `<div style="font-size:12px;color:#0f172a;">
+          <strong style="color:#1d4ed8;">${events.length} events for ${esc(email || mobile || "—")} · ${esc(serviceType)}</strong>
+          <table class="data" style="margin-top:10px;background:#fff;border-radius:8px;">
+            <thead><tr><th>When</th><th>Event</th><th>Channel</th><th>Description</th><th>Amount</th></tr></thead>
+            <tbody>${events.map(e => `<tr>
+              <td>${fmtDate(e.created_at)} ${fmtTime(e.created_at)}</td>
+              <td><span class="event-pill ${esc(e.event_type || "")}">${esc(e.event_type || "")}</span></td>
+              <td><span class="muted-small">${esc(e.channel || "")}</span></td>
+              <td>${esc(e.description || "")}</td>
+              <td class="money">${e.amount ? inr(e.amount) : "—"}</td>
+            </tr>`).join("")}</tbody>
+          </table>
+        </div>`;
+      } catch (err) {
+        td.innerHTML = `<div class="muted-small" style="color:#991b1b;">Error: ${esc(err.message)}</div>`;
+      }
+    });
+  });
 }
 
 function renderPending(rows) {
@@ -242,27 +281,4 @@ function renderSearch(d) {
   const sec = (title, rows, render) => rows.length ? `<h3 style="margin:18px 14px 8px;font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">${title} (${rows.length})</h3>${render(rows)}` : "";
   const noResults = !d.leads.length && !d.invoices.length && !d.wallets.length && !d.completed.length;
   if (noResults) {
-    $("#paneSearch").innerHTML = `<div class="empty">No results for "<strong>${esc(d.query)}</strong>".</div>`;
-    return;
-  }
-  $("#paneSearch").innerHTML = `
-    ${sec("Leads", d.leads, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td><span class="event-pill ${esc(r.event_type || "")}">${esc(r.event_type || "")}</span></td><td>${esc(r.service_name || "")}</td><td>${esc(r.email || "")}</td><td>${esc(r.mobile || "")}</td><td class="money">${r.amount ? inr(r.amount) : ""}</td></tr>`).join("")}</tbody></table></div>`)}
-    ${sec("Completed payments", d.completed, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.completed_at)}</td><td>${esc(r.email || "")}</td><td>${esc(r.service_name || "")}</td><td class="money green">${inr(r.amount)}</td><td class="mono">${esc(r.invoice_number || "")}</td></tr>`).join("")}</tbody></table></div>`)}
-    ${sec("Invoices", d.invoices, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td class="mono">${esc(r.invoice_number)}</td><td>${esc(r.email || "")}</td><td class="money green">${inr(r.total)}</td></tr>`).join("")}</tbody></table></div>`)}
-    ${sec("Wallets", d.wallets, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${esc(r.email)}</td><td>${esc(r.mobile || "")}</td><td class="money ${Number(r.balance) > 0 ? "green" : ""}">${inr(r.balance)}</td></tr>`).join("")}</tbody></table></div>`)}
-  `;
-}
-
-// ---- Utils ----
-function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function num(n) { return Number(n || 0).toLocaleString("en-IN"); }
-function inr(n) { return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(Number(n || 0)); }
-function fmtDate(iso) { if (!iso) return "—"; return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }); }
-function fmtTime(iso) { if (!iso) return ""; return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
-function humanError(err) {
-  const msg = (err && err.message) || String(err);
-  if (/invalid login credentials/i.test(msg)) return "Email and password don't match.";
-  if (/rate limit/i.test(msg))                return "Too many attempts, wait a minute.";
-  if (/don't have admin access/i.test(msg))   return "This email isn't on the admin whitelist.";
-  return msg;
-}
+    $("#paneSearch").innerHTML = `<div 
