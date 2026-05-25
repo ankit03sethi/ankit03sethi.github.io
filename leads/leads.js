@@ -209,21 +209,43 @@ function rowHtml(l) {
   const ageStr = ageHrs < 1 ? Math.round(ageHrs * 60) + "m"
               : ageHrs < 24 ? Math.round(ageHrs) + "h"
               : Math.round(ageHrs / 24) + "d";
-  const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call" data-customer-key="${cur}">Call</a>` : "";
-  const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa" data-customer-key="${cur}">WhatsApp</a>` : "";
 
   const statusValue = l.talk_status || "";
+  const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "-";
+
+  // ---------- LOCKED row: no clickable elements at all ----------
+  if (isLocked) {
+    return `<tr class="${l.is_stale ? "stale" : ""} locked" data-customer-key="${cur}">
+      <td>
+        <div style="font-weight:600;">${esc(l.service_name || l.service_type || "-")}</div>
+        ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
+        <span class="locked-tag">saved</span>
+      </td>
+      <td>
+        ${l.email ? `<div>${esc(l.email)}</div>` : ""}
+        ${l.mobile ? `<div class="muted-small">${esc(l.mobile)}</div>` : ""}
+      </td>
+      <td>
+        <div>${esc(ageStr)} ago</div>
+        <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
+      </td>
+      <td class="money">${l.amount ? inr(l.amount) : "-"}</td>
+      <td><span class="muted-small">-</span></td>
+      <td><span class="muted-small" style="font-weight:600;color:#475467;">${esc(statusLabel)}</span></td>
+      <td><span class="muted-small">${esc(l.remarks || "-")}</span></td>
+      <td><button class="row-save-btn saved" disabled>Saved</button></td>
+    </tr>`;
+  }
+
+  // ---------- EDITABLE row ----------
+  const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call" data-customer-key="${cur}">Call</a>` : "";
+  const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa" data-customer-key="${cur}">WhatsApp</a>` : "";
   const statusOpts = TALK_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === statusValue ? "selected" : ""}>${esc(o.label)}</option>`).join("");
 
-  const saveBtnHtml = isLocked
-    ? `<button class="row-save-btn saved" disabled>Saved</button>`
-    : `<button class="row-save-btn" data-action="save" data-customer-key="${cur}">Save</button>`;
-
-  return `<tr class="${l.is_stale ? "stale" : ""} ${isLocked ? "locked" : ""}" data-customer-key="${cur}">
+  return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "-")}</div>
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
-      ${isLocked ? `<span class="locked-tag">saved</span>` : ""}
     </td>
     <td>
       ${l.email ? `<div><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div>` : ""}
@@ -236,12 +258,15 @@ function rowHtml(l) {
     <td class="money">${l.amount ? inr(l.amount) : "-"}</td>
     <td><div class="row-actions">${callBtn}${waBtn}</div></td>
     <td>
-      <select class="status-select" data-field="talk_status" data-customer-key="${cur}" ${isLocked ? "disabled" : ""}>${statusOpts}</select>
+      <select class="status-select" data-field="talk_status" data-customer-key="${cur}">${statusOpts}</select>
     </td>
     <td>
-      <textarea class="remarks-input" data-field="remarks" data-customer-key="${cur}" placeholder="Notes..." rows="1" ${isLocked ? "disabled" : ""}>${esc(l.remarks || "")}</textarea>
+      <textarea class="remarks-input" data-field="remarks" data-customer-key="${cur}" placeholder="Notes..." rows="1">${esc(l.remarks || "")}</textarea>
     </td>
-    <td>${saveBtnHtml}<div class="row-save-error" style="display:none;"></div></td>
+    <td>
+      <button class="row-save-btn" data-action="save" data-customer-key="${cur}">Save</button>
+      <div class="row-save-error" style="display:none;"></div>
+    </td>
   </tr>`;
 }
 
@@ -286,21 +311,9 @@ async function onSaveRow(btn, key) {
       pipelineCache[idx].talk_status = talk_status;
       pipelineCache[idx].remarks = remarks;
     }
-    // Lock the row visually
-    sel.disabled = true;
-    ta.disabled = true;
-    btn.textContent = "Saved";
-    btn.classList.add("saved");
-    tr.classList.add("locked");
-    // Add saved tag
-    const serviceCell = tr.cells[0];
-    if (serviceCell && !serviceCell.querySelector(".locked-tag")) {
-      const tag = document.createElement("span");
-      tag.className = "locked-tag";
-      tag.textContent = "saved";
-      tag.style.marginLeft = "6px";
-      serviceCell.appendChild(tag);
-    }
+    // Re-render the stage so the saved row becomes fully non-interactive
+    // (Call/WhatsApp buttons removed, status + remarks become plain text).
+    renderStage();
   } catch (err) {
     btn.disabled = false;
     btn.textContent = "Save";
