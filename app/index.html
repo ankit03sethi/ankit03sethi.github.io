@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>cursive &middot; Seller dashboard</title>
+  <meta name="description" content="Your cursive seller workspace — products, sales, alerts in one place." />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='14 44 26 32 34 38 50 22' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/><polyline points='40 22 50 22 50 32' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="app.css?v=2026052501" />
+</head>
+<body>
+
+  <!-- ============= Topbar ============= -->
+  <header class="topbar">
+    <a href="/" class="brand" aria-label="cursive home">
+      <div class="brand-box" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 17 9 11 13 15 21 6"/>
+          <polyline points="15 6 21 6 21 12"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+        <div class="brand-sub">India&rsquo;s seller toolkit</div>
+      </div>
+    </a>
+    <div class="topbar-right">
+      <span id="trialChip" class="trial-chip hidden">Trial &middot; <span id="trialDays"></span> days left</span>
+      <span id="tenantChip" class="tenant-chip hidden"></span>
+      <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <!-- ============= Login view (signed-out) ============= -->
+  <main id="loginView" class="auth-wrap hidden">
+    <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+      <h1>Sign in</h1>
+      <p class="lede">Welcome back. Sign in to your cursive workspace.</p>
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" name="email" type="email" required autocomplete="email" />
+      <label for="loginPassword">Password</label>
+      <input id="loginPassword" name="password" type="password" required autocomplete="current-password" />
+      <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+      <p id="loginError" class="error hidden"></p>
+      <p class="switch-link">
+        <a href="#" id="showForgot">Forgot password?</a>
+      </p>
+      <p class="auth-meta">
+        New to cursive? Ask the team to send you an invite at
+        <a href="mailto:Contact@cursive.world">Contact@cursive.world</a>.
+      </p>
+    </form>
+  </main>
+
+  <!-- ============= Forgot password view ============= -->
+  <main id="forgotView" class="auth-wrap hidden">
+    <form id="forgotForm" class="auth-card" autocomplete="on" novalidate>
+      <h1>Reset password</h1>
+      <p class="lede">Enter your email and we&rsquo;ll send you a reset link.</p>
+      <label for="forgotEmail">Email</label>
+      <input id="forgotEmail" name="email" type="email" required autocomplete="email" />
+      <button type="submit" class="btn-primary" id="forgotBtn">Send reset link</button>
+      <p id="forgotMsg" class="success hidden"></p>
+      <p id="forgotError" class="error hidden"></p>
+      <p class="switch-link">
+        <a href="#" id="backToLogin">&larr; Back to sign in</a>
+      </p>
+    </form>
+  </main>
+
+  <!-- ============= Set-password view (invited / reset users) ============= -->
+  <main id="setPasswordView" class="auth-wrap hidden">
+    <form id="setPasswordForm" class="auth-card" autocomplete="on" novalidate>
+      <h1 id="setPasswordTitle">Set your password</h1>
+      <p class="lede" id="setPasswordLede">
+        Welcome to cursive! Pick a password to finish activating your account.
+      </p>
+      <label for="newPassword">New password</label>
+      <input id="newPassword" name="newPassword" type="password" required autocomplete="new-password" minlength="8" />
+      <label for="confirmPassword">Confirm password</label>
+      <input id="confirmPassword" name="confirmPassword" type="password" required autocomplete="new-password" minlength="8" />
+      <button type="submit" class="btn-primary" id="setPasswordBtn">Save password &amp; continue</button>
+      <p id="setPasswordError" class="error hidden"></p>
+    </form>
+  </main>
+
+  <!-- ============= Dashboard view (signed-in) ============= -->
+  <main id="dashView" class="dash hidden">
+    <section class="welcome">
+      <h1 id="welcomeTitle">Welcome</h1>
+      <p id="welcomeBody">Your seller workspace is ready.</p>
+    </section>
+
+    <section class="kpi-grid">
+      <div class="kpi">
+        <div class="label">Products tracked</div>
+        <div class="value" id="kpiProducts">&mdash;</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Files uploaded</div>
+        <div class="value" id="kpiFiles">&mdash;</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Master rows</div>
+        <div class="value" id="kpiMasterRows">&mdash;</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Unread alerts</div>
+        <div class="value" id="kpiAlerts">&mdash;</div>
+      </div>
+    </section>
+
+    <nav class="nav-tabs" id="navTabs">
+      <button class="nav-tab active" data-tab="overview">Overview</button>
+      <button class="nav-tab" data-tab="products">Products</button>
+      <button class="nav-tab" data-tab="files">Files</button>
+      <button class="nav-tab" data-tab="master">Master data</button>
+      <button class="nav-tab" data-tab="alerts">Alerts <span class="badge" id="alertsBadge">0</span></button>
+    </nav>
+
+    <section class="panel tab-pane" data-pane="overview">
+      <h2>Getting started</h2>
+      <p class="sub">A few things you can do in your workspace right away.</p>
+      <ol style="margin:0;padding-left:20px;line-height:2;color:#475467;font-size:15px;">
+        <li>Install the <strong>cursive Chrome extension</strong> (coming to the Web Store) and log in &mdash; it carries your identity automatically.</li>
+        <li>Add product URLs you want to track in <strong>Products</strong>.</li>
+        <li>Upload Flipkart / Amazon / Meesho sales reports in <strong>Files</strong> &mdash; they auto-clean into your master sheet.</li>
+        <li>Check <strong>Master data</strong> for your unified order book and P&amp;L.</li>
+        <li>Watch <strong>Alerts</strong> for listing suppressions, price drops and low stock.</li>
+      </ol>
+    </section>
+
+    <section class="panel tab-pane hidden" data-pane="products">
+      <h2>Products</h2>
+      <p class="sub">URLs we&rsquo;re tracking across marketplaces.</p>
+      <div class="empty">
+        <div class="em-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 11V7a4 4 0 0 0-8 0v4M5 9h14l-1 12H6L5 9z"/></svg>
+        </div>
+        <h3>No products yet</h3>
+        <p>Add product URLs through the Chrome extension or paste them here.</p>
+        <button class="btn-primary" style="max-width:200px;" disabled>Add product (soon)</button>
+      </div>
+    </section>
+
+    <section class="panel tab-pane hidden" data-pane="files">
+      <h2>Uploaded files</h2>
+      <p class="sub">Flipkart / Amazon / Meesho raw reports.</p>
+      <div class="empty">
+        <div class="em-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        </div>
+        <h3>No files uploaded yet</h3>
+        <p>Drop a CSV / XLSX exported from your marketplace dashboard. We&rsquo;ll clean it.</p>
+        <button class="btn-primary" style="max-width:200px;" disabled>Upload file (soon)</button>
+      </div>
+    </section>
+
+    <section class="panel tab-pane hidden" data-pane="master">
+      <h2>Master data</h2>
+      <p class="sub">Cleaned, merged order rows from all marketplaces.</p>
+      <div class="empty">
+        <div class="em-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+        </div>
+        <h3>Master sheet is empty</h3>
+        <p>Once you upload a few files we&rsquo;ll merge them into one tidy table.</p>
+      </div>
+    </section>
+
+    <section class="panel tab-pane hidden" data-pane="alerts">
+      <h2>Alerts</h2>
+      <p class="sub">Listing suppressions, price drops, low stock.</p>
+      <div class="empty">
+        <div class="em-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        </div>
+        <h3>No alerts</h3>
+        <p>All quiet. We&rsquo;ll notify you here when something needs your attention.</p>
+      </div>
+    </section>
+
+    <p class="footer-mini">
+      Need help? WhatsApp
+      <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%20need%20help" target="_blank" rel="noopener">+91 9625 73 74 75</a>
+      &middot; <a href="mailto:Contact@cursive.world">Contact@cursive.world</a>
+    </p>
+  </main>
+
+  <script src="config.js?v=2026052501"></script>
+  <script type="module" src="app.js?v=2026052501"></script>
+</body>
+</html>
