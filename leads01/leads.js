@@ -107,7 +107,7 @@ async function onSignOut() {
 async function bootDashboard() {
   hide($("#loginView")); show($("#dashView"));
   const { data: { user } } = await sb.auth.getUser();
-  $("#emailChip").textContent = user?.email || "";
+  $("#emailChip").textContent = "01";
   show($("#emailChip")); show($("#signOutBtn"));
   await refreshAll();
 }
