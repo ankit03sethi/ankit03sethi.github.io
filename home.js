@@ -20,19 +20,22 @@
   // Turn off with ?supabase=0 or localStorage.removeItem(...)
   var SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+  // Supabase is now the default backend for ALL customers.
+  // Add ?supabase=0 to any URL to fall back to Apps Script (emergency switch).
   function useSupabase() {
     try {
       var qs = window.location.search || "";
-      if (qs.indexOf("supabase=1") !== -1) {
-        try { localStorage.setItem("cursive_use_supabase", "1"); } catch (e) {}
-        return true;
-      }
       if (qs.indexOf("supabase=0") !== -1) {
-        try { localStorage.removeItem("cursive_use_supabase"); } catch (e) {}
+        try { localStorage.setItem("cursive_use_supabase", "0"); } catch (e) {}
         return false;
       }
-      return localStorage.getItem("cursive_use_supabase") === "1";
-    } catch (e) { return false; }
+      if (qs.indexOf("supabase=1") !== -1) {
+        try { localStorage.removeItem("cursive_use_supabase"); } catch (e) {}
+        return true;
+      }
+      // Default true unless someone explicitly opted out via localStorage
+      return localStorage.getItem("cursive_use_supabase") !== "0";
+    } catch (e) { return true; }
   }
 
   // ---- year in footer ----
