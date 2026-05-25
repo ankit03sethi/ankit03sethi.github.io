@@ -28,8 +28,8 @@ const FOLLOW_SUBS = [
   { id: "interested",      title: "Interested" },
   { id: "in_progress",     title: "In progress" },
   { id: "lost",            title: "Lost" },
-  { id: "never_visited",   title: "Said: never visited" },
-  { id: "dont_call_again", title: "Said: don't call" },
+  { id: "never_visited",   title: "Never visited" },
+  { id: "dont_call_again", title: "Don't call" },
   { id: "not_interested",  title: "Not interested" },
   { id: "not_required",    title: "Not required" },
 ];
@@ -41,8 +41,8 @@ const TALK_STATUS_OPTIONS = [
   { value: "interested",      label: "Interested" },
   { value: "in_progress",     label: "In progress" },
   { value: "lost",            label: "Lost" },
-  { value: "never_visited",   label: "Said: never visited site" },
-  { value: "dont_call_again", label: "Said: don't call again" },
+  { value: "never_visited",   label: "Never visited" },
+  { value: "dont_call_again", label: "Don't call again" },
   { value: "not_interested",  label: "Not interested" },
   { value: "not_required",    label: "Not required" },
   { value: "won_offline",     label: "Won (paid offline)" },
@@ -639,3 +639,4 @@ function humanError(err) {
   if (/don't have admin access/i.test(msg)) return "This email isn't on the admin whitelist.";
   return msg;
 }
+                             
