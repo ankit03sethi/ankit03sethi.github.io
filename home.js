@@ -14,6 +14,28 @@
   var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyf3idQypXbdftkUCj6y1W1jaZiZYTcnv5PoiFycwbh2PL7Ppl8MN_GCGLAdErEdHY/exec";
   var WHATSAPP_NUMBER = "919625737475";
 
+  // ---- Supabase Edge Functions (feature-flagged migration) ----
+  // Activate by adding ?supabase=1 to any page URL, OR
+  // by running this in the browser console:
+  //   localStorage.setItem("cursive_use_supabase","1")
+  // To turn off, use ?supabase=0 or localStorage.removeItem(...)
+  var SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+  function useSupabase() {
+    try {
+      var qs = window.location.search || "";
+      if (qs.indexOf("supabase=1") !== -1) {
+        try { localStorage.setItem("cursive_use_supabase", "1"); } catch (e) {}
+        return true;
+      }
+      if (qs.indexOf("supabase=0") !== -1) {
+        try { localStorage.removeItem("cursive_use_supabase"); } catch (e) {}
+        return false;
+      }
+      return localStorage.getItem("cursive_use_supabase") === "1";
+    } catch (e) { return false; }
+  }
+
   // ---- year in footer ----
   var yr = document.getElementById("year");
   if (yr) yr.textContent = new Date().getFullYear();
@@ -172,7 +194,11 @@
   }
 
   // ---- POST helper ----
+  // Routes to Supabase Edge Functions when useSupabase() is true,
+  // otherwise stays on Apps Script. Response shape is normalised so
+  // the rest of home.js does not need to know which backend served it.
   function postAS(action, params) {
+    if (useSupabase()) return postSB(action, params || {});
     var body = "action=" + encodeURIComponent(action);
     Object.keys(params || {}).forEach(function (k) {
       var v = params[k];
@@ -184,6 +210,108 @@
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body, redirect: "follow"
     }).then(function (r) { return r.json().catch(function () { return { ok: true }; }); });
+  }
+
+  // ---- Supabase Edge Function caller ----
+  // Maps the legacy Apps Script "action" name to the right Edge Function endpoint
+  // and translates camelCase params -> snake_case body. Response is normalised
+  // back to the camelCase shape the rest of home.js expects.
+  function postSB(action, params) {
+    // Tracking-only actions that don't have a Supabase equivalent: silently OK.
+    if (action === "lead_draft" || action === "lead_cta") {
+      // Best-effort: write a lightweight lead row via service-lead.
+      return sbFetch("service-lead", {
+        service_type: params.serviceType || "tracking",
+        service_name: params.serviceName || action,
+        email:        params.email || null,
+        mobile:       params.mobile || null,
+        description:  action + ": " + (params.serviceName || ""),
+        origin_url:   params.origin || null,
+      }).then(function () { return { ok: true }; })
+        .catch(function () { return { ok: true }; });
+    }
+
+    var endpoint = ({
+      "lead_otp_send":         "lead-otp-send",
+      "lead_otp_verify":       "lead-otp-verify",
+      "service_pay_initiate":  "service-pay-initiate",
+      "service_pay_complete":  "service-pay-complete",
+    })[action];
+    if (!endpoint) return Promise.resolve({ ok: false, message: "Unknown action: " + action });
+
+    // Body translation
+    var body;
+    if (action === "lead_otp_send") {
+      body = {
+        email:        params.email,
+        mobile:       params.mobile,
+        service_type: params.serviceType,
+        service_name: params.serviceName,
+        payload: {
+          name:          params.name || "",
+          service_price: params.servicePrice || "",
+          origin:        params.origin || "",
+        },
+      };
+    } else if (action === "lead_otp_verify") {
+      body = { email: params.email, otp: params.otp };
+    } else if (action === "service_pay_initiate") {
+      body = {
+        email:        params.email,
+        mobile:       params.mobile,
+        service_type: params.serviceType,
+        service_name: params.serviceName,
+        amount:       Number(params.servicePrice) * (Number(params.qty) || 1),
+        qty:          Number(params.qty) || 1,
+        origin_url:   params.origin,
+        payload: {
+          service_type: params.serviceType,
+          service_name: params.serviceName,
+          qty:          Number(params.qty) || 1,
+        },
+      };
+    } else if (action === "service_pay_complete") {
+      body = {
+        pendingId:           params.orderRef,
+        razorpay_payment_id: params.razorpay_payment_id,
+        razorpay_order_id:   params.razorpay_order_id,
+        razorpay_signature:  params.razorpay_signature,
+        email:               params.email,
+        mobile:              params.mobile,
+      };
+    }
+
+    return sbFetch(endpoint, body).then(function (r) {
+      // Normalise response shape back to what home.js expects
+      if (action === "service_pay_initiate" && r && r.ok) {
+        return {
+          ok: true,
+          orderRef: r.pendingId,
+          razorpay: {
+            keyId:       r.key_id,
+            amountPaise: r.amount,
+            currency:    r.currency,
+            orderId:     r.order_id,
+          },
+        };
+      }
+      if (action === "service_pay_complete" && r && r.ok) {
+        return { ok: true, invoiceNumber: r.invoice_number, amount: r.amount };
+      }
+      return r;
+    });
+  }
+
+  function sbFetch(endpoint, body) {
+    return fetch(SUPABASE_URL + "/functions/v1/" + endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        "Content-Type":  "application/json",
+        "apikey":        SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(body || {}),
+    }).then(function (r) { return r.json().catch(function () { return { ok: false, message: "Bad response" }; }); });
   }
 
   // ---- Abandoned-form capture ----
@@ -380,113 +508,4 @@
       }).then(function (res) {
         if (!res || res.ok !== true) {
           setBusy(payBtn, false, payBtnLabel());
-          showErr((res && res.message) || "Could not start payment. Please try again or call us.");
-          showStep("action");
-          return;
-        }
-        openRazorpay(res);
-      }).catch(function (err) {
-        setBusy(payBtn, false, payBtnLabel());
-        showErr("Could not reach the server: " + (err && err.message ? err.message : err));
-        showStep("action");
-      });
-    });
-  }
-
-  // Inject a quantity selector into the action step (Pay or Callback).
-  // Default 1, min 1, max 10. Updates the displayed total as user changes qty.
-  function injectQtySelector() {
-    if (!stepAction || !payBtn) return;
-    var existing = document.getElementById("leadQtyWrap");
-    if (existing) existing.remove();
-    var wrap = document.createElement("div");
-    wrap.id = "leadQtyWrap";
-    wrap.style.cssText = "display:flex;align-items:center;gap:10px;margin:14px 0;padding:12px;background:#f0f7ff;border:1px solid #cfe3ff;border-radius:10px;";
-    wrap.innerHTML =
-      '<label for="leadQty" style="font-weight:600;color:#1f2328;">Quantity:</label>' +
-      '<button type="button" id="leadQtyMinus" style="width:32px;height:32px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;">-</button>' +
-      '<input id="leadQty" type="number" value="1" min="1" max="10" style="width:60px;height:32px;text-align:center;border:1px solid #d0d7de;border-radius:6px;font-size:15px;">' +
-      '<button type="button" id="leadQtyPlus" style="width:32px;height:32px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;">+</button>' +
-      '<span style="color:#57606a;font-size:13px;margin-left:auto;">Total: <strong style="color:#1f6feb;font-size:16px;" id="leadQtyTotal">' + currentPriceNum + '</strong>/-</span>';
-    payBtn.parentNode.insertBefore(wrap, payBtn);
-
-    var qtyInput = document.getElementById("leadQty");
-    var totalEl  = document.getElementById("leadQtyTotal");
-    function refresh() {
-      var n = Math.max(1, Math.min(10, parseInt(qtyInput.value, 10) || 1));
-      qtyInput.value = n;
-      totalEl.textContent = (n * currentPriceNum).toLocaleString("en-IN");
-      payBtn.innerHTML = "🔒 Pay ₹" + (n * currentPriceNum).toLocaleString("en-IN") + "/- now";
-    }
-    qtyInput.addEventListener("input", refresh);
-    qtyInput.addEventListener("change", refresh);
-    document.getElementById("leadQtyMinus").addEventListener("click", function () {
-      qtyInput.value = Math.max(1, (parseInt(qtyInput.value, 10) || 1) - 1);
-      refresh();
-    });
-    document.getElementById("leadQtyPlus").addEventListener("click", function () {
-      qtyInput.value = Math.min(10, (parseInt(qtyInput.value, 10) || 1) + 1);
-      refresh();
-    });
-    refresh();
-  }
-
-  function openRazorpay(initData) {
-    if (typeof Razorpay === "undefined") {
-      setBusy(payBtn, false, payBtnLabel());
-      showErr("Payment library missing. Please refresh and try again.");
-      return;
-    }
-    var rzp = new Razorpay({
-      key: initData.razorpay.keyId,
-      amount: initData.razorpay.amountPaise,
-      currency: initData.razorpay.currency,
-      name: "SHOPPERSKART",
-      description: "cursive - " + currentService,
-      order_id: initData.razorpay.orderId,
-      prefill: { email: currentEmail, contact: currentMobile },
-      readonly: { email: true },
-      theme: { color: "#1f6feb" },
-      handler: function (response) {
-        setBusy(payBtn, true);
-        var qtyInputForComplete = document.getElementById("leadQty");
-        var qtyForComplete = qtyInputForComplete ? Math.max(1, Math.min(10, parseInt(qtyInputForComplete.value, 10) || 1)) : 1;
-        postAS("service_pay_complete", {
-          email: currentEmail,
-          mobile: currentMobile,
-          serviceType: currentServiceTag,
-          serviceName: currentService,
-          servicePrice: currentPriceNum * qtyForComplete,
-          qty: qtyForComplete,
-          orderRef: initData.orderRef,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_order_id:   response.razorpay_order_id,
-          razorpay_signature:  response.razorpay_signature,
-          origin: window.location.pathname
-        }).then(function (res) {
-          if (!res || res.ok !== true) {
-            setBusy(payBtn, false, payBtnLabel());
-            showErr((res && res.message) || "Payment succeeded but we couldn't record it. Please contact support immediately.");
-            return;
-          }
-          if (paidEmailEl)   paidEmailEl.textContent = currentEmail;
-          if (paidInvoiceEl) paidInvoiceEl.textContent = res.invoiceNumber || "(emailed)";
-          showStep("paid");
-        }).catch(function (err) {
-          setBusy(payBtn, false, payBtnLabel());
-          showErr("Server error: " + (err && err.message ? err.message : err));
-        });
-      },
-      modal: {
-        ondismiss: function () {
-          setBusy(payBtn, false, payBtnLabel());
-        }
-      }
-    });
-    rzp.on('payment.failed', function (response) {
-      setBusy(payBtn, false, payBtnLabel());
-      showErr("Payment failed: " + (response.error && response.error.description ? response.error.description : "Please try again."));
-    });
-    rzp.open();
-  }
-})();
+      
