@@ -173,11 +173,10 @@ function renderLeads(rows) {
         <td><div>${esc(r.service_name || r.service_type || "—")}</div>${r.latest_description ? `<div class="muted-small">${esc(r.latest_description)}</div>` : ""}</td>
         <td>${r.email ? `<div>${esc(r.email)}</div>` : ""}${r.mobile ? `<div class="muted-small">${esc(r.mobile)}</div>` : ""}</td>
         <td class="money">${r.amount ? inr(r.amount) : "—"}</td>
-        <td><span class="muted-small" style="background:#eef2ff;color:#1d4ed8;padding:2px 9px;border-radius:999px;font-weight:700;">${r.events_count}</span></td>
+        <td><span style="background:#eef2ff;color:#1d4ed8;padding:2px 9px;border-radius:999px;font-weight:700;font-size:11px;">${r.events_count}</span></td>
       </tr>`).join("")}</tbody></table></div>
-    <p style="margin:12px 16px;color:#94a3b8;font-size:11px;">Tip: click any row to see the full event history for that customer.</p>`;
+    <p style="margin:12px 16px;color:#94a3b8;font-size:11px;">Tip: click any row to expand its full event history.</p>`;
 
-  // Click-to-expand history
   document.querySelectorAll(".lead-row").forEach((tr) => {
     tr.addEventListener("click", async () => {
       const email = tr.dataset.email;
@@ -281,4 +280,27 @@ function renderSearch(d) {
   const sec = (title, rows, render) => rows.length ? `<h3 style="margin:18px 14px 8px;font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">${title} (${rows.length})</h3>${render(rows)}` : "";
   const noResults = !d.leads.length && !d.invoices.length && !d.wallets.length && !d.completed.length;
   if (noResults) {
-    $("#paneSearch").innerHTML = `<div 
+    $("#paneSearch").innerHTML = `<div class="empty">No results for "<strong>${esc(d.query)}</strong>".</div>`;
+    return;
+  }
+  $("#paneSearch").innerHTML = `
+    ${sec("Leads", d.leads, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.last_event_at || r.created_at)}</td><td><span class="event-pill ${esc(r.latest_event || r.event_type || "")}">${esc(r.latest_event || r.event_type || "")}</span></td><td>${esc(r.service_name || "")}</td><td>${esc(r.email || "")}</td><td>${esc(r.mobile || "")}</td><td class="money">${r.amount ? inr(r.amount) : ""}</td></tr>`).join("")}</tbody></table></div>`)}
+    ${sec("Completed payments", d.completed, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.completed_at)}</td><td>${esc(r.email || "")}</td><td>${esc(r.service_name || "")}</td><td class="money green">${inr(r.amount)}</td><td class="mono">${esc(r.invoice_number || "")}</td></tr>`).join("")}</tbody></table></div>`)}
+    ${sec("Invoices", d.invoices, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td class="mono">${esc(r.invoice_number)}</td><td>${esc(r.email || "")}</td><td class="money green">${inr(r.total)}</td></tr>`).join("")}</tbody></table></div>`)}
+    ${sec("Wallets", d.wallets, (rows) => `<div class="table-scroll"><table class="data"><tbody>${rows.map(r => `<tr><td>${esc(r.email)}</td><td>${esc(r.mobile || "")}</td><td class="money ${Number(r.balance) > 0 ? "green" : ""}">${inr(r.balance)}</td></tr>`).join("")}</tbody></table></div>`)}
+  `;
+}
+
+// ---- Utils ----
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function num(n) { return Number(n || 0).toLocaleString("en-IN"); }
+function inr(n) { return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(Number(n || 0)); }
+function fmtDate(iso) { if (!iso) return "—"; return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }); }
+function fmtTime(iso) { if (!iso) return ""; return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
+function humanError(err) {
+  const msg = (err && err.message) || String(err);
+  if (/invalid login credentials/i.test(msg)) return "Email and password don't match.";
+  if (/rate limit/i.test(msg))                return "Too many attempts, wait a minute.";
+  if (/don't have admin access/i.test(msg))   return "This email isn't on the admin whitelist.";
+  return msg;
+}
