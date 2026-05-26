@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052709" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052710" />
 </head>
 <body>
 
@@ -86,24 +86,14 @@
       <div class="meta">Across all marketplaces</div>
     </div>
     <div class="kpi">
-      <div class="label">Tracked successfully</div>
-      <div class="value" id="kpiOk">0</div>
-      <div class="meta">With latest data</div>
-    </div>
-    <div class="kpi">
-      <div class="label">Pending fetch</div>
-      <div class="value" id="kpiPending">0</div>
-      <div class="meta">Never fetched yet</div>
-    </div>
-    <div class="kpi">
-      <div class="label">Last fetched</div>
-      <div class="value" id="kpiLast">&mdash;</div>
-      <div class="meta">Most recent activity</div>
+      <div class="label">Total platforms</div>
+      <div class="value" id="kpiPlatforms">0</div>
+      <div class="meta">Marketplaces with products</div>
     </div>
   </div>
 
   <div id="filterBar" class="hidden" style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #eaecf0;">
-    <input id="searchInput" type="search" placeholder="Search Product Id or Seller..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
+    <input id="searchInput" type="search" placeholder="Search Product Id or Seller..." style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
     <select id="platformFilter" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
       <option value="">All platforms</option>
       <option value="Amazon">Amazon</option>
@@ -112,6 +102,15 @@
       <option value="Myntra">Myntra</option>
       <option value="Firstcry">Firstcry</option>
     </select>
+    <div id="sellerFilterWrap" style="position:relative;">
+      <button id="sellerFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:140px;text-align:left;">All sellers <span style="float:right;color:#94a3b8;">&#9662;</span></button>
+      <div id="sellerFilterPanel" class="hidden" style="position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d0d5dd;border-radius:8px;padding:8px;min-width:240px;max-height:280px;overflow-y:auto;box-shadow:0 4px 18px rgba(0,0,0,.1);z-index:50;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;font-weight:600;border-bottom:1px solid #eaecf0;margin-bottom:4px;cursor:pointer;">
+          <input type="checkbox" id="sellerAllChk" checked /> Select all
+        </label>
+        <div id="sellerList"></div>
+      </div>
+    </div>
     <select id="sortBy" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
       <option value="created_desc">Newest first</option>
       <option value="price_asc">Price: Low to High</option>
@@ -249,13 +248,9 @@ async function refreshDash() {
 
     // KPIs
     const total = _cachedRows.length;
-    const ok = _cachedRows.filter(p => p.last_check_status === "ok").length;
-    const pending = _cachedRows.filter(p => !p.last_checked_at).length;
-    const last = snapshots.length > 0 ? snapshots[0].fetched_at : null;
+    const platforms = new Set(_cachedRows.map(p => p.platform)).size;
     $("#kpiTotal").textContent = total;
-    $("#kpiOk").textContent = ok;
-    $("#kpiPending").textContent = pending;
-    $("#kpiLast").textContent = last ? new Date(last).toLocaleTimeString() : "—";
+    $("#kpiPlatforms").textContent = platforms;
     $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString() + " (auto-refresh every 60s)";
 
     if (tier === "trial") {
@@ -285,6 +280,7 @@ async function refreshDash() {
     if (total > 0) show($("#filterBar"));
     else hide($("#filterBar"));
 
+    rebuildSellerFilter();
     renderTable();
   } catch (e) {
     $("#productsContainer").innerHTML = `<div class="empty"><div class="big">Error loading data</div><div>${esc(e.message)}</div></div>`;
@@ -302,12 +298,22 @@ function renderTable() {
   const platform = $("#platformFilter")?.value || "";
   const sortBy = $("#sortBy")?.value || "created_desc";
 
+  // Read which sellers are currently checked
+  const sellerChecks = document.querySelectorAll("#sellerList input[type=checkbox]");
+  const allowedSellers = new Set();
+  let anySellerChecked = false;
+  sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
+
   let rows = _cachedRows.slice();
   if (platform) rows = rows.filter(r => r.platform === platform);
   if (q) rows = rows.filter(r =>
     (r.product_id || "").toLowerCase().includes(q) ||
     (r.seller || "").toLowerCase().includes(q)
   );
+  // Only apply seller filter if checkboxes exist AND not all checked
+  if (sellerChecks.length > 0 && anySellerChecked) {
+    rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
+  }
 
   const sorters = {
     created_desc: (a, b) => new Date(b.created_at) - new Date(a.created_at),
@@ -419,16 +425,3 @@ function setupExtensionAutoPair() {
     }
     if (event.data.type === "PD_TRACKER_SIGNIN_RESULT" && event.data.ok) {
       // Show a toast
-      const t = document.createElement("div");
-      t.style.cssText = "position:fixed;bottom:24px;right:24px;background:#047857;color:#fff;padding:12px 18px;border-radius:8px;font-weight:600;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.15);z-index:9999;";
-      t.textContent = "Extension connected!";
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 4000);
-    }
-  });
-  // Ping the extension in case it loaded before this listener
-  setTimeout(() => window.postMessage({ type: "PD_TRACKER_PING" }, "https://cursive.world"), 500);
-}
-</script>
-</body>
-</html>
