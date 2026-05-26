@@ -63,7 +63,7 @@
     </div>
     <div class="dash-actions">
       <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload products</a>
-      <a href="/pdtracker/install-extension.html" class="btn btn-outline">Install extension</a>
+      <a href="/pdtracker/install-extension.html" id="installExtBtn" class="btn btn-outline hidden">Install extension</a>
       <button id="refreshBtn" class="btn btn-outline">Refresh</button>
     </div>
   </div>
@@ -250,14 +250,20 @@ async function refreshDash() {
       $("#trialUsed").textContent = total;
       $("#trialQuota").textContent = quota;
       show($("#trialBanner"));
-    } else { hide($("#trialBanner")); }
+    } else {
+      hide($("#trialBanner"));
+      const btn = document.querySelector("#installExtBtn"); if (btn) btn.classList.remove("hidden");
+    }
 
     const { data: hb } = await sb.from("analytics_heartbeats").select("last_ping_at").maybeSingle();
     if (hb?.last_ping_at) {
       const ageMin = (Date.now() - new Date(hb.last_ping_at).getTime()) / 60000;
       const isOnline = ageMin < 10;
       $("#trackerStatus").className = "scraper-status " + (isOnline ? "online" : "offline");
-      $("#statusText").textContent = isOnline ? "Tracker online" : "Tracker offline";
+      $("#statusText").textContent = isOnline ? "Your tracker online" : "Your tracker offline";
+    } else if (tier === "trial") {
+      $("#trackerStatus").className = "scraper-status online";
+      $("#statusText").textContent = "Tracker active (free trial)";
     } else {
       $("#trackerStatus").className = "scraper-status offline";
       $("#statusText").textContent = "Install extension";
@@ -407,10 +413,4 @@ function setupExtensionAutoPair() {
       setTimeout(() => t.remove(), 4000);
     }
   });
-  // Ping the extension in case it loaded before this listener
-  setTimeout(() => window.postMessage({ type: "PD_TRACKER_PING" }, "https://cursive.world"), 500);
-}
-
-</script>
-</body>
-</html>
+  // Ping the e
