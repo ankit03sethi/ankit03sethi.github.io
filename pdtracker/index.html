@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052705" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052706" />
 </head>
 <body>
 
@@ -185,6 +185,7 @@ async function bootDash() {
   show($("#emailChip")); show($("#signOutBtn")); show($("#trackerStatus"));
   await refreshDash();
   startAutoRefresh();
+  setupExtensionAutoPair();
 
   // Realtime: live update when snapshots come in
   sb.channel("pd-snapshots")
@@ -373,6 +374,43 @@ function startAutoRefresh() {
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+// Auto-pair with Cursive PD Tracker extension (if installed)
+// The extension's content script (pd-bridge.js) injects on cursive.world/pdtracker/*
+// and announces itself via window.postMessage. We send the current JWT in response.
+let _pairAttempted = false;
+function setupExtensionAutoPair() {
+  if (_pairAttempted) return;
+  _pairAttempted = true;
+  // Listen for extension's announcement (it posts on load)
+  window.addEventListener("message", async (event) => {
+    if (event.origin !== "https://cursive.world") return;
+    if (!event.data) return;
+    if (event.data.type === "PD_TRACKER_EXTENSION_PRESENT") {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return;
+      // Post JWT to extension via window.postMessage; extension's bridge catches it
+      window.postMessage({
+        type: "PD_TRACKER_SIGNIN",
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at ? session.expires_at * 1000 : (Date.now() + 3600 * 1000),
+        email: session.user.email,
+      }, "https://cursive.world");
+    }
+    if (event.data.type === "PD_TRACKER_SIGNIN_RESULT" && event.data.ok) {
+      // Show a toast
+      const t = document.createElement("div");
+      t.style.cssText = "position:fixed;bottom:24px;right:24px;background:#047857;color:#fff;padding:12px 18px;border-radius:8px;font-weight:600;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.15);z-index:9999;";
+      t.textContent = "Extension connected!";
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+  });
+  // Ping the extension in case it loaded before this listener
+  setTimeout(() => window.postMessage({ type: "PD_TRACKER_PING" }, "https://cursive.world"), 500);
+}
+
 </script>
 </body>
 </html>
