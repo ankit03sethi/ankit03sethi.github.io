@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052714" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052715" />
 </head>
 <body>
 
@@ -110,16 +110,6 @@
         <div id="sellerList"></div>
       </div>
     </div>
-
-    <select id="sortBy" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
-      <option value="created_desc">Newest first</option>
-      <option value="price_asc">Price: Low to High</option>
-      <option value="price_desc">Price: High to Low</option>
-      <option value="rating_desc">Rating: High to Low</option>
-      <option value="rating_asc">Rating: Low to High</option>
-      <option value="reviews_desc">Reviews: Most first</option>
-      <option value="reviews_asc">Reviews: Least first</option>
-    </select>
 
     <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
       <span>Price &#8377;</span>
@@ -223,7 +213,8 @@ async function bootDash() {
 }
 
 let _cachedRows = [];
-let _pinnedApplied = false;   // last fetched data so filters work without re-querying
+let _pinnedApplied = false;
+let _sortKey = "created_desc";   // last fetched data so filters work without re-querying
 
 async function refreshDash() {
   try {
@@ -321,7 +312,7 @@ function renderTable() {
 
   const q = ($("#searchInput")?.value || "").trim().toLowerCase();
   const platform = $("#platformFilter")?.value || "";
-  const sortBy = $("#sortBy")?.value || "created_desc";
+  const sortBy = _sortKey || "created_desc";
 
   // Read which sellers are currently checked
   const sellerChecks = document.querySelectorAll("#sellerList input[type=checkbox]");
@@ -365,13 +356,18 @@ function renderTable() {
     return;
   }
 
+  const arrow = (col) => {
+    if (_sortKey === col + "_desc") return " &darr;";
+    if (_sortKey === col + "_asc") return " &uarr;";
+    return " &#8597;";
+  };
   let html = '<div class="table-scroll"><table class="data"><thead><tr>'
-    + '<th data-sort="platform" style="cursor:pointer;">Platform</th>'
-    + '<th data-sort="product_id" style="cursor:pointer;">Product ID</th>'
-    + '<th data-sort="price_desc" style="cursor:pointer;" title="Click to sort">Price &#8597;</th>'
-    + '<th data-sort="rating_desc" style="cursor:pointer;" title="Click to sort">Rating &#8597;</th>'
-    + '<th data-sort="reviews_desc" style="cursor:pointer;" title="Click to sort">Reviews &#8597;</th>'
-    + '<th data-sort="seller" style="cursor:pointer;">Seller</th>'
+    + '<th>Platform</th>'
+    + '<th>Product ID</th>'
+    + '<th data-sort="price_desc" style="cursor:pointer;" title="Click to sort">Price' + arrow("price") + '</th>'
+    + '<th data-sort="rating_desc" style="cursor:pointer;" title="Click to sort">Rating' + arrow("rating") + '</th>'
+    + '<th data-sort="reviews_desc" style="cursor:pointer;" title="Click to sort">Reviews' + arrow("reviews") + '</th>'
+    + '<th>Seller</th>'
     + '<th>Last fetched</th>'
     + '<th>Link</th>'
     + '</tr></thead><tbody>';
@@ -391,16 +387,14 @@ function renderTable() {
   html += "</tbody></table></div>";
   container.innerHTML = html;
 
-  // Click-to-sort on headers
+  // Click-to-sort on Price / Rating / Reviews headers — toggles high-to-low / low-to-high
   container.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", () => {
-      const sortKey = th.dataset.sort;
-      const dropdown = $("#sortBy");
-      // Toggle asc/desc on price/rating/reviews
-      if (["price_desc","rating_desc","reviews_desc"].includes(sortKey)) {
-        const ascKey = sortKey.replace("_desc","_asc");
-        dropdown.value = dropdown.value === sortKey ? ascKey : sortKey;
-      }
+      const baseKey = th.dataset.sort;  // e.g. "price_desc"
+      if (!["price_desc","rating_desc","reviews_desc"].includes(baseKey)) return;
+      const ascKey = baseKey.replace("_desc","_asc");
+      // Toggle: if currently desc on this col, switch to asc; otherwise set to desc
+      _sortKey = (_sortKey === baseKey) ? ascKey : baseKey;
       renderTable();
     });
   });
@@ -415,7 +409,7 @@ function getFilterState() {
   return {
     q: document.querySelector("#searchInput")?.value || "",
     platform: document.querySelector("#platformFilter")?.value || "",
-    sortBy: document.querySelector("#sortBy")?.value || "created_desc",
+    sortBy: _sortKey || "created_desc",
     priceMin: document.querySelector("#priceMin")?.value || "",
     priceMax: document.querySelector("#priceMax")?.value || "",
     ratingMin: document.querySelector("#ratingMin")?.value || "",
@@ -428,7 +422,7 @@ function applyFilterState(s) {
   const setVal = (sel, v) => { const el = document.querySelector(sel); if (el && v != null) el.value = v; };
   setVal("#searchInput", s.q);
   setVal("#platformFilter", s.platform);
-  setVal("#sortBy", s.sortBy);
+  if (s.sortBy) _sortKey = s.sortBy;
   setVal("#priceMin", s.priceMin);
   setVal("#priceMax", s.priceMax);
   setVal("#ratingMin", s.ratingMin);
@@ -455,14 +449,14 @@ function clearPinnedFilters() { localStorage.removeItem(FILTER_KEY); }
 window.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     const wire = (sel) => { const el = document.querySelector(sel); if (el) el.addEventListener(el.tagName === "SELECT" ? "change" : "input", renderTable); };
-    wire("#searchInput"); wire("#platformFilter"); wire("#sortBy");
+    wire("#searchInput"); wire("#platformFilter");
     wire("#priceMin"); wire("#priceMax"); wire("#ratingMin"); wire("#reviewsMin");
     const pin = document.querySelector("#saveFiltersBtn");
     if (pin) pin.addEventListener("click", () => savePinnedFilters());
     const rst = document.querySelector("#resetFiltersBtn");
     if (rst) rst.addEventListener("click", () => {
       ["#searchInput","#platformFilter","#priceMin","#priceMax","#ratingMin","#reviewsMin"].forEach(s => { const el = document.querySelector(s); if (el) el.value = ""; });
-      const sb_ = document.querySelector("#sortBy"); if (sb_) sb_.value = "created_desc";
+      _sortKey = "created_desc";
       document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => c.checked = true);
       syncSellerButtonLabel(); syncSellerAllCheck();
       clearPinnedFilters();
