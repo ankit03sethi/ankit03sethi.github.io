@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052716" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052717" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -64,6 +65,7 @@
     <div class="dash-actions">
       <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload products</a>
       <a href="/pdtracker/install-extension.html" id="installExtBtn" class="btn btn-outline hidden">Install extension</a>
+      <button id="downloadXlsxBtn" class="btn btn-outline">&#11015; Download Excel</button>
       <button id="refreshBtn" class="btn btn-outline">Refresh</button>
     </div>
   </div>
@@ -109,23 +111,6 @@
         </label>
         <div id="sellerList"></div>
       </div>
-    </div>
-
-    <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
-      <span>Price &#8377;</span>
-      <input id="priceMin" type="number" min="0" placeholder="min" style="width:70px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
-      <span>&ndash;</span>
-      <input id="priceMax" type="number" min="0" placeholder="max" style="width:70px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
-    </div>
-
-    <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
-      <span>Rating &ge;</span>
-      <input id="ratingMin" type="number" step="0.1" min="0" max="5" placeholder="0" style="width:50px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
-    </div>
-
-    <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
-      <span>Reviews &ge;</span>
-      <input id="reviewsMin" type="number" min="0" placeholder="0" style="width:70px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
     </div>
 
     <button id="saveFiltersBtn" class="btn btn-primary-sm" style="font-size:12px;padding:8px 14px;" title="Fix current filters so they auto-apply next time you sign in">&#128204; Fix filters</button>
@@ -320,12 +305,6 @@ function renderTable() {
   let anySellerChecked = false;
   sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
 
-  // Numeric ranges
-  const priceMin = parseFloat($("#priceMin")?.value || "");
-  const priceMax = parseFloat($("#priceMax")?.value || "");
-  const ratingMin = parseFloat($("#ratingMin")?.value || "");
-  const reviewsMin = parseFloat($("#reviewsMin")?.value || "");
-
   let rows = _cachedRows.slice();
   if (platform) rows = rows.filter(r => r.platform === platform);
   if (q) rows = rows.filter(r =>
@@ -335,10 +314,7 @@ function renderTable() {
   if (sellerChecks.length > 0 && anySellerChecked) {
     rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
   }
-  if (!isNaN(priceMin)) rows = rows.filter(r => r.price != null && r.price >= priceMin);
-  if (!isNaN(priceMax)) rows = rows.filter(r => r.price != null && r.price <= priceMax);
-  if (!isNaN(ratingMin)) rows = rows.filter(r => r.rating != null && r.rating >= ratingMin);
-  if (!isNaN(reviewsMin)) rows = rows.filter(r => r.review_count != null && r.review_count >= reviewsMin);
+
 
   const sorters = {
     created_desc: (a, b) => new Date(b.created_at) - new Date(a.created_at),
@@ -357,9 +333,9 @@ function renderTable() {
   }
 
   const arrow = (col) => {
-    if (_sortKey === col + "_desc") return " &darr;";
-    if (_sortKey === col + "_asc") return " &uarr;";
-    return " &#8597;";
+    if (_sortKey === col + "_desc") return ' <span style="color:#1f6feb;font-size:14px;font-weight:700;">&#9660;</span>';
+    if (_sortKey === col + "_asc") return ' <span style="color:#1f6feb;font-size:14px;font-weight:700;">&#9650;</span>';
+    return ' <span style="color:#cbd5e1;font-size:11px;">&#9650;&#9660;</span>';
   };
   let html = '<div class="table-scroll"><table class="data"><thead><tr>'
     + '<th>Platform</th>'
@@ -410,10 +386,6 @@ function getFilterState() {
     q: document.querySelector("#searchInput")?.value || "",
     platform: document.querySelector("#platformFilter")?.value || "",
     sortBy: _sortKey || "created_desc",
-    priceMin: document.querySelector("#priceMin")?.value || "",
-    priceMax: document.querySelector("#priceMax")?.value || "",
-    ratingMin: document.querySelector("#ratingMin")?.value || "",
-    reviewsMin: document.querySelector("#reviewsMin")?.value || "",
     sellersUnchecked,
   };
 }
@@ -423,10 +395,6 @@ function applyFilterState(s) {
   setVal("#searchInput", s.q);
   setVal("#platformFilter", s.platform);
   if (s.sortBy) _sortKey = s.sortBy;
-  setVal("#priceMin", s.priceMin);
-  setVal("#priceMax", s.priceMax);
-  setVal("#ratingMin", s.ratingMin);
-  setVal("#reviewsMin", s.reviewsMin);
   // Uncheck the sellers that were saved as unchecked
   if (Array.isArray(s.sellersUnchecked)) {
     document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => {
@@ -450,7 +418,6 @@ window.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     const wire = (sel) => { const el = document.querySelector(sel); if (el) el.addEventListener(el.tagName === "SELECT" ? "change" : "input", renderTable); };
     wire("#searchInput"); wire("#platformFilter");
-    wire("#priceMin"); wire("#priceMax"); wire("#ratingMin"); wire("#reviewsMin");
     const pin = document.querySelector("#saveFiltersBtn");
     if (pin) pin.addEventListener("click", () => savePinnedFilters());
     const rst = document.querySelector("#resetFiltersBtn");
@@ -564,6 +531,48 @@ document.addEventListener("change", (e) => {
     syncSellerButtonLabel(); renderTable();
   }
 });
+
+// ---- Download visible rows as Excel ----
+function downloadVisibleAsExcel() {
+  if (typeof XLSX === "undefined") { alert("Excel library not loaded yet, try again in a moment."); return; }
+  // Re-apply current filters to get visible rows
+  const q = ($("#searchInput")?.value || "").trim().toLowerCase();
+  const platform = $("#platformFilter")?.value || "";
+  const sellerChecks = document.querySelectorAll("#sellerList input[type=checkbox]");
+  const allowedSellers = new Set();
+  let anySellerChecked = false;
+  sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
+  let rows = _cachedRows.slice();
+  if (platform) rows = rows.filter(r => r.platform === platform);
+  if (q) rows = rows.filter(r => (r.product_id || "").toLowerCase().includes(q) || (r.seller || "").toLowerCase().includes(q));
+  if (sellerChecks.length > 0 && anySellerChecked) rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
+
+  if (rows.length === 0) { alert("No rows to export."); return; }
+  const data = rows.map(r => ({
+    "Platform": r.platform,
+    "Product ID": r.product_id,
+    "Price (INR)": r.price ?? "",
+    "Rating": r.rating ?? "",
+    "Reviews": r.review_count ?? "",
+    "Seller": r.seller ?? "",
+    "Last fetched": r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "",
+    "Product URL": r.product_url ?? "",
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  // Column widths
+  ws["!cols"] = [{wch:10},{wch:18},{wch:12},{wch:8},{wch:10},{wch:30},{wch:20},{wch:50}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  const ts = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `Cursive_PD_Tracker_${ts}.xlsx`);
+}
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    const b = document.querySelector("#downloadXlsxBtn");
+    if (b) b.addEventListener("click", downloadVisibleAsExcel);
+  }, 100);
+});
+
 </script>
 </body>
 </html>
