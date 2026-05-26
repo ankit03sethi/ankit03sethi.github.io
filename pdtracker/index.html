@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052712" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052713" />
 </head>
 <body>
 
@@ -420,3 +420,69 @@ function setupExtensionAutoPair() {
     }
     if (event.data.type === "PD_TRACKER_SIGNIN_RESULT" && event.data.ok) {
       // Show a toast
+      const t = document.createElement("div");
+      t.style.cssText = "position:fixed;bottom:24px;right:24px;background:#047857;color:#fff;padding:12px 18px;border-radius:8px;font-weight:600;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.15);z-index:9999;";
+      t.textContent = "Extension connected!";
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+  });
+  setTimeout(() => window.postMessage({ type: "PD_TRACKER_PING" }, "https://cursive.world"), 500);
+}
+
+// ---- Seller filter helpers ----
+function rebuildSellerFilter() {
+  const sellers = new Set();
+  for (const r of _cachedRows) sellers.add(r.seller || "(unknown)");
+  const sellersArr = Array.from(sellers).sort();
+  const list = document.querySelector("#sellerList");
+  if (!list) return;
+  const priorChecked = {};
+  list.querySelectorAll("input[type=checkbox]").forEach(c => { priorChecked[c.value] = c.checked; });
+  list.innerHTML = sellersArr.map(s => {
+    const wasChecked = priorChecked[s] !== false;
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;cursor:pointer;"><input type="checkbox" value="${esc(s)}" ${wasChecked ? "checked" : ""} class="sellerChk" /> ${esc(s)}</label>`;
+  }).join("");
+  list.querySelectorAll("input[type=checkbox]").forEach(c => c.addEventListener("change", () => {
+    syncSellerButtonLabel(); syncSellerAllCheck(); renderTable();
+  }));
+  syncSellerButtonLabel(); syncSellerAllCheck();
+}
+function syncSellerButtonLabel() {
+  const checks = document.querySelectorAll("#sellerList input[type=checkbox]");
+  const total = checks.length;
+  let checked = 0;
+  checks.forEach(c => { if (c.checked) checked++; });
+  const btn = document.querySelector("#sellerFilterBtn");
+  if (!btn) return;
+  if (total === 0) btn.innerHTML = `All sellers <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else if (checked === total) btn.innerHTML = `All sellers <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else if (checked === 0) btn.innerHTML = `No sellers <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else btn.innerHTML = `${checked} of ${total} sellers <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+}
+function syncSellerAllCheck() {
+  const all = document.querySelector("#sellerAllChk");
+  if (!all) return;
+  const checks = document.querySelectorAll("#sellerList input[type=checkbox]");
+  let allOn = true, anyOn = false;
+  checks.forEach(c => { if (c.checked) anyOn = true; else allOn = false; });
+  all.checked = allOn;
+  all.indeterminate = anyOn && !allOn;
+}
+document.addEventListener("click", (e) => {
+  const btn = document.querySelector("#sellerFilterBtn");
+  const panel = document.querySelector("#sellerFilterPanel");
+  if (!btn || !panel) return;
+  if (e.target === btn || btn.contains(e.target)) { panel.classList.toggle("hidden"); }
+  else if (!panel.contains(e.target)) { panel.classList.add("hidden"); }
+});
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.id === "sellerAllChk") {
+    const v = e.target.checked;
+    document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => { c.checked = v; });
+    syncSellerButtonLabel(); renderTable();
+  }
+});
+</script>
+</body>
+</html>
