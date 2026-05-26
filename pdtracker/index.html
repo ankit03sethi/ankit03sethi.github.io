@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052720" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052721" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     @keyframes pd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -67,6 +67,12 @@
     <div>
       <h1>Your tracked products</h1>
       <div class="subtitle" id="lastUpdate">Loading...</div>
+    </div>
+    <div style="flex:1;display:flex;justify-content:center;padding:0 16px;min-width:240px;">
+      <div style="background:#f0f6ff;border:1px solid #c7d9f7;border-radius:10px;padding:10px 16px;font-size:13px;color:#1d4ed8;line-height:1.5;text-align:center;max-width:520px;">
+        &#9201; <strong>First-time upload may take a few minutes.</strong><br>
+        We&rsquo;re carefully checking each product on the marketplace for you &mdash; thank you for your patience.
+      </div>
     </div>
     <div class="dash-actions">
       <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload products</a>
