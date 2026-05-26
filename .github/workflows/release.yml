@@ -1,0 +1,48 @@
+name: Publish Cursive PD Tracker Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify release assets exist
+        run: |
+          ls -la .github/release-assets/
+          test -f .github/release-assets/CursivePDTracker-Setup.bat
+          test -f .github/release-assets/cursive-pd-tracker.zip
+
+      - name: Create Release with assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Cursive PD Tracker ${{ github.ref_name }}
+          body: |
+            ## Cursive PD Tracker installer
+
+            Helping sellers stay informed about publicly visible product data on marketplaces - for their own business decisions.
+
+            ### What customers download
+            Just one file: **CursivePDTracker-Setup.bat** (4 KB)
+
+            ### How it works
+            Customer double-clicks the .bat. Installer downloads the extension ZIP from this release automatically, extracts to %LOCALAPPDATA%, sets Chrome to auto-launch on PC boot, opens Chrome for sign-in.
+
+            ### Files in this release
+            - `CursivePDTracker-Setup.bat` - what customers download
+            - `cursive-pd-tracker.zip` - extension files (fetched by the .bat)
+          files: |
+            .github/release-assets/CursivePDTracker-Setup.bat
+            .github/release-assets/cursive-pd-tracker.zip
+          draft: false
+          prerelease: false
+          make_latest: true
