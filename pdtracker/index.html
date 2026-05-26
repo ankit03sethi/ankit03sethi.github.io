@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052710" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052711" />
 </head>
 <body>
 
@@ -71,12 +71,9 @@
   <div id="trialBanner" class="trial-banner hidden">
     <div class="text">
       <strong>Free trial:</strong> <span id="trialLeft">10</span> of <span id="trialQuota">10</span> products left to try.
-      <span style="color:#92400e;opacity:.75;">Loving it? Unlock unlimited products on your own PC.</span>
+      <span style="color:#92400e;opacity:.75;">Loving it?</span>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn-upgrade" id="skipTrialBtn" style="background:transparent;color:#92400e;border:1px solid #92400e;">Skip trial &amp; upgrade</button>
-      <button class="btn-upgrade" id="upgradeBtn">Upgrade now</button>
-    </div>
+    <button class="btn-upgrade" id="upgradeBtn">Upgrade now</button>
   </div>
 
   <div class="kpi-row">
@@ -188,15 +185,13 @@ async function bootDash() {
   await refreshDash();
   startAutoRefresh();
   setupExtensionAutoPair();
-  // Wire upgrade + skip-trial buttons (placeholder until Razorpay subscription is built)
-  const wireUpgrade = (id, label) => {
-    const b = document.querySelector(id);
-    if (b) b.addEventListener("click", () => {
-      alert(label + " — payment flow coming soon. For now, WhatsApp +91 96257 37475 to upgrade manually.");
-    });
-  };
-  wireUpgrade("#upgradeBtn", "Upgrade");
-  wireUpgrade("#skipTrialBtn", "Skip trial");
+  // Wire upgrade button (placeholder until Razorpay subscription is built)
+  const upBtn = document.querySelector("#upgradeBtn");
+  if (upBtn) upBtn.addEventListener("click", () => {
+    if (confirm("Upgrade to unlimited products. You can pay now, or close this and continue your free trial. Continue to payment?")) {
+      alert("Payment flow coming soon. For now, WhatsApp +91 96257 37475 to upgrade manually. Your trial continues until then.");
+    }
+  });
 
   // Realtime: live update when snapshots come in
   sb.channel("pd-snapshots")
@@ -424,4 +419,4 @@ function setupExtensionAutoPair() {
       }, "https://cursive.world");
     }
     if (event.data.type === "PD_TRACKER_SIGNIN_RESULT" && event.data.ok) {
-      // Show a toast
+      // Show a toast                                                                                                                                                                                                                                                                           
