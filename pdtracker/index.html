@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052713" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052714" />
 </head>
 <body>
 
@@ -91,6 +91,7 @@
 
   <div id="filterBar" class="hidden" style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #eaecf0;">
     <input id="searchInput" type="search" placeholder="Search Product Id or Seller..." style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
+
     <select id="platformFilter" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
       <option value="">All platforms</option>
       <option value="Amazon">Amazon</option>
@@ -99,6 +100,7 @@
       <option value="Myntra">Myntra</option>
       <option value="Firstcry">Firstcry</option>
     </select>
+
     <div id="sellerFilterWrap" style="position:relative;">
       <button id="sellerFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:140px;text-align:left;">All sellers <span style="float:right;color:#94a3b8;">&#9662;</span></button>
       <div id="sellerFilterPanel" class="hidden" style="position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d0d5dd;border-radius:8px;padding:8px;min-width:240px;max-height:280px;overflow-y:auto;box-shadow:0 4px 18px rgba(0,0,0,.1);z-index:50;">
@@ -108,6 +110,7 @@
         <div id="sellerList"></div>
       </div>
     </div>
+
     <select id="sortBy" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
       <option value="created_desc">Newest first</option>
       <option value="price_asc">Price: Low to High</option>
@@ -117,7 +120,27 @@
       <option value="reviews_desc">Reviews: Most first</option>
       <option value="reviews_asc">Reviews: Least first</option>
     </select>
-    <button id="clearFiltersBtn" class="btn btn-outline" style="font-size:12px;padding:8px 12px;">Clear</button>
+
+    <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
+      <span>Price &#8377;</span>
+      <input id="priceMin" type="number" min="0" placeholder="min" style="width:70px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
+      <span>&ndash;</span>
+      <input id="priceMax" type="number" min="0" placeholder="max" style="width:70px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
+    </div>
+
+    <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
+      <span>Rating &ge;</span>
+      <input id="ratingMin" type="number" step="0.1" min="0" max="5" placeholder="0" style="width:50px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
+    </div>
+
+    <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475467;">
+      <span>Reviews &ge;</span>
+      <input id="reviewsMin" type="number" min="0" placeholder="0" style="width:70px;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;" />
+    </div>
+
+    <button id="saveFiltersBtn" class="btn btn-primary-sm" style="font-size:12px;padding:8px 14px;" title="Save current filters so they auto-apply next time you sign in">&#128279; Pin filters</button>
+    <button id="resetFiltersBtn" class="btn btn-outline" style="font-size:12px;padding:8px 12px;">Reset</button>
+    <span id="filtersSavedHint" style="font-size:11px;color:#047857;font-weight:600;" class="hidden">&#10003; Pinned</span>
   </div>
   <div id="productsContainer"></div>
 </main>
@@ -199,7 +222,8 @@ async function bootDash() {
     .subscribe();
 }
 
-let _cachedRows = [];   // last fetched data so filters work without re-querying
+let _cachedRows = [];
+let _pinnedApplied = false;   // last fetched data so filters work without re-querying
 
 async function refreshDash() {
   try {
@@ -276,6 +300,12 @@ async function refreshDash() {
     else hide($("#filterBar"));
 
     rebuildSellerFilter();
+    // Apply pinned filters once on first render
+    if (!_pinnedApplied) {
+      _pinnedApplied = true;
+      const pinned = loadPinnedFilters();
+      if (pinned) applyFilterState(pinned);
+    }
     renderTable();
   } catch (e) {
     $("#productsContainer").innerHTML = `<div class="empty"><div class="big">Error loading data</div><div>${esc(e.message)}</div></div>`;
@@ -299,16 +329,25 @@ function renderTable() {
   let anySellerChecked = false;
   sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
 
+  // Numeric ranges
+  const priceMin = parseFloat($("#priceMin")?.value || "");
+  const priceMax = parseFloat($("#priceMax")?.value || "");
+  const ratingMin = parseFloat($("#ratingMin")?.value || "");
+  const reviewsMin = parseFloat($("#reviewsMin")?.value || "");
+
   let rows = _cachedRows.slice();
   if (platform) rows = rows.filter(r => r.platform === platform);
   if (q) rows = rows.filter(r =>
     (r.product_id || "").toLowerCase().includes(q) ||
     (r.seller || "").toLowerCase().includes(q)
   );
-  // Only apply seller filter if checkboxes exist AND not all checked
   if (sellerChecks.length > 0 && anySellerChecked) {
     rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
   }
+  if (!isNaN(priceMin)) rows = rows.filter(r => r.price != null && r.price >= priceMin);
+  if (!isNaN(priceMax)) rows = rows.filter(r => r.price != null && r.price <= priceMax);
+  if (!isNaN(ratingMin)) rows = rows.filter(r => r.rating != null && r.rating >= ratingMin);
+  if (!isNaN(reviewsMin)) rows = rows.filter(r => r.review_count != null && r.review_count >= reviewsMin);
 
   const sorters = {
     created_desc: (a, b) => new Date(b.created_at) - new Date(a.created_at),
@@ -367,18 +406,66 @@ function renderTable() {
   });
 }
 
-// Hook up filter inputs
+// ---- Saved filter helpers ----
+const FILTER_KEY = "pd_pinned_filters";
+function getFilterState() {
+  const sellerChecks = document.querySelectorAll("#sellerList input[type=checkbox]");
+  const sellersUnchecked = [];
+  sellerChecks.forEach(c => { if (!c.checked) sellersUnchecked.push(c.value); });
+  return {
+    q: document.querySelector("#searchInput")?.value || "",
+    platform: document.querySelector("#platformFilter")?.value || "",
+    sortBy: document.querySelector("#sortBy")?.value || "created_desc",
+    priceMin: document.querySelector("#priceMin")?.value || "",
+    priceMax: document.querySelector("#priceMax")?.value || "",
+    ratingMin: document.querySelector("#ratingMin")?.value || "",
+    reviewsMin: document.querySelector("#reviewsMin")?.value || "",
+    sellersUnchecked,
+  };
+}
+function applyFilterState(s) {
+  if (!s) return;
+  const setVal = (sel, v) => { const el = document.querySelector(sel); if (el && v != null) el.value = v; };
+  setVal("#searchInput", s.q);
+  setVal("#platformFilter", s.platform);
+  setVal("#sortBy", s.sortBy);
+  setVal("#priceMin", s.priceMin);
+  setVal("#priceMax", s.priceMax);
+  setVal("#ratingMin", s.ratingMin);
+  setVal("#reviewsMin", s.reviewsMin);
+  // Uncheck the sellers that were saved as unchecked
+  if (Array.isArray(s.sellersUnchecked)) {
+    document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => {
+      c.checked = !s.sellersUnchecked.includes(c.value);
+    });
+    syncSellerButtonLabel(); syncSellerAllCheck();
+  }
+}
+function loadPinnedFilters() {
+  try { return JSON.parse(localStorage.getItem(FILTER_KEY) || "null"); } catch { return null; }
+}
+function savePinnedFilters() {
+  localStorage.setItem(FILTER_KEY, JSON.stringify(getFilterState()));
+  const hint = document.querySelector("#filtersSavedHint");
+  if (hint) { hint.classList.remove("hidden"); setTimeout(() => hint.classList.add("hidden"), 2500); }
+}
+function clearPinnedFilters() { localStorage.removeItem(FILTER_KEY); }
+
+// Wire up filter inputs + Pin/Reset buttons
 window.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     const wire = (sel) => { const el = document.querySelector(sel); if (el) el.addEventListener(el.tagName === "SELECT" ? "change" : "input", renderTable); };
-    wire("#searchInput");
-    wire("#platformFilter");
-    wire("#sortBy");
-    const clr = document.querySelector("#clearFiltersBtn");
-    if (clr) clr.addEventListener("click", () => {
-      const si = document.querySelector("#searchInput"); if (si) si.value = "";
-      const pf = document.querySelector("#platformFilter"); if (pf) pf.value = "";
+    wire("#searchInput"); wire("#platformFilter"); wire("#sortBy");
+    wire("#priceMin"); wire("#priceMax"); wire("#ratingMin"); wire("#reviewsMin");
+    const pin = document.querySelector("#saveFiltersBtn");
+    if (pin) pin.addEventListener("click", () => savePinnedFilters());
+    const rst = document.querySelector("#resetFiltersBtn");
+    if (rst) rst.addEventListener("click", () => {
+      ["#searchInput","#platformFilter","#priceMin","#priceMax","#ratingMin","#reviewsMin"].forEach(s => { const el = document.querySelector(s); if (el) el.value = ""; });
       const sb_ = document.querySelector("#sortBy"); if (sb_) sb_.value = "created_desc";
+      document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => c.checked = true);
+      syncSellerButtonLabel(); syncSellerAllCheck();
+      clearPinnedFilters();
       renderTable();
     });
   }, 50);
