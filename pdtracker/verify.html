@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052702" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052703" />
 </head>
 <body>
 
@@ -76,13 +76,25 @@ $("#verifyForm").addEventListener("submit", async (e) => {
     const j = await r.json();
     if (!j.ok) throw new Error(j.message || "Verification failed");
 
-    // Now sign in via Supabase Auth
+    // Auto sign-in via Supabase Auth using the password stashed by signup.html
     ok.textContent = "Verified! Signing you in...";
     ok.classList.remove("hidden");
-    // Password is held in sessionStorage by signup page? No — we stored only email.
-    // Show success and ask user to log in fresh on /pdtracker/
-    sessionStorage.removeItem("pd_signup_email");
-    setTimeout(() => location.href = "/pdtracker/?welcome=1&email=" + encodeURIComponent(email), 1200);
+    const pw = sessionStorage.getItem("pd_signup_password");
+    if (pw) {
+      const { error: sErr } = await sb.auth.signInWithPassword({ email, password: pw });
+      sessionStorage.removeItem("pd_signup_email");
+      sessionStorage.removeItem("pd_signup_password");
+      if (sErr) {
+        // Fall back to login page
+        setTimeout(() => location.href = "/pdtracker/?welcome=1&email=" + encodeURIComponent(email), 1200);
+        return;
+      }
+      // Logged in — go to upload page (download template + upload in one screen)
+      setTimeout(() => location.href = "/pdtracker/upload.html?welcome=1", 800);
+    } else {
+      sessionStorage.removeItem("pd_signup_email");
+      setTimeout(() => location.href = "/pdtracker/?welcome=1&email=" + encodeURIComponent(email), 1200);
+    }
   } catch (e2) {
     err.textContent = e2.message;
     err.classList.remove("hidden");
