@@ -9,8 +9,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052719" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052720" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    @keyframes pd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    #refreshIcon.spinning { animation: pd-spin 0.6s linear; color: #1f6feb !important; }
+    #refreshBtnCard:hover { background: #f9fafb; }
+    #downloadXlsxBtn:hover { background: #1858d6 !important; }
+  </style>
 </head>
 <body>
 
@@ -87,16 +93,16 @@
       <div class="value" id="kpiPlatforms">0</div>
       <div class="meta">Marketplaces with products</div>
     </div>
-    <div class="kpi" style="padding:0;overflow:hidden;display:flex;flex-direction:column;">
-      <div id="refreshBtnCard" style="flex:1;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #eaecf0;background:#fff;color:#475467;transition:background .12s;" title="Reload data now">
-        <span style="font-size:20px;">&#x21bb;</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="kpi" id="refreshBtnCard" style="cursor:pointer;display:flex;align-items:center;gap:12px;flex:1;padding:14px 18px;transition:background .12s;" title="Reload data now">
+        <span id="refreshIcon" style="font-size:24px;color:#475467;display:inline-block;">&#x21bb;</span>
         <div>
-          <div style="font-size:13px;font-weight:700;">Refresh</div>
+          <div style="font-size:13px;font-weight:700;color:#0f172a;">Refresh</div>
           <div style="font-size:11px;color:#94a3b8;">Reload data now</div>
         </div>
       </div>
-      <div id="downloadXlsxBtn" style="flex:1;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;background:#1f6feb;color:#fff;transition:background .12s;" title="Download visible products as Excel">
-        <span style="font-size:20px;">&#11015;</span>
+      <div class="kpi" id="downloadXlsxBtn" style="cursor:pointer;display:flex;align-items:center;gap:12px;flex:1;padding:14px 18px;background:#1f6feb;color:#fff;border-color:#1f6feb;transition:background .12s;" title="Download visible products as Excel">
+        <span style="font-size:24px;">&#11015;</span>
         <div>
           <div style="font-size:13px;font-weight:700;">Download data</div>
           <div style="font-size:11px;opacity:.85;">Excel (.xlsx) of visible rows</div>
@@ -158,12 +164,16 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("#loginForm").addEventListener("submit", onLogin);
   $("#signOutBtn").addEventListener("click", onSignOut);
   const refCard = document.querySelector("#refreshBtnCard");
-  if (refCard) refCard.addEventListener("click", () => refreshDash());
-  refCard?.addEventListener("mouseenter", () => refCard.style.background = "#f9fafb");
-  refCard?.addEventListener("mouseleave", () => refCard.style.background = "#fff");
-  const dlCard = document.querySelector("#downloadXlsxBtn");
-  dlCard?.addEventListener("mouseenter", () => dlCard.style.background = "#1858d6");
-  dlCard?.addEventListener("mouseleave", () => dlCard.style.background = "#1f6feb");
+  if (refCard) refCard.addEventListener("click", () => {
+    const icon = document.querySelector("#refreshIcon");
+    if (icon) {
+      icon.classList.remove("spinning");
+      void icon.offsetWidth;
+      icon.classList.add("spinning");
+      setTimeout(() => icon.classList.remove("spinning"), 700);
+    }
+    refreshDash();
+  });
   const { data: { session } } = await sb.auth.getSession();
   if (session) bootDash();
   else { show($("#loginView")); }
@@ -296,11 +306,12 @@ async function refreshDash() {
     else hide($("#filterBar"));
 
     rebuildSellerFilter();
-    // Apply pinned filters once on first render
     if (!_pinnedApplied) {
       _pinnedApplied = true;
-      const pinned = loadPinnedFilters();
-      if (pinned) applyFilterState(pinned);
+      let saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem("pd_session_filters") || "null"); } catch {}
+      if (!saved) saved = loadPinnedFilters();
+      if (saved) applyFilterState(saved);
     }
     renderTable();
   } catch (e) {
@@ -383,6 +394,8 @@ function renderTable() {
   html += "</tbody></table></div>";
   container.innerHTML = html;
 
+  try { sessionStorage.setItem("pd_session_filters", JSON.stringify(getFilterState())); } catch {}
+
   // Click-to-sort on Price / Rating / Reviews headers — toggles high-to-low / low-to-high
   container.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", () => {
@@ -447,6 +460,7 @@ window.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => c.checked = true);
       syncSellerButtonLabel(); syncSellerAllCheck();
       clearPinnedFilters();
+      try { sessionStorage.removeItem("pd_session_filters"); } catch {}
       renderTable();
     });
   }, 50);
