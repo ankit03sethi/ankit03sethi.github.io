@@ -4,12 +4,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Install extension &mdash; Cursive PD Tracker</title>
+  <title>Install Cursive PD Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052701" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052702" />
+  <style>
+    .option-card { background:#fff;border-radius:14px;padding:24px;margin-bottom:18px;border:2px solid #e5e7eb;transition:all .15s; }
+    .option-card.recommended { border-color:#1f6feb; box-shadow:0 4px 14px rgba(31,111,235,.15); position:relative; }
+    .recommended-tag { position:absolute;top:-10px;right:18px;background:#1f6feb;color:#fff;padding:3px 11px;border-radius:999px;font-size:11px;font-weight:700; }
+    .option-card h3 { margin:0 0 6px;font-size:18px;font-weight:700; }
+    .option-card .sub { color:#64748b;font-size:13px;margin-bottom:14px; }
+    .option-card ol { margin:12px 0 0 0;padding-left:20px;font-size:14px;color:#475467; line-height:1.6; }
+    .option-card ol li { margin-bottom:6px; }
+    .dl-row { display:flex;gap:10px;flex-wrap:wrap;margin-top:12px; }
+    .badge-soon { background:#fef3c7;color:#92400e;font-size:11px;padding:3px 9px;border-radius:999px;font-weight:700;margin-left:8px; }
+    code.path { display:block;background:#f3f4f6;padding:8px 12px;border-radius:6px;font-size:12px;color:#0f172a;margin-top:6px;word-break:break-all; }
+  </style>
 </head>
 <body>
 
@@ -35,52 +47,57 @@
   <div class="install-card">
     <h1 style="margin:0 0 6px;font-size:24px;">Install Cursive PD Tracker</h1>
     <p class="muted" style="margin:0 0 24px;font-size:14px;">
-      The extension runs on your Chrome browser, fetches public data from marketplaces for products you choose to monitor, and updates your dashboard automatically.
+      Pick the install method that works for you. The extension runs on your Chrome and updates your dashboard automatically.
     </p>
 
-    <div class="install-step">
-      <div class="install-num">1</div>
-      <div class="install-body">
-        <h3>Make sure you have Google Chrome</h3>
-        <p>The extension only works in Chrome on Windows / Mac / Linux. If you don't have it, <a href="https://www.google.com/chrome/" target="_blank" rel="noopener">download Chrome here</a>.</p>
+    <!-- Option 1: Auto installer (recommended) -->
+    <div class="option-card recommended">
+      <div class="recommended-tag">RECOMMENDED · Windows</div>
+      <h3>Option 1 &mdash; Auto-installer</h3>
+      <div class="sub">Downloads + extracts + opens Chrome for you. ~30 seconds.</div>
+      <div class="dl-row">
+        <a href="/pdtracker/CursivePDTracker-Install.bat" class="dl-btn" download>&#11015; Download Auto-Installer (.bat)</a>
       </div>
+      <ol>
+        <li>Click the download button above &mdash; saves a small <code>.bat</code> file.</li>
+        <li>Double-click the downloaded file. (If Windows warns: click "More info" → "Run anyway".)</li>
+        <li>It downloads the extension, extracts it, and opens Chrome's Extensions page.</li>
+        <li>In Chrome: toggle <strong>Developer mode</strong> ON (top-right) → click <strong>Load unpacked</strong> → paste the path (already copied to clipboard) → Enter.</li>
+        <li>Click the Cursive icon in Chrome toolbar → sign in with your email/password.</li>
+      </ol>
     </div>
 
-    <div class="install-step">
-      <div class="install-num">2</div>
-      <div class="install-body">
-        <h3>Download the extension</h3>
-        <p>Click below to download the installer (~3 MB). Run it once &mdash; it will set up Chrome automatically.</p>
-        <a href="/pdtracker/CursivePDTracker-Setup.exe" class="dl-btn">&#11015; Download for Windows</a>
-        <p style="margin-top:12px;font-size:12px;color:#94a3b8;">
-          (Coming soon: Chrome Web Store one-click install for all platforms)
-        </p>
+    <!-- Option 2: Manual sideload -->
+    <div class="option-card">
+      <h3>Option 2 &mdash; Manual sideload</h3>
+      <div class="sub">For Mac, Linux, or if Option 1 doesn't work.</div>
+      <div class="dl-row">
+        <a href="/pdtracker/cursive-pd-tracker.zip" class="dl-btn" download>&#11015; Download Extension (.zip)</a>
       </div>
+      <ol>
+        <li>Download the ZIP and <strong>unzip it</strong> to any folder you remember (e.g. Desktop).</li>
+        <li>Open Chrome → go to <code>chrome://extensions</code> in the address bar.</li>
+        <li>Turn ON <strong>Developer mode</strong> (top-right toggle).</li>
+        <li>Click <strong>Load unpacked</strong> → select the unzipped folder.</li>
+        <li>Click the Cursive icon in toolbar → sign in.</li>
+      </ol>
     </div>
 
-    <div class="install-step">
-      <div class="install-num">3</div>
-      <div class="install-body">
-        <h3>Sign in once with your account</h3>
-        <p>After install, click the Cursive icon in your Chrome toolbar. Sign in with the <strong>same email + password</strong> you use here.</p>
-      </div>
+    <!-- Option 3: Chrome Web Store (coming soon) -->
+    <div class="option-card" style="opacity:.7;">
+      <h3>Option 3 &mdash; Chrome Web Store <span class="badge-soon">COMING SOON</span></h3>
+      <div class="sub">True 1-click install + silent auto-updates. Submitted for Google approval (1-3 working days).</div>
+      <p style="margin:6px 0 0;font-size:13px;color:#64748b;">Once approved, this will be the easiest way. Until then, use Option 1.</p>
     </div>
 
-    <div class="install-step">
-      <div class="install-num">4</div>
-      <div class="install-body">
-        <h3>That's it &mdash; leave Chrome running</h3>
-        <p>The extension runs quietly in the background. It updates your data automatically every 6 hours. You'll see the &#x1F7E2; <strong>Tracker online</strong> badge on your dashboard.</p>
-        <p>If your PC is off, no data updates &mdash; just turn it back on and the extension picks up where it left off.</p>
-      </div>
-    </div>
-
-    <div class="install-step" style="border:none;background:#f0f6ff;padding:18px;border-radius:10px;">
-      <div class="install-num" style="background:#fff;color:#1f6feb;border:2px solid #1f6feb;">?</div>
-      <div class="install-body">
-        <h3>Need help installing?</h3>
-        <p>WhatsApp us at <a href="https://wa.me/919625737475?text=Hi%2C%20I%20need%20help%20installing%20Cursive%20PD%20Tracker" target="_blank" rel="noopener">+91 96257 37475</a> or email <a href="mailto:contact@cursive.world">contact@cursive.world</a>. We'll guide you in 5 minutes.</p>
-      </div>
+    <!-- Help -->
+    <div class="option-card" style="background:#f0f6ff;border-color:#c7d9f7;">
+      <h3>Need help? &mdash; we'll install it for you</h3>
+      <div class="sub">15-minute screen share, completely free.</div>
+      <p style="margin:6px 0 0;font-size:14px;color:#475467;">
+        WhatsApp: <a href="https://wa.me/919625737475?text=Hi%2C%20please%20help%20me%20install%20Cursive%20PD%20Tracker" target="_blank" rel="noopener">+91 96257 37475</a>
+        &middot; Email: <a href="mailto:contact@cursive.world">contact@cursive.world</a>
+      </p>
     </div>
 
     <p class="legal-line" style="margin-top:24px;">
