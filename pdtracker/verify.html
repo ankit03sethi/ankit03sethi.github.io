@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Verify email &mdash; Cursive PD Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052701" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup><span class="tracker-badge">PD TRACKER</span></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+</header>
+
+<main class="auth-wrap">
+  <form id="verifyForm" class="auth-card" novalidate>
+    <h1>Check your email</h1>
+    <p class="lede">We sent a 6-digit code to <strong id="emailDisplay">your email</strong>. Enter it below.</p>
+
+    <label for="otp">6-digit code</label>
+    <input id="otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" placeholder="123456" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:700;" />
+
+    <button type="submit" id="verifyBtn" class="btn-primary">Verify &rarr;</button>
+    <p id="verifyError" class="error hidden"></p>
+    <p id="verifySuccess" class="success hidden"></p>
+
+    <div class="auth-foot">
+      Didn't get it? <a href="/pdtracker/signup.html">Try again</a> &middot; Check spam folder
+    </div>
+  </form>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+
+const $ = (s) => document.querySelector(s);
+const email = sessionStorage.getItem("pd_signup_email");
+if (!email) location.href = "/pdtracker/signup.html";
+$("#emailDisplay").textContent = email;
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+$("#verifyForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#verifyError"); const ok = $("#verifySuccess");
+  err.classList.add("hidden"); ok.classList.add("hidden");
+  const btn = $("#verifyBtn");
+  btn.disabled = true; btn.textContent = "Verifying...";
+  try {
+    const otp = $("#otp").value.trim();
+    if (!/^\d{6}$/.test(otp)) throw new Error("Enter the 6-digit code");
+
+    const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-otp-verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email, otp }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.message || "Verification failed");
+
+    // Now sign in via Supabase Auth
+    ok.textContent = "Verified! Signing you in...";
+    ok.classList.remove("hidden");
+    // Password is held in sessionStorage by signup page? No — we stored only email.
+    // Show success and ask user to log in fresh on /pdtracker/
+    sessionStorage.removeItem("pd_signup_email");
+    setTimeout(() => location.href = "/pdtracker/?welcome=1&email=" + encodeURIComponent(email), 1200);
+  } catch (e2) {
+    err.textContent = e2.message;
+    err.classList.remove("hidden");
+    btn.disabled = false; btn.textContent = "Verify →";
+  }
+});
+
+// Auto-submit when 6 digits typed
+$("#otp").addEventListener("input", (e) => {
+  if (/^\d{6}$/.test(e.target.value)) $("#verifyBtn").click();
+});
+</script>
+</body>
+</html>

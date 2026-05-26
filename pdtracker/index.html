@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Cursive PD Tracker &mdash; Marketplace Public Data Insights</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052701" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup><span class="tracker-badge">PD TRACKER</span></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <span id="trackerStatus" class="scraper-status offline hidden"><span class="dot"></span> <span id="statusText">Offline</span></span>
+    <span id="emailChip" class="email-chip hidden"></span>
+    <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
+  </div>
+</header>
+
+<!-- LOGIN VIEW -->
+<main id="loginView" class="auth-wrap hidden">
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Sign in</h1>
+    <p class="lede">Welcome back. Sign in to your Cursive PD Tracker account.</p>
+    <p id="welcomeMsg" class="success hidden"></p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" id="loginBtn" class="btn-primary">Sign in &rarr;</button>
+    <p id="loginError" class="error hidden"></p>
+    <div class="auth-foot">
+      New here? <a href="/pdtracker/signup.html">Create an account</a>
+    </div>
+    <p class="legal-line">
+      Helping sellers stay informed about publicly visible product data on marketplaces &mdash; for their own business decisions.
+    </p>
+  </form>
+</main>
+
+<!-- DASHBOARD VIEW -->
+<main id="dashView" class="dash hidden">
+  <div class="dash-head">
+    <div>
+      <h1>Your tracked products</h1>
+      <div class="subtitle" id="lastUpdate">Loading...</div>
+    </div>
+    <div class="dash-actions">
+      <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload products</a>
+      <a href="/pdtracker/install-extension.html" class="btn btn-outline">Install extension</a>
+      <button id="refreshBtn" class="btn btn-outline">Refresh</button>
+    </div>
+  </div>
+
+  <div id="trialBanner" class="trial-banner hidden">
+    <div class="text">
+      <strong>Free trial:</strong> <span id="trialUsed">0</span> of <span id="trialQuota">10</span> products used.
+      Want unlimited? <strong>&#8377;499/month</strong> for unlimited products.
+    </div>
+    <button class="btn-upgrade" onclick="alert('Upgrade flow coming soon!')">Upgrade now</button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="label">Total products</div>
+      <div class="value" id="kpiTotal">0</div>
+      <div class="meta">Across all marketplaces</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Tracked successfully</div>
+      <div class="value" id="kpiOk">0</div>
+      <div class="meta">With latest data</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Pending fetch</div>
+      <div class="value" id="kpiPending">0</div>
+      <div class="meta">Never fetched yet</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Last fetched</div>
+      <div class="value" id="kpiLast">&mdash;</div>
+      <div class="meta">Most recent activity</div>
+    </div>
+  </div>
+
+  <div id="productsContainer"></div>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+const $ = (s) => document.querySelector(s);
+const show = (el) => el && el.classList.remove("hidden");
+const hide = (el) => el && el.classList.add("hidden");
+
+// Welcome banner from verify.html
+const urlParams = new URLSearchParams(location.search);
+if (urlParams.get("welcome") === "1") {
+  const wm = $("#welcomeMsg");
+  wm.textContent = "Account created! Sign in with your email and password.";
+  show(wm);
+  if (urlParams.get("email")) $("#email").value = urlParams.get("email");
+}
+
+// Boot
+window.addEventListener("DOMContentLoaded", async () => {
+  $("#loginForm").addEventListener("submit", onLogin);
+  $("#signOutBtn").addEventListener("click", onSignOut);
+  $("#refreshBtn").addEventListener("click", () => refreshDash());
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) bootDash();
+  else { show($("#loginView")); }
+});
+
+async function onLogin(e) {
+  e.preventDefault();
+  hide($("#loginError"));
+  const email = $("#email").value.trim().toLowerCase();
+  const password = $("#password").value;
+  const btn = $("#loginBtn");
+  btn.disabled = true; btn.textContent = "Signing in...";
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    bootDash();
+  } catch (err) {
+    const el = $("#loginError");
+    el.textContent = err.message.includes("Invalid login credentials") ? "Email and password don't match." : err.message;
+    show(el);
+  } finally {
+    btn.disabled = false; btn.textContent = "Sign in →";
+  }
+}
+
+async function onSignOut() {
+  await sb.auth.signOut();
+  hide($("#dashView")); show($("#loginView"));
+  hide($("#emailChip")); hide($("#signOutBtn")); hide($("#trackerStatus"));
+}
+
+async function bootDash() {
+  hide($("#loginView")); show($("#dashView"));
+  const { data: { user } } = await sb.auth.getUser();
+  $("#emailChip").textContent = user?.email || "";
+  show($("#emailChip")); show($("#signOutBtn")); show($("#trackerStatus"));
+  await refreshDash();
+
+  // Realtime: live update when snapshots come in
+  sb.channel("pd-snapshots")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "analytics_snapshots" }, () => refreshDash())
+    .subscribe();
+}
+
+async function refreshDash() {
+  try {
+    // Get user info + quota
+    const { data: u } = await sb.from("analytics_users").select("user_tier, trial_quota").maybeSingle();
+    const tier = u?.user_tier ?? "trial";
+    const quota = u?.trial_quota ?? 10;
+
+    // Get all products with latest snapshot
+    const { data: products, error } = await sb
+      .from("analytics_products")
+      .select("id, platform, product_id, product_url, last_checked_at, last_check_status, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const productIds = (products || []).map(p => p.id);
+    let snapshots = [];
+    if (productIds.length > 0) {
+      const { data: snaps } = await sb
+        .from("analytics_snapshots")
+        .select("product_id_fk, rating, review_count, price, seller, fetched_at")
+        .in("product_id_fk", productIds)
+        .order("fetched_at", { ascending: false });
+      snapshots = snaps || [];
+    }
+    const latestByProduct = {};
+    for (const s of snapshots) {
+      if (!latestByProduct[s.product_id_fk]) latestByProduct[s.product_id_fk] = s;
+    }
+
+    // KPIs
+    const total = (products || []).length;
+    const ok = (products || []).filter(p => p.last_check_status === "ok").length;
+    const pending = (products || []).filter(p => !p.last_checked_at).length;
+    const last = snapshots.length > 0 ? snapshots[0].fetched_at : null;
+    $("#kpiTotal").textContent = total;
+    $("#kpiOk").textContent = ok;
+    $("#kpiPending").textContent = pending;
+    $("#kpiLast").textContent = last ? new Date(last).toLocaleTimeString() : "—";
+    $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString();
+
+    // Trial banner
+    if (tier === "trial") {
+      $("#trialUsed").textContent = total;
+      $("#trialQuota").textContent = quota;
+      show($("#trialBanner"));
+    } else {
+      hide($("#trialBanner"));
+    }
+
+    // Heartbeat status
+    const { data: hb } = await sb.from("analytics_heartbeats").select("last_ping_at").maybeSingle();
+    if (hb?.last_ping_at) {
+      const ageMin = (Date.now() - new Date(hb.last_ping_at).getTime()) / 60000;
+      const isOnline = ageMin < 10;
+      $("#trackerStatus").className = "scraper-status " + (isOnline ? "online" : "offline");
+      $("#statusText").textContent = isOnline ? "Tracker online" : "Tracker offline";
+    } else {
+      $("#trackerStatus").className = "scraper-status offline";
+      $("#statusText").textContent = "Install extension";
+    }
+
+    // Products table
+    const container = $("#productsContainer");
+    if (total === 0) {
+      container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Upload products</a></div>';
+      return;
+    }
+    let html = '<div class="table-scroll"><table class="data"><thead><tr><th>Platform</th><th>Product ID</th><th>Price</th><th>Rating</th><th>Reviews</th><th>Seller</th><th>Last fetched</th><th>Link</th></tr></thead><tbody>';
+    for (const p of products) {
+      const s = latestByProduct[p.id] || {};
+      const statusClass = p.last_check_status === "ok" ? "ok" : (p.last_check_status === "pending" || !p.last_checked_at ? "pending" : "fail");
+      html += `<tr>
+        <td><span class="platform-tag ${p.platform.toLowerCase()}">${esc(p.platform)}</span></td>
+        <td><code>${esc(p.product_id)}</code></td>
+        <td class="price-cell">${s.price ? "₹" + s.price : "—"}</td>
+        <td class="rating-cell">${s.rating ? s.rating + " ★" : "—"}</td>
+        <td>${s.review_count ? s.review_count.toLocaleString() : "—"}</td>
+        <td>${esc(s.seller || "—")}</td>
+        <td><span class="status-dot ${statusClass}"></span>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
+        <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
+      </tr>`;
+    }
+    html += "</tbody></table></div>";
+    container.innerHTML = html;
+  } catch (e) {
+    $("#productsContainer").innerHTML = `<div class="empty"><div class="big">Error loading data</div><div>${esc(e.message)}</div></div>`;
+  }
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Sign up &mdash; Cursive PD Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052701" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup><span class="tracker-badge">PD TRACKER</span></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+</header>
+
+<main class="auth-wrap">
+  <form id="signupForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Create your account</h1>
+    <p class="lede">Start tracking 10 products free. No credit card required.</p>
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@yourbrand.com" />
+
+    <label for="mobile">Mobile (10 digits)</label>
+    <input id="mobile" name="mobile" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" autocomplete="tel-national" placeholder="9876543210" />
+
+    <label for="password">Password (6+ characters)</label>
+    <input id="password" name="password" type="password" minlength="6" required autocomplete="new-password" />
+
+    <button type="submit" id="signupBtn" class="btn-primary">Send OTP &rarr;</button>
+    <p id="signupError" class="error hidden"></p>
+    <p id="signupSuccess" class="success hidden"></p>
+
+    <div class="auth-foot">
+      Already have an account? <a href="/pdtracker/">Sign in</a>
+    </div>
+    <p class="legal-line">
+      Helping sellers stay informed about publicly visible product data on marketplaces &mdash; for their own business decisions.
+    </p>
+  </form>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+
+const $ = (s) => document.querySelector(s);
+
+$("#signupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#signupError"); const ok = $("#signupSuccess");
+  err.classList.add("hidden"); ok.classList.add("hidden");
+  const btn = $("#signupBtn");
+  btn.disabled = true; btn.textContent = "Sending OTP...";
+  try {
+    const body = {
+      email: $("#email").value.trim().toLowerCase(),
+      password: $("#password").value,
+      mobile: $("#mobile").value.trim().replace(/\D/g, ""),
+    };
+    const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.message || "Signup failed");
+    sessionStorage.setItem("pd_signup_email", body.email);
+    location.href = "/pdtracker/verify.html";
+  } catch (e2) {
+    err.textContent = e2.message;
+    err.classList.remove("hidden");
+  } finally {
+    btn.disabled = false; btn.textContent = "Send OTP →";
+  }
+});
+</script>
+</body>
+</html>
