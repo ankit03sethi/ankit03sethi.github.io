@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052703" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052704" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -118,7 +118,19 @@ function handleFile(file) {
   reader.onload = (e) => {
     try {
       const wb = XLSX.read(e.target.result, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
+      // Prefer the "Template" sheet; otherwise find any sheet with Platform + Product Id columns; else fall back to first
+      let pickedName = wb.SheetNames.find(n => n.toLowerCase() === "template");
+      if (!pickedName) {
+        pickedName = wb.SheetNames.find(n => {
+          const ws_ = wb.Sheets[n];
+          const r = XLSX.utils.sheet_to_json(ws_, { defval: "", header: 1 });
+          if (r.length === 0) return false;
+          const headers = (r[0] || []).map(h => String(h || "").toLowerCase());
+          return headers.some(h => h.includes("platform")) && headers.some(h => h.includes("product"));
+        });
+      }
+      if (!pickedName) pickedName = wb.SheetNames[0];
+      const ws = wb.Sheets[pickedName];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
       if (rows.length === 0) throw new Error("Sheet is empty");
       parsedRows = rows.map((r, i) => ({
