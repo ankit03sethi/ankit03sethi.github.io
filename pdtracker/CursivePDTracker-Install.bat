@@ -1,16 +1,11 @@
 @echo off
-chcp 65001 >nul 2>&1
 title Cursive PD Tracker - Installer
 
-color 0B
 echo.
-echo  ╔══════════════════════════════════════════════════════╗
-echo  ║                                                      ║
-echo  ║         CURSIVE PD TRACKER - INSTALLER               ║
-echo  ║                                                      ║
-echo  ║         Public Data Marketplace Insights             ║
-echo  ║                                                      ║
-echo  ╚══════════════════════════════════════════════════════╝
+echo  ======================================================
+echo         CURSIVE PD TRACKER - INSTALLER
+echo         Public Data Marketplace Insights
+echo  ======================================================
 echo.
 echo  This will:
 echo    1. Download the latest extension to your PC
@@ -36,7 +31,6 @@ echo [2/4] Downloading extension (small, ~25 KB)...
 powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%ZIP_PATH%' -UseBasicParsing; exit 0 } catch { Write-Host $_.Exception.Message; exit 1 }"
 if errorlevel 1 (
     echo.
-    color 0C
     echo  ERROR: Could not download. Check your internet connection.
     echo  Visit: https://cursive.world/pdtracker/install-extension.html
     pause
@@ -48,7 +42,6 @@ powershell -NoProfile -Command "Expand-Archive -LiteralPath '%ZIP_PATH%' -Destin
 del "%ZIP_PATH%" 2>nul
 
 if not exist "%INSTALL_DIR%\manifest.json" (
-    color 0C
     echo  ERROR: Extraction failed.
     pause
     exit /b 1
@@ -58,13 +51,10 @@ echo [4/4] Opening Chrome's Extensions page...
 start chrome.exe --new-window "chrome://extensions/"
 timeout /t 2 >nul
 
-color 0A
 echo.
-echo  ╔══════════════════════════════════════════════════════╗
-echo  ║                                                      ║
-echo  ║                    ✓ READY!                          ║
-echo  ║                                                      ║
-echo  ╚══════════════════════════════════════════════════════╝
+echo  ======================================================
+echo                    READY!
+echo  ======================================================
 echo.
 echo  Chrome should now be open at the Extensions page.
 echo.
