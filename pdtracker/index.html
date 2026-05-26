@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <link rel="stylesheet" href="pdtracker.css?v=2026052704" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026052705" />
 </head>
 <body>
 
@@ -99,6 +99,27 @@
     </div>
   </div>
 
+  <div id="filterBar" class="hidden" style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #eaecf0;">
+    <input id="searchInput" type="search" placeholder="Search Product Id or Seller..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
+    <select id="platformFilter" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
+      <option value="">All platforms</option>
+      <option value="Amazon">Amazon</option>
+      <option value="Flipkart">Flipkart</option>
+      <option value="Meesho">Meesho</option>
+      <option value="Myntra">Myntra</option>
+      <option value="Firstcry">Firstcry</option>
+    </select>
+    <select id="sortBy" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
+      <option value="created_desc">Newest first</option>
+      <option value="price_asc">Price: Low to High</option>
+      <option value="price_desc">Price: High to Low</option>
+      <option value="rating_desc">Rating: High to Low</option>
+      <option value="rating_asc">Rating: Low to High</option>
+      <option value="reviews_desc">Reviews: Most first</option>
+      <option value="reviews_asc">Reviews: Least first</option>
+    </select>
+    <button id="clearFiltersBtn" class="btn btn-outline" style="font-size:12px;padding:8px 12px;">Clear</button>
+  </div>
   <div id="productsContainer"></div>
 </main>
 
@@ -163,6 +184,7 @@ async function bootDash() {
   $("#emailChip").textContent = user?.email || "";
   show($("#emailChip")); show($("#signOutBtn")); show($("#trackerStatus"));
   await refreshDash();
+  startAutoRefresh();
 
   // Realtime: live update when snapshots come in
   sb.channel("pd-snapshots")
@@ -170,14 +192,14 @@ async function bootDash() {
     .subscribe();
 }
 
+let _cachedRows = [];   // last fetched data so filters work without re-querying
+
 async function refreshDash() {
   try {
-    // Get user info + quota
     const { data: u } = await sb.from("analytics_users").select("user_tier, trial_quota").maybeSingle();
     const tier = u?.user_tier ?? "trial";
     const quota = u?.trial_quota ?? 10;
 
-    // Get all products with latest snapshot
     const { data: products, error } = await sb
       .from("analytics_products")
       .select("id, platform, product_id, product_url, last_checked_at, last_check_status, created_at")
@@ -199,27 +221,36 @@ async function refreshDash() {
       if (!latestByProduct[s.product_id_fk]) latestByProduct[s.product_id_fk] = s;
     }
 
+    // Build merged rows for filter/sort
+    _cachedRows = (products || []).map(p => {
+      const s = latestByProduct[p.id] || {};
+      return {
+        ...p,
+        price: s.price ?? null,
+        rating: s.rating ?? null,
+        review_count: s.review_count ?? null,
+        seller: s.seller ?? null,
+        fetched_at: s.fetched_at ?? null,
+      };
+    });
+
     // KPIs
-    const total = (products || []).length;
-    const ok = (products || []).filter(p => p.last_check_status === "ok").length;
-    const pending = (products || []).filter(p => !p.last_checked_at).length;
+    const total = _cachedRows.length;
+    const ok = _cachedRows.filter(p => p.last_check_status === "ok").length;
+    const pending = _cachedRows.filter(p => !p.last_checked_at).length;
     const last = snapshots.length > 0 ? snapshots[0].fetched_at : null;
     $("#kpiTotal").textContent = total;
     $("#kpiOk").textContent = ok;
     $("#kpiPending").textContent = pending;
     $("#kpiLast").textContent = last ? new Date(last).toLocaleTimeString() : "—";
-    $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString();
+    $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString() + " (auto-refresh every 60s)";
 
-    // Trial banner
     if (tier === "trial") {
       $("#trialUsed").textContent = total;
       $("#trialQuota").textContent = quota;
       show($("#trialBanner"));
-    } else {
-      hide($("#trialBanner"));
-    }
+    } else { hide($("#trialBanner")); }
 
-    // Heartbeat status
     const { data: hb } = await sb.from("analytics_heartbeats").select("last_ping_at").maybeSingle();
     if (hb?.last_ping_at) {
       const ageMin = (Date.now() - new Date(hb.last_ping_at).getTime()) / 60000;
@@ -231,32 +262,114 @@ async function refreshDash() {
       $("#statusText").textContent = "Install extension";
     }
 
-    // Products table
-    const container = $("#productsContainer");
-    if (total === 0) {
-      container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Upload products</a></div>';
-      return;
-    }
-    let html = '<div class="table-scroll"><table class="data"><thead><tr><th>Platform</th><th>Product ID</th><th>Price</th><th>Rating</th><th>Reviews</th><th>Seller</th><th>Last fetched</th><th>Link</th></tr></thead><tbody>';
-    for (const p of products) {
-      const s = latestByProduct[p.id] || {};
-      const statusClass = p.last_check_status === "ok" ? "ok" : (p.last_check_status === "pending" || !p.last_checked_at ? "pending" : "fail");
-      html += `<tr>
-        <td><span class="platform-tag ${p.platform.toLowerCase()}">${esc(p.platform)}</span></td>
-        <td><code>${esc(p.product_id)}</code></td>
-        <td class="price-cell">${s.price ? "₹" + s.price : "—"}</td>
-        <td class="rating-cell">${s.rating ? s.rating + " ★" : "—"}</td>
-        <td>${s.review_count ? s.review_count.toLocaleString() : "—"}</td>
-        <td>${esc(s.seller || "—")}</td>
-        <td><span class="status-dot ${statusClass}"></span>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
-        <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
-      </tr>`;
-    }
-    html += "</tbody></table></div>";
-    container.innerHTML = html;
+    if (total > 0) show($("#filterBar"));
+    else hide($("#filterBar"));
+
+    renderTable();
   } catch (e) {
     $("#productsContainer").innerHTML = `<div class="empty"><div class="big">Error loading data</div><div>${esc(e.message)}</div></div>`;
   }
+}
+
+function renderTable() {
+  const container = $("#productsContainer");
+  if (_cachedRows.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Upload products</a></div>';
+    return;
+  }
+
+  const q = ($("#searchInput")?.value || "").trim().toLowerCase();
+  const platform = $("#platformFilter")?.value || "";
+  const sortBy = $("#sortBy")?.value || "created_desc";
+
+  let rows = _cachedRows.slice();
+  if (platform) rows = rows.filter(r => r.platform === platform);
+  if (q) rows = rows.filter(r =>
+    (r.product_id || "").toLowerCase().includes(q) ||
+    (r.seller || "").toLowerCase().includes(q)
+  );
+
+  const sorters = {
+    created_desc: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+    price_asc:    (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity),
+    price_desc:   (a, b) => (b.price ?? -1) - (a.price ?? -1),
+    rating_desc:  (a, b) => (b.rating ?? -1) - (a.rating ?? -1),
+    rating_asc:   (a, b) => (a.rating ?? Infinity) - (b.rating ?? Infinity),
+    reviews_desc: (a, b) => (b.review_count ?? -1) - (a.review_count ?? -1),
+    reviews_asc:  (a, b) => (a.review_count ?? Infinity) - (b.review_count ?? Infinity),
+  };
+  rows.sort(sorters[sortBy] || sorters.created_desc);
+
+  if (rows.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="big">No products match the filters</div><div>Try clearing search or platform filter.</div></div>';
+    return;
+  }
+
+  let html = '<div class="table-scroll"><table class="data"><thead><tr>'
+    + '<th data-sort="platform" style="cursor:pointer;">Platform</th>'
+    + '<th data-sort="product_id" style="cursor:pointer;">Product ID</th>'
+    + '<th data-sort="price_desc" style="cursor:pointer;" title="Click to sort">Price &#8597;</th>'
+    + '<th data-sort="rating_desc" style="cursor:pointer;" title="Click to sort">Rating &#8597;</th>'
+    + '<th data-sort="reviews_desc" style="cursor:pointer;" title="Click to sort">Reviews &#8597;</th>'
+    + '<th data-sort="seller" style="cursor:pointer;">Seller</th>'
+    + '<th>Last fetched</th>'
+    + '<th>Link</th>'
+    + '</tr></thead><tbody>';
+  for (const p of rows) {
+    const statusClass = p.last_check_status === "ok" ? "ok" : (p.last_check_status === "pending" || !p.last_checked_at ? "pending" : "fail");
+    html += `<tr>
+      <td><span class="platform-tag ${p.platform.toLowerCase()}">${esc(p.platform)}</span></td>
+      <td><code>${esc(p.product_id)}</code></td>
+      <td class="price-cell">${p.price ? "₹" + p.price : "—"}</td>
+      <td class="rating-cell">${p.rating ? p.rating + " ★" : "—"}</td>
+      <td>${p.review_count ? p.review_count.toLocaleString() : "—"}</td>
+      <td>${esc(p.seller || "—")}</td>
+      <td><span class="status-dot ${statusClass}"></span>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
+      <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
+    </tr>`;
+  }
+  html += "</tbody></table></div>";
+  container.innerHTML = html;
+
+  // Click-to-sort on headers
+  container.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const sortKey = th.dataset.sort;
+      const dropdown = $("#sortBy");
+      // Toggle asc/desc on price/rating/reviews
+      if (["price_desc","rating_desc","reviews_desc"].includes(sortKey)) {
+        const ascKey = sortKey.replace("_desc","_asc");
+        dropdown.value = dropdown.value === sortKey ? ascKey : sortKey;
+      }
+      renderTable();
+    });
+  });
+}
+
+// Hook up filter inputs
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    const wire = (sel) => { const el = document.querySelector(sel); if (el) el.addEventListener(el.tagName === "SELECT" ? "change" : "input", renderTable); };
+    wire("#searchInput");
+    wire("#platformFilter");
+    wire("#sortBy");
+    const clr = document.querySelector("#clearFiltersBtn");
+    if (clr) clr.addEventListener("click", () => {
+      const si = document.querySelector("#searchInput"); if (si) si.value = "";
+      const pf = document.querySelector("#platformFilter"); if (pf) pf.value = "";
+      const sb_ = document.querySelector("#sortBy"); if (sb_) sb_.value = "created_desc";
+      renderTable();
+    });
+  }, 50);
+});
+
+// Auto-refresh every 60s (soft)
+let _autoRefresh = null;
+function startAutoRefresh() {
+  if (_autoRefresh) clearInterval(_autoRefresh);
+  _autoRefresh = setInterval(() => {
+    if (document.visibilityState === "visible") refreshDash().catch(() => {});
+  }, 60000);
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
