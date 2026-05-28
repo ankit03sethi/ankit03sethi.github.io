@@ -1,0 +1,28 @@
+name: Build Cursive Watcher
+on:
+  push:
+    tags:
+      - 'watcher-v*'
+permissions:
+  contents: write
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Build watcher.exe
+        shell: bash
+        working-directory: cursive-watcher
+        run: |
+          GOOS=windows GOARCH=amd64 go build -ldflags "-H windowsgui -s -w" -o CursiveWatcher.exe ./cmd/watcher
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Cursive Watcher ${{ github.ref_name }}
+          files: cursive-watcher/CursiveWatcher.exe
+          draft: false
+          prerelease: true
