@@ -39,12 +39,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo  [3/4] Extracting + setting Chrome auto-start...
+echo  [3/4] Installing files + setting Chrome auto-start...
 powershell -NoProfile -Command "Expand-Archive -LiteralPath '%ZIP_PATH%' -DestinationPath '%INSTALL_DIR%' -Force"
 del "%ZIP_PATH%" 2>nul
 
 if not exist "%INSTALL_DIR%\manifest.json" (
-    echo  ERROR: Extraction failed.
+    echo  ERROR: Installation failed.
     set /p "DUMMY=Press Enter to close: "
     exit /b 1
 )
