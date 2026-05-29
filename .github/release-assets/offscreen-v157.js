@@ -1,8 +1,7 @@
 // Cursive PD Tracker — offscreen background scraper v1.0.57
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
 // No tabs, no windows, no visible activity at all.
-// Same beefy extractor as v1.0.15. Tab fallback handles platforms (Flipkart,
-// Myntra) whose seller name only appears in lazy-rendered React buy-box DOM.
+// v1.0.15: Much beefier extractor — more JSON patterns, meta tags, fallback regex.
 
 console.log('[PD-OFFSCREEN] loaded v1.0.57');
 
@@ -233,4 +232,9 @@ function extract(doc, html, platform) {
     const m = bodyText.match(/₹\s*([\d,]+)/);
     if (m) {
       const v = parseInt(m[1].replace(/,/g, ''));
-      if (v >= 10 && v < 1000000) price = Str
+      if (v >= 10 && v < 1000000) price = String(v);
+    }
+  }
+
+  return { rating, reviewCount, price, seller };
+}
