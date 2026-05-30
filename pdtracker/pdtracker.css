@@ -247,3 +247,15 @@ table.data tbody tr:last-child td { border-bottom: none; }
   box-shadow: 0 3px 8px rgba(15,23,42,.08);
 }
 /* Table rows keep their existing flat background-only hover (lifting rows looks broken) */
+
+
+/* Brand link in the topbar should never underline on hover */
+.topbar .brand,
+.topbar .brand:hover,
+.topbar .brand:focus,
+.topbar .brand *,
+.topbar .brand:hover *,
+.topbar .brand:focus * {
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
