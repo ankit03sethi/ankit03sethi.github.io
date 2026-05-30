@@ -538,13 +538,20 @@ window.addEventListener("DOMContentLoaded", () => {
   }, 50);
 });
 
-// Auto-refresh every 60s (soft)
+// Auto-refresh every 60s (always — was previously gated on visibilityState which
+// blocked refresh when the tab was in the background or browser misreported state)
 let _autoRefresh = null;
 function startAutoRefresh() {
   if (_autoRefresh) clearInterval(_autoRefresh);
   _autoRefresh = setInterval(() => {
-    if (document.visibilityState === "visible") refreshDash().catch(() => {});
+    refreshDash().catch(() => {});
   }, 60000);
+  // Also catch up the moment the user returns to the tab
+  document.removeEventListener("visibilitychange", _onVisibility);
+  document.addEventListener("visibilitychange", _onVisibility);
+}
+function _onVisibility() {
+  if (document.visibilityState === "visible") refreshDash().catch(() => {});
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -668,17 +675,4 @@ function downloadVisibleAsExcel() {
   // Column widths
   ws["!cols"] = [{wch:10},{wch:18},{wch:12},{wch:8},{wch:10},{wch:30},{wch:20},{wch:50}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Products");
-  const ts = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `Cursive_PD_Tracker_${ts}.xlsx`);
-}
-window.addEventListener("DOMContentLoaded", () => {
-  setTimeout(() => {
-    const b = document.querySelector("#downloadXlsxBtn");
-    if (b) b.addEventListener("click", downloadVisibleAsExcel);
-  }, 100);
-});
-
-</script>
-</body>
-</html>
+  XLSX.utils.book_
