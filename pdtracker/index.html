@@ -549,7 +549,6 @@ function renderTable() {
     + '<th>Link</th>'
     + '</tr></thead><tbody>';
   for (const p of rows) {
-    const statusClass = p.last_check_status === "ok" ? "ok" : (p.last_check_status === "pending" || !p.last_checked_at ? "pending" : "fail");
     html += `<tr>
       <td><span class="platform-tag ${p.platform.toLowerCase()}">${esc(p.platform)}</span></td>
       <td><code>${esc(p.product_id)}</code></td>
@@ -557,7 +556,7 @@ function renderTable() {
       <td class="rating-cell">${p.rating ? p.rating + " ★" : "—"}</td>
       <td>${p.review_count ? p.review_count.toLocaleString() : "—"}</td>
       <td>${esc(p.seller || "—")}</td>
-      <td><span class="status-dot ${statusClass}"></span>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
+      <td>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
       <td>${planPill(p)}</td>
       <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
     </tr>`;
