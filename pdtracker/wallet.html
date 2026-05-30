@@ -101,6 +101,7 @@
       <div class="balance-label">CURRENT BALANCE</div>
       <div class="balance-amount"><span class="rupee">₹</span><span id="balanceAmt">—</span></div>
       <div class="balance-sub" id="balanceSub">Loading…</div>
+      <div id="freeQuotaChip" class="hidden" style="margin-top:8px;display:inline-block;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">&#127881; <span id="freeQuotaCount">0</span> free trial rows remaining</div>
     </div>
     <button class="recharge-btn" id="rechargeBtn">+ Add money</button>
   </div>
@@ -179,6 +180,12 @@ async function load() {
   $("#balanceSub").textContent = j.updated_at
     ? "Last activity: " + fmtDate(j.updated_at)
     : "No transactions yet";
+  if ((j.free_quota_remaining ?? 0) > 0) {
+    $("#freeQuotaCount").textContent = j.free_quota_remaining;
+    $("#freeQuotaChip").classList.remove("hidden");
+  } else {
+    $("#freeQuotaChip").classList.add("hidden");
+  }
 
   const tx = j.transactions || [];
   if (tx.length === 0) {

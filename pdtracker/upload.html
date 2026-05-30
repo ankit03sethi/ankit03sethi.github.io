@@ -87,6 +87,7 @@
       <div>
         <h2 style="margin:0 0 4px;font-size:20px;">Pick a plan</h2>
         <p class="muted" style="margin:0;font-size:13px;">For <b id="modalRowCount">0</b> products. All prices include 18% GST.</p>
+        <p id="freeTrialBanner" class="hidden" style="margin:6px 0 0;font-size:13px;color:#16a34a;font-weight:600;">&#127881; You have <span id="freeTrialRemaining">0</span> free trial rows — the first ones are on us.</p>
       </div>
       <button id="modalCloseBtn" class="btn btn-outline" style="padding:6px 12px;font-size:14px;">&times; Close</button>
     </div>
@@ -116,7 +117,8 @@
     </div>
 
     <div id="quoteBox" class="hidden" style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px;background:#f9fafb;">
-      <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>Subtotal (<span id="qPlan">&mdash;</span> &times; <span id="qRows">0</span>)</span><span id="qSubtotal">&#8377;0.00</span></div>
+      <div id="qFreeRowsLine" class="hidden" style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;color:#16a34a;font-weight:600;"><span>Free trial covers</span><span><span id="qFreeRows">0</span> rows &mdash; &#8377;0.00</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>Subtotal (<span id="qPlan">&mdash;</span> &times; <span id="qRows">0</span> billable)</span><span id="qSubtotal">&#8377;0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>GST (18%)</span><span id="qGst">&#8377;0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;"><span>Total to pay</span><span id="qTotal">&#8377;0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:10px;color:#6b7280;"><span>Wallet balance</span><span id="qBalance">&#8377;0.00</span></div>
@@ -236,7 +238,7 @@ const addMoneyBtn = $("#addMoneyBtn");
 
 function rupees(paise) { return "₹" + (paise / 100).toFixed(2); }
 
-$("#uploadBtn").addEventListener("click", () => {
+$("#uploadBtn").addEventListener("click", async () => {
   if (parsedRows.length === 0) return;
   $("#modalRowCount").textContent = parsedRows.length;
   selectedPlan = null;
@@ -247,7 +249,20 @@ $("#uploadBtn").addEventListener("click", () => {
   addMoneyBtn.classList.add("hidden");
   $("#payError").classList.add("hidden");
   $("#paySuccess").classList.add("hidden");
+  $("#freeTrialBanner").classList.add("hidden");
   planModal.classList.remove("hidden");
+  // Fetch free quota to show banner if any
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const sumRes = await fetch(SUPABASE_URL + "/functions/v1/analytics-wallet-summary", {
+      headers: { Authorization: "Bearer " + session.access_token, apikey: SUPABASE_ANON_KEY },
+    });
+    const sum = await sumRes.json();
+    if (sum.ok && sum.free_quota_remaining > 0) {
+      $("#freeTrialRemaining").textContent = sum.free_quota_remaining;
+      $("#freeTrialBanner").classList.remove("hidden");
+    }
+  } catch {}
 });
 
 $("#modalCloseBtn").addEventListener("click", () => planModal.classList.add("hidden"));
@@ -282,11 +297,26 @@ async function refreshQuote() {
     if (!j.ok) throw new Error(j.error || "Quote failed");
     currentQuote = j;
     $("#qPlan").textContent = selectedPlan === "topup" ? "₹2.00" : "₹5.00";
-    $("#qRows").textContent = j.row_count;
+    $("#qRows").textContent = j.billable_rows;
     $("#qSubtotal").textContent = rupees(j.subtotal_paise);
     $("#qGst").textContent = rupees(j.gst_paise);
     $("#qTotal").textContent = rupees(j.total_paise);
     $("#qBalance").textContent = rupees(j.balance_paise);
+    if (j.free_rows > 0) {
+      $("#qFreeRowsLine").classList.remove("hidden");
+      $("#qFreeRows").textContent = j.free_rows;
+    } else {
+      $("#qFreeRowsLine").classList.add("hidden");
+    }
+    if (j.total_paise === 0) {
+      // Entirely free — hide payment lines, just show Pay button
+      payNowBtn.textContent = "Activate " + j.free_rows + " free rows →";
+      payNowBtn.classList.remove("hidden");
+      addMoneyBtn.classList.add("hidden");
+      $("#qShortfall").classList.add("hidden");
+      return;
+    }
+    payNowBtn.textContent = "Pay & upload →";
     if (j.shortfall_paise > 0) {
       $("#qShortfall").classList.remove("hidden");
       $("#qShortVal").textContent = rupees(j.shortfall_paise);
@@ -336,7 +366,7 @@ payNowBtn.addEventListener("click", async () => {
       }
       throw new Error(j.error || "Payment failed");
     }
-    $("#paySuccess").textContent = `${j.inserted_count} products added. Tracking ${selectedPlan === "subscription" ? "until " + j.paid_until : "until first successful scrape"}. Redirecting...`;
+    $("#paySuccess").textContent = `${j.inserted_count} products added (${j.free_consumed} on free trial, ${j.billable_count} paid). Redirecting...`;
     $("#paySuccess").classList.remove("hidden");
     setTimeout(() => location.href = "/pdtracker/", 1800);
   } catch (e) {
