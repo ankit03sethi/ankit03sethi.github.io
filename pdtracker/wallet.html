@@ -254,22 +254,37 @@ proceedBtn.addEventListener("click", async () => {
       image: "https://cursive.world/pdtracker/icon128.png",
       prefill: { email: session.user.email || "" },
       theme: { color: "#1f6feb" },
-      handler: function () {
-        // Razorpay confirms payment. Webhook will credit the wallet within seconds.
+      handler: async function (response) {
+        // Razorpay called handler with signed payment proof. Send it to our
+        // confirm endpoint, which verifies the signature and credits the wallet.
         modal.classList.remove("open");
         amtInput.value = "";
         proceedBtn.disabled = true; proceedBtn.textContent = "Proceed to pay";
-        // Poll for credit confirmation (up to 10s)
-        let tries = 0;
-        const start = Date.now();
-        const startBalance = parseFloat(($("#balanceAmt").textContent || "0").replace(/,/g, ""));
-        const poll = setInterval(async () => {
-          tries++;
-          await load();
-          const now = parseFloat(($("#balanceAmt").textContent || "0").replace(/,/g, ""));
-          if (now > startBalance || tries > 10) clearInterval(poll);
-        }, 1500);
-        alert(`Payment received. Crediting ₹${rupees.toLocaleString("en-IN")} to your wallet — will reflect in a few seconds.`);
+        try {
+          const { data: { session: s2 } } = await sb.auth.getSession();
+          const cr = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-confirm`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${s2.access_token}`,
+              "apikey": SUPABASE_ANON_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const cj = await cr.json();
+          if (cj.ok) {
+            alert(`Payment received. ₹${rupees.toLocaleString("en-IN")} credited to your wallet.`);
+          } else {
+            alert(`Payment captured but wallet credit failed: ${cj.error || "Unknown error"}\n\nYour payment is safe — please WhatsApp +91 96257 37475 with the payment ID: ${response.razorpay_payment_id}`);
+          }
+        } catch (e) {
+          alert(`Payment captured but confirmation failed: ${e.message}\n\nWhatsApp +91 96257 37475 with payment ID: ${response.razorpay_payment_id}`);
+        }
+        await load();
       },
       modal: {
         ondismiss: function () {
