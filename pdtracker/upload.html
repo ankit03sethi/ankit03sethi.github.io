@@ -259,7 +259,7 @@ function handleFile(file) {
       })).filter(r => r.platform && r.product_id);
 
       if (parsedRows.length === 0) throw new Error("No valid rows. Make sure Platform and Product Id columns are filled.");
-      renderPreview();
+      renderPreview().catch(e2 => { err.textContent = "Render failed: " + e2.message; err.classList.remove("hidden"); });
     } catch (e2) {
       err.textContent = "Couldn't parse: " + e2.message;
       err.classList.remove("hidden");
@@ -269,7 +269,7 @@ function handleFile(file) {
 }
 
 // === Trial detection state ===
-let trialQuota = 0;          // free_quota_remaining at page load
+let trialQuota = null;       // null = not yet fetched; populated by fetchTrialQuota
 let forcePaidMode = false;   // set true if user clicked "Skip trial"
 
 async function fetchTrialQuota() {
@@ -284,9 +284,9 @@ async function fetchTrialQuota() {
   } catch { return 0; }
 }
 
-// Wire skip-trial link
+// Wire skip-trial link (added inside DOMContentLoaded so $ helper is ready)
 document.addEventListener("DOMContentLoaded", () => {
-  const skipLink = $("#skipTrialLink");
+  const skipLink = document.getElementById("skipTrialLink");
   if (skipLink) skipLink.addEventListener("click", (e) => {
     e.preventDefault();
     forcePaidMode = true;
@@ -294,7 +294,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-function renderPreview() {
+async function renderPreview() {
+  // Ensure trial quota is loaded before we branch
+  if (trialQuota === null) {
+    trialQuota = await fetchTrialQuota();
+  }
   $("#rowCount").textContent = parsedRows.length;
   let html = "<thead><tr><th>#</th><th>Platform</th><th>Product Id</th><th>Country</th><th>State</th></tr></thead><tbody>";
   parsedRows.slice(0, 50).forEach(r => {
