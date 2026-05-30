@@ -119,7 +119,7 @@
   </div>
 
   <div style="display:flex;justify-content:flex-end;margin:-4px 0 12px;">
-    <button id="resetDataBtn" type="button" style="padding:7px 14px;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" title="Clear current data and re-check everything fresh">
+    <button id="resetDataBtn" type="button" style="padding:7px 14px;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" title="Clear captured Buy Box / Ratings / Price (respects current filter). Uploaded products are kept.">
       <span style="font-size:14px;">&#9888;</span> Reset data
     </button>
   </div>
@@ -195,37 +195,55 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function onResetData() {
-  const choice = prompt(
-    "RESET DATA\n\n" +
-    "Type one of these to choose what to reset:\n\n" +
-    "  REFRESH  - keep your product list, clear all price/rating/seller data,\n" +
-    "             and start re-checking fresh.\n" +
-    "             (recommended if you just want current/fresh data)\n\n" +
-    "  WIPE     - DELETE all your products AND all data.\n" +
-    "             You will need to re-upload your Excel template to start again.\n\n" +
-    "WARNING: Both options permanently delete the price / rating / seller history\n" +
-    "currently in your dashboard. This cannot be undone.\n\n" +
-    "Type REFRESH or WIPE (in capitals) and press OK, or press Cancel:"
+  // Compute which rows are CURRENTLY visible under the active filter — exactly
+  // the same logic as renderTable() uses. Reset operates only on these.
+  const q = ($("#searchInput")?.value || "").trim().toLowerCase();
+  const platform = $("#platformFilter")?.value || "";
+  const sellerChecks = document.querySelectorAll("#sellerList input[type=checkbox]");
+  const allowedSellers = new Set();
+  let anySellerChecked = false;
+  sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
+
+  let visible = (_cachedRows || []).slice();
+  if (platform) visible = visible.filter(r => r.platform === platform);
+  if (q) visible = visible.filter(r =>
+    (r.product_id || "").toLowerCase().includes(q) ||
+    (r.seller || "").toLowerCase().includes(q)
   );
-  if (!choice) return;
-  const mode = choice.trim().toUpperCase();
-  if (mode !== "REFRESH" && mode !== "WIPE") {
-    alert("Reset cancelled - you didn't type REFRESH or WIPE exactly.");
+  if (sellerChecks.length > 0 && anySellerChecked) {
+    visible = visible.filter(r => allowedSellers.has(r.seller || "(unknown)"));
+  }
+
+  const totalRows = (_cachedRows || []).length;
+  const filteredCount = visible.length;
+  const isFiltered = (platform || q || (sellerChecks.length > 0 && anySellerChecked));
+
+  if (filteredCount === 0) {
+    alert("Nothing to reset — no products match your current filter.");
     return;
   }
-  if (mode === "WIPE") {
-    const ok = confirm(
-      "FINAL CONFIRMATION - WIPE\n\n" +
-      "This will permanently delete every product in your dashboard, " +
-      "every snapshot, and every history record. You will need to re-upload " +
-      "your Excel template to start tracking again.\n\n" +
-      "Click OK to permanently delete everything, or Cancel to keep your data."
-    );
-    if (!ok) return;
-  }
+
+  const scope = isFiltered
+    ? `the ${filteredCount} product${filteredCount === 1 ? "" : "s"} currently visible (${platform || "filtered view"})`
+    : `all ${totalRows} product${totalRows === 1 ? "" : "s"} on your dashboard`;
+
+  const ok = confirm(
+    "RESET DATA\n\n" +
+    `This will clear the captured Buy Box / Ratings / Ratings Count / Price for ${scope}.\n\n` +
+    "Your uploaded product list stays — only the captured data is wiped, and a fresh check starts within a few seconds.\n\n" +
+    (isFiltered ? "Tip: clear the filter first if you want to reset every product instead.\n\n" : "") +
+    "Click OK to reset, or Cancel to keep current data."
+  );
+  if (!ok) return;
+
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { alert("Please sign in first."); return; }
+    const body = { confirm: "RESET" };
+    // Only send IDs when a filter is active. Without a filter, server resets all.
+    if (isFiltered) {
+      body.product_ids = visible.map(r => r.id).filter(Boolean);
+    }
     const url = `${SUPABASE_URL}/functions/v1/analytics-reset`;
     const res = await fetch(url, {
       method: "POST",
@@ -234,7 +252,7 @@ async function onResetData() {
         "apikey": SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode: mode.toLowerCase(), confirm: "RESET" }),
+      body: JSON.stringify(body),
     });
     const j = await res.json();
     if (!res.ok || !j.ok) {
@@ -242,11 +260,7 @@ async function onResetData() {
       return;
     }
     alert(j.message || "Done.");
-    if (mode === "WIPE") {
-      location.href = "/pdtracker/upload.html";
-    } else {
-      await refreshDash();
-    }
+    await refreshDash();
   } catch (e) {
     alert("Reset failed: " + e.message);
   }
