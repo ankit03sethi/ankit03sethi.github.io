@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Business Launcher &mdash; Start your online business in one go | cursive</title>
+<meta name="description" content="The complete launch bundle: GST, Current Account, Trademark, Marketplace setup, Imaging, Listing, Video and Product sourcing. From ₹20,000." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/home.css" />
+<link rel="stylesheet" href="/service.css" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<style>
+  .bl-hero {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    padding: 56px 0 40px;
+  }
+  .bl-pill {
+    display: inline-block; background: #16a34a; color: #fff;
+    font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
+    letter-spacing: .6px; text-transform: uppercase;
+  }
+  .bl-title { font-size: 40px; font-weight: 800; color: #0f172a; line-height: 1.15; margin: 16px 0 8px; }
+  .bl-title-accent { color: #16a34a; }
+  .bl-sub { font-size: 17px; color: #475467; max-width: 720px; margin: 0 auto 22px; line-height: 1.55; text-align: center; }
+  .bl-hero-inner { text-align: center; max-width: 900px; margin: 0 auto; padding: 0 20px; }
+  .bl-cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .bl-call, .bl-wa { padding: 14px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 16px; display: inline-flex; align-items: center; gap: 8px; transition: all .18s ease; box-shadow: 0 4px 12px rgba(15,23,42,.08); }
+  .bl-call { background: #1f6feb; color: #fff; }
+  .bl-call:hover { background: #1858d6; transform: translateY(-3px); box-shadow: 0 10px 22px rgba(31,111,235,.30); }
+  .bl-wa { background: #25d366; color: #fff; }
+  .bl-wa:hover { background: #1ebe5b; transform: translateY(-3px); box-shadow: 0 10px 22px rgba(37,211,102,.30); }
+
+  .bl-included { padding: 56px 0; }
+  .bl-included h2 { font-size: 30px; text-align: center; color: #0f172a; margin: 0 0 8px; }
+  .bl-included .lead { text-align: center; color: #64748b; font-size: 15px; margin: 0 auto 36px; max-width: 620px; }
+  .bl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+  .bl-item { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; display: flex; gap: 12px; align-items: flex-start; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .bl-item:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(15,23,42,.10); border-color: #16a34a; }
+  .bl-item .check { background: #dcfce7; color: #16a34a; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; }
+  .bl-item h4 { margin: 0 0 4px; font-size: 15px; color: #0f172a; }
+  .bl-item p { margin: 0; font-size: 12px; color: #64748b; line-height: 1.5; }
+
+  .bl-plans { padding: 56px 0; background: #f9fafb; }
+  .bl-plans h2 { font-size: 30px; text-align: center; color: #0f172a; margin: 0 0 8px; }
+  .bl-plans .lead { text-align: center; color: #64748b; font-size: 15px; margin: 0 auto 36px; max-width: 620px; }
+  .bl-tier-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+  .bl-tier { background: #fff; border: 2px solid #e5e7eb; border-radius: 14px; padding: 26px 24px; position: relative; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .bl-tier:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(15,23,42,.10); }
+  .bl-tier.popular { border-color: #16a34a; }
+  .bl-tier .pop-badge { position: absolute; top: -11px; right: 18px; background: #16a34a; color: #fff; font-size: 11px; padding: 3px 12px; border-radius: 8px; font-weight: 700; letter-spacing: .3px; }
+  .bl-tier-name { font-size: 14px; font-weight: 700; color: #1f6feb; text-transform: uppercase; letter-spacing: .5px; }
+  .bl-tier-price { font-size: 36px; font-weight: 800; color: #0f172a; margin: 8px 0 2px; }
+  .bl-tier-price small { font-size: 14px; color: #6b7280; font-weight: 500; }
+  .bl-tier-products { font-size: 14px; color: #16a34a; font-weight: 700; margin-bottom: 14px; }
+  .bl-tier ul { margin: 0; padding-left: 18px; font-size: 13px; color: #374151; line-height: 1.85; }
+  .bl-tier ul li { margin-bottom: 2px; }
+
+  .bl-why { padding: 56px 0; }
+  .bl-why h2 { font-size: 28px; text-align: center; color: #0f172a; margin: 0 0 36px; }
+  .bl-why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+  .bl-why-item { padding: 22px; }
+  .bl-why-item .num { font-size: 28px; font-weight: 800; color: #16a34a; }
+  .bl-why-item h4 { margin: 6px 0 6px; font-size: 16px; color: #0f172a; }
+  .bl-why-item p { margin: 0; font-size: 13px; color: #475467; line-height: 1.55; }
+
+  .bl-cta-band { background: linear-gradient(135deg, #16a34a 0%, #14532d 100%); color: #fff; padding: 52px 20px; text-align: center; }
+  .bl-cta-band h2 { font-size: 30px; margin: 0 0 8px; }
+  .bl-cta-band p { font-size: 15px; opacity: .9; margin: 0 0 22px; }
+  .bl-cta-band .bl-call { background: #fff; color: #16a34a; }
+  .bl-cta-band .bl-call:hover { background: #f0fdf4; color: #14532d; }
+
+  @media (max-width: 640px) {
+    .bl-title { font-size: 30px; }
+    .bl-sub { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="/" class="topnav-brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1f6feb" stroke-width="2.4"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
+      <span class="topnav-word">cursive<sup>&reg;</sup></span>
+    </a>
+    <div class="topnav-links">
+      <a href="/#services">Services</a>
+      <a href="/#why">Why cursive</a>
+      <a href="/pdtracker/" class="nav-cta">&#128274; Login</a>
+    </div>
+  </div>
+</nav>
+
+<header class="bl-hero">
+  <div class="bl-hero-inner">
+    <span class="bl-pill">&#127881; Complete launch bundle</span>
+    <h1 class="bl-title">Don't know where to start?<br><span class="bl-title-accent">Launch your whole business in one go.</span></h1>
+    <p class="bl-sub">
+      We do GST, Current Account, Trademark, Marketplace setup, Product Imaging, Listing, Video and Product sourcing &mdash; <b>under one team, one invoice, one deadline</b>. You bring the idea; we deliver a shop-ready business.
+    </p>
+    <div class="bl-cta-row">
+      <a href="tel:+919625737475" class="bl-call">&#128222; Call +91 96257 37475</a>
+      <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%27d%20like%20to%20know%20more%20about%20the%20Business%20Launcher%20bundle." target="_blank" rel="noopener" class="bl-wa">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.45L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.149-.173.198-.297.297-.495.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413z"/></svg>
+        WhatsApp us
+      </a>
+    </div>
+    <p style="font-size:12px;color:#64748b;margin-top:14px;">Reply within 15 minutes during 10am&ndash;8pm IST &middot; * Conditions apply</p>
+  </div>
+</header>
+
+<section class="bl-included">
+  <h2>Everything you get in one bundle</h2>
+  <p class="lead">No more chasing different agencies for different things. One team handles it all, end-to-end.</p>
+  <div class="bl-grid">
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>GST Registration</h4><p>CA-backed filing. Certificate hand-delivered to your inbox.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Current Account</h4><p>Zero-balance business current account, opened digitally.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Trademark Registration</h4><p>Protect your brand. Stops copycats from day one.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Marketplace Account Opening</h4><p>Amazon, Flipkart or Meesho seller account &mdash; all docs done.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Product Imaging</h4><p>Studio-quality white-background &amp; lifestyle photos.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Product Listing</h4><p>Listed and live on every marketplace you chose.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Product Video</h4><p>Short product video per SKU. Boosts listing conversion.</p></div></div>
+    <div class="bl-item"><span class="check">&#10003;</span><div><h4>Product Sourcing</h4><p>We help find / negotiate suppliers if you don't have product yet.</p></div></div>
+  </div>
+</section>
+
+<section class="bl-plans">
+  <h2>Pick the tier that fits your catalog</h2>
+  <p class="lead">All tiers include the same 8 services &mdash; only the product count changes. Pay only for what you'll list.</p>
+  <div class="bl-tier-row">
+
+    <div class="bl-tier">
+      <div class="bl-tier-name">Starter</div>
+      <div class="bl-tier-price">&#8377;20,000<small> total</small></div>
+      <div class="bl-tier-products">Up to 20 products</div>
+      <ul>
+        <li>All 8 services included</li>
+        <li>1 marketplace (Amazon / Flipkart / Meesho)</li>
+        <li>1 product video</li>
+        <li>Dedicated launch manager</li>
+        <li>30-day post-launch support</li>
+      </ul>
+    </div>
+
+    <div class="bl-tier popular">
+      <span class="pop-badge">MOST PICKED</span>
+      <div class="bl-tier-name" style="color:#16a34a;">Growth</div>
+      <div class="bl-tier-price">&#8377;30,000<small> total</small></div>
+      <div class="bl-tier-products">Up to 50 products</div>
+      <ul>
+        <li>All 8 services included</li>
+        <li>Up to 2 marketplaces</li>
+        <li>5 product videos</li>
+        <li>Dedicated launch manager</li>
+        <li>60-day post-launch support</li>
+        <li>Free Cursive PD Tracker for 60 days</li>
+      </ul>
+    </div>
+
+    <div class="bl-tier">
+      <div class="bl-tier-name">Scale</div>
+      <div class="bl-tier-price">&#8377;40,000<small> total</small></div>
+      <div class="bl-tier-products">Up to 100 products</div>
+      <ul>
+        <li>All 8 services included</li>
+        <li>Up to 3 marketplaces + your own website</li>
+        <li>10 product videos</li>
+        <li>Dedicated launch manager + senior consultant</li>
+        <li>90-day post-launch support</li>
+        <li>Free Cursive PD Tracker for 90 days</li>
+      </ul>
+    </div>
+
+  </div>
+  <p style="text-align:center;font-size:13px;color:#94a3b8;margin-top:18px;">Need more than 100 products or a custom mix? <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%20need%20a%20custom%20Business%20Launcher%20quote." target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;">WhatsApp for a custom quote &rarr;</a></p>
+</section>
+
+<section class="bl-why">
+  <h2>Why bundle instead of buying piece-by-piece?</h2>
+  <div class="bl-why-grid">
+    <div class="bl-why-item">
+      <div class="num">01</div>
+      <h4>One deadline, not eight</h4>
+      <p>Buying separately means chasing 4 agencies, 8 deadlines, and constantly playing project manager. Here, one team owns the launch.</p>
+    </div>
+    <div class="bl-why-item">
+      <div class="num">02</div>
+      <h4>Things are sequenced right</h4>
+      <p>Your GST has to come before the bank account, which has to come before the marketplace account. We know the order, you don't have to.</p>
+    </div>
+    <div class="bl-why-item">
+      <div class="num">03</div>
+      <h4>You save real money</h4>
+      <p>Bundle pricing is 20-35% lower than buying each service separately. We don't pad each line item.</p>
+    </div>
+    <div class="bl-why-item">
+      <div class="num">04</div>
+      <h4>One human to call</h4>
+      <p>Your launch manager has your phone number on speed dial. No support tickets, no IVR.</p>
+    </div>
+  </div>
+</section>
+
+<section class="bl-cta-band">
+  <h2>Ready to launch in 2-3 weeks?</h2>
+  <p>Tell us your business idea &mdash; we'll tell you the exact tier and timeline.</p>
+  <div class="bl-cta-row">
+    <a href="tel:+919625737475" class="bl-call">&#128222; Call +91 96257 37475</a>
+    <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%27d%20like%20to%20discuss%20the%20Business%20Launcher%20bundle." target="_blank" rel="noopener" class="bl-wa">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.45L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+      WhatsApp us
+    </a>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container" style="text-align:center;color:#94a3b8;font-size:13px;padding:24px 0;">
+    &copy; 2026 Cursive &middot; Hari Nagar, New Delhi 110064 &middot; <a href="mailto:contact@cursive.world" style="color:#1f6feb;">contact@cursive.world</a>
+  </div>
+</footer>
+
+</body>
+</html>
