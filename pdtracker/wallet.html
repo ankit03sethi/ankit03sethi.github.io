@@ -96,6 +96,54 @@
     You need to add <b>&#8377;<span id="prefillNeed">0</span></b> to complete your upload. We've pre-filled the amount below.
   </div>
 
+  <!-- Tax / billing details (used on every invoice) -->
+  <div id="billingCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 24px;margin-bottom:22px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <h2 style="margin:0 0 4px;font-size:16px;color:#0f172a;">Tax &amp; billing details</h2>
+        <p style="margin:0;font-size:12px;color:#64748b;">Used on every invoice. GSTIN unlocks input-tax credit on your payments.</p>
+      </div>
+      <span id="billingStatus" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:#fef3c7;color:#78350f;">Not set</span>
+    </div>
+
+    <!-- View mode: shown when profile exists -->
+    <div id="billingView" class="hidden">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;color:#374151;margin:10px 0;">
+        <div><div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:2px;">LEGAL NAME</div><div id="bvName">&mdash;</div></div>
+        <div><div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:2px;">GSTIN</div><div id="bvGst">&mdash;</div></div>
+        <div style="grid-column:1/-1;"><div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:2px;">BILLING ADDRESS</div><div id="bvAddr" style="white-space:pre-wrap;">&mdash;</div></div>
+      </div>
+      <button id="billingEditBtn" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Edit</button>
+    </div>
+
+    <!-- Form mode: shown when no profile or when editing -->
+    <div id="billingForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;">
+        <div style="grid-column:1/-1;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">Legal name <span style="color:#dc2626;">*</span></label>
+          <input id="bfName" type="text" placeholder="e.g. Cursive Hari Nagar" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">GSTIN (optional)</label>
+          <input id="bfGst" type="text" placeholder="07ABCDE1234F1Z5" maxlength="15" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;text-transform:uppercase;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">State code (auto from GST)</label>
+          <input id="bfState" type="text" placeholder="07" maxlength="2" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;" />
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">Billing address <span style="color:#dc2626;">*</span></label>
+          <textarea id="bfAddr" rows="2" placeholder="Hari Nagar, New Delhi, 110064" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+        <button id="billingSaveBtn" class="btn btn-primary-sm" style="padding:9px 22px;font-size:14px;">Save details</button>
+        <button id="billingCancelBtn" class="btn btn-outline hidden" style="padding:9px 18px;font-size:14px;">Cancel</button>
+        <span id="billingMsg" style="font-size:12px;color:#64748b;"></span>
+      </div>
+    </div>
+  </div>
+
   <div class="balance-card">
     <div>
       <div class="balance-label">CURRENT BALANCE</div>
@@ -235,10 +283,125 @@ chips.forEach(c => c.addEventListener("click", () => {
   chips.forEach(x => x.classList.toggle("active", x === c));
   syncProceedState();
 }));
+let _cachedProfile = null;
+
+async function loadBillingProfile() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return null;
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/analytics-billing-profile`, {
+      headers: { Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON_KEY },
+    });
+    const j = await r.json();
+    _cachedProfile = j.ok ? (j.profile || null) : null;
+    renderBillingProfile();
+    return _cachedProfile;
+  } catch { return null; }
+}
+
+function renderBillingProfile() {
+  const view = $("#billingView");
+  const form = $("#billingForm");
+  const status = $("#billingStatus");
+  const editBtn = $("#billingEditBtn");
+  const cancelBtn = $("#billingCancelBtn");
+  if (_cachedProfile) {
+    $("#bvName").textContent = _cachedProfile.legal_name || "—";
+    $("#bvGst").textContent = _cachedProfile.gst_number || "(no GSTIN)";
+    $("#bvAddr").textContent = _cachedProfile.billing_address || "—";
+    view.classList.remove("hidden");
+    form.classList.add("hidden");
+    cancelBtn.classList.remove("hidden");
+    status.style.background = "#dcfce7"; status.style.color = "#166534";
+    status.textContent = _cachedProfile.gst_number ? "GSTIN saved" : "Saved";
+    // Pre-fill form for editing
+    $("#bfName").value = _cachedProfile.legal_name || "";
+    $("#bfGst").value = _cachedProfile.gst_number || "";
+    $("#bfState").value = _cachedProfile.state_code || "";
+    $("#bfAddr").value = _cachedProfile.billing_address || "";
+  } else {
+    view.classList.add("hidden");
+    form.classList.remove("hidden");
+    cancelBtn.classList.add("hidden");
+    status.style.background = "#fef3c7"; status.style.color = "#78350f";
+    status.textContent = "Not set";
+  }
+}
+
+$("#billingEditBtn")?.addEventListener("click", () => {
+  $("#billingView").classList.add("hidden");
+  $("#billingForm").classList.remove("hidden");
+});
+$("#billingCancelBtn")?.addEventListener("click", () => {
+  renderBillingProfile();
+});
+$("#bfGst")?.addEventListener("input", (e) => {
+  const v = e.target.value.toUpperCase().replace(/\s+/g, "");
+  e.target.value = v;
+  if (v.length >= 2) $("#bfState").value = v.substring(0, 2);
+});
+
+$("#billingSaveBtn")?.addEventListener("click", async () => {
+  const msg = $("#billingMsg");
+  msg.textContent = "Saving..."; msg.style.color = "#64748b";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const body = {
+      legal_name: $("#bfName").value.trim(),
+      billing_address: $("#bfAddr").value.trim(),
+      gst_number: $("#bfGst").value.trim() || null,
+      state_code: $("#bfState").value.trim() || null,
+    };
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/analytics-billing-profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "Save failed");
+    _cachedProfile = j.profile;
+    renderBillingProfile();
+    msg.textContent = "✓ Saved"; msg.style.color = "#16a34a";
+    setTimeout(() => msg.textContent = "", 2500);
+  } catch (e) {
+    msg.textContent = "× " + e.message; msg.style.color = "#dc2626";
+  }
+});
+
+async function ensureBillingBeforePay() {
+  // If profile already saved, show a confirm dialog with the details
+  if (_cachedProfile && _cachedProfile.legal_name) {
+    const gst = _cachedProfile.gst_number || "(no GSTIN)";
+    return confirm(
+      "Invoice will be issued to:\n\n" +
+      _cachedProfile.legal_name + "\n" +
+      _cachedProfile.billing_address + "\nGSTIN: " + gst + "\n\n" +
+      "Click OK to continue with these details, or Cancel to edit them first."
+    );
+  }
+  // No profile: prompt the customer to fill it now (with a skip option)
+  const proceed = confirm(
+    "You haven't saved tax / billing details yet.\n\n" +
+    "If you skip, your invoice will use just your email address — no GSTIN will be claimable.\n\n" +
+    "Click Cancel to fill in the form above first, or OK to skip and continue paying."
+  );
+  return proceed;
+}
+
 proceedBtn.addEventListener("click", async () => {
   const rupees = parseInt(amtInput.value || "0");
   if (!(rupees > 0)) return;
   const amount_paise = rupees * 100;
+
+  // Make sure profile is loaded then confirm with customer
+  if (_cachedProfile === null) await loadBillingProfile();
+  const ok = await ensureBillingBeforePay();
+  if (!ok) {
+    // Scroll the billing card into view so they can fill it
+    document.getElementById("billingCard")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
   proceedBtn.disabled = true; proceedBtn.textContent = "Opening checkout...";
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -333,6 +496,8 @@ if (prefill > 0) {
     amtInput.focus();
   }, 400);
 }
+
+loadBillingProfile();
 
 load().catch(e => {
   $("#txContainer").innerHTML = `<div class="tx-empty">Error: ${esc(e.message)}</div>`;
