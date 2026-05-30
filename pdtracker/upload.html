@@ -250,10 +250,6 @@ function handleFile(file) {
       if (rows.length === 0) throw new Error("Sheet is empty");
       parsedRows = rows.map((r, i) => ({
         row_num: i + 2,
-        country: String(r.Country ?? r.country ?? "").trim(),
-        state: String(r.State ?? r.state ?? "").trim(),
-        mobile: String(r["Registered Mobile Number"] ?? r.mobile ?? "").trim(),
-        email: String(r["Registered Email Id"] ?? r.email ?? "").trim(),
         platform: String(r.Platform ?? r.platform ?? "").trim(),
         product_id: String(r["Product Id"] ?? r["Product ID"] ?? r.product_id ?? "").trim(),
       })).filter(r => r.platform && r.product_id);
@@ -300,11 +296,11 @@ async function renderPreview() {
     trialQuota = await fetchTrialQuota();
   }
   $("#rowCount").textContent = parsedRows.length;
-  let html = "<thead><tr><th>#</th><th>Platform</th><th>Product Id</th><th>Country</th><th>State</th></tr></thead><tbody>";
+  let html = "<thead><tr><th>#</th><th>Platform</th><th>Product Id</th></tr></thead><tbody>";
   parsedRows.slice(0, 50).forEach(r => {
-    html += `<tr><td>${r.row_num}</td><td><span class="platform-tag ${r.platform.toLowerCase()}">${esc(r.platform)}</span></td><td><code>${esc(r.product_id)}</code></td><td>${esc(r.country)}</td><td>${esc(r.state)}</td></tr>`;
+    html += `<tr><td>${r.row_num}</td><td><span class="platform-tag ${r.platform.toLowerCase()}">${esc(r.platform)}</span></td><td><code>${esc(r.product_id)}</code></td></tr>`;
   });
-  if (parsedRows.length > 50) html += `<tr><td colspan="5" class="muted-small">...and ${parsedRows.length - 50} more</td></tr>`;
+  if (parsedRows.length > 50) html += `<tr><td colspan="3" class="muted-small">...and ${parsedRows.length - 50} more</td></tr>`;
   html += "</tbody>";
   $("#previewTable").innerHTML = html;
 
