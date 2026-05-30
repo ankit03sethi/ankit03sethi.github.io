@@ -65,6 +65,7 @@
     .modal-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
     .placeholder-note { margin-top: 14px; padding: 10px 12px; background: #fef3c7; border-radius: 8px; color: #78350f; font-size: 12px; }
   </style>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -128,8 +129,8 @@
       <button class="modal-btn modal-btn-secondary" id="rechargeCancel">Cancel</button>
       <button class="modal-btn modal-btn-primary" id="rechargeProceed" disabled>Proceed to pay</button>
     </div>
-    <div class="placeholder-note">
-      Razorpay payment flow is being wired in the next push. For now, contact us on WhatsApp <a href="https://wa.me/919625737475">+91 96257 37475</a> to credit your wallet manually.
+    <div style="margin-top:14px;font-size:11px;color:#94a3b8;text-align:center;">
+      Secured by Razorpay &middot; UPI, cards, netbanking &middot; No GST or fees added
     </div>
   </div>
 </div>
@@ -223,8 +224,64 @@ chips.forEach(c => c.addEventListener("click", () => {
   chips.forEach(x => x.classList.toggle("active", x === c));
   syncProceedState();
 }));
-proceedBtn.addEventListener("click", () => {
-  alert("Razorpay checkout will open here in the next update. For now please contact +91 96257 37475 to manually credit your wallet.");
+proceedBtn.addEventListener("click", async () => {
+  const rupees = parseInt(amtInput.value || "0");
+  if (!(rupees > 0)) return;
+  const amount_paise = rupees * 100;
+  proceedBtn.disabled = true; proceedBtn.textContent = "Opening checkout...";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { alert("Please sign in first."); return; }
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-order`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ amount_paise }),
+    });
+    const j = await res.json();
+    if (!j.ok) { alert("Could not start payment: " + (j.error || "unknown")); proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay"; return; }
+    if (typeof Razorpay === "undefined") { alert("Razorpay library failed to load. Refresh and try again."); proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay"; return; }
+    const rzp = new Razorpay({
+      key: j.key_id,
+      order_id: j.order_id,
+      amount: j.amount_paise,
+      currency: j.currency,
+      name: "Cursive PD Tracker",
+      description: `Wallet recharge ₹${rupees.toLocaleString("en-IN")}`,
+      image: "https://cursive.world/pdtracker/icon128.png",
+      prefill: { email: session.user.email || "" },
+      theme: { color: "#1f6feb" },
+      handler: function () {
+        // Razorpay confirms payment. Webhook will credit the wallet within seconds.
+        modal.classList.remove("open");
+        amtInput.value = "";
+        proceedBtn.disabled = true; proceedBtn.textContent = "Proceed to pay";
+        // Poll for credit confirmation (up to 10s)
+        let tries = 0;
+        const start = Date.now();
+        const startBalance = parseFloat(($("#balanceAmt").textContent || "0").replace(/,/g, ""));
+        const poll = setInterval(async () => {
+          tries++;
+          await load();
+          const now = parseFloat(($("#balanceAmt").textContent || "0").replace(/,/g, ""));
+          if (now > startBalance || tries > 10) clearInterval(poll);
+        }, 1500);
+        alert(`Payment received. Crediting ₹${rupees.toLocaleString("en-IN")} to your wallet — will reflect in a few seconds.`);
+      },
+      modal: {
+        ondismiss: function () {
+          proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+        },
+      },
+    });
+    rzp.open();
+  } catch (e) {
+    alert("Payment error: " + e.message);
+    proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+  }
 });
 
 load().catch(e => {
