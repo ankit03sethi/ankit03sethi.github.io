@@ -389,7 +389,11 @@ async function refreshDash() {
     $("#kpiPlatforms").textContent = platforms;
     $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString() + " (auto-refresh every 60s)";
 
-    if (tier === "trial") {
+    // Hide the golden free-trial banner the moment the customer has ANY
+    // subscription row — they're no longer 'just on trial' even if their
+    // tier flag is still 'trial' from signup.
+    const hasSubscriptionRow = _cachedRows.some(p => p.plan === "subscription");
+    if (tier === "trial" && !hasSubscriptionRow) {
       const left = Math.max(0, quota - total);
       $("#trialLeft").textContent = left;
       $("#trialQuota").textContent = quota;
