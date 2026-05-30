@@ -72,7 +72,7 @@
     </div>
 
     <h1 style="margin:0 0 6px;font-size:22px;">Step 3 of 4 &mdash; Download &amp; upload products</h1>
-    <p class="muted" style="margin:0 0 20px;font-size:14px;">Two simple plans: <b>&#8377;2/row</b> for a one-time check, or <b>&#8377;5/row</b> for 30 days of continuous tracking. GST extra. Pay from your wallet.</p>
+    <p class="muted" id="introCopy" style="margin:0 0 20px;font-size:14px;">Upload your product list to start tracking Buy Box, Ratings & Price.</p>
 
     <div class="upload-step">
       <h3>Step 1: Download the template</h3>
@@ -92,12 +92,31 @@
 
     <div id="previewSection" class="upload-step hidden">
       <h3>Step 3: Confirm and upload (<span id="rowCount">0</span> products)</h3>
+
+      <!-- Trial banner: shown only when user has free quota AND row count fits inside the quota -->
+      <div id="trialBanner" class="hidden" style="margin:6px 0 14px;padding:14px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;color:#14532d;font-size:14px;">
+        &#127881; <b>Free trial</b> &mdash; these <span id="trialUseCount">0</span> products will be tracked for <b>30 days at no cost</b>. We&rsquo;ll start checking them within a few seconds. Our central server handles the tracking, so you don&rsquo;t need to install anything.
+      </div>
+
+      <!-- Over-limit banner: trial available but rows exceed quota -->
+      <div id="trialOverBanner" class="hidden" style="margin:6px 0 14px;padding:14px 16px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:10px;color:#78350f;font-size:14px;">
+        &#9888; <b>Trial limit reached.</b> You have <b><span id="trialAvail">0</span> free trial slots</b> remaining but uploaded <b><span id="trialAttempt">0</span> products</b>. Either:
+        <ul style="margin:8px 0 0;padding-left:22px;">
+          <li>Trim your file to <span id="trialAvail2">0</span> products and re-upload, or</li>
+          <li>Skip the trial and upgrade to a paid plan (covers all rows)</li>
+        </ul>
+      </div>
+
       <div style="overflow-x:auto;max-height:300px;">
         <table class="preview-table" id="previewTable"></table>
       </div>
-      <div style="margin-top:14px;display:flex;gap:10px;">
-        <button id="uploadBtn" class="btn btn-primary-sm" style="padding:12px 24px;">Choose plan &amp; pay &rarr;</button>
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <!-- Trial-mode button -->
+        <button id="uploadTrialBtn" class="btn btn-primary-sm hidden" style="padding:12px 24px;background:#16a34a;border-color:#16a34a;">Upload to free trial &rarr;</button>
+        <!-- Paid-mode button -->
+        <button id="uploadBtn" class="btn btn-primary-sm hidden" style="padding:12px 24px;">Choose plan &amp; pay &rarr;</button>
         <button id="cancelBtn" class="btn btn-outline" style="padding:12px 24px;">Cancel</button>
+        <a href="#" id="skipTrialLink" class="hidden" style="font-size:13px;color:#1f6feb;text-decoration:underline;cursor:pointer;margin-left:auto;">Skip trial &amp; see paid plans &rarr;</a>
       </div>
       <p id="uploadError" class="error hidden"></p>
       <p id="uploadSuccess" class="success hidden"></p>
@@ -249,6 +268,32 @@ function handleFile(file) {
   reader.readAsArrayBuffer(file);
 }
 
+// === Trial detection state ===
+let trialQuota = 0;          // free_quota_remaining at page load
+let forcePaidMode = false;   // set true if user clicked "Skip trial"
+
+async function fetchTrialQuota() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return 0;
+    const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-wallet-summary", {
+      headers: { Authorization: "Bearer " + session.access_token, apikey: SUPABASE_ANON_KEY },
+    });
+    const j = await r.json();
+    return j.ok ? (j.free_quota_remaining || 0) : 0;
+  } catch { return 0; }
+}
+
+// Wire skip-trial link
+document.addEventListener("DOMContentLoaded", () => {
+  const skipLink = $("#skipTrialLink");
+  if (skipLink) skipLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    forcePaidMode = true;
+    renderPreview();
+  });
+});
+
 function renderPreview() {
   $("#rowCount").textContent = parsedRows.length;
   let html = "<thead><tr><th>#</th><th>Platform</th><th>Product Id</th><th>Country</th><th>State</th></tr></thead><tbody>";
@@ -258,6 +303,43 @@ function renderPreview() {
   if (parsedRows.length > 50) html += `<tr><td colspan="5" class="muted-small">...and ${parsedRows.length - 50} more</td></tr>`;
   html += "</tbody>";
   $("#previewTable").innerHTML = html;
+
+  // Decide trial vs paid mode
+  const trialBanner = $("#trialBanner");
+  const overBanner = $("#trialOverBanner");
+  const trialBtn = $("#uploadTrialBtn");
+  const paidBtn = $("#uploadBtn");
+  const skipLink = $("#skipTrialLink");
+
+  trialBanner.classList.add("hidden");
+  overBanner.classList.add("hidden");
+  trialBtn.classList.add("hidden");
+  paidBtn.classList.add("hidden");
+  skipLink.classList.add("hidden");
+
+  const rows = parsedRows.length;
+  const inPaidMode = forcePaidMode || trialQuota === 0;
+
+  if (!inPaidMode) {
+    if (rows <= trialQuota) {
+      // Pure trial path — no pricing shown
+      $("#trialUseCount").textContent = rows;
+      trialBanner.classList.remove("hidden");
+      trialBtn.classList.remove("hidden");
+      skipLink.classList.remove("hidden");
+    } else {
+      // Trial available but rows exceed quota — block, no pricing surface yet
+      $("#trialAvail").textContent = trialQuota;
+      $("#trialAvail2").textContent = trialQuota;
+      $("#trialAttempt").textContent = rows;
+      overBanner.classList.remove("hidden");
+      skipLink.classList.remove("hidden");
+    }
+  } else {
+    // Paid mode
+    paidBtn.classList.remove("hidden");
+  }
+
   $("#previewSection").classList.remove("hidden");
 }
 
@@ -278,6 +360,41 @@ const payNowBtn = $("#payNowBtn");
 const addMoneyBtn = $("#addMoneyBtn");
 
 function rupees(paise) { return "₹" + (paise / 100).toFixed(2); }
+
+// Trial direct-upload button
+$("#uploadTrialBtn").addEventListener("click", async () => {
+  if (parsedRows.length === 0) return;
+  const btn = $("#uploadTrialBtn");
+  const err = $("#uploadError"); const ok = $("#uploadSuccess");
+  err.classList.add("hidden"); ok.classList.add("hidden");
+  btn.disabled = true; btn.textContent = "Uploading...";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    // plan='subscription' is sent but irrelevant — billable_count will be 0 since
+    // free_quota fully covers the upload. Trial rows are inserted as plan='trial'.
+    const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-upload-confirm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        plan: "subscription",
+        rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id })),
+      }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "Upload failed");
+    ok.textContent = `✨ ${j.inserted_count} products added on free trial. Tracking starts in a few seconds. Redirecting...`;
+    ok.classList.remove("hidden");
+    setTimeout(() => location.href = "/pdtracker/", 1500);
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove("hidden");
+    btn.disabled = false; btn.textContent = "Upload to free trial →";
+  }
+});
 
 $("#uploadBtn").addEventListener("click", async () => {
   if (parsedRows.length === 0) return;
@@ -419,6 +536,9 @@ payNowBtn.addEventListener("click", async () => {
 });
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+// Fetch trial quota once at page load so the preview can branch correctly
+fetchTrialQuota().then(q => { trialQuota = q; });
 </script>
 </body>
 </html>
