@@ -118,12 +118,6 @@
     </div>
   </div>
 
-  <div style="display:flex;justify-content:flex-end;margin:-4px 0 12px;">
-    <button id="resetDataBtn" type="button" style="padding:7px 14px;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" title="Clear captured Buy Box / Ratings / Price (respects current filter). Uploaded products are kept.">
-      <span style="font-size:14px;">&#9888;</span> Reset data
-    </button>
-  </div>
-
   <div id="filterBar" class="hidden" style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #eaecf0;">
     <input id="searchInput" type="search" placeholder="Search Product Id or Seller..." style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
 
@@ -187,8 +181,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
     refreshDash();
   });
-  const resetBtn = document.querySelector("#resetDataBtn");
-  if (resetBtn) resetBtn.addEventListener("click", onResetData);
   const { data: { session } } = await sb.auth.getSession();
   if (session) bootDash();
   else { show($("#loginView")); }
