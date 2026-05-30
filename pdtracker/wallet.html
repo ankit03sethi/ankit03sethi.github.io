@@ -135,6 +135,10 @@
           <input id="bfState" type="text" placeholder="07" maxlength="2" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;" />
         </div>
         <div style="grid-column:1/-1;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">Mobile <span style="color:#94a3b8;">(skip Razorpay contact step)</span></label>
+          <input id="bfMobile" type="tel" maxlength="10" placeholder="98XXXXXXXX (10 digits, no +91)" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;" />
+        </div>
+        <div style="grid-column:1/-1;">
           <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">Billing address <span style="color:#dc2626;">*</span></label>
           <textarea id="bfAddr" rows="2" placeholder="Hari Nagar, New Delhi, 110064" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;resize:vertical;"></textarea>
         </div>
@@ -322,6 +326,7 @@ function renderBillingProfile() {
     $("#bfGst").value = _cachedProfile.gst_number || "";
     $("#bfState").value = _cachedProfile.state_code || "";
     $("#bfAddr").value = _cachedProfile.billing_address || "";
+    $("#bfMobile").value = _cachedProfile.mobile || "";
   } else {
     view.classList.add("hidden");
     form.classList.remove("hidden");
@@ -354,6 +359,7 @@ $("#billingSaveBtn")?.addEventListener("click", async () => {
       billing_address: $("#bfAddr").value.trim(),
       gst_number: $("#bfGst").value.trim() || null,
       state_code: $("#bfState").value.trim() || null,
+      mobile: $("#bfMobile").value.trim() || null,
     };
     const r = await fetch(`${SUPABASE_URL}/functions/v1/analytics-billing-profile`, {
       method: "POST",
@@ -418,7 +424,7 @@ proceedBtn.addEventListener("click", async () => {
       image: "https://cursive.world/pdtracker/icon128.png",
       prefill: {
         email: session.user.email || "",
-        contact: (session.user.user_metadata?.mobile || session.user.phone || "").replace(/^\+?91/, "").replace(/\D/g, "") || undefined,
+        contact: ((_cachedProfile?.mobile) || session.user.user_metadata?.mobile || session.user.phone || "").toString().replace(/^\+?91/, "").replace(/\D/g, "") || undefined,
       },
       theme: { color: "#1f6feb" },
       handler: async function (response) {
@@ -444,7 +450,7 @@ proceedBtn.addEventListener("click", async () => {
           });
           const cj = await cr.json();
           if (cj.ok) {
-            alert(`Payment received. ₹${rupees.toLocaleString("en-IN")} credited to your wallet.`);
+            // Silent: just refresh the balance card + statement (load() runs below).
             // If the user came from upload flow, send them back so they can finish paying
             const qp2 = new URLSearchParams(location.search);
             const back2 = qp2.get("back");
