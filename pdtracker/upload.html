@@ -76,7 +76,7 @@
 
     <div class="upload-step">
       <h3>Step 1: Download the template</h3>
-      <p class="muted" style="margin:0 0 10px;font-size:13px;">Excel with 6 columns: Country, State, Mobile, Email, Platform, Product Id</p>
+      <p class="muted" style="margin:0 0 10px;font-size:13px;">Excel with 2 columns: <b>Platform</b> (Amazon / Flipkart / Meesho / Myntra / FirstCry) and <b>Product Id</b>.</p>
       <a href="/pdtracker/cursive_Trial_Template.xlsx" class="btn btn-outline" download>&#11015; Download template</a>
     </div>
 
@@ -349,6 +349,7 @@ async function renderPreview() {
 
 $("#cancelBtn").addEventListener("click", () => {
   parsedRows = [];
+  forcePaidMode = false; // re-enable trial detection on next upload
   $("#previewSection").classList.add("hidden");
   fileInput.value = "";
 });
@@ -541,8 +542,8 @@ payNowBtn.addEventListener("click", async () => {
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-// Fetch trial quota once at page load so the preview can branch correctly
-fetchTrialQuota().then(q => { trialQuota = q; });
+// Trial quota is lazy-fetched inside renderPreview() the first time it runs,
+// so we don't race the file-drop against the network call.
 </script>
 </body>
 </html>
