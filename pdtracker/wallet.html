@@ -372,23 +372,10 @@ $("#billingSaveBtn")?.addEventListener("click", async () => {
 });
 
 async function ensureBillingBeforePay() {
-  // If profile already saved, show a confirm dialog with the details
-  if (_cachedProfile && _cachedProfile.legal_name) {
-    const gst = _cachedProfile.gst_number || "(no GSTIN)";
-    return confirm(
-      "Invoice will be issued to:\n\n" +
-      _cachedProfile.legal_name + "\n" +
-      _cachedProfile.billing_address + "\nGSTIN: " + gst + "\n\n" +
-      "Click OK to continue with these details, or Cancel to edit them first."
-    );
-  }
-  // No profile: prompt the customer to fill it now (with a skip option)
-  const proceed = confirm(
-    "You haven't saved tax / billing details yet.\n\n" +
-    "If you skip, your invoice will use just your email address — no GSTIN will be claimable.\n\n" +
-    "Click Cancel to fill in the form above first, or OK to skip and continue paying."
-  );
-  return proceed;
+  // No popup: the amber 'GST mandatory' notice on the billing card above is
+  // enough warning. Customer can always pay without GSTIN and add it later
+  // (we'll regenerate the invoice once details are saved).
+  return true;
 }
 
 proceedBtn.addEventListener("click", async () => {
