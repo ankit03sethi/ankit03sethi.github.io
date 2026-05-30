@@ -35,9 +35,7 @@
   </a>
   <div class="topbar-right">
     <span id="trackerStatus" class="scraper-status offline hidden"><span class="dot"></span> <span id="statusText">Offline</span></span>
-    <a id="walletChip" href="/pdtracker/wallet.html" class="email-chip hidden" style="text-decoration:none;color:#0f172a;background:#dcfce7;border-color:#86efac;" title="View wallet & transaction history">
-      <span style="font-weight:700;">₹</span><span id="walletBalanceTxt">—</span>
-    </a>
+    <a id="walletChip" href="/pdtracker/wallet.html" class="email-chip hidden" style="text-decoration:none;color:#0f172a;background:#dcfce7;border-color:#86efac;" title="View wallet & transaction history"><span style="font-weight:700;">&#8377;</span><span id="walletBalanceTxt">&mdash;</span></a>
     <span id="emailChip" class="email-chip hidden"></span>
     <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
   </div>
@@ -285,7 +283,6 @@ async function bootDash() {
   const { data: { user } } = await sb.auth.getUser();
   $("#emailChip").textContent = user?.email || "";
   show($("#emailChip")); show($("#signOutBtn")); show($("#trackerStatus"));
-  // Load wallet balance into the topbar chip (silent — failures hide the chip)
   refreshWalletChip().catch(() => {});
   await refreshDash();
   startAutoRefresh();
@@ -675,4 +672,38 @@ function downloadVisibleAsExcel() {
   const sellerChecks = document.querySelectorAll("#sellerList input[type=checkbox]");
   const allowedSellers = new Set();
   let anySellerChecked = false;
-  sellerChecks.forEach(c => { if (c.checked) { allowedSellers
+  sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
+  let rows = _cachedRows.slice();
+  if (platform) rows = rows.filter(r => r.platform === platform);
+  if (q) rows = rows.filter(r => (r.product_id || "").toLowerCase().includes(q) || (r.seller || "").toLowerCase().includes(q));
+  if (sellerChecks.length > 0 && anySellerChecked) rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
+
+  if (rows.length === 0) { alert("No rows to export."); return; }
+  const data = rows.map(r => ({
+    "Platform": r.platform,
+    "Product ID": r.product_id,
+    "Price (INR)": r.price ?? "",
+    "Rating": r.rating ?? "",
+    "Reviews": r.review_count ?? "",
+    "Seller": r.seller ?? "",
+    "Last fetched": r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "",
+    "Product URL": r.product_url ?? "",
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  // Column widths
+  ws["!cols"] = [{wch:10},{wch:18},{wch:12},{wch:8},{wch:10},{wch:30},{wch:20},{wch:50}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  const ts = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `Cursive_PD_Tracker_${ts}.xlsx`);
+}
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    const b = document.querySelector("#downloadXlsxBtn");
+    if (b) b.addEventListener("click", downloadVisibleAsExcel);
+  }, 100);
+});
+
+</script>
+</body>
+</html>
