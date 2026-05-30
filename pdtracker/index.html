@@ -327,7 +327,7 @@ async function refreshDash() {
 
     const { data: products, error } = await sb
       .from("analytics_products")
-      .select("id, platform, product_id, product_url, last_checked_at, last_check_status, created_at")
+      .select("id, platform, product_id, product_url, last_checked_at, last_check_status, created_at, plan, paid_until, uploaded_at, scrape_attempts")
       .order("created_at", { ascending: false });
     if (error) throw error;
 
@@ -407,6 +407,42 @@ async function refreshDash() {
   }
 }
 
+function planPill(p) {
+  // p has { plan, paid_until, uploaded_at, scrape_attempts }
+  const plan = p.plan;
+  const paid = p.paid_until ? new Date(p.paid_until + "T00:00:00") : null;
+  const startedRaw = p.uploaded_at || p.created_at;
+  const started = startedRaw ? new Date(startedRaw) : null;
+  const fmtDay = (d) => d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—";
+  const daysLeft = paid ? Math.ceil((paid - new Date()) / 86400000) : null;
+
+  if (plan === "trial") {
+    const expired = daysLeft !== null && daysLeft < 0;
+    const bg = expired ? "#fee2e2" : "#dcfce7";
+    const fg = expired ? "#991b1b" : "#166534";
+    const label = expired ? "Trial ended" : "Free trial";
+    return `<span style="display:inline-block;background:${bg};color:${fg};font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;">${label}</span>` +
+           `<div style="font-size:11px;color:#64748b;margin-top:3px;">Started ${fmtDay(started)} &middot; ${expired ? "ended " + fmtDay(paid) : "ends " + fmtDay(paid) + " (" + daysLeft + "d left)"}</div>`;
+  }
+  if (plan === "subscription") {
+    const expired = daysLeft !== null && daysLeft < 0;
+    const bg = expired ? "#fee2e2" : "#dbeafe";
+    const fg = expired ? "#991b1b" : "#1e40af";
+    const label = expired ? "Expired" : "Active &middot; ₹5";
+    return `<span style="display:inline-block;background:${bg};color:${fg};font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;">${label}</span>` +
+           `<div style="font-size:11px;color:#64748b;margin-top:3px;">Started ${fmtDay(started)} &middot; ${expired ? "ended " + fmtDay(paid) : "renews " + fmtDay(paid) + " (" + daysLeft + "d left)"}</div>`;
+  }
+  if (plan === "topup") {
+    const frozen = (p.scrape_attempts ?? 0) >= 3;
+    const bg = frozen ? "#fef3c7" : "#e0e7ff";
+    const fg = frozen ? "#78350f" : "#3730a3";
+    const label = frozen ? "One-time · done" : "One-time · ₹2";
+    return `<span style="display:inline-block;background:${bg};color:${fg};font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;">${label}</span>` +
+           `<div style="font-size:11px;color:#64748b;margin-top:3px;">Uploaded ${fmtDay(started)} &middot; no renewal</div>`;
+  }
+  return `<span style="font-size:12px;color:#94a3b8;">—</span>`;
+}
+
 function renderTable() {
   const container = $("#productsContainer");
   if (_cachedRows.length === 0) {
@@ -464,6 +500,7 @@ function renderTable() {
     + '<th data-sort="reviews_desc" style="cursor:pointer;" title="Click to sort">Reviews' + arrow("reviews") + '</th>'
     + '<th>Seller</th>'
     + '<th>Last fetched</th>'
+    + '<th>Plan / Renews</th>'
     + '<th>Link</th>'
     + '</tr></thead><tbody>';
   for (const p of rows) {
@@ -476,6 +513,7 @@ function renderTable() {
       <td>${p.review_count ? p.review_count.toLocaleString() : "—"}</td>
       <td>${esc(p.seller || "—")}</td>
       <td><span class="status-dot ${statusClass}"></span>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
+      <td>${planPill(p)}</td>
       <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
     </tr>`;
   }
@@ -702,6 +740,9 @@ function downloadVisibleAsExcel() {
     "Seller": r.seller ?? "",
     "Last fetched": r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "",
     "Product URL": r.product_url ?? "",
+      "Plan": r.plan ?? "",
+      "Started": r.uploaded_at ?? r.created_at ?? "",
+      "Renews on": r.paid_until ?? "",
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   // Column widths
