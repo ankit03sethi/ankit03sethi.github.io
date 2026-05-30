@@ -92,6 +92,10 @@
   <h1 style="margin:0 0 6px;font-size:26px;color:#0f172a;">Wallet</h1>
   <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Add money to your Cursive PD Tracker wallet. We deduct from here each time you upload new products or your subscription rows renew.</p>
 
+  <div id="prefillBanner" style="margin-bottom:18px;padding:12px 16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;font-size:14px;color:#78350f;display:none;">
+    You need to add <b>&#8377;<span id="prefillNeed">0</span></b> to complete your upload. We've pre-filled the amount below.
+  </div>
+
   <div class="balance-card">
     <div>
       <div class="balance-label">CURRENT BALANCE</div>
@@ -278,6 +282,12 @@ proceedBtn.addEventListener("click", async () => {
           const cj = await cr.json();
           if (cj.ok) {
             alert(`Payment received. ₹${rupees.toLocaleString("en-IN")} credited to your wallet.`);
+            // If the user came from upload flow, send them back so they can finish paying
+            const qp2 = new URLSearchParams(location.search);
+            const back2 = qp2.get("back");
+            if (back2 && /^\/pdtracker\//.test(back2)) {
+              setTimeout(() => { location.href = back2; }, 600);
+            }
           } else {
             alert(`Payment captured but wallet credit failed: ${cj.error || "Unknown error"}\n\nYour payment is safe — please WhatsApp +91 96257 37475 with the payment ID: ${response.razorpay_payment_id}`);
           }
@@ -298,6 +308,21 @@ proceedBtn.addEventListener("click", async () => {
     proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
   }
 });
+
+// Handle prefill / back-link from upload flow
+const qp = new URLSearchParams(location.search);
+const prefill = parseInt(qp.get("prefill") || "0");
+if (prefill > 0) {
+  $("#prefillNeed").textContent = prefill.toLocaleString("en-IN");
+  $("#prefillBanner").style.display = "block";
+  setTimeout(() => {
+    amtInput.value = prefill;
+    chips.forEach(c => c.classList.remove("active"));
+    syncProceedState();
+    modal.classList.add("open");
+    amtInput.focus();
+  }, 400);
+}
 
 load().catch(e => {
   $("#txContainer").innerHTML = `<div class="tx-empty">Error: ${esc(e.message)}</div>`;
