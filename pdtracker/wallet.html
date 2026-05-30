@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Wallet — Cursive PD Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026053001" />
+  <style>
+    .balance-card {
+      background: linear-gradient(135deg, #1f6feb 0%, #1858d6 100%);
+      color: #fff; border-radius: 16px; padding: 28px 32px; margin-bottom: 28px;
+      box-shadow: 0 4px 14px rgba(31,111,235,.18);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px;
+    }
+    .balance-label { font-size: 14px; opacity: .85; letter-spacing: .3px; }
+    .balance-amount { font-size: 42px; font-weight: 700; margin-top: 4px; line-height: 1; }
+    .balance-amount .rupee { font-size: 28px; opacity: .8; margin-right: 2px; }
+    .balance-sub { font-size: 12px; opacity: .7; margin-top: 8px; }
+    .recharge-btn {
+      background: #fff; color: #1f6feb; border: none; padding: 13px 26px; border-radius: 10px;
+      font-size: 15px; font-weight: 700; cursor: pointer; transition: transform .12s, box-shadow .12s;
+    }
+    .recharge-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,.18); }
+    .recharge-btn:active { transform: translateY(0); }
+    .tx-card { background: #fff; border-radius: 12px; padding: 20px 24px; border: 1px solid #e5e7eb; }
+    .tx-card h2 { margin: 0 0 14px; font-size: 18px; color: #0f172a; }
+    .tx-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .tx-table th { text-align: left; padding: 10px 8px; border-bottom: 2px solid #e5e7eb; color: #64748b; font-weight: 600; font-size: 12px; letter-spacing: .3px; text-transform: uppercase; }
+    .tx-table td { padding: 12px 8px; border-bottom: 1px solid #f1f5f9; color: #0f172a; vertical-align: top; }
+    .tx-table tr:last-child td { border-bottom: none; }
+    .amt-credit { color: #047857; font-weight: 600; }
+    .amt-debit { color: #b91c1c; font-weight: 600; }
+    .tx-type { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .2px; }
+    .tx-type-recharge { background: #dcfce7; color: #166534; }
+    .tx-type-upload   { background: #fee2e2; color: #991b1b; }
+    .tx-type-renewal  { background: #fef3c7; color: #92400e; }
+    .tx-type-refund   { background: #dbeafe; color: #1e40af; }
+    .tx-type-adjust   { background: #f3e8ff; color: #6b21a8; }
+    .tx-empty { padding: 36px; text-align: center; color: #94a3b8; font-size: 14px; }
+    .recharge-modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; z-index: 9999; }
+    .recharge-modal-bg.open { display: flex; }
+    .recharge-modal { background: #fff; border-radius: 14px; padding: 28px 32px; width: 92%; max-width: 420px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+    .recharge-modal h3 { margin: 0 0 6px; font-size: 22px; color: #0f172a; }
+    .recharge-modal p { margin: 0 0 18px; color: #475467; font-size: 14px; line-height: 1.5; }
+    .amount-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .amount-row .rupee { font-size: 28px; color: #64748b; }
+    .amount-row input {
+      flex: 1; font-size: 26px; padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 10px;
+      font-weight: 600; color: #0f172a;
+    }
+    .amount-row input:focus { outline: none; border-color: #1f6feb; }
+    .quick-chips { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .quick-chip { padding: 8px 14px; background: #f1f5f9; border: 1px solid #e5e7eb; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; color: #475467; }
+    .quick-chip:hover { background: #e2e8f0; }
+    .quick-chip.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-btn { padding: 10px 18px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .modal-btn-secondary { background: #f1f5f9; color: #475467; }
+    .modal-btn-primary { background: #1f6feb; color: #fff; }
+    .modal-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .placeholder-note { margin-top: 14px; padding: 10px 12px; background: #fef3c7; border-radius: 8px; color: #78350f; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/pdtracker/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup><span class="tracker-badge">PD TRACKER</span></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <a href="/pdtracker/" class="btn-ghost">&larr; Back to dashboard</a>
+  </div>
+</header>
+
+<main style="max-width:960px;margin:0 auto;padding:24px 18px 60px;">
+
+  <h1 style="margin:0 0 6px;font-size:26px;color:#0f172a;">Wallet</h1>
+  <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Add money to your Cursive PD Tracker wallet. We deduct from here each time you upload new products or your subscription rows renew.</p>
+
+  <div class="balance-card">
+    <div>
+      <div class="balance-label">CURRENT BALANCE</div>
+      <div class="balance-amount"><span class="rupee">₹</span><span id="balanceAmt">—</span></div>
+      <div class="balance-sub" id="balanceSub">Loading…</div>
+    </div>
+    <button class="recharge-btn" id="rechargeBtn">+ Add money</button>
+  </div>
+
+  <div class="tx-card">
+    <h2>Statement</h2>
+    <div id="txContainer">
+      <div class="tx-empty">Loading transactions…</div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Recharge modal -->
+<div class="recharge-modal-bg" id="rechargeModal">
+  <div class="recharge-modal">
+    <h3>Add money to wallet</h3>
+    <p>Enter any amount. We accept UPI, card, and netbanking via Razorpay.</p>
+    <div class="amount-row">
+      <span class="rupee">₹</span>
+      <input type="number" id="rechargeAmt" placeholder="0" min="1" inputmode="numeric" />
+    </div>
+    <div class="quick-chips">
+      <div class="quick-chip" data-amt="200">₹200</div>
+      <div class="quick-chip" data-amt="500">₹500</div>
+      <div class="quick-chip" data-amt="1000">₹1,000</div>
+      <div class="quick-chip" data-amt="5000">₹5,000</div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-secondary" id="rechargeCancel">Cancel</button>
+      <button class="modal-btn modal-btn-primary" id="rechargeProceed" disabled>Proceed to pay</button>
+    </div>
+    <div class="placeholder-note">
+      Razorpay payment flow is being wired in the next push. For now, contact us on WhatsApp <a href="https://wa.me/919625737475">+91 96257 37475</a> to credit your wallet manually.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (paise) => "₹" + (Math.abs(paise) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+const TYPE_META = {
+  credit_recharge: { label: "Recharge", cls: "tx-type-recharge" },
+  debit_upload:    { label: "Upload",    cls: "tx-type-upload" },
+  debit_renewal:   { label: "Renewal",   cls: "tx-type-renewal" },
+  refund:          { label: "Refund",    cls: "tx-type-refund" },
+  manual_adjust:   { label: "Adjusted",  cls: "tx-type-adjust" },
+};
+
+async function load() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = "/pdtracker/?return=wallet"; return; }
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=100`, {
+    headers: {
+      "Authorization": `Bearer ${session.access_token}`,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+  });
+  const j = await res.json();
+  if (!j.ok) {
+    $("#txContainer").innerHTML = `<div class="tx-empty">Failed to load: ${esc(j.error || "Unknown error")}</div>`;
+    return;
+  }
+
+  $("#balanceAmt").textContent = j.balance_rupees;
+  $("#balanceSub").textContent = j.updated_at
+    ? "Last activity: " + fmtDate(j.updated_at)
+    : "No transactions yet";
+
+  const tx = j.transactions || [];
+  if (tx.length === 0) {
+    $("#txContainer").innerHTML = `<div class="tx-empty">No transactions yet. Add money to get started.</div>`;
+    return;
+  }
+
+  let html = `<table class="tx-table"><thead><tr>
+    <th>Date</th><th>Type</th><th>Description</th>
+    <th style="text-align:right">Amount</th><th style="text-align:right">Balance</th>
+  </tr></thead><tbody>`;
+  for (const t of tx) {
+    const meta = TYPE_META[t.type] || { label: t.type, cls: "" };
+    const isCredit = t.amount_paise > 0;
+    html += `<tr>
+      <td>${esc(fmtDate(t.created_at))}</td>
+      <td><span class="tx-type ${meta.cls}">${esc(meta.label)}</span></td>
+      <td>${esc(t.description || "")}${t.reference ? `<br><small style="color:#94a3b8">${esc(t.reference)}</small>` : ""}</td>
+      <td style="text-align:right" class="${isCredit ? "amt-credit" : "amt-debit"}">${isCredit ? "+" : "−"}${esc(fmt(t.amount_paise))}</td>
+      <td style="text-align:right">${esc(fmt(t.balance_after_paise))}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  $("#txContainer").innerHTML = html;
+}
+
+// Recharge modal wiring (UI only; Razorpay flow ships next)
+const modal = $("#rechargeModal");
+const amtInput = $("#rechargeAmt");
+const proceedBtn = $("#rechargeProceed");
+const chips = document.querySelectorAll(".quick-chip");
+
+function syncProceedState() {
+  const v = parseInt(amtInput.value || "0");
+  proceedBtn.disabled = !(v > 0);
+}
+
+$("#rechargeBtn").addEventListener("click", () => { modal.classList.add("open"); amtInput.focus(); });
+$("#rechargeCancel").addEventListener("click", () => modal.classList.remove("open"));
+modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
+amtInput.addEventListener("input", () => {
+  chips.forEach(c => c.classList.remove("active"));
+  syncProceedState();
+});
+chips.forEach(c => c.addEventListener("click", () => {
+  amtInput.value = c.dataset.amt;
+  chips.forEach(x => x.classList.toggle("active", x === c));
+  syncProceedState();
+}));
+proceedBtn.addEventListener("click", () => {
+  alert("Razorpay checkout will open here in the next update. For now please contact +91 96257 37475 to manually credit your wallet.");
+});
+
+load().catch(e => {
+  $("#txContainer").innerHTML = `<div class="tx-empty">Error: ${esc(e.message)}</div>`;
+});
+</script>
+
+</body>
+</html>
