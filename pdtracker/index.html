@@ -35,6 +35,39 @@
   </a>
   <div class="topbar-right">
     <span id="trackerStatus" class="scraper-status offline hidden"><span class="dot"></span> <span id="statusText">Offline</span></span>
+
+    <!-- Pricing dropdown -->
+    <div id="pricingChipWrap" style="position:relative;display:inline-block;">
+      <button id="pricingChip" type="button" class="email-chip" style="background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a;font-weight:700;cursor:pointer;" title="See pricing">
+        &#8377; Pricing &#9662;
+      </button>
+      <div id="pricingPanel" class="hidden" style="position:absolute;right:0;top:calc(100% + 8px);width:340px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 18px 38px rgba(15,23,42,.18);padding:16px;z-index:200;text-align:left;">
+        <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px;">How Cursive PD Tracker is priced</div>
+        <p style="font-size:12px;color:#64748b;margin:0 0 12px;line-height:1.5;">Every new account gets 10 free trial rows. Beyond that you pick a plan per upload.</p>
+
+        <div style="border:1.5px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:10px;background:#eff6ff;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:12px;color:#1f6feb;text-transform:uppercase;letter-spacing:.4px;">One-time check</span>
+            <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;2.36<span style="font-size:11px;font-weight:500;color:#6b7280;"> / row</span></span>
+          </div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;2 + 18% GST</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">One snapshot per product. Auto-retries 3 times if the check fails, then stops. No renewal.</div>
+        </div>
+
+        <div style="border:1.5px solid #bbf7d0;border-radius:10px;padding:12px;background:#f0fdf4;position:relative;">
+          <span style="position:absolute;top:-9px;right:10px;background:#16a34a;color:#fff;font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;letter-spacing:.3px;">RECOMMENDED</span>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:12px;color:#16a34a;text-transform:uppercase;letter-spacing:.4px;">30-day tracking</span>
+            <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;5.90<span style="font-size:11px;font-weight:500;color:#6b7280;"> / row</span></span>
+          </div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;5 + 18% GST</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Re-checked every few hours for 30 days. Auto-renews from wallet on day 30. Shows day-by-day history of Buy Box, Ratings &amp; Price.</div>
+        </div>
+
+        <div style="font-size:11px;color:#94a3b8;margin-top:10px;text-align:center;">All prices in INR. Paid via Razorpay (UPI / cards / netbanking).</div>
+      </div>
+    </div>
+
     <a id="walletChip" href="/pdtracker/wallet.html" class="email-chip hidden" style="text-decoration:none;color:#0f172a;background:#dcfce7;border-color:#86efac;" title="View wallet & transaction history"><span style="font-weight:700;">&#8377;</span><span id="walletBalanceTxt">&mdash;</span></a>
     <span id="emailChip" class="email-chip hidden"></span>
     <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
@@ -84,9 +117,7 @@
   <div id="trialBanner" class="trial-banner hidden">
     <div class="text">
       <strong>Free trial:</strong> <span id="trialLeft">10</span> of <span id="trialQuota">10</span> products left to try.
-      <span style="color:#92400e;opacity:.75;">Loving it?</span>
     </div>
-    <button class="btn-upgrade" id="upgradeBtn">Upgrade now</button>
   </div>
 
   <div class="kpi-row">
@@ -649,6 +680,18 @@ async function refreshWalletChip() {
     const txt = document.querySelector("#walletBalanceTxt");
     if (txt) txt.textContent = j.balance_rupees;
     show(document.querySelector("#walletChip"));
+    // Pricing dropdown toggle
+    const pcBtn = document.querySelector("#pricingChip");
+    const pcPanel = document.querySelector("#pricingPanel");
+    if (pcBtn && pcPanel) {
+      pcBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        pcPanel.classList.toggle("hidden");
+      });
+      document.addEventListener("click", (e) => {
+        if (!pcPanel.contains(e.target) && e.target !== pcBtn) pcPanel.classList.add("hidden");
+      });
+    }
   } catch {}
 }
 
