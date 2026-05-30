@@ -365,7 +365,15 @@ async function refreshDash() {
       show($("#trialBanner"));
     } else {
       hide($("#trialBanner"));
-      const btn = document.querySelector("#installExtBtn"); if (btn) btn.classList.remove("hidden");
+    }
+    // Show the Install Extension button whenever the customer has at least one
+    // paid row (subscription or topup). Trial-only rows are scraped centrally
+    // by the admin PC, so trial-only customers don\'t need the extension.
+    const hasPaidRow = _cachedRows.some(p => p.plan === "subscription" || p.plan === "topup");
+    const installBtn = document.querySelector("#installExtBtn");
+    if (installBtn) {
+      if (hasPaidRow || tier !== "trial") installBtn.classList.remove("hidden");
+      else installBtn.classList.add("hidden");
     }
 
     const { data: hb } = await sb.from("analytics_heartbeats").select("last_ping_at").maybeSingle();
