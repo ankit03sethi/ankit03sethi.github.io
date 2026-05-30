@@ -675,4 +675,17 @@ function downloadVisibleAsExcel() {
   // Column widths
   ws["!cols"] = [{wch:10},{wch:18},{wch:12},{wch:8},{wch:10},{wch:30},{wch:20},{wch:50}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  const ts = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `Cursive_PD_Tracker_${ts}.xlsx`);
+}
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    const b = document.querySelector("#downloadXlsxBtn");
+    if (b) b.addEventListener("click", downloadVisibleAsExcel);
+  }, 100);
+});
+
+</script>
+</body>
+</html>
