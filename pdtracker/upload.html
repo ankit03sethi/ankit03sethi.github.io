@@ -11,6 +11,24 @@
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="pdtracker.css?v=2026052704" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+    .kpi-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 12px;
+      background: #f0fdf4; border: 1.5px solid #bbf7d0;
+      border-radius: 10px;
+      font-size: 12px; font-weight: 700; color: #14532d;
+      letter-spacing: .2px; text-transform: uppercase;
+      transition: all .18s ease;
+      cursor: default;
+    }
+    .kpi-chip:hover {
+      background: #16a34a; color: #fff; border-color: #16a34a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(22,163,74,.28);
+    }
+    .kpi-chip .ico { font-size: 14px; line-height: 1; }
+  </style>
 </head>
 <body>
 
@@ -110,7 +128,14 @@
         <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;5 + 18% GST</div>
         <ul style="margin:0;padding-left:18px;font-size:13px;color:#374151;line-height:1.7;">
           <li>Re-checked every few hours for 30 days</li>
-          <li>See how price, rating &amp; Buy Box change day by day</li>
+          <li style="list-style:none;margin-left:-18px;padding:6px 0;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <span class="kpi-chip"><span class="ico">&#127942;</span> Buy Box</span>
+              <span class="kpi-chip"><span class="ico">&#11088;</span> Ratings</span>
+              <span class="kpi-chip"><span class="ico">&#128176;</span> Price</span>
+            </div>
+            <div style="font-size:12px;color:#6b7280;margin-top:6px;">tracked &amp; logged day by day</div>
+          </li>
           <li>Auto-renew if wallet has balance</li>
         </ul>
       </div>
