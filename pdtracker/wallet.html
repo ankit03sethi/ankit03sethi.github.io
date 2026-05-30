@@ -256,7 +256,10 @@ proceedBtn.addEventListener("click", async () => {
       name: "Cursive PD Tracker",
       description: `Wallet recharge ₹${rupees.toLocaleString("en-IN")}`,
       image: "https://cursive.world/pdtracker/icon128.png",
-      prefill: { email: session.user.email || "" },
+      prefill: {
+        email: session.user.email || "",
+        contact: (session.user.user_metadata?.mobile || session.user.phone || "").replace(/^\+?91/, "").replace(/\D/g, "") || undefined,
+      },
       theme: { color: "#1f6feb" },
       handler: async function (response) {
         // Razorpay called handler with signed payment proof. Send it to our
