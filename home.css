@@ -1119,3 +1119,43 @@ section { padding: 80px 0; }
 }
 .contact-whatsapp { background: #25D366; }
 .contact-email    { background: var(--primary); }
+
+/* ============================================================
+   UNIVERSAL LIFT-ON-HOVER  (Cursive hover-card standard)
+   Anything clickable lifts 4px and casts a soft shadow on hover.
+   On press (active), it sinks back to 1px so the click feels
+   physical. Cards already have this via .card:hover above; this
+   block extends the same treatment to buttons & CTAs everywhere.
+   ============================================================ */
+.btn-primary,
+.btn-mega,
+.btn-mega-outline,
+.btn-mega-light,
+.btn-whatsapp,
+.card-cta,
+.nav-cta,
+.btn-link {
+  transition: transform .18s ease, box-shadow .18s ease,
+              background .15s, color .15s, border-color .15s;
+}
+.btn-primary:hover,
+.btn-mega:hover,
+.btn-mega-outline:hover,
+.btn-mega-light:hover,
+.btn-whatsapp:hover,
+.card-cta:hover,
+.nav-cta:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(15,23,42,.12);
+}
+.btn-primary:active,
+.btn-mega:active,
+.btn-mega-outline:active,
+.btn-mega-light:active,
+.btn-whatsapp:active,
+.card-cta:active,
+.nav-cta:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(15,23,42,.08);
+}
+/* Cards (.card) already lift via existing rule above — leave alone. */

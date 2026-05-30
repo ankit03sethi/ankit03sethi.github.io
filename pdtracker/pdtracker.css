@@ -209,3 +209,41 @@ table.data tbody tr:last-child td { border-bottom: none; }
   .auth-card { padding: 22px; }
   .upload-card, .install-card { padding: 20px; margin: 14px; }
 }
+
+/* ===== Cursive hover-card standard (PD Tracker) ===== */
+.btn-primary,
+.btn-primary-sm,
+.btn-outline,
+.btn-ghost,
+.dl-btn,
+.plan-card,
+.recharge-btn,
+.balance-card,
+.tx-card,
+.auth-card,
+.install-card,
+.upload-card {
+  transition: transform .18s ease, box-shadow .18s ease,
+              background .15s, color .15s, border-color .15s;
+}
+.btn-primary:hover,
+.btn-primary-sm:hover,
+.btn-outline:hover,
+.btn-ghost:hover,
+.dl-btn:hover,
+.plan-card:hover,
+.recharge-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(15,23,42,.12);
+}
+.btn-primary:active,
+.btn-primary-sm:active,
+.btn-outline:active,
+.btn-ghost:active,
+.dl-btn:active,
+.plan-card:active,
+.recharge-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(15,23,42,.08);
+}
+/* Table rows keep their existing flat background-only hover (lifting rows looks broken) */

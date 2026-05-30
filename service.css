@@ -306,3 +306,24 @@
 }
 .lead-secondary:hover { color: var(--primary-dark); text-decoration: underline; }
 .lead-secondary-sep { margin: 0 10px; color: #cbd5e1; }
+
+/* ===== Cursive hover-card standard (service pages) ===== */
+.svc-price-card,
+.svc-doc-cta,
+.lead-callback-btn,
+.lead-secondary {
+  transition: transform .18s ease, box-shadow .18s ease,
+              background .15s, color .15s, border-color .15s;
+}
+.svc-price-card:hover,
+.svc-doc-cta:hover,
+.lead-callback-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(15,23,42,.12);
+}
+.svc-price-card:active,
+.svc-doc-cta:active,
+.lead-callback-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(15,23,42,.08);
+}
