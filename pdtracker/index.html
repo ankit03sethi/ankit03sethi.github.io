@@ -109,27 +109,27 @@
       </div>
     </div>
     <div class="dash-actions">
-      <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload products</a>
-      <a href="/pdtracker/install-extension.html" id="installExtBtn" class="btn btn-install-pulse hidden" title="Required for paid plans — your PC scrapes your products" style="padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;">Install extension</a>
+      <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload your products</a>
+      <a href="/pdtracker/install-extension.html" id="installExtBtn" class="btn btn-install-pulse hidden" title="Required for paid plans — your PC tracks your own products" style="padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;">Install extension</a>
     </div>
   </div>
 
   <div id="trialBanner" class="trial-banner hidden">
     <div class="text">
-      <strong>Free trial:</strong> <span id="trialLeft">10</span> of <span id="trialQuota">10</span> products left to try.
+      <strong>Free trial:</strong> <span id="trialLeft">10</span> of <span id="trialQuota">10</span> of your own products left to add.
     </div>
   </div>
 
   <div class="kpi-row">
     <div class="kpi">
-      <div class="label">Total products</div>
+      <div class="label">Your total products</div>
       <div class="value" id="kpiTotal">0</div>
       <div class="meta">Across all marketplaces</div>
     </div>
     <div class="kpi">
       <div class="label">Total platforms</div>
       <div class="value" id="kpiPlatforms">0</div>
-      <div class="meta">Marketplaces with products</div>
+      <div class="meta">Marketplaces where your products live</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div class="kpi" id="refreshBtnCard" style="cursor:pointer;display:flex;align-items:center;gap:12px;flex:1;padding:14px 18px;transition:background .12s;" title="Reload data now">
@@ -139,7 +139,7 @@
           <div style="font-size:11px;color:#94a3b8;">Reload data now</div>
         </div>
       </div>
-      <div class="kpi" id="downloadXlsxBtn" style="cursor:pointer;display:flex;align-items:center;gap:12px;flex:1;padding:14px 18px;background:#1f6feb;color:#fff;border-color:#1f6feb;transition:background .12s;" title="Download visible products as Excel">
+      <div class="kpi" id="downloadXlsxBtn" style="cursor:pointer;display:flex;align-items:center;gap:12px;flex:1;padding:14px 18px;background:#1f6feb;color:#fff;border-color:#1f6feb;transition:background .12s;" title="Download your visible products as Excel">
         <span style="font-size:24px;">&#11015;</span>
         <div>
           <div style="font-size:13px;font-weight:700;">Download data</div>
@@ -242,7 +242,7 @@ async function onResetData() {
   const isFiltered = (platform || q || (sellerChecks.length > 0 && anySellerChecked));
 
   if (filteredCount === 0) {
-    alert("Nothing to reset — no products match your current filter.");
+    alert("Nothing to reset — none of your products match the current filter.");
     return;
   }
 
@@ -327,7 +327,7 @@ async function bootDash() {
   // Wire upgrade button (placeholder until Razorpay subscription is built)
   const upBtn = document.querySelector("#upgradeBtn");
   if (upBtn) upBtn.addEventListener("click", () => {
-    if (confirm("Upgrade to unlimited products. You can pay now, or close this and continue your free trial. Continue to payment?")) {
+    if (confirm("Upgrade to track unlimited products of your own. You can pay now, or close this and continue your free trial. Continue to payment?")) {
       alert("Payment flow coming soon. For now, WhatsApp +91 96257 37475 to upgrade manually. Your trial continues until then.");
     }
   });
@@ -501,7 +501,7 @@ function planPill(p) {
 function renderTable() {
   const container = $("#productsContainer");
   if (_cachedRows.length === 0) {
-    container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Upload products</a></div>';
+    container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Upload your products</a></div>';
     return;
   }
 
@@ -538,7 +538,7 @@ function renderTable() {
   rows.sort(sorters[sortBy] || sorters.created_desc);
 
   if (rows.length === 0) {
-    container.innerHTML = '<div class="empty"><div class="big">No products match the filters</div><div>Try clearing search or platform filter.</div></div>';
+    container.innerHTML = '<div class="empty"><div class="big">None of your products match these filters</div><div>Try clearing search or platform filter.</div></div>';
     return;
   }
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Upload products &mdash; Cursive PD Tracker</title>
+  <title>Upload your products &mdash; Cursive PD Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
@@ -71,7 +71,7 @@
       <div style="flex:1;height:6px;border-radius:3px;background:#e5e7eb;" title="Step 4: Dashboard"></div>
     </div>
 
-    <h1 style="margin:0 0 6px;font-size:22px;">Step 3 of 4 &mdash; Download &amp; upload products</h1>
+    <h1 style="margin:0 0 6px;font-size:22px;">Step 3 of 4 &mdash; Download &amp; upload your products</h1>
     <p class="muted" id="introCopy" style="margin:0 0 20px;font-size:14px;">Upload your product list to start tracking Buy Box, Ratings & Price.</p>
 
     <div class="upload-step">
@@ -97,18 +97,18 @@
     </div>
 
     <div id="previewSection" class="upload-step hidden">
-      <h3>Step 3: Confirm and upload (<span id="rowCount">0</span> products)</h3>
+      <h3>Step 3: Confirm and upload (<span id="rowCount">0</span> of your products)</h3>
 
       <!-- Trial banner: shown only when user has free quota AND row count fits inside the quota -->
       <div id="trialBanner" class="hidden" style="margin:6px 0 14px;padding:14px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;color:#14532d;font-size:14px;">
-        &#127881; <b>Free trial</b> &mdash; these <span id="trialUseCount">0</span> products will be tracked for <b>30 days at no cost</b>. We&rsquo;ll start checking them within a few seconds. Our central server handles the tracking, so you don&rsquo;t need to install anything.
+        &#127881; <b>Free trial</b> &mdash; these <span id="trialUseCount">0</span> of your own products will be tracked for <b>30 days at no cost</b>. We&rsquo;ll start checking them within a few seconds. Our central server handles the tracking, so you don&rsquo;t need to install anything.
       </div>
 
       <!-- Over-limit banner: trial available but rows exceed quota -->
       <div id="trialOverBanner" class="hidden" style="margin:6px 0 14px;padding:14px 16px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:10px;color:#78350f;font-size:14px;">
-        &#9888; <b>Trial limit reached.</b> You have <b><span id="trialAvail">0</span> free trial slots</b> remaining but uploaded <b><span id="trialAttempt">0</span> products</b>. Either:
+        &#9888; <b>Trial limit reached.</b> You have <b><span id="trialAvail">0</span> free trial slots</b> remaining but uploaded <b><span id="trialAttempt">0</span> of your products</b>. Either:
         <ul style="margin:8px 0 0;padding-left:22px;">
-          <li>Trim your file to <span id="trialAvail2">0</span> products and re-upload, or</li>
+          <li>Trim your file to <span id="trialAvail2">0</span> of your products and re-upload, or</li>
           <li>Skip the trial and upgrade to a paid plan (covers all rows)</li>
         </ul>
       </div>
@@ -136,7 +136,7 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
       <div>
         <h2 style="margin:0 0 4px;font-size:20px;">Pick a plan</h2>
-        <p class="muted" style="margin:0;font-size:13px;">For <b id="modalRowCount">0</b> products. All prices include 18% GST.</p>
+        <p class="muted" style="margin:0;font-size:13px;">For <b id="modalRowCount">0</b> of your products. All prices include 18% GST.</p>
         <p id="freeTrialBanner" class="hidden" style="margin:6px 0 0;font-size:13px;color:#16a34a;font-weight:600;">&#127881; You have <span id="freeTrialRemaining">0</span> free trial rows — the first ones are on us.</p>
       </div>
       <button id="modalCloseBtn" class="btn btn-outline" style="padding:6px 12px;font-size:14px;">&times; Close</button>
@@ -402,7 +402,7 @@ $("#uploadTrialBtn").addEventListener("click", async () => {
     });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || "Upload failed");
-    ok.textContent = `✨ ${j.inserted_count} products added on free trial. Tracking starts in a few seconds. Redirecting...`;
+    ok.textContent = `✨ ${j.inserted_count} of your products added on free trial. Tracking starts in a few seconds. Redirecting...`;
     ok.classList.remove("hidden");
     setTimeout(() => location.href = "/pdtracker/", 1500);
   } catch (e) {
@@ -540,7 +540,7 @@ payNowBtn.addEventListener("click", async () => {
       }
       throw new Error(j.error || "Payment failed");
     }
-    $("#paySuccess").textContent = `${j.inserted_count} products added (${j.free_consumed} on free trial, ${j.billable_count} paid). Redirecting...`;
+    $("#paySuccess").textContent = `${j.inserted_count} of your products added (${j.free_consumed} on free trial, ${j.billable_count} paid). Redirecting...`;
     $("#paySuccess").classList.remove("hidden");
     setTimeout(() => location.href = "/pdtracker/", 1800);
   } catch (e) {
