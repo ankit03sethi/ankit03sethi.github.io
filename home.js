@@ -87,6 +87,7 @@
   // ---- Service tag (column A in All Leads sheet) ----
   function serviceTag(serviceName) {
     var s = String(serviceName || "").toLowerCase();
+    if (s.indexOf("business launcher") !== -1) return "business_launcher";
     if (s.indexOf("seller analytics") !== -1) return "analytics";
     if (s.indexOf("gst") !== -1)              return "gst";
     if (s.indexOf("trademark") !== -1)        return "trademark";
@@ -251,18 +252,27 @@
     } else if (action === "lead_otp_verify") {
       body = { email: params.email, otp: params.otp };
     } else if (action === "service_pay_initiate") {
+      var basePrice = Number(params.servicePrice) || 0;
+      var qty       = Number(params.qty) || 1;
+      var subtotal  = basePrice * qty;
+      // Business Launcher prices are quoted EX-GST. Add 18% GST so Razorpay
+      // collects the full ₹X + 18% the customer sees on the page.
+      var gstMul    = (params.serviceType === "business_launcher") ? 1.18 : 1;
+      var amountFinal = Math.round(subtotal * gstMul);
       body = {
         email:        params.email,
         mobile:       params.mobile,
         service_type: params.serviceType,
         service_name: params.serviceName,
-        amount:       Number(params.servicePrice) * (Number(params.qty) || 1),
-        qty:          Number(params.qty) || 1,
+        amount:       amountFinal,
+        qty:          qty,
         origin_url:   params.origin,
         payload: {
           service_type: params.serviceType,
           service_name: params.serviceName,
-          qty:          Number(params.qty) || 1
+          qty:          qty,
+          base_price:   subtotal,
+          gst_applied:  (gstMul > 1) ? Math.round(subtotal * (gstMul - 1)) : 0
         }
       };
     } else if (action === "service_pay_complete") {
