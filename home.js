@@ -260,7 +260,7 @@
       var subtotal  = basePrice * qty;
       // Business Launcher prices are quoted EX-GST. Add 18% GST so Razorpay
       // collects the full ₹X + 18% the customer sees on the page.
-      var gstMul    = (params.serviceType === "business_launcher") ? 1.18 : 1;
+      var gstMul    = 1.18; // 18% GST is now added to every service payment
       var amountFinal = Math.round(subtotal * gstMul);
       // Pull the GST + agent code from the new "Confirm payment" step (every page).
       var extras = {
@@ -525,12 +525,12 @@
         '<hr style="border:none;border-top:1px solid #e5e7eb;margin:6px 0;" />' +
         '<div style="display:flex;justify-content:space-between;font-weight:700;font-size:14px;color:#0f172a;"><span>Total payable</span><span>&#8377;<span id="pdTotalAmt">0</span>/-</span></div>' +
       '</div>' +
-      '<details style="margin:0 0 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">' +
-        '<summary style="cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:#1f6feb;list-style:none;display:flex;justify-content:space-between;align-items:center;">' +
-          '<span>+ Add GST details for input-tax credit (optional)</span>' +
-          '<span style="font-size:11px;color:#94a3b8;font-weight:500;">Recommended</span>' +
-        '</summary>' +
-        '<div style="padding:0 14px 14px;">' +
+      '<div style="margin:0 0 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:12px 14px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#1f6feb;margin-bottom:6px;">' +
+          '<span>GST details for input-tax credit</span>' +
+          '<span style="font-size:11px;color:#94a3b8;font-weight:500;">Optional &middot; Recommended</span>' +
+        '</div>' +
+        '<div>' +
           '<label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:8px 0 4px;">Legal name (as on GST certificate)</label>' +
           '<input id="pdLegalName" type="text" autocomplete="off" placeholder="e.g. Cursive Hari Nagar" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />' +
           '<label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:10px 0 4px;">GSTIN</label>' +
@@ -539,7 +539,7 @@
           '<textarea id="pdBillAddr" rows="2" autocomplete="off" placeholder="Hari Nagar, New Delhi, 110064" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>' +
           '<p style="margin:8px 0 0;font-size:11px;color:#94a3b8;">Both fields must match the GST certificate exactly.</p>' +
         '</div>' +
-      '</details>' +
+      '</div></div>' +
       '<input id="pdAgentCode" type="text" autocomplete="off" placeholder="" maxlength="20" style="width:100%;padding:9px 12px;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;color:#475467;background:#fafbfc;margin:0 0 14px;letter-spacing:.3px;" />' +
       '<div class="lead-actions lead-actions-stacked">' +
         '<button type="button" class="btn btn-primary lead-submit" id="pdConfirmBtn"><span class="lead-pay-emoji">&#128274;</span> Confirm &amp; Pay &#8377;<span id="pdConfirmAmt">0</span>/- now</button>' +
@@ -607,9 +607,8 @@
       hideErr();
       ensurePayDetailsStep();
       // Populate breakdown
-      var isBL = currentServiceTag === "business_launcher";
       var base = currentPriceNum;
-      var gst  = isBL ? Math.round(base * 0.18) : 0;
+      var gst  = Math.round(base * 0.18);
       var total = base + gst;
       var fmt = function (n) { return Number(n).toLocaleString("en-IN"); };
       var $ = function (id) { return document.getElementById(id); };
@@ -618,11 +617,7 @@
       if ($("pdGstAmt"))      $("pdGstAmt").textContent      = fmt(gst);
       if ($("pdTotalAmt"))    $("pdTotalAmt").textContent    = fmt(total);
       if ($("pdConfirmAmt"))  $("pdConfirmAmt").textContent  = fmt(total);
-      // Hide the GST row entirely if no extra GST is being added (non-BL services)
-      var gstRow = $("pdGstRow");
-      if (gstRow) gstRow.style.display = isBL ? "flex" : "none";
-      var baseRow = $("pdBaseRow");
-      if (baseRow) baseRow.firstElementChild.textContent = isBL ? "Base price" : "Amount";
+      // GST row always visible — 18% applies to every service
       showStep("paydetails");
     });
   }
