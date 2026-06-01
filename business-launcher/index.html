@@ -318,15 +318,43 @@
       </div>
     </form>
 
-    <div id="leadStepDone" class="lead-step-done hidden">
+    <div id="leadStepAction" class="lead-step-action hidden">
+      <div class="lead-done-check lead-done-check-small">&#10003;</div>
+      <h3>Verified! What next?</h3>
+      <p class="muted">Choose how you'd like to proceed.</p>
+      <div class="lead-actions lead-actions-stacked">
+        <button type="button" class="btn btn-primary lead-submit lead-pay-btn" id="leadPayBtn">
+          <span class="lead-pay-emoji">&#128274;</span> Pay &#8377;<span id="leadPayAmount">20000</span>/- now
+          <small>&middot; start launch</small>
+        </button>
+        <button type="button" class="btn btn-ghost lead-callback-btn" id="leadCallbackBtn">Request callback instead</button>
+      </div>
+      <div class="lead-secondary-actions">
+        <a id="leadDoneCall" href="tel:+919625737475" class="lead-secondary">&#9742; Call now</a>
+        <span class="lead-secondary-sep">&middot;</span>
+        <a id="leadDoneWa" href="https://wa.me/919625737475" target="_blank" rel="noopener" class="lead-secondary">WhatsApp</a>
+      </div>
+    </div>
+
+    <div id="leadStepCallback" class="lead-step-done hidden">
       <div class="lead-done-check">&#10003;</div>
       <h3>Thanks! You're on the list.</h3>
       <p>Our team will connect with you as soon as possible to walk you through the documents and next steps.</p>
-      <p class="muted small">Want to talk right now? Tap call or WhatsApp below.</p>
       <div class="lead-actions">
-        <a id="leadDoneCall" href="tel:+919625737475" class="btn btn-primary lead-submit">&#9742; Call now</a>
-        <a id="leadDoneWa" href="https://wa.me/919625737475" target="_blank" rel="noopener" class="btn btn-whatsapp">WhatsApp us now</a>
+        <a href="tel:+919625737475" class="btn btn-primary lead-submit">&#9742; Call now</a>
+        <a href="https://wa.me/919625737475" target="_blank" rel="noopener" class="btn btn-whatsapp">WhatsApp us</a>
         <button type="button" class="btn btn-link" id="leadDoneBtn">Close</button>
+      </div>
+    </div>
+
+    <div id="leadStepPaid" class="lead-step-done hidden">
+      <div class="lead-done-check lead-done-check-success">&#10003;</div>
+      <h3>Payment received!</h3>
+      <p>Invoice <strong id="leadPaidInvoice">&mdash;</strong> emailed to <strong id="leadPaidEmail">&mdash;</strong>.</p>
+      <p class="muted small">Check your email for the document list — your launch manager will reach out shortly.</p>
+      <div class="lead-actions">
+        <a href="https://wa.me/919625737475" target="_blank" rel="noopener" class="btn btn-whatsapp">Send documents on WhatsApp</a>
+        <button type="button" class="btn btn-link" id="leadDoneBtn2">Close</button>
       </div>
     </div>
   </div>
