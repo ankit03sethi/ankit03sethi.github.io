@@ -7,8 +7,8 @@
 //   GADS_PURCHASE_LBL  — conversion action label for 'Purchase' (e.g. 'abcdEFGH123')
 // ────────────────────────────────────────────────────────────────────────
 (function () {
-  var META_PIXEL_ID      = "";
-  var GA4_MEASUREMENT_ID = "";
+  var META_PIXEL_ID      = "1362876068529303";
+  var GA4_MEASUREMENT_ID = "G-PY8W3VH57P";
   var GADS_TAG_ID        = "";
   var GADS_PURCHASE_LBL  = "";
 
