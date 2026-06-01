@@ -228,6 +228,7 @@
         mobile:       params.mobile || null,
         description:  action + ": " + (params.serviceName || ""),
         origin_url:   params.origin || null,
+        attribution:  (window.cwGetAttribution ? window.cwGetAttribution() : null),
       }).then(function () { return { ok: true }; })
         .catch(function () { return { ok: true }; });
     }
@@ -249,7 +250,8 @@
         payload: {
           name:          params.name || "",
           service_price: params.servicePrice || "",
-          origin:        params.origin || ""
+          origin:        params.origin || "",
+          attribution:   (window.cwGetAttribution ? window.cwGetAttribution() : null)
         }
       };
     } else if (action === "lead_otp_verify") {
@@ -286,7 +288,8 @@
           legal_name:      extras.legal_name || null,
           gstin:           extras.gstin || null,
           billing_address: extras.billing_address || null,
-          agent_code:      extras.agent_code || null
+          agent_code:      extras.agent_code || null,
+          attribution:     (window.cwGetAttribution ? window.cwGetAttribution() : null)
         }
       };
     } else if (action === "service_pay_complete") {
@@ -419,6 +422,7 @@
       }
       // OTP ok. If this service has a price, show action chooser (Pay or Callback).
       // If no price, just show callback confirmation.
+      try { if (window.cwTrack) window.cwTrack("Lead", { service: currentService, value: currentPriceNum, currency: "INR" }); } catch (e) {}
       if (currentPriceNum > 0 && stepAction && payBtn) {
         if (payAmountEl) payAmountEl.textContent = currentPriceNum;
         setBusy(payBtn, false, payBtnLabel());
@@ -700,6 +704,14 @@
           }
           if (paidEmailEl)   paidEmailEl.textContent = currentEmail;
           if (paidInvoiceEl) paidInvoiceEl.textContent = res.invoiceNumber || "(emailed)";
+          try {
+            if (window.cwTrack) window.cwTrack("Purchase", {
+              service: currentService,
+              value: (res.amount || (currentPriceNum * qtyForComplete)),
+              currency: "INR",
+              transaction_id: response.razorpay_payment_id || initData.orderRef
+            });
+          } catch (e) {}
           showStep("paid");
         }).catch(function (err) {
           setBusy(payBtn, false, payBtnLabel());

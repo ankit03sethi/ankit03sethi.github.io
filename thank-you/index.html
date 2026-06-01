@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment received - cursive.world</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f8fb;color:#1f2328;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;max-width:520px;width:100%;padding:36px 28px;box-shadow:0 10px 40px rgba(0,0,0,.06);text-align:center}
+  .check{width:72px;height:72px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;color:#fff;font-size:36px;font-weight:800}
+  h1{font-size:26px;margin:0 0 6px;color:#0f172a}
+  .sub{color:#475569;margin:0 0 22px;font-size:15px;line-height:1.5}
+  .meta{background:#f1f5f9;border-radius:10px;padding:14px 16px;text-align:left;margin:0 0 22px;font-size:13.5px}
+  .meta div{padding:4px 0}
+  .meta b{color:#0f172a}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn{display:inline-block;padding:11px 18px;border-radius:9px;border:1.5px solid #1f6feb;color:#1f6feb;text-decoration:none;font-weight:700;font-size:14px;background:#fff;transition:.18s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(31,111,235,.18)}
+  .btn-primary{background:#1f6feb;color:#fff}
+  .small{font-size:12.5px;color:#64748b;margin-top:18px}
+</style>
+<script src="/analytics.js" defer></script>
+</head>
+<body>
+  <div class="card">
+    <div class="check">&check;</div>
+    <h1>Payment received</h1>
+    <p class="sub">Thank you. Your order has been recorded and a confirmation e-mail is on its way. Our team will reach out within 1 working day to start delivery.</p>
+
+    <div class="meta" id="metaBox">
+      <div><b>Order:</b> <span id="orderId">-</span></div>
+      <div><b>Service:</b> <span id="serviceName">-</span></div>
+      <div><b>Amount paid:</b> &#8377;<span id="amount">-</span></div>
+    </div>
+
+    <div class="row">
+      <a href="/" class="btn">&larr; Back to home</a>
+      <a href="/pdtracker/" class="btn btn-primary">Open your dashboard</a>
+    </div>
+
+    <p class="small">Need help? WhatsApp <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%20just%20paid.%20Need%20help%20with%20next%20steps." style="color:#16a34a;font-weight:600;text-decoration:none">+91 9625 73 74 75</a></p>
+  </div>
+
+<script>
+(function () {
+  var p = new URLSearchParams(location.search);
+  var pid    = p.get("payment_id") || p.get("rpid") || "";
+  var svc    = p.get("service")    || "";
+  var amount = p.get("amount")     || "";
+  if (pid)    document.getElementById("orderId").textContent     = pid;
+  if (svc)    document.getElementById("serviceName").textContent = svc;
+  if (amount) document.getElementById("amount").textContent      = amount;
+
+  function fire() {
+    try {
+      if (window.cwTrack) {
+        window.cwTrack("Purchase", {
+          service: svc, value: Number(amount) || 0,
+          currency: "INR", transaction_id: pid
+        });
+      }
+    } catch (e) {}
+  }
+  if (document.readyState === "complete") setTimeout(fire, 300);
+  else window.addEventListener("load", function () { setTimeout(fire, 300); });
+})();
+</script>
+</body>
+</html>
