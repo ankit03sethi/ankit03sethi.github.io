@@ -55,6 +55,7 @@
   var stepAction  = document.getElementById("leadStepAction");
   var stepCallback = document.getElementById("leadStepCallback");
   var stepPaid    = document.getElementById("leadStepPaid");
+  var stepPayDetails = null; // lazily created on first Pay click — shared on every service page
 
   var mobileEl    = document.getElementById("leadMobile");
   var emailEl     = document.getElementById("leadEmail");
@@ -101,14 +102,16 @@
   function showStep(which) {
     formContact.classList.add("hidden");
     formOtp.classList.add("hidden");
-    if (stepAction)   stepAction.classList.add("hidden");
-    if (stepCallback) stepCallback.classList.add("hidden");
-    if (stepPaid)     stepPaid.classList.add("hidden");
-    if (which === "contact")  formContact.classList.remove("hidden");
-    if (which === "otp")      formOtp.classList.remove("hidden");
-    if (which === "action" && stepAction)     stepAction.classList.remove("hidden");
-    if (which === "callback" && stepCallback) stepCallback.classList.remove("hidden");
-    if (which === "paid" && stepPaid)         stepPaid.classList.remove("hidden");
+    if (stepAction)     stepAction.classList.add("hidden");
+    if (stepCallback)   stepCallback.classList.add("hidden");
+    if (stepPaid)       stepPaid.classList.add("hidden");
+    if (stepPayDetails) stepPayDetails.classList.add("hidden");
+    if (which === "contact")     formContact.classList.remove("hidden");
+    if (which === "otp")         formOtp.classList.remove("hidden");
+    if (which === "action" && stepAction)         stepAction.classList.remove("hidden");
+    if (which === "paydetails" && stepPayDetails) stepPayDetails.classList.remove("hidden");
+    if (which === "callback" && stepCallback)     stepCallback.classList.remove("hidden");
+    if (which === "paid" && stepPaid)             stepPaid.classList.remove("hidden");
   }
 
   // Determine current service for modal:
@@ -259,9 +262,13 @@
       // collects the full ₹X + 18% the customer sees on the page.
       var gstMul    = (params.serviceType === "business_launcher") ? 1.18 : 1;
       var amountFinal = Math.round(subtotal * gstMul);
-      // Business Launcher: pull optional GST / billing details + agent code from
-      // the extras block injected on /business-launcher/. Safe no-op elsewhere.
-      var extras = (typeof window.blGetExtras === "function") ? window.blGetExtras() : {};
+      // Pull the GST + agent code from the new "Confirm payment" step (every page).
+      var extras = {
+        legal_name:      ((document.getElementById("pdLegalName") || {}).value || "").trim(),
+        gstin:           ((document.getElementById("pdGstin") || {}).value || "").toUpperCase().replace(/\s+/g, ""),
+        billing_address: ((document.getElementById("pdBillAddr") || {}).value || "").trim(),
+        agent_code:      ((document.getElementById("pdAgentCode") || {}).value || "").trim()
+      };
       body = {
         email:        params.email,
         mobile:       params.mobile,
@@ -499,35 +506,124 @@
   if (doneCall) doneCall.addEventListener("click", function () { trackCta("call"); });
   if (doneWa)   doneWa.addEventListener("click",   function () { trackCta("whatsapp"); });
 
-  // ---- STEP 3b - Pay -> Razorpay ----
+  // ---- Lazy-build the 'Confirm payment' step (GST breakdown + GST form + agent code) ----
+  function ensurePayDetailsStep() {
+    if (stepPayDetails) return stepPayDetails;
+    var modal = overlay.querySelector(".lead-modal");
+    if (!modal) return null;
+    var div = document.createElement("div");
+    div.id = "leadStepPayDetails";
+    div.className = "lead-step-action hidden";
+    div.innerHTML =
+      '<div style="text-align:center;margin-bottom:12px;"><div class="lead-done-check lead-done-check-small">&#10003;</div></div>' +
+      '<h3 style="margin:0 0 6px;">Confirm payment</h3>' +
+      '<p class="muted" style="margin:0 0 14px;">Review the total and add your GST details if you want input-tax credit.</p>' +
+      '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin:0 0 14px;font-size:13px;color:#0f172a;">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px;font-weight:600;"><span>Service</span><span id="pdServiceName">&mdash;</span></div>' +
+        '<div id="pdBaseRow" style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Base price</span><span>&#8377;<span id="pdBaseAmt">0</span>/-</span></div>' +
+        '<div id="pdGstRow" style="display:flex;justify-content:space-between;margin-bottom:4px;color:#64748b;"><span>GST (18%)</span><span>&#8377;<span id="pdGstAmt">0</span>/-</span></div>' +
+        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:6px 0;" />' +
+        '<div style="display:flex;justify-content:space-between;font-weight:700;font-size:14px;color:#0f172a;"><span>Total payable</span><span>&#8377;<span id="pdTotalAmt">0</span>/-</span></div>' +
+      '</div>' +
+      '<details style="margin:0 0 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">' +
+        '<summary style="cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:#1f6feb;list-style:none;display:flex;justify-content:space-between;align-items:center;">' +
+          '<span>+ Add GST details for input-tax credit (optional)</span>' +
+          '<span style="font-size:11px;color:#94a3b8;font-weight:500;">Recommended</span>' +
+        '</summary>' +
+        '<div style="padding:0 14px 14px;">' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:8px 0 4px;">Legal name (as on GST certificate)</label>' +
+          '<input id="pdLegalName" type="text" autocomplete="off" placeholder="e.g. Cursive Hari Nagar" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:10px 0 4px;">GSTIN</label>' +
+          '<input id="pdGstin" type="text" autocomplete="off" placeholder="07ABCDE1234F1Z5" maxlength="15" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;text-transform:uppercase;" />' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:10px 0 4px;">Billing address</label>' +
+          '<textarea id="pdBillAddr" rows="2" autocomplete="off" placeholder="Hari Nagar, New Delhi, 110064" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>' +
+          '<p style="margin:8px 0 0;font-size:11px;color:#94a3b8;">Both fields must match the GST certificate exactly.</p>' +
+        '</div>' +
+      '</details>' +
+      '<input id="pdAgentCode" type="text" autocomplete="off" placeholder="" maxlength="20" style="width:100%;padding:9px 12px;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;color:#475467;background:#fafbfc;margin:0 0 14px;letter-spacing:.3px;" />' +
+      '<div class="lead-actions lead-actions-stacked">' +
+        '<button type="button" class="btn btn-primary lead-submit" id="pdConfirmBtn"><span class="lead-pay-emoji">&#128274;</span> Confirm &amp; Pay &#8377;<span id="pdConfirmAmt">0</span>/- now</button>' +
+        '<button type="button" class="btn btn-ghost" id="pdBackBtn">&larr; Back</button>' +
+      '</div>' +
+      '<p id="pdError" class="lead-error hidden" style="margin-top:10px;"></p>';
+    modal.appendChild(div);
+    stepPayDetails = div;
+
+    // Wire interactions
+    document.getElementById("pdBackBtn").addEventListener("click", function () { showStep("action"); });
+    var gstInput = document.getElementById("pdGstin");
+    gstInput.addEventListener("input", function (e) { e.target.value = e.target.value.toUpperCase().replace(/\s+/g, ""); });
+    document.getElementById("pdConfirmBtn").addEventListener("click", function () { triggerRazorpayFlow(); });
+    return stepPayDetails;
+  }
+
+  function readPayDetails() {
+    return {
+      legal_name:      ((document.getElementById("pdLegalName") || {}).value || "").trim(),
+      gstin:           ((document.getElementById("pdGstin") || {}).value || "").toUpperCase().replace(/\s+/g, ""),
+      billing_address: ((document.getElementById("pdBillAddr") || {}).value || "").trim(),
+      agent_code:      ((document.getElementById("pdAgentCode") || {}).value || "").trim()
+    };
+  }
+
+  function triggerRazorpayFlow() {
+    var confirmBtn = document.getElementById("pdConfirmBtn");
+    var pdErr = document.getElementById("pdError");
+    if (pdErr) pdErr.classList.add("hidden");
+    setBusy(confirmBtn, true);
+
+    var qtyInput = document.getElementById("leadQty");
+    var qtyVal = qtyInput ? Math.max(1, Math.min(10, parseInt(qtyInput.value, 10) || 1)) : 1;
+    postAS("service_pay_initiate", {
+      email:        currentEmail,
+      mobile:       currentMobile,
+      serviceType:  currentServiceTag,
+      serviceName:  currentService,
+      servicePrice: currentPriceNum,
+      qty:          qtyVal,
+      origin: window.location.pathname
+    }).then(function (res) {
+      if (!res || res.ok !== true) {
+        setBusy(confirmBtn, false, '<span class="lead-pay-emoji">&#128274;</span> Confirm & Pay');
+        if (pdErr) {
+          pdErr.textContent = (res && res.message) || "Could not start payment. Please try again or call us.";
+          pdErr.classList.remove("hidden");
+        }
+        return;
+      }
+      openRazorpay(res);
+    }).catch(function (err) {
+      setBusy(confirmBtn, false, '<span class="lead-pay-emoji">&#128274;</span> Confirm & Pay');
+      if (pdErr) {
+        pdErr.textContent = "Could not reach the server: " + (err && err.message ? err.message : err);
+        pdErr.classList.remove("hidden");
+      }
+    });
+  }
+
+  // ---- STEP 3b - Pay button on Verified screen → show the new confirm step ----
   if (payBtn) {
     payBtn.addEventListener("click", function () {
       hideErr();
-      setBusy(payBtn, true);
-
-      var qtyInput = document.getElementById("leadQty");
-      var qtyVal = qtyInput ? Math.max(1, Math.min(10, parseInt(qtyInput.value, 10) || 1)) : 1;
-      postAS("service_pay_initiate", {
-        email:        currentEmail,
-        mobile:       currentMobile,
-        serviceType:  currentServiceTag,
-        serviceName:  currentService,
-        servicePrice: currentPriceNum,
-        qty:          qtyVal,
-        origin: window.location.pathname
-      }).then(function (res) {
-        if (!res || res.ok !== true) {
-          setBusy(payBtn, false, payBtnLabel());
-          showErr((res && res.message) || "Could not start payment. Please try again or call us.");
-          showStep("action");
-          return;
-        }
-        openRazorpay(res);
-      }).catch(function (err) {
-        setBusy(payBtn, false, payBtnLabel());
-        showErr("Could not reach the server: " + (err && err.message ? err.message : err));
-        showStep("action");
-      });
+      ensurePayDetailsStep();
+      // Populate breakdown
+      var isBL = currentServiceTag === "business_launcher";
+      var base = currentPriceNum;
+      var gst  = isBL ? Math.round(base * 0.18) : 0;
+      var total = base + gst;
+      var fmt = function (n) { return Number(n).toLocaleString("en-IN"); };
+      var $ = function (id) { return document.getElementById(id); };
+      if ($("pdServiceName")) $("pdServiceName").textContent = currentService || "Service";
+      if ($("pdBaseAmt"))     $("pdBaseAmt").textContent     = fmt(base);
+      if ($("pdGstAmt"))      $("pdGstAmt").textContent      = fmt(gst);
+      if ($("pdTotalAmt"))    $("pdTotalAmt").textContent    = fmt(total);
+      if ($("pdConfirmAmt"))  $("pdConfirmAmt").textContent  = fmt(total);
+      // Hide the GST row entirely if no extra GST is being added (non-BL services)
+      var gstRow = $("pdGstRow");
+      if (gstRow) gstRow.style.display = isBL ? "flex" : "none";
+      var baseRow = $("pdBaseRow");
+      if (baseRow) baseRow.firstElementChild.textContent = isBL ? "Base price" : "Amount";
+      showStep("paydetails");
     });
   }
 
