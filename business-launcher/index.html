@@ -71,6 +71,9 @@
   .bl-cta-band .bl-call { background: #fff; color: #16a34a; }
   .bl-cta-band .bl-call:hover { background: #f0fdf4; color: #14532d; }
 
+
+  .bl-tier-cta-pay:hover, .bl-callback-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(31,111,235,.25); }
+  .bl-tier a[href^="tel"]:hover, .bl-tier a[href*="wa.me"]:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(15,23,42,.10); }
   @media (max-width: 640px) {
     .bl-title { font-size: 30px; }
     .bl-sub { font-size: 15px; }
@@ -139,9 +142,11 @@
 
     <div class="bl-tier">
       <div class="bl-tier-name">Starter</div>
-      <div class="bl-tier-price">&#8377;20,000<small> total</small></div>
+      <div class="bl-tier-price">&#8377;20,000<small> total</small></div><div style="font-size:11px;color:#94a3b8;margin-top:-4px;margin-bottom:2px;">+ 18% GST extra</div>
       <div class="bl-tier-products">Up to 20 products</div>
       <ul>
+        <li>Dedicated launch manager</li>
+        <li>30-day post-launch support</li>
         <li>GST Registration</li>
         <li>Trademark Registration</li>
         <li>Current Account opening</li>
@@ -149,18 +154,24 @@
         <li>100 product images</li>
         <li>20 listings</li>
         <li>Up to 1 marketplace</li>
-        <li>Dedicated launch manager</li>
-        <li>30-day post-launch support</li>
         <li>1 Thank You template for customers</li>
       </ul>
-      <div class="card-tnc" style="margin-top:14px;font-size:11px;color:#94a3b8;">* Conditions apply</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+        <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%27d%20like%20the%20Business%20Launcher%20Growth%20(₹30,000)%20plan.%20Please%20share%20payment%20details." target="_blank" rel="noopener" class="bl-tier-cta-pay" style="background:#1f6feb;color:#fff;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">&#8377; Pay now</a>
+        <button type="button" class="bl-callback-btn" data-tier="Growth" data-amount="₹30,000" style="background:#fff;color:#1f6feb;border:1.5px solid #1f6feb;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;">&#9742; Request callback</button>
+        <a href="tel:+919625737475" style="background:#fff;color:#0f172a;border:1.5px solid #e5e7eb;padding:10px;border-radius:8px;text-align:center;font-weight:600;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">&#128222; Call now</a>
+        <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20please%20call%20me%20back%20about%20the%20Business%20Launcher%20Growth%20(₹30,000)%20plan." target="_blank" rel="noopener" style="background:#25d366;color:#fff;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">WhatsApp</a>
+      </div>
+      <div class="card-tnc" style="margin-top:10px;font-size:11px;color:#94a3b8;">* Conditions apply</div>
     </div>
 
-    <div class="bl-tier">
+    <div class="bl-tier popular">
       <div class="bl-tier-name">Growth</div>
-      <div class="bl-tier-price">&#8377;30,000<small> total</small></div>
+      <div class="bl-tier-price">&#8377;30,000<small> total</small></div><div style="font-size:11px;color:#94a3b8;margin-top:-4px;margin-bottom:2px;">+ 18% GST extra</div>
       <div class="bl-tier-products">Up to 50 products</div>
       <ul>
+        <li>Dedicated launch manager</li>
+        <li>30-day post-launch support</li>
         <li>GST Registration</li>
         <li>Trademark Registration</li>
         <li>Current Account opening</li>
@@ -169,20 +180,26 @@
         <li>100 listings</li>
         <li>Up to 2 marketplaces</li>
         <li>1 product video</li>
-        <li>Dedicated launch manager</li>
-        <li>30-day post-launch support</li>
         <li>Free Cursive PD Tracker for 30 days</li>
         <li>1 Thank You template for customers</li>
       </ul>
-      <div class="card-tnc" style="margin-top:14px;font-size:11px;color:#94a3b8;">* Conditions apply</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+        <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%27d%20like%20the%20Business%20Launcher%20Starter%20(₹20,000)%20plan.%20Please%20share%20payment%20details." target="_blank" rel="noopener" class="bl-tier-cta-pay" style="background:#1f6feb;color:#fff;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">&#8377; Pay now</a>
+        <button type="button" class="bl-callback-btn" data-tier="Starter" data-amount="₹20,000" style="background:#fff;color:#1f6feb;border:1.5px solid #1f6feb;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;">&#9742; Request callback</button>
+        <a href="tel:+919625737475" style="background:#fff;color:#0f172a;border:1.5px solid #e5e7eb;padding:10px;border-radius:8px;text-align:center;font-weight:600;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">&#128222; Call now</a>
+        <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20please%20call%20me%20back%20about%20the%20Business%20Launcher%20Starter%20(₹20,000)%20plan." target="_blank" rel="noopener" style="background:#25d366;color:#fff;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">WhatsApp</a>
+      </div>
+      <div class="card-tnc" style="margin-top:10px;font-size:11px;color:#94a3b8;">* Conditions apply</div>
     </div>
 
-    <div class="bl-tier popular">
+    <div class="bl-tier">
       <span class="pop-badge">MOST PICKED</span>
       <div class="bl-tier-name" style="color:#16a34a;">Scale</div>
-      <div class="bl-tier-price">&#8377;40,000<small> total</small></div>
+      <div class="bl-tier-price">&#8377;40,000<small> total</small></div><div style="font-size:11px;color:#94a3b8;margin-top:-4px;margin-bottom:2px;">+ 18% GST extra</div>
       <div class="bl-tier-products">Up to 100 products</div>
       <ul>
+        <li>Dedicated launch manager</li>
+        <li>30-day post-launch support</li>
         <li>GST Registration</li>
         <li>Trademark Registration</li>
         <li>Current Account opening</li>
@@ -191,13 +208,17 @@
         <li>300 listings</li>
         <li>Up to 3 marketplaces</li>
         <li>10 product videos</li>
-        <li>Dedicated launch manager</li>
-        <li>30-day post-launch support</li>
         <li>Free Cursive PD Tracker for 30 days</li>
         <li>Amazon FBA setup</li>
         <li>1 Thank You template for customers</li>
       </ul>
-      <div class="card-tnc" style="margin-top:14px;font-size:11px;color:#94a3b8;">* Conditions apply</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+        <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20I%27d%20like%20the%20Business%20Launcher%20Scale%20(₹40,000)%20plan.%20Please%20share%20payment%20details." target="_blank" rel="noopener" class="bl-tier-cta-pay" style="background:#1f6feb;color:#fff;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">&#8377; Pay now</a>
+        <button type="button" class="bl-callback-btn" data-tier="Scale" data-amount="₹40,000" style="background:#fff;color:#1f6feb;border:1.5px solid #1f6feb;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;">&#9742; Request callback</button>
+        <a href="tel:+919625737475" style="background:#fff;color:#0f172a;border:1.5px solid #e5e7eb;padding:10px;border-radius:8px;text-align:center;font-weight:600;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">&#128222; Call now</a>
+        <a href="https://wa.me/919625737475?text=Hi%20cursive%2C%20please%20call%20me%20back%20about%20the%20Business%20Launcher%20Scale%20(₹40,000)%20plan." target="_blank" rel="noopener" style="background:#25d366;color:#fff;padding:10px;border-radius:8px;text-align:center;font-weight:700;font-size:13px;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;">WhatsApp</a>
+      </div>
+      <div class="card-tnc" style="margin-top:10px;font-size:11px;color:#94a3b8;">* Conditions apply</div>
     </div>
 
   </div>
@@ -247,6 +268,79 @@
     &copy; 2026 Cursive &middot; Hari Nagar, New Delhi 110064 &middot; <a href="mailto:contact@cursive.world" style="color:#1f6feb;">contact@cursive.world</a>
   </div>
 </footer>
+
+
+<!-- Request callback modal -->
+<div id="callbackOverlay" style="position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px;">
+  <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:28px;box-shadow:0 24px 50px rgba(0,0,0,.25);">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+      <div>
+        <h3 style="margin:0 0 4px;font-size:20px;color:#0f172a;">Request a callback</h3>
+        <p style="margin:0;font-size:13px;color:#64748b;">Share your number — we'll call within working hours.</p>
+      </div>
+      <button id="callbackClose" type="button" style="background:none;border:none;font-size:24px;color:#94a3b8;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div id="callbackTierLine" style="font-size:12px;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;"></div>
+    <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">Your name</label>
+    <input id="cbName" type="text" placeholder="e.g. Ankit Sethi" style="width:100%;padding:10px 12px;border:1.5px solid #d0d5dd;border-radius:8px;font-size:14px;margin-bottom:12px;" />
+    <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin-bottom:4px;">Mobile</label>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <span style="background:#f1f5f9;color:#475467;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-weight:600;">+91</span>
+      <input id="cbPhone" type="tel" maxlength="10" placeholder="98XXXXXXXX" style="flex:1;padding:10px 12px;border:1.5px solid #d0d5dd;border-radius:8px;font-size:14px;" />
+    </div>
+    <p id="cbMsg" style="font-size:12px;margin:0 0 12px;display:none;"></p>
+    <button id="callbackSubmit" type="button" style="width:100%;background:#1f6feb;color:#fff;padding:12px;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;">Send my number</button>
+    <p style="font-size:11px;color:#94a3b8;margin:10px 0 0;text-align:center;">By submitting you agree we may call or WhatsApp you about this plan.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const overlay = document.getElementById("callbackOverlay");
+  const closeBtn = document.getElementById("callbackClose");
+  const submitBtn = document.getElementById("callbackSubmit");
+  const tierLine = document.getElementById("callbackTierLine");
+  const msg = document.getElementById("cbMsg");
+  const nameI = document.getElementById("cbName");
+  const phoneI = document.getElementById("cbPhone");
+  let ctx = { tier: "", amount: "" };
+
+  function open(tier, amount) {
+    ctx.tier = tier; ctx.amount = amount;
+    tierLine.textContent = "About: Business Launcher · " + tier + " (" + amount + ")";
+    msg.style.display = "none";
+    nameI.value = ""; phoneI.value = "";
+    overlay.style.display = "flex";
+  }
+  function close() { overlay.style.display = "none"; }
+
+  document.querySelectorAll(".bl-callback-btn").forEach(b => {
+    b.addEventListener("click", () => open(b.dataset.tier || "", b.dataset.amount || ""));
+  });
+  closeBtn.addEventListener("click", close);
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+
+  submitBtn.addEventListener("click", async () => {
+    const name = nameI.value.trim();
+    const phone = phoneI.value.replace(/\D/g, "");
+    msg.style.display = "block";
+    if (!name) { msg.textContent = "Please enter your name."; msg.style.color = "#dc2626"; return; }
+    if (phone.length !== 10) { msg.textContent = "Mobile must be 10 digits."; msg.style.color = "#dc2626"; return; }
+    submitBtn.disabled = true; submitBtn.textContent = "Sending...";
+    try {
+      await fetch("https://bttppihskbfmxwujyztj.supabase.co/functions/v1/service-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8" },
+        body: JSON.stringify({ name, mobile: phone, service: "Business Launcher", tier: ctx.tier, amount: ctx.amount, source: "/business-launcher/" })
+      });
+    } catch (e) { /* non-fatal */ }
+    msg.textContent = "Thanks! We'll call you shortly.";
+    msg.style.color = "#16a34a";
+    submitBtn.textContent = "Sent ✓";
+    setTimeout(() => { close(); submitBtn.disabled = false; submitBtn.textContent = "Send my number"; }, 1800);
+  });
+})();
+</script>
 
 </body>
 </html>
