@@ -259,6 +259,9 @@
       // collects the full ₹X + 18% the customer sees on the page.
       var gstMul    = (params.serviceType === "business_launcher") ? 1.18 : 1;
       var amountFinal = Math.round(subtotal * gstMul);
+      // Business Launcher: pull optional GST / billing details + agent code from
+      // the extras block injected on /business-launcher/. Safe no-op elsewhere.
+      var extras = (typeof window.blGetExtras === "function") ? window.blGetExtras() : {};
       body = {
         email:        params.email,
         mobile:       params.mobile,
@@ -268,11 +271,15 @@
         qty:          qty,
         origin_url:   params.origin,
         payload: {
-          service_type: params.serviceType,
-          service_name: params.serviceName,
-          qty:          qty,
-          base_price:   subtotal,
-          gst_applied:  (gstMul > 1) ? Math.round(subtotal * (gstMul - 1)) : 0
+          service_type:    params.serviceType,
+          service_name:    params.serviceName,
+          qty:             qty,
+          base_price:      subtotal,
+          gst_applied:     (gstMul > 1) ? Math.round(subtotal * (gstMul - 1)) : 0,
+          legal_name:      extras.legal_name || null,
+          gstin:           extras.gstin || null,
+          billing_address: extras.billing_address || null,
+          agent_code:      extras.agent_code || null
         }
       };
     } else if (action === "service_pay_complete") {

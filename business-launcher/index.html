@@ -322,6 +322,37 @@
       <div class="lead-done-check lead-done-check-small">&#10003;</div>
       <h3>Verified! What next?</h3>
       <p class="muted">Choose how you'd like to proceed.</p>
+
+      <!-- GST breakdown for Business Launcher: shows base + 18% + total before Pay -->
+      <div id="blGstBreakdown" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin:12px 0;font-size:13px;color:#0f172a;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Base price</span><span>&#8377;<span id="blBaseAmt">20000</span>/-</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#64748b;"><span>GST (18%)</span><span>&#8377;<span id="blGstAmt">3600</span>/-</span></div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:6px 0;" />
+        <div style="display:flex;justify-content:space-between;font-weight:700;font-size:14px;color:#0f172a;"><span>Total payable</span><span>&#8377;<span id="blTotalAmt">23600</span>/-</span></div>
+      </div>
+
+      <!-- Optional GST details form (collapsed by default) -->
+      <details id="blGstDetails" style="margin:0 0 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">
+        <summary style="cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:#1f6feb;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          <span>+ Add GST details for input-tax credit (optional)</span>
+          <span style="font-size:11px;color:#94a3b8;font-weight:500;">Recommended</span>
+        </summary>
+        <div style="padding:0 14px 14px;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:8px 0 4px;">Legal name (as on GST certificate)</label>
+          <input id="blLegalName" type="text" placeholder="e.g. Cursive Hari Nagar" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:10px 0 4px;">GSTIN</label>
+          <input id="blGstin" type="text" placeholder="07ABCDE1234F1Z5" maxlength="15" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;text-transform:uppercase;" />
+          <label style="display:block;font-size:12px;font-weight:600;color:#475467;margin:10px 0 4px;">Billing address</label>
+          <textarea id="blBillAddr" rows="2" placeholder="Hari Nagar, New Delhi, 110064" style="width:100%;padding:9px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+          <p style="margin:8px 0 0;font-size:11px;color:#94a3b8;">Both fields must match the GST certificate exactly for the credit to land.</p>
+        </div>
+      </details>
+
+      <!-- Unlabeled agent code: selling agents fill this when assisting customers.
+           Intentionally has no header so customers don't ask what it is. -->
+      <input id="blAgentCode" type="text" autocomplete="off" placeholder="" maxlength="20"
+             style="width:100%;padding:9px 12px;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;color:#475467;background:#fafbfc;margin:0 0 14px;letter-spacing:.3px;" />
+
       <div class="lead-actions lead-actions-stacked">
         <button type="button" class="btn btn-primary lead-submit lead-pay-btn" id="leadPayBtn">
           <span class="lead-pay-emoji">&#128274;</span> Pay &#8377;<span id="leadPayAmount">20000</span>/- now
@@ -362,6 +393,48 @@
 
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="/home.js?v=2026053102" defer></script>
+
+
+<script>
+(function () {
+  function num(s) { return Number(String(s || "").replace(/[^0-9.]/g, "")) || 0; }
+  function refreshBreakdown() {
+    // The base amount mirrors what home.js wrote into #leadPayAmount (string with commas)
+    var baseEl = document.getElementById("leadPayAmount");
+    if (!baseEl) return;
+    var base = num(baseEl.textContent);
+    var gst  = Math.round(base * 0.18);
+    var tot  = base + gst;
+    var f = function (n) { return n.toLocaleString("en-IN"); };
+    var b = document.getElementById("blBaseAmt");  if (b) b.textContent = f(base);
+    var g = document.getElementById("blGstAmt");   if (g) g.textContent = f(gst);
+    var t = document.getElementById("blTotalAmt"); if (t) t.textContent = f(tot);
+    // Also update the Pay button text so it shows the GST-inclusive total
+    var pb = document.getElementById("leadPayBtn");
+    if (pb && pb.querySelector("span.lead-pay-emoji")) {
+      pb.innerHTML = '<span class="lead-pay-emoji">&#128274;</span> Pay &#8377;' + f(tot) + '/- now <small>&middot; start launch</small>';
+    }
+  }
+  // Watch when the action step becomes visible — refresh the breakdown each time
+  var stepAction = document.getElementById("leadStepAction");
+  if (stepAction && "MutationObserver" in window) {
+    new MutationObserver(refreshBreakdown).observe(stepAction, { attributes: true, attributeFilter: ["class"] });
+  }
+  // Auto-uppercase GSTIN
+  var gst = document.getElementById("blGstin");
+  if (gst) gst.addEventListener("input", function (e) { e.target.value = e.target.value.toUpperCase().replace(/\s+/g, ""); });
+
+  // Helper home.js will call when submitting Pay/Callback to grab the extras
+  window.blGetExtras = function () {
+    return {
+      legal_name:      (document.getElementById("blLegalName") || {}).value || "",
+      gstin:           ((document.getElementById("blGstin") || {}).value || "").toUpperCase().replace(/\s+/g, ""),
+      billing_address: (document.getElementById("blBillAddr") || {}).value || "",
+      agent_code:      ((document.getElementById("blAgentCode") || {}).value || "").trim()
+    };
+  };
+})();
+</script>
 
 </body>
 </html>
