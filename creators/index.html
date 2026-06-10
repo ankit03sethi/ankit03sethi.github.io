@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cursive Creators &mdash; YouTuber marketplace for sellers</title>
+<meta name="description" content="India's marketplace where e-commerce sellers find YouTubers to make videos about their products. Categories, follower tiers, and per-video pricing." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; background: linear-gradient(180deg, #eff6ff 0%, #ffffff 60%); min-height: 100vh; }
+  .brand-wordmark { font-family: 'Dancing Script', cursive; font-weight: 700; color: #1f6feb; line-height: 0.9; letter-spacing: -1px; }
+  .brand-wordmark sup { font-family: system-ui, sans-serif; font-size: 0.22em; opacity: 0.5; font-weight: 400; margin-left: 1px; vertical-align: super; }
+  .brand-logo-box { width: 50px; height: 50px; background: #1f6feb; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 28px; max-width: 1200px; margin: 0 auto; }
+  .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+  .nav-brand .nav-title { font-size: 46px !important; }
+  .nav-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+  .nav-links a { color: #475569; text-decoration: none; margin-left: 22px; font-size: 14px; font-weight: 500; }
+  .nav-links a.cta { background: #1f6feb; color: #fff; padding: 8px 16px; border-radius: 8px; }
+
+  .hero { max-width: 1200px; margin: 30px auto 20px; padding: 0 28px; text-align: center; }
+  .hero-pill { display: inline-block; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 999px; letter-spacing: .3px; margin-bottom: 16px; }
+  .hero h1 { font-size: 44px; line-height: 1.15; margin: 0 0 14px; font-weight: 800; letter-spacing: -0.5px; }
+  .hero h1 span { color: #1f6feb; }
+  .hero p { font-size: 17px; color: #475569; max-width: 720px; margin: 0 auto 28px; line-height: 1.55; }
+
+  .doors { max-width: 1100px; margin: 30px auto 50px; padding: 0 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .door { background: #fff; border-radius: 18px; padding: 36px 30px; box-shadow: 0 6px 28px rgba(15,23,42,0.08); border: 2px solid transparent; transition: transform .2s, box-shadow .2s, border-color .2s; display: flex; flex-direction: column; }
+  .door:hover { transform: translateY(-4px); box-shadow: 0 14px 40px rgba(15,23,42,0.14); }
+  .door-creator { border-color: #fce7f3; }
+  .door-creator:hover { border-color: #f9a8d4; }
+  .door-customer { border-color: #dbeafe; }
+  .door-customer:hover { border-color: #93c5fd; }
+  .door-emoji { font-size: 44px; line-height: 1; margin-bottom: 14px; }
+  .door h2 { font-size: 26px; margin: 0 0 10px; font-weight: 800; letter-spacing: -0.3px; }
+  .door-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; letter-spacing: .4px; margin-bottom: 14px; }
+  .door-creator .door-tag { background: #fdf2f8; color: #be185d; }
+  .door-customer .door-tag { background: #eff6ff; color: #1e40af; }
+  .door p.lead { font-size: 16px; color: #334155; line-height: 1.55; margin: 0 0 22px; }
+  .door .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; font-size: 14px; font-weight: 700; border-radius: 10px; text-decoration: none; cursor: pointer; border: 1.5px solid transparent; transition: all .15s; }
+  .btn-primary-creator { background: #db2777; color: #fff; }
+  .btn-primary-creator:hover { background: #be185d; }
+  .btn-outline-creator { background: #fff; color: #be185d; border-color: #f9a8d4; }
+  .btn-outline-creator:hover { background: #fdf2f8; }
+  .btn-primary-customer { background: #1f6feb; color: #fff; }
+  .btn-primary-customer:hover { background: #1858d6; }
+  .btn-outline-customer { background: #fff; color: #1e40af; border-color: #93c5fd; }
+  .btn-outline-customer:hover { background: #eff6ff; }
+  .door ul { list-style: none; padding: 0; margin: 0; }
+  .door ul li { padding: 7px 0; font-size: 14px; color: #475569; display: flex; align-items: flex-start; gap: 8px; }
+  .door ul li::before { content: "\2713"; color: #16a34a; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+
+  .trust-band { text-align: center; padding: 24px 28px 50px; color: #64748b; font-size: 13px; }
+  .trust-band span { margin: 0 14px; white-space: nowrap; }
+
+  @media (max-width: 760px) {
+    .nav { padding: 14px 18px; }
+    .nav-links a { margin-left: 14px; font-size: 13px; }
+    .nav-brand .nav-title { font-size: 38px !important; }
+    .hero h1 { font-size: 30px; }
+    .hero p { font-size: 15px; }
+    .doors { grid-template-columns: 1fr; gap: 18px; padding: 0 16px; }
+    .door { padding: 26px 22px; }
+    .door h2 { font-size: 22px; }
+    .door-emoji { font-size: 38px; }
+    .trust-band span { display: block; margin: 6px 0; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-brand">
+    <div class="brand-logo-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="nav-title brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Creators &mdash; YouTuber marketplace</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/pdtracker/">Login &rarr;</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <span class="hero-pill">&#127909; Now accepting first 100 creators</span>
+  <h1>Where Indian sellers meet <span>Indian YouTubers</span></h1>
+  <p>Sellers, get authentic YouTube videos made about your products by creators with real Indian audiences. Creators, get paid to make content about products you genuinely use.</p>
+</section>
+
+<section class="doors">
+
+  <!-- LEFT: Creator -->
+  <div class="door door-creator">
+    <div class="door-emoji">&#127908;</div>
+    <span class="door-tag">FOR CONTENT CREATORS</span>
+    <h2>I'm a Content Creator</h2>
+    <p class="lead">Get paid to make videos about products you love. Pick only the jobs that fit your niche and audience.</p>
+    <div class="actions">
+      <a href="/creators/join.html" class="btn btn-primary-creator">Join as Creator &rarr;</a>
+      <a href="/creators/portal.html" class="btn btn-outline-creator">Sign in</a>
+    </div>
+    <ul>
+      <li>Real Indian audiences across 10 categories</li>
+      <li>Take only jobs that fit you &mdash; no obligations</li>
+      <li>Build a steady side income from your channel</li>
+      <li>Get paid securely after every approved video</li>
+    </ul>
+  </div>
+
+  <!-- RIGHT: Customer -->
+  <div class="door door-customer">
+    <div class="door-emoji">&#128717;</div>
+    <span class="door-tag">FOR E-COMMERCE SELLERS</span>
+    <h2>I'm an E-commerce Seller</h2>
+    <p class="lead">Get YouTube videos made about your products. Pick category and creator type. Order multiple videos in one go.</p>
+    <div class="actions">
+      <a href="/creators/post-job.html" class="btn btn-primary-customer">Post a Job &rarr;</a>
+      <a href="/creators/customer.html" class="btn btn-outline-customer">Sign in</a>
+    </div>
+    <ul>
+      <li>Pick category + creator gender that fits your product</li>
+      <li>Order 1 video or 100 in a single payment</li>
+      <li>Videos posted on creators' own YouTube channels</li>
+      <li>Track delivery and watch results from your dashboard</li>
+    </ul>
+  </div>
+
+</section>
+
+<div class="trust-band">
+  <span>&#10003; Trusted by 1,000+ sellers</span>
+  <span>&#10003; CA-backed payouts</span>
+  <span>&#10003; * Conditions apply</span>
+</div>
+
+<script src="/analytics.js" defer></scrisþ
+</body>
+</html>
