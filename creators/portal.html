@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Creator Portal &mdash; cursive Creators</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#fdf2f8;min-height:100vh;}
+  .brand-wordmark{font-family:'Dancing Script',cursive;font-weight:700;color:#1f6feb;line-height:0.9;}
+  .brand-wordmark sup{font-family:system-ui,sans-serif;font-size:0.22em;opacity:0.5;font-weight:400;margin-left:1px;vertical-align:super;}
+  .brand-logo-box{width:44px;height:44px;background:#1f6feb;border-radius:11px;display:flex;align-items:center;justify-content:center;}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;max-width:1100px;margin:0 auto;background:#fff;border-bottom:1px solid #fce7f3;}
+  .nav-brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;}
+  .nav-brand .nav-title{font-size:36px !important;}
+  .nav-sub{font-size:12px;color:#64748b;margin-top:2px;}
+  .signout{background:none;border:1.5px solid #e2e8f0;color:#475569;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
+  .wrap{max-width:760px;margin:30px auto;padding:0 22px;}
+  .card{background:#fff;border-radius:16px;padding:28px 26px;box-shadow:0 6px 24px rgba(15,23,42,.06);margin-bottom:18px;}
+  h1{font-size:24px;margin:0 0 8px;font-weight:800;}
+  .status-row{display:flex;align-items:center;gap:12px;margin-top:18px;padding:16px 18px;border-radius:11px;}
+  .status-pending{background:#fef3c7;color:#92400e;}
+  .status-approved{background:#dcfce7;color:#14532d;}
+  .status-rejected{background:#fee2e2;color:#991b1b;}
+  .status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .status-pending .status-dot{background:#f59e0b;}
+  .status-approved .status-dot{background:#16a34a;}
+  .status-rejected .status-dot{background:#dc2626;}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:14px;font-size:13px;color:#475569;}
+  .meta b{color:#0f172a;font-weight:600;}
+  .empty{text-align:center;color:#94a3b8;padding:40px 20px;}
+  .empty-emoji{font-size:48px;line-height:1;margin-bottom:10px;}
+  .hidden{display:none !important;}
+  .signin-msg{text-align:center;padding:40px 20px;}
+  .signin-msg a{color:#db2777;font-weight:700;text-decoration:none;}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/creators/" class="nav-brand">
+    <div class="brand-logo-box">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="nav-title brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Creator portal</div>
+    </div>
+  </a>
+  <button id="signOutBtn" class="signout hidden" type="button">Sign out</button>
+</nav>
+
+<main class="wrap">
+  <div id="signinView" class="signin-msg hidden">
+    <h1>Please sign in</h1>
+    <p>You need to sign in to access the creator portal. <br/><a href="/creators/join.html">Sign in or apply &rarr;</a></p>
+  </div>
+
+  <div id="dash" class="hidden">
+    <div class="card">
+      <h1 id="hello">Hi there 👋</h1>
+      <div id="statusRow" class="status-row"></div>
+      <div class="meta" id="profileMeta"></div>
+    </div>
+
+    <div class="card" id="jobsCard">
+      <h1>Available jobs</h1>
+      <div class="empty">
+        <div class="empty-emoji">⏳</div>
+        <div><b>Job feed launching soon.</b></div>
+        <div style="font-size:13px;margin-top:6px;">Once approved, you'll see matching jobs here. We'll email you the moment they're live.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+  const sb = createClient(
+    "https://bttppihskbfmxwujyztj.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8",
+    { auth: { persistSession: true, storageKey: "cc_creator_auth" } }
+  );
+
+  const $ = s => document.querySelector(s);
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      $("#signinView").classList.remove("hidden");
+      return;
+    }
+    $("#dash").classList.remove("hidden");
+    $("#signOutBtn").classList.remove("hidden");
+    $("#signOutBtn").addEventListener("click", async () => {
+      await sb.auth.signOut();
+      window.location.href = "/creators/";
+    });
+
+    const { data: profile, error } = await sb.from("cc_creators").select("*, cc_categories(display_name)").eq("user_id", session.user.id).maybeSingle();
+    if (error || !profile) {
+      $("#hello").textContent = "Welcome";
+      $("#statusRow").className = "status-row status-pending";
+      $("#statusRow").innerHTML = '<div class="status-dot"></div><div><b>Complete your application</b><br/><a href="/creators/join.html" style="color:inherit;">Apply now &rarr;</a></div>';
+      return;
+    }
+    $("#hello").textContent = "Hi " + profile.display_name + " 👋";
+    const cls = profile.status === "approved" ? "status-approved" : profile.status === "rejected" ? "status-rejected" : "status-pending";
+    $("#statusRow").className = "status-row " + cls;
+    const statusText = {
+      pending: "<b>Application under review.</b> Usually within 24-48 hours. We'll email you the moment you're approved.",
+      approved: "<b>Approved!</b> You're ready to take jobs. Watch this space when the feed launches.",
+      rejected: "<b>Application not accepted at this time.</b>" + (profile.notes ? " " + profile.notes : ""),
+      suspended: "<b>Account temporarily suspended.</b> Email contact@cursive.world for help."
+    }[profile.status] || "<b>Status: " + profile.status + "</b>";
+    $("#statusRow").innerHTML = '<div class="status-dot"></div><div>' + statusText + '</div>';
+
+    const cat = profile.cc_categories?.display_name || profile.category_slug;
+    $("#profileMeta").innerHTML = `
+      <div>Email: <b>${session.user.email}</b></div>
+      <div>Mobile: <b>${profile.mobile}</b></div>
+      <div>Niche: <b>${cat}</b></div>
+      <div>Gender: <b>${profile.gender}</b></div>
+      <div>Channel: <b><a href="${profile.channel_url}" target="_blank" rel="noopener" style="color:#1f6feb;">View &rarr;</a></b></div>
+      <div>Followers: <b>${profile.followers_count.toLocaleString()}</b></div>
+    `;
+  })();
+</script>
+</body>
+</html>
