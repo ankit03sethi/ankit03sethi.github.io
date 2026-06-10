@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Post a Job &mdash; cursive Creators</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<style>
+  *{box-sizing:border-box;}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#eff6ff;min-height:100vh;}
+  .brand-wordmark{font-family:'Dancing Script',cursive;font-weight:700;color:#1f6feb;line-height:0.9;}
+  .brand-wordmark sup{font-family:system-ui,sans-serif;font-size:0.22em;opacity:0.5;font-weight:400;margin-left:1px;vertical-align:super;}
+  .brand-logo-box{width:44px;height:44px;background:#1f6feb;border-radius:11px;display:flex;align-items:center;justify-content:center;}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;max-width:1100px;margin:0 auto;background:#fff;border-bottom:1px solid #dbeafe;}
+  .nav-brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;}
+  .nav-brand .nav-title{font-size:36px !important;}
+  .nav-sub{font-size:12px;color:#64748b;margin-top:2px;}
+  .back-link{color:#475569;text-decoration:none;font-size:14px;font-weight:500;}
+  .wrap{max-width:760px;margin:30px auto 60px;padding:0 22px;}
+  .card{background:#fff;border-radius:16px;padding:28px 26px;box-shadow:0 6px 24px rgba(15,23,42,.06);margin-bottom:18px;}
+  h1{font-size:26px;margin:0 0 8px;font-weight:800;}
+  .sub{color:#64748b;font-size:14px;margin:0 0 22px;}
+  label{display:block;font-size:13px;font-weight:600;color:#334155;margin:16px 0 6px;}
+  label .req{color:#dc2626;}
+  input,select,textarea{width:100%;padding:11px 13px;font-size:14px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;color:#0f172a;font-family:inherit;}
+  textarea{min-height:80px;resize:vertical;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 3px rgba(31,111,235,.12);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .slab-row{display:grid;grid-template-columns:1fr 110px 130px;gap:12px;align-items:center;padding:13px 14px;border:1.5px solid #e2e8f0;border-radius:11px;margin-bottom:10px;background:#f8fafc;}
+  .slab-row .info{}
+  .slab-row .info b{font-size:13px;color:#0f172a;font-weight:700;}
+  .slab-row .info .sub{font-size:11px;color:#64748b;margin-top:2px;}
+  .slab-row input[type=number]{padding:8px 10px;font-size:14px;text-align:center;}
+  .slab-row .price{text-align:right;font-size:13px;color:#475569;}
+  .slab-row .price b{display:block;color:#0f172a;font-size:14px;}
+  .total-box{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);padding:18px 20px;border-radius:12px;margin-top:18px;}
+  .total-line{display:flex;justify-content:space-between;padding:5px 0;font-size:14px;color:#475569;}
+  .total-line.grand{border-top:1.5px solid #93c5fd;margin-top:8px;padding-top:11px;font-size:18px;font-weight:800;color:#0f172a;}
+  .file-input-wrap{padding:18px;border:2px dashed #cbd5e1;border-radius:12px;text-align:center;background:#fafbfc;}
+  .file-input-wrap input[type=file]{margin-top:8px;}
+  .preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-top:14px;}
+  .preview-grid img,.preview-grid video{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1.5px solid #e2e8f0;}
+  .btn-primary{display:block;width:100%;padding:14px 22px;font-size:15px;font-weight:700;border:none;border-radius:10px;background:#1f6feb;color:#fff;cursor:pointer;margin-top:22px;}
+  .btn-primary:hover{background:#1858d6;}
+  .btn-primary:disabled{background:#cbd5e1;}
+  .err{background:#fee2e2;color:#991b1b;padding:11px 13px;border-radius:9px;font-size:13px;margin-top:14px;display:none;line-height:1.5;}
+  .err.show{display:block;}
+  .ok{background:#dcfce7;color:#14532d;padding:16px 16px;border-radius:10px;font-size:14px;margin-top:18px;display:none;line-height:1.6;}
+  .ok.show{display:block;}
+  .hidden{display:none !important;}
+  .hint{font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.4;}
+  @media (max-width:600px){
+    .row2{grid-template-columns:1fr;}
+    .slab-row{grid-template-columns:1fr;text-align:left;}
+    .slab-row .price{text-align:left;}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/creators/" class="nav-brand">
+    <div class="brand-logo-box">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="nav-title brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Post a job</div>
+    </div>
+  </a>
+  <a href="/creators/customer.html" class="back-link">&larr; Dashboard</a>
+</nav>
+
+<main class="wrap">
+  <div id="signinNudge" class="card hidden">
+    <h1>Sign in required</h1>
+    <p class="sub">Please <a href="/creators/customer.html" style="color:#1f6feb;">sign in or create an account</a> to post a video job.</p>
+  </div>
+
+  <form id="jobForm" class="card hidden">
+    <h1>Post a video job</h1>
+    <p class="sub">Tell us about your product. Real Indian YouTubers will make and post videos on their own channels.</p>
+
+    <label for="prodName">Product name <span class="req">*</span></label>
+    <input id="prodName" type="text" required maxlength="120" placeholder="e.g. Aloe Vera Face Wash" />
+
+    <div class="row2">
+      <div>
+        <label for="catSel">Category <span class="req">*</span></label>
+        <select id="catSel" required><option value="">Select</option></select>
+      </div>
+      <div>
+        <label for="genderSel">Creator gender <span class="req">*</span></label>
+        <select id="genderSel" required>
+          <option value="either">Either</option>
+          <option value="female">Female only</option>
+          <option value="male">Male only</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Pick number of videos per slab <span class="req">*</span></label>
+    <div class="hint">Mix-and-match across slabs. Total = sum of all slabs + 18% GST.</div>
+    <div id="slabBox" style="margin-top:10px;"></div>
+
+    <div class="total-box">
+      <div class="total-line"><span>Subtotal</span><span id="subTotal">₹0</span></div>
+      <div class="total-line"><span>GST (18%)</span><span id="gstAmt">₹0</span></div>
+      <div class="total-line grand"><span>Total payable</span><span id="grandTotal">₹0</span></div>
+    </div>
+
+    <label for="briefText">Brief (optional)</label>
+    <textarea id="briefText" maxlength="500" placeholder="What should the video cover? Tone, key features, USPs..."></textarea>
+
+    <label>Product images <span class="req">*</span> (4 to 6 images)</label>
+    <div class="file-input-wrap">
+      <div>📸 Upload 4–6 photos of your product</div>
+      <input id="imgInput" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+      <div class="hint">JPG, PNG or WEBP. Max 5 MB each.</div>
+      <div id="imgPreview" class="preview-grid"></div>
+    </div>
+
+    <label>Brief video (optional)</label>
+    <div class="file-input-wrap">
+      <div>🎬 Record yourself explaining what you want (optional)</div>
+      <input id="vidInput" type="file" accept="video/mp4,video/quicktime,video/webm" />
+      <div class="hint">MP4, MOV or WEBM. Max 50 MB.</div>
+      <div id="vidPreview" class="preview-grid"></div>
+    </div>
+
+    <button type="submit" id="submitBtn" class="btn-primary">Submit job &amp; proceed to payment &rarr;</button>
+    <div id="errBox" class="err"></div>
+    <div id="okBox" class="ok"></div>
+  </form>
+</main>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+  const sb = createClient(
+    "https://bttppihskbfmxwujyztj.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8",
+    { auth: { persistSession: true, storageKey: "cc_customer_auth" } }
+  );
+
+  const $ = s => document.querySelector(s);
+
+  function showErr(msg) { const e=$("#errBox"); e.textContent=msg; e.classList.add("show"); }
+  function clearErr() { $("#errBox").classList.remove("show"); }
+
+  let SLABS = [];
+  let imageFiles = [];
+  let videoFile = null;
+
+  function updateTotals() {
+    let subtotal = 0;
+    for (const s of SLABS) {
+      const qty = parseInt(document.getElementById("qty_"+s.slab).value || "0", 10);
+      subtotal += qty * s.customer_price_paise;
+    }
+    const gst = Math.round(subtotal * 0.18);
+    const total = subtotal + gst;
+    $("#subTotal").textContent = "₹" + (subtotal/100).toLocaleString("en-IN");
+    $("#gstAmt").textContent = "₹" + (gst/100).toLocaleString("en-IN");
+    $("#grandTotal").textContent = "₹" + (total/100).toLocaleString("en-IN");
+    return { subtotal, gst, total };
+  }
+
+  async function loadConfig() {
+    const { data: cats } = await sb.from("cc_categories").select("*").order("position");
+    const cs = $("#catSel");
+    for (const c of cats || []) { const o=document.createElement("option"); o.value=c.slug; o.textContent=c.display_name; cs.appendChild(o); }
+
+    const { data: slabs } = await sb.from("cc_slabs").select("*").order("slab");
+    SLABS = slabs || [];
+    const sb_box = $("#slabBox");
+    for (const s of SLABS) {
+      const div = document.createElement("div");
+      div.className = "slab-row";
+      div.innerHTML = `
+        <div class="info">
+          <b>Slab ${s.slab}</b>
+          <div class="sub">${s.display_label}</div>
+        </div>
+        <input id="qty_${s.slab}" type="number" min="0" max="50" value="0" />
+        <div class="price"><b>₹${(s.customer_price_paise/100).toLocaleString("en-IN")}</b> / video</div>
+      `;
+      sb_box.appendChild(div);
+      div.querySelector("input").addEventListener("input", updateTotals);
+    }
+    updateTotals();
+  }
+
+  $("#imgInput").addEventListener("change", (e) => {
+    imageFiles = Array.from(e.target.files || []).slice(0, 6);
+    const p = $("#imgPreview"); p.innerHTML = "";
+    for (const f of imageFiles) {
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(f);
+      p.appendChild(img);
+    }
+  });
+  $("#vidInput").addEventListener("change", (e) => {
+    videoFile = (e.target.files || [])[0] || null;
+    const p = $("#vidPreview"); p.innerHTML = "";
+    if (videoFile) {
+      const v = document.createElement("video");
+      v.src = URL.createObjectURL(videoFile);
+      v.controls = true; v.muted = true; v.style.maxHeight = "120px"; v.style.aspectRatio="";
+      p.appendChild(v);
+    }
+  });
+
+  $("#jobForm").addEventListener("submit", async (e) => {
+    e.preventDefault(); clearErr();
+    const btn = $("#submitBtn"); btn.disabled = true; btn.textContent = "Submitting...";
+
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { showErr("Please sign in first."); btn.disabled=false; btn.textContent="Submit job → "; return; }
+
+    const productName = $("#prodName").value.trim();
+    const category = $("#catSel").value;
+    const gender = $("#genderSel").value;
+    const briefText = $("#briefText").value.trim();
+    const { subtotal, gst, total } = updateTotals();
+
+    if (!productName || !category || !gender) { showErr("Fill product name, category, and gender."); btn.disabled=false; btn.textContent="Submit job → "; return; }
+    if (imageFiles.length < 4 || imageFiles.length > 6) { showErr("Please upload 4 to 6 product images."); btn.disabled=false; btn.textContent="Submit job → "; return; }
+    if (total === 0) { showErr("Please pick at least 1 video across the slabs."); btn.disabled=false; btn.textContent="Submit job → "; return; }
+
+    // 1. Create job row (pending_payment)
+    btn.textContent = "Creating job...";
+    const { data: job, error: jobErr } = await sb.from("cc_jobs").insert({
+      customer_id: session.user.id,
+      category_slug: category,
+      creator_gender: gender,
+      brief_text: briefText || null,
+      product_name: productName,
+      subtotal_paise: subtotal,
+      gst_paise: gst,
+      total_paise: total,
+      status: "pending_payment",
+      expires_at: new Date(Date.now() + 7*86400*1000).toISOString()
+    }).select().single();
+    if (jobErr) { showErr("Could not create job: " + jobErr.message); btn.disabled=false; btn.textContent="Submit job → "; return; }
+
+    // 2. Upload images
+    btn.textContent = "Uploading images (0 of " + imageFiles.length + ")...";
+    const uploadedImageUrls = [];
+    for (let i = 0; i < imageFiles.length; i++) {
+      btn.textContent = `Uploading images (${i+1} of ${imageFiles.length})...`;
+      const ext = imageFiles[i].name.split(".").pop() || "jpg";
+      const path = `${session.user.id}/job_${job.id}/img_${i}.${ext}`;
+      const { error: upErr } = await sb.storage.from("cc-assets").upload(path, imageFiles[i], { upsert: true });
+      if (upErr) { showErr("Image upload failed: " + upErr.message); btn.disabled=false; btn.textContent="Submit job → "; return; }
+      uploadedImageUrls.push(path);
+    }
+    await sb.from("cc_job_images").insert(uploadedImageUrls.map((p, idx) => ({ job_id: job.id, image_url: p, position: idx })));
+
+    // 3. Upload video (optional)
+    let videoPath = null;
+    if (videoFile) {
+      btn.textContent = "Uploading brief video...";
+      const ext = videoFile.name.split(".").pop() || "mp4";
+      videoPath = `${session.user.id}/job_${job.id}/brief.${ext}`;
+      const { error: vErr } = await sb.storage.from("cc-assets").upload(videoPath, videoFile, { upsert: true });
+      if (vErr) { showErr("Video upload failed: " + vErr.message); btn.disabled=false; btn.textContent="Submit job → "; return; }
+      await sb.from("cc_jobs").update({ brief_video_url: videoPath }).eq("id", job.id);
+    }
+
+    // 4. Insert job lines (one per non-zero slab)
+    const lines = [];
+    for (const s of SLABS) {
+      const qty = parseInt(document.getElementById("qty_"+s.slab).value || "0", 10);
+      if (qty > 0) {
+        lines.push({
+          job_id: job.id, slab: s.slab, quantity: qty,
+          customer_price_paise: s.customer_price_paise,
+          creator_payout_paise: s.creator_payout_paise
+        });
+      }
+    }
+    await sb.from("cc_job_lines").insert(lines);
+
+    // 5. Show success (Razorpay integration deferred to Phase 2)
+    $("#jobForm").style.display = "none";
+    const ok = $("#okBox");
+    ok.innerHTML = `
+      <b>✓ Job #${job.id} created!</b><br/>
+      Total payable: <b>₹${(total/100).toLocaleString("en-IN")}</b> (incl. 18% GST)<br/><br/>
+      We'll send you a Razorpay payment link via WhatsApp shortly. Once paid, your job goes live and matching YouTubers can claim it.<br/><br/>
+      <a href="/creators/customer.html" style="color:#1f6feb;font-weight:700;">View dashboard &rarr;</a>
+    `;
+    ok.classList.add("show");
+    window.scrollTo(0, 0);
+  });
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { $("#signinNudge").classList.remove("hidden"); return; }
+    $("#jobForm").classList.remove("hidden");
+    await loadConfig();
+  })();
+</script>
+</body>
+</html>
