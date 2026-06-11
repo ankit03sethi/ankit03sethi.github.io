@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Operator Console &mdash; cursive Creators</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<style>
+  *{box-sizing:border-box;}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#f8fafc;min-height:100vh;}
+  .brand-wordmark{font-family:'Dancing Script',cursive;font-weight:700;color:#1f6feb;line-height:0.9;}
+  .brand-wordmark sup{font-family:system-ui,sans-serif;font-size:0.22em;opacity:0.5;font-weight:400;margin-left:1px;vertical-align:super;}
+  .brand-logo-box{width:44px;height:44px;background:#1f6feb;border-radius:11px;display:flex;align-items:center;justify-content:center;}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:#fff;border-bottom:1px solid #e2e8f0;}
+  .nav-brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;}
+  .nav-brand .nav-title{font-size:36px !important;}
+  .nav-sub{font-size:12px;color:#64748b;margin-top:2px;}
+  .ops-pill{background:#fbbf24;color:#78350f;font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px;letter-spacing:.4px;margin-left:8px;vertical-align:middle;}
+  .topright{display:flex;align-items:center;gap:10px;}
+  .signout{background:none;border:1.5px solid #e2e8f0;color:#475569;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px 22px 60px;}
+
+  /* SIGN-IN */
+  .signin-wrap{max-width:420px;margin:60px auto 0;background:#fff;border-radius:14px;padding:32px 30px;box-shadow:0 6px 28px rgba(15,23,42,.08);}
+  .signin-wrap h1{font-size:22px;margin:0 0 6px;font-weight:800;}
+  .signin-wrap .sub{font-size:13px;color:#64748b;margin:0 0 22px;}
+  .signin-wrap label{display:block;font-size:12px;font-weight:600;color:#334155;margin:14px 0 6px;}
+  .signin-wrap input{width:100%;padding:11px 13px;font-size:14px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;font-family:inherit;}
+  .signin-wrap input:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 3px rgba(31,111,235,.12);}
+  .signin-wrap .btn-primary{display:block;width:100%;padding:12px 22px;font-size:14px;font-weight:700;border:none;border-radius:9px;background:#1f6feb;color:#fff;cursor:pointer;margin-top:20px;}
+  .signin-wrap .btn-primary:hover{background:#1858d6;}
+  .signin-wrap .btn-primary:disabled{background:#cbd5e1;cursor:not-allowed;}
+  .signin-wrap .err{background:#fee2e2;color:#991b1b;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:14px;display:none;}
+  .signin-wrap .err.show{display:block;}
+  .signin-wrap .reset{font-size:11px;color:#64748b;text-align:center;margin-top:16px;}
+  .signin-wrap .reset a{color:#1f6feb;text-decoration:none;}
+
+  /* OPS view */
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px;}
+  .kpi{background:#fff;padding:18px 20px;border-radius:12px;box-shadow:0 2px 8px rgba(15,23,42,.04);border:1px solid #e2e8f0;}
+  .kpi-label{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;}
+  .kpi-value{font-size:28px;font-weight:800;margin-top:4px;color:#0f172a;}
+  .tab-bar{display:flex;background:#fff;border-radius:12px 12px 0 0;border:1px solid #e2e8f0;border-bottom:none;padding:4px;gap:4px;}
+  .tab-btn{flex:0 0 auto;padding:11px 18px;border:none;background:transparent;font-size:13px;font-weight:700;color:#64748b;border-radius:8px;cursor:pointer;}
+  .tab-btn.active{background:#1f6feb;color:#fff;}
+  .tab-btn .count{display:inline-block;margin-left:6px;background:rgba(255,255,255,.25);padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;}
+  .tab-btn:not(.active) .count{background:#e2e8f0;color:#475569;}
+  .panel{background:#fff;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;padding:18px 20px;}
+  .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:13px;}
+  .filter-bar select,.filter-bar input{padding:7px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;padding:10px 12px;background:#f8fafc;color:#475569;font-weight:600;border-bottom:1px solid #e2e8f0;position:sticky;top:0;}
+  td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+  tr:hover td{background:#fafbff;}
+  .pill{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px;}
+  .pill-pending,.pill-pending_payment{background:#fef3c7;color:#92400e;}
+  .pill-approved,.pill-filled,.pill-paid{background:#dcfce7;color:#14532d;}
+  .pill-rejected,.pill-refunded,.pill-expired{background:#fee2e2;color:#991b1b;}
+  .pill-open,.pill-partially_filled{background:#dbeafe;color:#1e40af;}
+  .pill-suspended{background:#e5e7eb;color:#374151;}
+  .btn{padding:6px 12px;font-size:12px;font-weight:700;border-radius:6px;border:1.5px solid;cursor:pointer;background:#fff;}
+  .btn-approve{color:#15803d;border-color:#86efac;}
+  .btn-approve:hover{background:#dcfce7;}
+  .btn-reject{color:#991b1b;border-color:#fca5a5;}
+  .btn-reject:hover{background:#fee2e2;}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-link{color:#1f6feb;background:none;border:none;text-decoration:none;font-size:12px;font-weight:600;cursor:pointer;padding:0;}
+  .btn-link:hover{text-decoration:underline;}
+  .empty{text-align:center;color:#94a3b8;padding:40px 20px;font-size:14px;}
+  .hidden{display:none !important;}
+  .row-actions{display:flex;gap:6px;}
+  .small-info{font-size:11px;color:#94a3b8;margin-top:2px;}
+  @media (max-width:760px){.wrap{padding:14px;}.nav{padding:12px 14px;}table{font-size:12px;}th,td{padding:8px 8px;}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/creators/" class="nav-brand">
+    <div class="brand-logo-box">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="nav-title brand-wordmark">cursive<sup>&reg;</sup><span class="ops-pill">OPS</span></div>
+      <div class="nav-sub">Creators operator console</div>
+    </div>
+  </a>
+  <div class="topright">
+    <span id="emailChip" style="font-size:13px;color:#475569;font-weight:600;" class="hidden"></span>
+    <button id="signOutBtn" class="signout hidden" type="button">Sign out</button>
+  </div>
+</nav>
+
+<main class="wrap">
+  <!-- SIGN-IN VIEW -->
+  <div id="signinView" class="signin-wrap hidden">
+    <h1>Operator sign in</h1>
+    <p class="sub">Use your cursive admin email and password (same as PD Tracker admin).</p>
+    <form id="signinForm" autocomplete="on">
+      <label for="siEmail">Email</label>
+      <input id="siEmail" type="email" required autocomplete="email" placeholder="ankit03sethi@gmail.com" />
+      <label for="siPassword">Password</label>
+      <input id="siPassword" type="password" required autocomplete="current-password" placeholder="********" />
+      <button id="siBtn" type="submit" class="btn-primary">Sign in &rarr;</button>
+      <div id="siErr" class="err"></div>
+    </form>
+    <div class="reset">Forgot password? <a href="/pdtracker/reset-password.html">Reset it here</a>.</div>
+  </div>
+
+  <!-- BLOCKED (signed in, but not admin) -->
+  <div id="blockedView" class="signin-wrap hidden" style="text-align:center;">
+    <h1>Not an admin account</h1>
+    <p class="sub" id="blockedMsg">You are signed in, but this account does not have operator access.</p>
+    <button id="blockSignOutBtn" class="btn-primary" type="button" style="background:#64748b;">Sign out and try a different account</button>
+  </div>
+
+  <!-- OPS DASHBOARD -->
+  <div id="opsView" class="hidden">
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Total jobs</div><div class="kpi-value" id="kpiTotalJobs">0</div></div>
+      <div class="kpi"><div class="kpi-label">Pending payment</div><div class="kpi-value" id="kpiPendingPay">0</div></div>
+      <div class="kpi"><div class="kpi-label">Open / Filling</div><div class="kpi-value" id="kpiOpen">0</div></div>
+      <div class="kpi"><div class="kpi-label">Filled (delivered)</div><div class="kpi-value" id="kpiFilled">0</div></div>
+      <div class="kpi"><div class="kpi-label">Pending creators</div><div class="kpi-value" id="kpiPendingCr">0</div></div>
+      <div class="kpi"><div class="kpi-label">Approved creators</div><div class="kpi-value" id="kpiApprCr">0</div></div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="jobs" type="button">Jobs <span class="count" id="cJobs">0</span></button>
+      <button class="tab-btn" data-tab="creators" type="button">Creators <span class="count" id="cCreators">0</span></button>
+      <button class="tab-btn" data-tab="reviews" type="button">Pending video reviews <span class="count" id="cReviews">0</span></button>
+    </div>
+
+    <div class="panel">
+      <div id="panelJobs">
+        <div class="filter-bar">
+          <span>Filter:</span>
+          <select id="jobsStatusFilter">
+            <option value="">All statuses</option>
+            <option value="pending_payment">Pending payment</option>
+            <option value="open">Open</option>
+            <option value="partially_filled">Partially filled</optin>
+            <option value="filled">Filled</option>
+            <option value="refunded">Refunded</option>
+            <option value="expired">Expired</option>
+          </select>
+          <input id="jobsSearch" type="text" placeholder="Search customer email or product..." style="flex:1;min-width:200px;" />
+          <button id="jobsRefresh" class="btn-link">&#8635; Refresh</button>
+        </div>
+        <div id="jobsContainer"></div>
+      </div>
+
+      <div id="panelCreators" class="hidden">
+        <div class="filter-bar">
+          <span>Filter:</span>
+          <select id="creatorsStatusFilter">
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="suspended">Suspended</option>
+          </select>
+          <input id="creatorsSearch" type="text" placeholder="Search name, email, channel..." style="flex:1;min-width:200px;" />
+          <button id="creatorsRefresh" class="btn-link">&#8635; Refresh</button>
+        </div>
+        <div id="creatorsContainer"></div>
+      </div>
+
+      <div id="panelReviews" class="hidden">
+        <div class="empty">
+          <b>No video submissions to review yet.</b><br/>
+          <span style="font-size:12px;">Once Phase 2 launches and creators submit YouTube URLs, they appear here for approval.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+  const sb = createClient(
+    "https://bttppihskbfmxwujyztj.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8",
+    { auth: { persistSession: true, storageKey: "pd_tracker_auth" } }  // shared with PD Tracker
+  );
+
+  const $ = s => document.querySelector(s);
+  let JOBS = [], CREATORS = [];
+
+  function pill(v) { return `<span class="pill pill-${v}">${(v||"").replace(/_/g, " ")}</span>`; }
+  function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function fmtDate(s) { if (!s) return "—"; const d=new Date(s); return d.toLocaleDateString("en-IN",{day:"2-digit",month:"short"})+", "+d.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}); }
+  function fmtRs(p) { return "₹"+(p/100).toLocaleString("en-IN"); }
+
+  // SIGN IN
+  $("#signinForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#siErr").classList.remove("show");
+    const btn = $("#siBtn"); btn.disabled = true; btn.textContent = "Signing in...";
+    const { error } = await sb.auth.signInWithPassword({
+      email: $("#siEmail").value.trim().toLowerCase(),
+      password: $("#siPassword").value
+    });
+    if (error) {
+      $("#siErr").textContent = error.message || "Invalid email or password.";
+      $("#siErr").classList.add("show");
+      btn.disabled = false; btn.textContent = "Sign in →";
+      return;
+    }
+    location.reload();
+  });
+
+  $("#blockSignOutBtn")?.addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+  // TABS
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    ["jobs","creators","reviews"].forEach(t => {
+      $(`#panel${t.charAt(0).toUpperCase()+t.slice(1)}`).classList.toggle("hidden", t !== tab);
+    });
+  }));
+
+  // JOBS
+  function renderJobs() {
+    const status = $("#jobsStatusFilter").value;
+    const q = $("#jobsSearch").value.trim().toLowerCase();
+    let rows = JOBS;
+    if (status) rows = rows.filter(j => j.status === status);
+    if (q) rows = rows.filter(j => (j.customer_email||"").toLowerCase().includes(q) || (j.product_name||"").toLowerCase().includes(q));
+    const c = $("#jobsContainer");
+    if (rows.length === 0) { c.innerHTML = '<div class="empty">No jobs match this filter.</div>'; return; }
+    let html = '<table><thead><tr><th>#</th><th>Customer</th><th>Product</th><th>Category</th><th>Qty</th><th>Total</th><th>Status</th><th>Filled</th><th>Created</th></tr></thead><tbody>';
+    for (const j of rows) {
+      html += `<tr>
+        <td><b>#${j.job_id}</b></td>
+        <td>${esc(j.customer_email)}<div class="small-info">${j.creator_gender} pref</div></td>
+        <td>${esc(j.product_name||"—")}</td>
+        <td>${esc(j.category_slug)}</td>
+        <td><b>${j.total_qty}</b></td>
+        <td>${fmtRs(j.total_paise)}</td>
+        <td>${pill(j.status)}</td>
+        <td><b>${j.filled_qty}</b>/${j.total_qty}</td>
+        <td><span class="small-info">${fmtDate(j.created_at)}</span></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    c.innerHTML = html;
+  }
+
+  async function loadJobs() {
+    const { data, error } = await sb.rpc("cc_admin_jobs_overview");
+    if (error) { $("#jobsContainer").innerHTML = '<div class="empty">Error: '+esc(error.message)+'</div>'; return; }
+    JOBS = data || [];
+    $("#kpiTotalJobs").textContent = JOBS.length;
+    $("#kpiPendingPay").textContent = JOBS.filter(j=>j.status==="pending_payment").length;
+    $("#kpiOpen").textContent = JOBS.filter(j=>j.status==="open"||j.status==="partially_filled").length;
+    $("#kpiFilled").textContent = JOBS.filter(j=>j.status==="filled").length;
+    $("#cJobs").textContent = JOBS.length;
+    renderJobs();
+  }
+  $("#jobsStatusFilter").addEventListener("change", renderJobs);
+  $("#jobsSearch").addEventListener("input", renderJobs);
+  $("#jobsRefresh").addEventListener("click", loadJobs);
+
+  // CREATORS
+  function renderCreators() {
+    const status = $("#creatorsStatusFilter").value;
+    const q = $("#creatorsSearch").value.trim().toLowerCase();
+    let rows = CREATORS;
+    if (status) rows = rows.filter(c => c.status === status);
+    if (q) rows = rows.filter(c => (c.email||"").toLowerCase().includes(q) || (c.display_name||"").toLowerCase().includes(q) || (c.channel_url||"").toLowerCase().includes(q));
+    const c = $("#creatorsContainer");
+    if (rows.length === 0) { c.innerHTML = '<div class="empty">No creators match this filter.</div>'; return; }
+    let html = '<table><thead><tr><th>Name</th><th>Email / Mobile</th><th>Niche</th><th>Gender</th><th>Channel</th><th>Followers</th><th>Status</th><th>Joined</th><th>Action</th></tr></thead><tbody>';
+    for (const r of rows) {
+      const showApprove = r.status === "pending" || r.status === "rejected";
+      const showReject = r.status === "pending" || r.status === "approved";
+      html += `<tr data-uid="${r.user_id}">
+        <td><b>${esc(r.display_name)}</b></td>
+        <td>${esc(r.email)}<div class="small-info">${esc(r.mobile)}</div></td>
+        <td>${esc(r.category_slug)}</td>
+        <td>${r.gender}</td>
+        <td><a href="${esc(r.channel_url)}" target="_blank" rel="noopener" style="color:#1f6feb;">View &rarr;</a></td>
+        <td><b>${r.followers_count.toLocaleString("en-IN")}</b></td>
+        <td>${pill(r.status)}</td>
+        <td><span class="small-info">${fmtDate(r.created_at)}</span></td>
+        <td><div class="row-actions">
+          ${showApprove ? `<button class="btn btn-approve" data-act="approve">Approve</button>` : ""}
+          ${showReject ? `<button class="btn btn-reject" data-act="reject">Reject</button>` : ""}
+        </div></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    c.innerHTML = html;
+    c.querySelectorAll("button[data-act]").forEach(btn => btn.addEventListener("click", async (e) => {
+      const tr = e.target.closest("tr");
+      const uid = tr.dataset.uid;
+      const act = e.target.dataset.act;
+      e.target.disabled = true;
+      const newStatus = act === "approve" ? "approved" : "rejected";
+      let notes = null;
+      if (act === "reject") {
+        notes = prompt("Optional note (shown to creator):", "");
+        if (notes === null) { e.target.disabled = false; return; }
+      }
+      const updates = { status: newStatus };
+      if (notes) updates.notes = notes;
+      if (act === "approve") updates.approved_at = new Date().toISOString();
+      const { error } = await sb.from("cc_creators").update(updates).eq("user_id", uid);
+      if (error) { alert("Failed: " + error.message); e.target.disabled = false; return; }
+      await loadCreators();
+    }));
+  }
+
+  async function loadCreators() {
+    const { data, error } = await sb.rpc("cc_admin_creators_overview");
+    if (error) { $("#creatorsContainer").innerHTML = '<div class="empty">Error: '+esc(error.message)+'</div>'; return; }
+    CREATORS = data || [];
+    $("#kpiPendingCr").textContent = CREATORS.filter(c=>c.status==="pending").length;
+    $("#kpiApprCr").textContent = CREATORS.filter(c=>c.status==="approved").length;
+    $("#cCreators").textContent = CREATORS.length;
+    renderCreators();
+  }
+  $("#creatorsStatusFilter").addEventListener("change", renderCreators);
+  $("#creatorsSearch").addEventListener("input", renderCreators);
+  $("#creatorsRefresh").addEventListener("click", loadCreators);
+
+  // BOOT
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      $("#signinView").classList.remove("hidden");
+      return;
+    }
+    const { data: u } = await sb.from("analytics_users").select("user_tier").eq("user_id", session.user.id).maybeSingle();
+    if (u?.user_tier !== "admin") {
+      $("#blockedView").classList.remove("hidden");
+      $("#blockedMsg").textContent = "You are signed in as " + session.user.email + ". This account does not have operator access.";
+      return;
+    }
+    $("#opsView").classList.remove("hidden");
+    $("#emailChip").classList.remove("hidden");
+    $("#emailChip").textContent = session.user.email;
+    $("#signOutBtn").classList.remove("hidden");
+    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+    await Promise.all([loadJobs(), loadCreators()]);
+  })();
+</script>
+</body>
+</html>
