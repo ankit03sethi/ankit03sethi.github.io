@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Dashboard &middot; cursive admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="dashboard.css?v=2026061501" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/dashboard/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Dashboard &middot; admin only</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
+  </div>
+</header>
+
+<main id="loginView" class="auth-wrap hidden">
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Admin sign in</h1>
+    <p class="lede">Dashboard is restricted to admin accounts.</p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+    <p id="loginError" class="error hidden"></p>
+  </form>
+</main>
+
+<main id="denyView" class="auth-wrap hidden">
+  <div class="auth-card">
+    <h1>Not authorised</h1>
+    <p class="lede">Your account does not have admin access to this page.</p>
+    <button id="denySignOut" class="btn-primary" type="button">Sign out</button>
+  </div>
+</main>
+
+<main id="dashView" class="dash hidden">
+
+  <!-- Section nav (more sections will be added: Reconcile / Pricing / Master CSV) -->
+  <nav class="section-tabs">
+    <button class="section-tab active" data-section="uploads">Uploads</button>
+    <button class="section-tab disabled" disabled title="Coming after uploads">Reconcile</button>
+    <button class="section-tab disabled" disabled title="Coming later">Daily Pricing</button>
+    <button class="section-tab disabled" disabled title="Coming later">Master CSV</button>
+  </nav>
+
+  <!-- Section: Uploads -->
+  <section id="sectionUploads" class="section">
+    <div class="section-head">
+      <div>
+        <h2>Uploads</h2>
+        <p class="muted">Drop the 4 reference files below. Re-upload at any time &mdash; the latest version replaces the previous one. Files are stored privately and only admins can see them.</p>
+      </div>
+    </div>
+
+    <div class="slot-grid">
+
+      <article class="slot-card" data-slot-key="master_sku">
+        <div class="slot-head">
+          <div>
+            <div class="slot-tag">1</div>
+            <h3 class="slot-title">Master SKU File</h3>
+            <p class="slot-desc">Central product catalogue. Maps SKU &rarr; Category, Sub-Category, Product name, MRP, COGS, etc. Equivalent of the "Master SKU FILE" sheet in the old Master CSV.</p>
+          </div>
+        </div>
+        <div class="slot-status" id="status_master_sku">No upload yet.</div>
+        <div class="slot-actions">
+          <input type="file" id="file_master_sku" accept=".xlsx,.xls,.csv" hidden />
+          <button class="btn-primary slot-upload" data-slot-key="master_sku" type="button">Upload file</button>
+          <span class="slot-msg" id="msg_master_sku"></span>
+        </div>
+      </article>
+
+      <article class="slot-card" data-slot-key="prices">
+        <div class="slot-head">
+          <div>
+            <div class="slot-tag">2</div>
+            <h3 class="slot-title">Platform Prices</h3>
+            <p class="slot-desc">SKU &rarr; selling price per marketplace (Amazon / Flipkart / Meesho / FirstCry / Myntra). Equivalent of the "PRICES" sheet in the old Master CSV.</p>
+          </div>
+        </div>
+        <div class="slot-status" id="status_prices">No upload yet.</div>
+        <div class="slot-actions">
+          <input type="file" id="file_prices" accept=".xlsx,.xls,.csv" hidden />
+          <button class="btn-primary slot-upload" data-slot-key="prices" type="button">Upload file</button>
+          <span class="slot-msg" id="msg_prices"></span>
+        </div>
+      </article>
+
+      <article class="slot-card" data-slot-key="multi_lookup">
+        <div class="slot-head">
+          <div>
+            <div class="slot-tag">3</div>
+            <h3 class="slot-title">Multi-Platform Lookup</h3>
+            <p class="slot-desc">Per-platform "value column" lookup (used by Master CSV). One sheet with MEESHO / MYNTRA tabs &mdash; Myntra keys on F+G+K, others on col A.</p>
+          </div>
+        </div>
+        <div class="slot-status" id="status_multi_lookup">No upload yet.</div>
+        <div class="slot-actions">
+          <input type="file" id="file_multi_lookup" accept=".xlsx,.xls,.csv" hidden />
+          <button class="btn-primary slot-upload" data-slot-key="multi_lookup" type="button">Upload file</button>
+          <span class="slot-msg" id="msg_multi_lookup"></span>
+        </div>
+      </article>
+
+      <article class="slot-card" data-slot-key="amazon_fba">
+        <div class="slot-head">
+          <div>
+            <div class="slot-tag">4</div>
+            <h3 class="slot-title">Amazon FBA Orders</h3>
+            <p class="slot-desc">Amazon FBA order CSV &mdash; separate from the Amazon Easy Ship orders the watcher already collects. The 6th source the old Master CSV reads from.</p>
+          </div>
+        </div>
+        <div class="slot-status" id="status_amazon_fba">No upload yet.</div>
+        <div class="slot-actions">
+          <input type="file" id="file_amazon_fba" accept=".xlsx,.xls,.csv" hidden />
+          <button class="btn-primary slot-upload" data-slot-key="amazon_fba" type="button">Upload file</button>
+          <span class="slot-msg" id="msg_amazon_fba"></span>
+        </div>
+      </article>
+
+    </div>
+
+    <details class="history">
+      <summary>Upload history (all versions)</summary>
+      <div class="history-body">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Slot</th>
+              <th>File</th>
+              <th>Size</th>
+              <th>Uploaded by</th>
+              <th>Uploaded at</th>
+              <th>Current?</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <p class="footer-note">
+    Files stored privately in Supabase &middot; Only admin accounts can see this page &middot; The 4 uploads will power the next step (Reconcile).
+  </p>
+</main>
+
+<script type="module" src="dashboard.js?v=2026061501"></script>
+</body>
+</html>
