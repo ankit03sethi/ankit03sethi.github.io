@@ -1,0 +1,76 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #f6f8fa; -webkit-font-smoothing: antialiased; }
+a { color: #1f6feb; text-decoration: none; } a:hover { text-decoration: underline; }
+.hidden { display: none !important; }
+.muted { color: #64748b; font-size: 13px; margin: 4px 0 0; }
+
+.topbar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: #fff; border-bottom: 1px solid #eaecf0; }
+.brand { display: inline-flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.brand-box { width: 50px; height: 50px; background: #1f6feb; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.brand-wordmark { font-family: 'Dancing Script', cursive; font-size: 46px; color: #1f6feb; font-weight: 700; letter-spacing: -1px; line-height: 0.9; }
+.brand-wordmark sup { font-family: system-ui, sans-serif; font-size: 0.22em; opacity: 0.5; font-weight: 400; margin-left: 1px; vertical-align: super; }
+.nav-sub { font-size: 12px; color: #667085; margin-top: 2px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.email-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 11px; background: #f0f6ff; color: #1d4ed8; border: 1px solid #c7d9f7; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.btn-ghost { background: transparent; border: 1px solid #e5e7eb; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #475467; cursor: pointer; }
+.btn-ghost:hover { background: #f9fafb; }
+
+.auth-wrap { min-height: calc(100vh - 60px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.auth-card { width: 100%; max-width: 400px; background: #fff; border-radius: 16px; box-shadow: 0 6px 28px rgba(16,24,40,.07); padding: 32px; }
+.auth-card h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; }
+.auth-card .lede { margin: 0 0 20px; color: #64748b; font-size: 14px; }
+.auth-card label { display: block; font-size: 13px; font-weight: 600; color: #344054; margin: 12px 0 6px; }
+.auth-card input { width: 100%; padding: 11px 13px; font-size: 15px; border: 1px solid #d0d5dd; border-radius: 9px; outline: none; }
+.auth-card input:focus { border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,.15); }
+.btn-primary { padding: 11px 16px; font-size: 14px; font-weight: 700; color: #fff; background: #1f6feb; border: none; border-radius: 9px; cursor: pointer; }
+.btn-primary:hover { background: #1858d6; }
+.btn-primary:disabled { opacity: .6; cursor: progress; }
+.auth-card .btn-primary { width: 100%; margin-top: 18px; padding: 12px 16px; font-size: 15px; border-radius: 10px; }
+.error { margin-top: 12px; padding: 10px 13px; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; }
+
+.dash { max-width: 1280px; margin: 0 auto; padding: 22px 20px 60px; }
+
+.section-tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid #eaecf0; padding-bottom: 8px; flex-wrap: wrap; }
+.section-tab { background: transparent; border: none; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #64748b; border-radius: 8px 8px 0 0; cursor: pointer; }
+.section-tab:hover:not(.disabled) { background: #f0f6ff; color: #1f6feb; }
+.section-tab.active { background: #1f6feb; color: #fff; }
+.section-tab.disabled { opacity: .45; cursor: not-allowed; }
+
+.section { background: transparent; }
+.section-head { margin-bottom: 18px; }
+.section-head h2 { margin: 0; font-size: 20px; font-weight: 800; }
+
+.slot-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 880px) { .slot-grid { grid-template-columns: 1fr; } }
+
+.slot-card { background: #fff; border: 1px solid #eaecf0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: box-shadow .15s; }
+.slot-card:hover { box-shadow: 0 6px 20px rgba(16,24,40,.05); }
+
+.slot-head { display: flex; gap: 10px; align-items: flex-start; }
+.slot-tag { display: inline-block; min-width: 26px; height: 26px; line-height: 26px; text-align: center; background: #1f6feb; color: #fff; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.slot-title { margin: 4px 0 6px; font-size: 16px; font-weight: 700; color: #0f172a; }
+.slot-desc { margin: 0; font-size: 13px; color: #64748b; line-height: 1.5; }
+
+.slot-status { font-size: 13px; padding: 9px 12px; background: #f1f5f9; border-radius: 8px; color: #475467; border-left: 3px solid #cbd5e1; }
+.slot-status.uploaded { background: #ecfdf5; color: #065f46; border-left-color: #047857; }
+.slot-status .file-line { font-weight: 600; }
+.slot-status .meta-line { font-size: 11px; color: #94a3b8; margin-top: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.slot-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.slot-msg { font-size: 12px; color: #64748b; }
+.slot-msg.error { color: #b91c1c; }
+.slot-msg.success { color: #047857; }
+
+.history { margin-top: 24px; background: #fff; border: 1px solid #eaecf0; border-radius: 12px; padding: 0; }
+.history summary { padding: 14px 18px; font-weight: 700; cursor: pointer; font-size: 14px; color: #344054; }
+.history summary:hover { background: #f9fafb; }
+.history-body { padding: 0 18px 18px; overflow-x: auto; }
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.history-table th { text-align: left; padding: 9px 10px; background: #f8fafc; color: #475467; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #eaecf0; }
+.history-table td { padding: 9px 10px; border-bottom: 1px solid #f1f4f8; }
+.history-table .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.history-table .pill.current { background: #ecfdf5; color: #047857; }
+.history-table .pill.stale { background: #f1f5f9; color: #64748b; }
+
+.footer-note { margin-top: 24px; padding-top: 16px; color: #94a3b8; font-size: 11px; text-align: center; border-top: 1px solid #eaecf0; }
