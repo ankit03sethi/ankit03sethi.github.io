@@ -105,7 +105,7 @@ async function checkAdmin() {
 async function refreshAll() {
   try {
     // First, ensure every customer has a password row (free for admin since SECURITY DEFINER)
-    await sb.rpc("ensure_pdtracker_install_passwords").catch(() => {});
+    try { await sb.rpc("ensure_pdtracker_install_passwords"); } catch {}
 
     // Pull passwords + customer info
     const { data: pwds, error: e1 } = await sb
