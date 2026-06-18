@@ -113,9 +113,8 @@ async function refreshAll() {
       .select("user_id, current_password, rotates_at, is_blocked, updated_at");
     if (e1) throw e1;
 
-    const { data: users, error: e2 } = await sb
-      .from("analytics_users")
-      .select("user_id, email, mobile, full_name, user_tier");
+    // Admin RPC that joins auth.users + analytics_users and exposes email
+    const { data: users, error: e2 } = await sb.rpc("pd_admin_customer_directory");
     if (e2) throw e2;
 
     const userMap = Object.fromEntries((users || []).map((u) => [u.user_id, u]));
@@ -135,7 +134,7 @@ async function refreshAll() {
       ...p,
       email:  userMap[p.user_id]?.email  || "(unknown)",
       mobile: userMap[p.user_id]?.mobile || "",
-      name:   userMap[p.user_id]?.full_name || "",
+      name:   "",
       tier:   userMap[p.user_id]?.user_tier || "",
       lastAttempt: lastByUser[p.user_id] || null,
     }));
