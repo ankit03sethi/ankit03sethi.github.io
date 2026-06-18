@@ -121,7 +121,15 @@
       });
       if (!resp.ok) {
         msg.style.color = "#b91c1c";
-        msg.textContent = "Failed to generate installer. Please retry.";
+        if (resp.status === 403) {
+          const reason = (await resp.text()).trim();
+          msg.textContent = reason || "Your extension is blocked. Please contact support at contact@cursive.world.";
+        } else if (resp.status === 401) {
+          msg.textContent = "Session expired. Please sign in again at /pdtracker/.";
+          setTimeout(() => { window.location.href = "/pdtracker/"; }, 2000);
+        } else {
+          msg.textContent = "Failed to generate installer. Please retry, or WhatsApp +91 96257 37475.";
+        }
         return;
       }
       const blob = await resp.blob();
