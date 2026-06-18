@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>PD Tracker Install Passwords &middot; cursive admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="passwords.css?v=2026061701" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/pdtracker/passwords/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">PD Tracker passwords &middot; admin only</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
+  </div>
+</header>
+
+<main id="loginView" class="auth-wrap hidden">
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Admin sign in</h1>
+    <p class="lede">This page is restricted to admin accounts.</p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+    <p id="loginError" class="error hidden"></p>
+  </form>
+</main>
+
+<main id="denyView" class="auth-wrap hidden">
+  <div class="auth-card">
+    <h1>Not authorised</h1>
+    <p class="lede">Your account does not have admin access.</p>
+    <button id="denySignOut" class="btn-primary" type="button">Sign out</button>
+  </div>
+</main>
+
+<main id="dashView" class="dash hidden">
+
+  <div class="toolbar">
+    <input id="searchBox" class="search-box" type="search" placeholder="Search by email or mobile..." autocomplete="off" />
+    <button id="refreshBtn" class="btn-refresh" type="button">Refresh</button>
+    <span class="last-refreshed" id="lastRefreshed"></span>
+  </div>
+
+  <div class="info-strip">
+    <span>Passwords rotate <b>every 1 hour</b> automatically.</span>
+    <span class="dot">&middot;</span>
+    <span>Auto-refresh every 30 seconds.</span>
+    <span class="dot">&middot;</span>
+    <span id="customerCount">0 customers</span>
+  </div>
+
+  <div class="panel">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Email</th>
+            <th>Mobile</th>
+            <th>Current password</th>
+            <th>Rotates in</th>
+            <th>Last attempt</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rowsBody"></tbody>
+      </table>
+    </div>
+    <div id="emptyState" class="empty-state hidden">No customers found.</div>
+  </div>
+
+  <details class="attempts">
+    <summary>Recent install attempts (last 50)</summary>
+    <div class="attempts-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Customer</th>
+            <th>Result</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody id="attemptsBody"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <p class="footer-note">
+    Wrong-password attempts are throttled to 5/minute per customer. Block any customer instantly via the toggle.
+  </p>
+</main>
+
+<script type="module" src="passwords.js?v=2026061701"></script>
+</body>
+</html>
