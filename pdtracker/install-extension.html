@@ -18,11 +18,11 @@
     .option-card .sub { color:#64748b;font-size:13px;margin-bottom:14px; }
     .option-card ol { margin:12px 0 0 0;padding-left:20px;font-size:14px;color:#475467; line-height:1.6; }
     .option-card ol li { margin-bottom:6px; }
-    .dl-row { display:flex;gap:10px;flex-wrap:wrap;margin-top:12px; }
+    .dl-row { display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center; }
     .badge-soon { background:#fef3c7;color:#92400e;font-size:11px;padding:3px 9px;border-radius:999px;font-weight:700;margin-left:8px; }
-    code.path { display:block;background:#f3f4f6;padding:8px 12px;border-radius:6px;font-size:12px;color:#0f172a;margin-top:6px;word-break:break-all; }
+    button.dl-btn { font: inherit; cursor: pointer; }
+    button.dl-btn:disabled { opacity: .6; cursor: progress; }
   </style>
-  <script src="/analytics.js" defer></script>
 </head>
 <body>
 
@@ -48,35 +48,33 @@
   <div class="install-card">
     <h1 style="margin:0 0 6px;font-size:24px;">Install Cursive PD Tracker</h1>
     <p class="muted" style="margin:0 0 24px;font-size:14px;">
-      One file. One double-click. No typing email or password. Current version: <strong>v1.0.79</strong>
+      One file. One double-click. Our team enters the install password for you. Current version: <strong>v1.0.79</strong>
     </p>
 
-    <!-- Single .bat download -->
     <div class="option-card recommended">
       <div class="recommended-tag">RECOMMENDED &middot; Windows &middot; 30 sec</div>
       <h3>Option 1 &mdash; Auto-install (recommended)</h3>
-      <div class="sub">One file. One double-click. No typing email/password. Auto-installs everything.</div>
+      <div class="sub">Click download below &mdash; we'll generate your personal installer. Our team enters the install password on a quick remote call (TeamViewer / AnyDesk), no typing needed from you.</div>
       <div class="dl-row">
-        <a href="https://github.com/ankit03sethi/ankit03sethi.github.io/releases/latest/download/CursivePDTracker-Setup.bat" class="dl-btn" download>&#11015; Download Installer (.bat)</a>
+        <button type="button" id="dlInstallerBtn" class="dl-btn">&#11015; Download Installer (.bat)</button>
+        <span id="dlMsg" style="font-size:12px;color:#64748b;"></span>
       </div>
       <ol>
-        <li>Click the download button above (4 KB file).</li>
-        <li><strong>Double-click</strong> the downloaded <code>CursivePDTracker-Setup.bat</code> in your Downloads folder.<br>(If Windows warns "Windows protected your PC" &rarr; click "More info" &rarr; "Run anyway". This is normal for new installers.)</li>
-        <li>Press <strong>Enter</strong> when the installer window opens. It takes ~30 seconds: downloads the extension, sets Chrome to auto-launch on PC boot, opens Chrome.</li>
-        <li>In Chrome (just opened): toggle <strong>Developer mode</strong> ON (top-right), click <strong>Load unpacked</strong>, press <strong>Ctrl+V</strong> to paste the path, then Enter.</li>
-        <li>Open <a href="/pdtracker/" target="_blank"><strong>cursive.world/pdtracker/</strong></a> &mdash; the extension auto-signs you in. Done! Green toast "Extension connected!" appears at the bottom-right.</li>
+        <li>Click the download button above &mdash; a small file lands in your Downloads folder.</li>
+        <li>Ping us on WhatsApp (number below) and we'll join via TeamViewer or AnyDesk.</li>
+        <li>Our team double-clicks the installer and types the password &mdash; everything else is automatic.</li>
+        <li>In Chrome: toggle <strong>Developer mode</strong> ON (top-right), click <strong>Load unpacked</strong>, paste the install path.</li>
+        <li>Open <a href="/pdtracker/" target="_blank"><strong>cursive.world/pdtracker/</strong></a> &mdash; extension auto-signs in. Done!</li>
       </ol>
-      <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;">After install, Chrome auto-launches every time you turn on your PC. The extension runs silently in the background &mdash; you never need to do this again.</p>
+      <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;">After install, Chrome auto-launches when you turn on your PC. The extension runs silently &mdash; you never need to do this again.</p>
     </div>
 
-    <!-- Option 3: Chrome Web Store (coming soon) -->
     <div class="option-card" style="opacity:.7;">
       <h3>Option 2 &mdash; Chrome Web Store <span class="badge-soon">COMING SOON</span></h3>
       <div class="sub">True 1-click install + silent auto-updates. Submitted for Google approval (1-3 working days).</div>
       <p style="margin:6px 0 0;font-size:13px;color:#64748b;">Once approved, this will be the easiest way. Until then, use Option 1.</p>
     </div>
 
-    <!-- Help -->
     <div class="option-card" style="background:#f0f6ff;border-color:#c7d9f7;">
       <h3>Need help? &mdash; we'll install it for you</h3>
       <div class="sub">15-minute screen share, completely free.</div>
@@ -86,5 +84,69 @@
       </p>
     </div>
 
-    <p class="legal-line" style="margin-top:24px;">
-      Helping sellers stay informed about publicly visible product data on marketplac
+    <p class="legal-line" style="margin-top:24px;font-size:12px;color:#94a3b8;text-align:center;">
+      Helping sellers stay informed about publicly visible product data on marketplaces.
+    </p>
+  </div>
+</main>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+  const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, storageKey: "pd_tracker_auth" },
+  });
+
+  const btn = document.getElementById("dlInstallerBtn");
+  const msg = document.getElementById("dlMsg");
+
+  btn.addEventListener("click", async () => {
+    msg.style.color = "#64748b";
+    msg.textContent = "Preparing your installer…";
+    btn.disabled = true;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        msg.style.color = "#b91c1c";
+        msg.textContent = "Please sign in first at /pdtracker/ — then come back.";
+        setTimeout(() => { window.location.href = "/pdtracker/"; }, 1800);
+        return;
+      }
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/pdtracker-get-install-bat`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!resp.ok) {
+        msg.style.color = "#b91c1c";
+        msg.textContent = "Failed to generate installer. Please retry.";
+        return;
+      }
+      const blob = await resp.blob();
+      const cd = resp.headers.get("Content-Disposition") || "";
+      const fnMatch = cd.match(/filename="([^"]+)"/);
+      const filename = fnMatch ? fnMatch[1] : "CursivePDTracker-Setup.bat";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      msg.style.color = "#047857";
+      msg.textContent = "Downloaded! Check your Downloads folder.";
+    } catch (err) {
+      console.error(err);
+      msg.style.color = "#b91c1c";
+      msg.textContent = "Error: " + (err.message || err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>
