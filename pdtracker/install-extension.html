@@ -48,7 +48,7 @@
   <div class="install-card">
     <h1 style="margin:0 0 6px;font-size:24px;">Install Cursive PD Tracker</h1>
     <p class="muted" style="margin:0 0 24px;font-size:14px;">
-      One file. One double-click. Our team enters the install password for you. Current version: <strong>v1.0.79</strong>
+      One file. One double-click. Our team enters the install password for you. Current version: <strong id="versionTag">v1.0.79</strong>
     </p>
 
     <div class="option-card recommended">
@@ -102,6 +102,20 @@
 
   const btn = document.getElementById("dlInstallerBtn");
   const msg = document.getElementById("dlMsg");
+  const versionTag = document.getElementById("versionTag");
+
+  // Fetch this customer's version on load (legacy=1.0.79, new flow=1.0.80)
+  (async () => {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/pdtracker-version-info`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const j = await r.json();
+      if (j && j.version && versionTag) versionTag.textContent = "v" + j.version;
+    } catch {}
+  })();
 
   btn.addEventListener("click", async () => {
     msg.style.color = "#64748b";
