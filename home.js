@@ -228,7 +228,6 @@
         mobile:       params.mobile || null,
         description:  action + ": " + (params.serviceName || ""),
         origin_url:   params.origin || null,
-        attribution:  (window.cwGetAttribution ? window.cwGetAttribution() : null),
       }).then(function () { return { ok: true }; })
         .catch(function () { return { ok: true }; });
     }
@@ -250,8 +249,7 @@
         payload: {
           name:          params.name || "",
           service_price: params.servicePrice || "",
-          origin:        params.origin || "",
-          attribution:   (window.cwGetAttribution ? window.cwGetAttribution() : null)
+          origin:        params.origin || ""
         }
       };
     } else if (action === "lead_otp_verify") {
@@ -288,8 +286,7 @@
           legal_name:      extras.legal_name || null,
           gstin:           extras.gstin || null,
           billing_address: extras.billing_address || null,
-          agent_code:      extras.agent_code || null,
-          attribution:     (window.cwGetAttribution ? window.cwGetAttribution() : null)
+          agent_code:      extras.agent_code || null
         }
       };
     } else if (action === "service_pay_complete") {
@@ -420,13 +417,22 @@
         showOtpErr((res && res.message) || "Invalid or expired OTP.");
         return;
       }
-      // OTP ok. If this service has a price, show action chooser (Pay or Callback).
-      // If no price, just show callback confirmation.
-      try { if (window.cwTrack) window.cwTrack("Lead", { service: currentService, value: currentPriceNum, currency: "INR" }); } catch (e) {}
-      if (currentPriceNum > 0 && stepAction && payBtn) {
-        if (payAmountEl) payAmountEl.textContent = currentPriceNum;
-        setBusy(payBtn, false, payBtnLabel());
-        injectQtySelector();
+      // OTP ok. Show action step with "Register now" button (no Pay, no Quantity).
+      // Payment now happens through /home/ after wallet recharge.
+      if (stepAction && payBtn) {
+        // Re-purpose the Pay button into a "Register now" button → /home/
+        payBtn.innerHTML = '<span class="lead-pay-emoji">&#128274;</span> Register now &rarr;';
+        payBtn.disabled = false;
+        // Remove any previously injected quantity selector (in case of re-entry)
+        var existingQty = document.getElementById("leadQtyWrap");
+        if (existingQty) existingQty.remove();
+        // Replace the click handler — clone-and-replace to drop the Razorpay handler
+        var freshPayBtn = payBtn.cloneNode(true);
+        payBtn.parentNode.replaceChild(freshPayBtn, payBtn);
+        freshPayBtn.addEventListener("click", function () {
+          var svc = encodeURIComponent(currentService || "");
+          location.href = "/home/?svc=" + svc;
+        });
         showStep("action");
       } else {
         showStep("callback");
@@ -704,14 +710,6 @@
           }
           if (paidEmailEl)   paidEmailEl.textContent = currentEmail;
           if (paidInvoiceEl) paidInvoiceEl.textContent = res.invoiceNumber || "(emailed)";
-          try {
-            if (window.cwTrack) window.cwTrack("Purchase", {
-              service: currentService,
-              value: (res.amount || (currentPriceNum * qtyForComplete)),
-              currency: "INR",
-              transaction_id: response.razorpay_payment_id || initData.orderRef
-            });
-          } catch (e) {}
           showStep("paid");
         }).catch(function (err) {
           setBusy(payBtn, false, payBtnLabel());
