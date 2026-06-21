@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Home &middot; Cursive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <style>
+    .home-wrap { max-width: 1280px; margin: 28px auto; padding: 0 18px; }
+    .home-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: flex-start; }
+    @media (max-width: 920px) { .home-grid { grid-template-columns: 1fr; } }
+    .panel { background: #fff; border: 1px solid #eaecf0; border-radius: 14px; padding: 18px; }
+    .panel h2 { margin: 0 0 14px; font-size: 17px; color: #0f172a; }
+    .wallet-frame { width: 100%; height: 760px; border: 0; border-radius: 12px; background: #fff; }
+    .svc-card { display: flex; gap: 14px; align-items: center; padding: 16px; border: 1.5px solid #e5e7eb; border-radius: 12px; text-decoration: none; color: #0f172a; transition: all .12s; margin-bottom: 12px; cursor: pointer; background: #fff; }
+    .svc-card:hover { border-color: #1f6feb; box-shadow: 0 4px 18px rgba(31,111,235,.12); transform: translateY(-1px); }
+    .svc-icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; font-size: 26px; color: #fff; flex-shrink: 0; }
+    .svc-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+    .svc-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .svc-cta { margin-left: auto; color: #1f6feb; font-weight: 700; font-size: 13px; }
+    .signout-btn { width: 100%; padding: 12px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 10px; font-weight: 700; cursor: pointer; margin-top: 14px; }
+    .signout-btn:hover { background: #fee2e2; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <span id="emailChip" class="email-chip hidden"></span>
+  </div>
+</header>
+
+<!-- LOGIN VIEW (when not signed in) -->
+<main id="loginView" class="auth-wrap hidden">
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Sign in</h1>
+    <p class="lede">Welcome back to Cursive — sign in to your account.</p>
+    <p id="welcomeMsg" class="success hidden"></p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" id="loginBtn" class="btn-primary">Sign in &rarr;</button>
+    <p id="loginError" class="error hidden"></p>
+    <div class="auth-foot">
+      New here? <a href="/pdtracker/signup.html"><b>Create a free account &rarr;</b></a>
+    </div>
+    <ul style="list-style:none;padding:0;margin:14px 0 0;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:12px;color:#475467;">
+      <li><span style="color:#16a34a;font-weight:700;">&#10003;</span> No credit card required</li>
+      <li><span style="color:#16a34a;font-weight:700;">&#10003;</span> Unified wallet across all Cursive services</li>
+      <li><span style="color:#16a34a;font-weight:700;">&#10003;</span> Add Pro tools any time</li>
+    </ul>
+    <p class="legal-line" style="margin-top:14px;font-size:11px;color:#94a3b8;text-align:center;">
+      A part of <b>cursive&reg;</b> &middot; India&rsquo;s seller toolkit
+    </p>
+    <p class="auth-foot" style="margin-top:8px;">
+      <a href="/pdtracker/reset-password.html" style="font-size:12px;color:#64748b;">Forgot password?</a>
+    </p>
+  </form>
+</main>
+
+<!-- HOME VIEW (after sign in) -->
+<main id="homeView" class="home-wrap hidden">
+  <div class="home-grid">
+
+    <!-- LEFT: Wallet (iframe of /pdtracker/wallet.html) -->
+    <div>
+      <div class="panel">
+        <h2 style="display:flex;align-items:center;justify-content:space-between;">
+          <span>&#128176; Your Wallet</span>
+          <a href="/pdtracker/wallet.html" target="_blank" style="font-size:12px;font-weight:600;color:#1f6feb;text-decoration:none;">Open in full page &rarr;</a>
+        </h2>
+        <iframe id="walletFrame" class="wallet-frame" src="/pdtracker/wallet.html"></iframe>
+      </div>
+    </div>
+
+    <!-- RIGHT: Services + Sign out -->
+    <div>
+      <div class="panel">
+        <h2>Your services</h2>
+
+        <a class="svc-card" href="/pdtracker/">
+          <div class="svc-icon" style="background:#1f6feb;">&#128202;</div>
+          <div style="flex:1;">
+            <div class="svc-name">PD Tracker</div>
+            <div class="svc-desc">Marketplace product tracking &middot; Health score &middot; Reports</div>
+          </div>
+          <div class="svc-cta">Open &rarr;</div>
+        </a>
+
+        <a class="svc-card" href="/business-launcher/">
+          <div class="svc-icon" style="background:#16a34a;">&#128640;</div>
+          <div style="flex:1;">
+            <div class="svc-name">Business Launcher</div>
+            <div class="svc-desc">Bundle to launch your seller business</div>
+          </div>
+          <div class="svc-cta">Open &rarr;</div>
+        </a>
+
+        <a class="svc-card" href="/creators/">
+          <div class="svc-icon" style="background:#a855f7;">&#127908;</div>
+          <div style="flex:1;">
+            <div class="svc-name">Creators Marketplace</div>
+            <div class="svc-desc">Hire YouTubers &amp; influencers</div>
+          </div>
+          <div class="svc-cta">Open &rarr;</div>
+        </a>
+
+        <button id="signOutBtn" class="signout-btn" type="button">Sign out</button>
+      </div>
+
+      <p style="margin-top:14px;color:#94a3b8;font-size:11px;text-align:center;">
+        A part of <b>cursive&reg;</b> &middot; India&rsquo;s seller toolkit
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const $ = (s) => document.querySelector(s);
+const show = (el) => el.classList.remove("hidden");
+const hide = (el) => el.classList.add("hidden");
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    showHome(session);
+  } else {
+    showLogin();
+  }
+}
+
+function showLogin() {
+  hide($("#homeView"));
+  show($("#loginView"));
+  hide($("#emailChip"));
+}
+
+function showHome(session) {
+  hide($("#loginView"));
+  show($("#homeView"));
+  $("#emailChip").textContent = session.user.email;
+  show($("#emailChip"));
+}
+
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hide($("#loginError"));
+  const email = $("#email").value.trim();
+  const pwd = $("#password").value;
+  $("#loginBtn").disabled = true;
+  $("#loginBtn").textContent = "Signing in...";
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+  $("#loginBtn").disabled = false;
+  $("#loginBtn").textContent = "Sign in →";
+  if (error) {
+    $("#loginError").textContent = error.message;
+    show($("#loginError"));
+    return;
+  }
+  showHome(data.session);
+});
+
+$("#signOutBtn")?.addEventListener("click", async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
+
+init();
+</script>
+
+</body>
+</html>
