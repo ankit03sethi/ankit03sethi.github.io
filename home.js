@@ -421,11 +421,39 @@
         showOtpErr((res && res.message) || "Invalid or expired OTP.");
         return;
       }
-      // OTP ok. Knowledge-mode action step: hide Pay button + Qty, only Call/WhatsApp/Callback.
+      // OTP ok. Knowledge-mode action step:
+      //   - hide native Pay button + Qty selector
+      //   - inject "Register now to pay" button (redirects to /home/ login)
+      //   - keep Request callback / Call now / WhatsApp untouched
       if (stepAction) {
         if (payBtn) payBtn.style.display = "none";
         var existingQty = document.getElementById("leadQtyWrap");
         if (existingQty) existingQty.remove();
+
+        // Inject Register-now-to-pay button just below "Verified! What next?"
+        // (only once per modal session)
+        if (!document.getElementById("leadRegisterBtn")) {
+          var regBtn = document.createElement("button");
+          regBtn.type = "button";
+          regBtn.id = "leadRegisterBtn";
+          regBtn.className = "btn btn-primary lead-submit lead-pay-btn";
+          regBtn.innerHTML = '<span class="lead-pay-emoji">&#128274;</span> Register now to pay';
+          regBtn.addEventListener("click", function () {
+            // Send to login/signup hub. Pass return path so user lands back
+            // on the same service knowledge page after sign-in.
+            var ret = encodeURIComponent(window.location.pathname);
+            window.location.href = "/home/?return=" + ret;
+          });
+          // Insert as the FIRST action in the stacked-actions block so it sits
+          // directly under the "Verified! What next?" header, above Callback.
+          var actionsWrap = stepAction.querySelector(".lead-actions-stacked");
+          if (actionsWrap) {
+            actionsWrap.insertBefore(regBtn, actionsWrap.firstChild);
+          } else {
+            stepAction.appendChild(regBtn);
+          }
+        }
+
         showStep("action");
       } else {
         showStep("callback");
