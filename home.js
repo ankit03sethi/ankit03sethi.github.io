@@ -47,48 +47,53 @@
     var sess = readCursiveSession();
     if (!sess) return; // not logged in -> leave Login button alone
 
-    // Find every "Login" anchor / button on the page and replace it with
-    // a Home + Logout pair sized & styled the same way.
+    // Robust detection: match by trailing "login" or "sign in" in textContent.
+    // Handles 🔒 Login, Sign in, plain Login, etc.
     var nodes = document.querySelectorAll("a, button");
     var loginNodes = [];
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       var txt = (n.textContent || "").trim().toLowerCase();
-      if (txt === "login" || txt === "🔒 login" || txt === "🔒 login" || txt.indexOf("login") === 0 && txt.length < 12) {
+      if (txt.length === 0 || txt.length > 20) continue;
+      if (/(^|\s)log\s*in\s*$/.test(txt) || /(^|\s)sign\s*in\s*$/.test(txt)) {
         loginNodes.push(n);
       }
     }
 
+    if (loginNodes.length === 0) return;
+
+    // Build our own buttons with explicit inline styles (don't inherit the
+    // original className — its CSS gradient/color was eating our Logout text).
+    var BTN_BASE = "display:inline-block;padding:10px 18px;border-radius:10px;" +
+                   "font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;" +
+                   "font-family:inherit;line-height:1.2;vertical-align:middle;";
+    var BTN_PRIMARY = BTN_BASE + "background:#1f6feb;color:#fff;border:1px solid #1f6feb;";
+    var BTN_GHOST   = BTN_BASE + "background:#fff;color:#1f6feb;border:1px solid #1f6feb;";
+
     loginNodes.forEach(function (loginEl) {
-      // Container we'll replace into
       var parent = loginEl.parentNode;
       if (!parent) return;
 
-      var className = loginEl.className || "";
+      var wrap = document.createElement("span");
+      wrap.style.cssText = "display:inline-flex;gap:8px;align-items:center;";
 
-      // Home button (primary blue, same style as login)
       var homeBtn = document.createElement("a");
       homeBtn.href = "/home/";
-      homeBtn.className = className;
-      homeBtn.style.marginRight = "8px";
       homeBtn.textContent = "Home";
+      homeBtn.setAttribute("style", BTN_PRIMARY);
 
-      // Logout button (ghost-ish — neutral style)
       var outBtn = document.createElement("button");
       outBtn.type = "button";
-      outBtn.className = className;
-      outBtn.style.background = "#fff";
-      outBtn.style.color = "#1f6feb";
-      outBtn.style.border = "1px solid #1f6feb";
       outBtn.textContent = "Logout";
+      outBtn.setAttribute("style", BTN_GHOST);
       outBtn.addEventListener("click", function (e) {
         e.preventDefault();
         signOutAndGoHome();
       });
 
-      parent.insertBefore(homeBtn, loginEl);
-      parent.insertBefore(outBtn, loginEl);
-      parent.removeChild(loginEl);
+      wrap.appendChild(homeBtn);
+      wrap.appendChild(outBtn);
+      parent.replaceChild(wrap, loginEl);
     });
   }
 
