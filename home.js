@@ -152,27 +152,13 @@
     if (payBtn) setBusy(payBtn, false, payBtnLabel());
     if (callbackBtn) setBusy(callbackBtn, false, "Request callback instead");
 
-    // Knowledge-page mode: skip OTP entirely. Show only Call / WhatsApp / Callback.
-    // The Pay button is hidden because payment now happens via /home/ wallet.
-    if (payBtn) payBtn.style.display = "none";
-    var oldQty = document.getElementById("leadQtyWrap");
-    if (oldQty) oldQty.remove();
+    // Knowledge-page mode: keep OTP (collects mobile + email), then show only Call / WhatsApp / Callback.
+    // Remove any inline mini-form (we already get the number from OTP)
+    var oldKp = document.getElementById("leadKpForm"); if (oldKp) oldKp.remove();
 
-    // Inject a minimal name+mobile mini-form inside stepAction (once)
-    if (stepAction && !document.getElementById("leadKpForm")) {
-      var miniForm = document.createElement("div");
-      miniForm.id = "leadKpForm";
-      miniForm.style.cssText = "margin:10px 0 14px;padding:14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;text-align:left;";
-      miniForm.innerHTML =
-        '<div style="font-weight:600;color:#0f172a;margin-bottom:8px;font-size:13px;">For callback / WhatsApp</div>' +
-        '<input id="leadKpName" type="text" placeholder="Your name" style="width:100%;padding:9px 11px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;" />' +
-        '<input id="leadKpMobile" type="tel" placeholder="Mobile number" style="width:100%;padding:9px 11px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;box-sizing:border-box;" />';
-      stepAction.insertBefore(miniForm, stepAction.querySelector(".lead-actions") || stepAction.firstChild.nextSibling);
-    }
-
-    showStep("action");
+    showStep("contact");
     overlay.classList.remove("hidden");
-    setTimeout(function () { var nm = document.getElementById("leadKpName"); if (nm) nm.focus(); }, 50);
+    setTimeout(function () { mobileEl.focus(); }, 50);
   }
   function payBtnLabel() {
     return "🔒 Pay ₹" + (currentPriceNum || "") + "/- now";
@@ -435,22 +421,11 @@
         showOtpErr((res && res.message) || "Invalid or expired OTP.");
         return;
       }
-      // OTP ok. Show action step with "Register now" button (no Pay, no Quantity).
-      // Payment now happens through /home/ after wallet recharge.
-      if (stepAction && payBtn) {
-        // Re-purpose the Pay button into a "Register now" button → /home/
-        payBtn.innerHTML = '<span class="lead-pay-emoji">&#128274;</span> Register now &rarr;';
-        payBtn.disabled = false;
-        // Remove any previously injected quantity selector (in case of re-entry)
+      // OTP ok. Knowledge-mode action step: hide Pay button + Qty, only Call/WhatsApp/Callback.
+      if (stepAction) {
+        if (payBtn) payBtn.style.display = "none";
         var existingQty = document.getElementById("leadQtyWrap");
         if (existingQty) existingQty.remove();
-        // Replace the click handler — clone-and-replace to drop the Razorpay handler
-        var freshPayBtn = payBtn.cloneNode(true);
-        payBtn.parentNode.replaceChild(freshPayBtn, payBtn);
-        freshPayBtn.addEventListener("click", function () {
-          var svc = encodeURIComponent(currentService || "");
-          location.href = "/home/?svc=" + svc;
-        });
         showStep("action");
       } else {
         showStep("callback");
@@ -492,38 +467,20 @@
     setTimeout(function () { mobileEl.focus(); }, 50);
   });
 
-  // ---- Callback button (knowledge-page mode: no OTP, mini-form Name+Mobile) ----
+  // ---- Callback button — uses email/mobile already collected via OTP ----
   if (callbackBtn) {
     callbackBtn.addEventListener("click", function () {
-      var nameEl = document.getElementById("leadKpName");
-      var mobEl  = document.getElementById("leadKpMobile");
-      var name = (nameEl && nameEl.value || "").trim();
-      var mob  = (mobEl && mobEl.value || "").trim().replace(/\D/g, "");
-      if (!name || mob.length < 10) {
-        if (mobEl) mobEl.style.borderColor = "#dc2626";
-        if (nameEl && !name) nameEl.style.borderColor = "#dc2626";
-        var hint = document.getElementById("leadKpHint");
-        if (!hint && stepAction) {
-          hint = document.createElement("p");
-          hint.id = "leadKpHint";
-          hint.style.cssText = "color:#dc2626;font-size:12px;margin:6px 0 0;";
-          hint.textContent = "Please enter your name + 10-digit mobile.";
-          var miniForm = document.getElementById("leadKpForm");
-          if (miniForm) miniForm.appendChild(hint);
-        }
-        return;
+      if (currentEmail) {
+        postAS("lead_cta", {
+          email:        currentEmail,
+          mobile:       currentMobile,
+          serviceType:  currentServiceTag,
+          serviceName:  currentService,
+          servicePrice: currentPrice,
+          channel:      "callback",
+          origin:       window.location.pathname
+        }).catch(function () { /* non-blocking */ });
       }
-      // Log the callback request
-      postAS("lead_cta", {
-        email:        "",   // not collected in knowledge mode
-        mobile:       mob,
-        name:         name,
-        serviceType:  currentServiceTag,
-        serviceName:  currentService,
-        servicePrice: currentPrice,
-        channel:      "callback",
-        origin:       window.location.pathname
-      }).catch(function () { /* non-blocking */ });
       showStep("callback");
     });
   }
