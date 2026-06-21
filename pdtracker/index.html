@@ -357,7 +357,7 @@ async function refreshDash() {
 
     const { data: products, error } = await sb
       .from("analytics_products")
-      .select("id, platform, product_id, product_url, last_checked_at, last_check_status, created_at, plan, paid_until, uploaded_at, scrape_attempts")
+      .select("id, platform, product_id, seller_code, seller_name, product_url, last_checked_at, last_check_status, created_at, plan, paid_until, uploaded_at, scrape_attempts")
       .order("created_at", { ascending: false });
     if (error) throw error;
 
@@ -589,6 +589,8 @@ function renderTable() {
     + '<th>Last updated</th>'
     + '<th>Plan / Renews</th>'
     + '<th>Link</th>'
+    + '<th>Seller Code</th>'
+    + '<th>Seller Name</th>'
     + '</tr></thead><tbody>';
   for (const p of rows) {
     html += `<tr>
@@ -601,6 +603,8 @@ function renderTable() {
       <td>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
       <td>${planPill(p)}</td>
       <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
+      <td>${esc(p.seller_code || "—")}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(p.seller_name || "")}">${esc(p.seller_name || "—")}</td>
     </tr>`;
   }
   html += "</tbody></table></div>";
