@@ -14,9 +14,36 @@
     .home-wrap { max-width: 1280px; margin: 28px auto; padding: 0 18px; }
     .home-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: flex-start; }
     @media (max-width: 920px) { .home-grid { grid-template-columns: 1fr; } }
-    .panel { background: #fff; border: 1px solid #eaecf0; border-radius: 14px; padding: 18px; }
+    .panel { background: #fff; border: 1px solid #eaecf0; border-radius: 14px; padding: 18px; margin-bottom: 16px; }
     .panel h2 { margin: 0 0 14px; font-size: 17px; color: #0f172a; }
-    .wallet-frame { width: 100%; height: 760px; border: 0; border-radius: 12px; background: #fff; }
+
+    /* Balance hero */
+    .bal-hero { background: linear-gradient(135deg, #1f6feb 0%, #1e40af 100%); color: #fff; border-radius: 14px; padding: 22px; display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+    .bal-hero .bal-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; opacity: .85; }
+    .bal-hero .bal-amount { font-size: 36px; font-weight: 800; margin-top: 4px; line-height: 1; }
+    .add-btn { background: #fff; color: #1f6feb; padding: 12px 22px; border: 0; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+    .add-btn:hover { background: #f1f5f9; }
+
+    /* Filters */
+    .filters-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .filters-row label { font-size: 12px; color: #64748b; font-weight: 600; }
+    .filters-row select { padding: 7px 10px; border: 1px solid #d0d5dd; border-radius: 8px; font-size: 13px; background: #fff; }
+
+    /* Tx table */
+    .tx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tx-table th { background: #f8fafc; padding: 8px 10px; text-align: left; font-weight: 700; color: #475467; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid #eaecf0; }
+    .tx-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .tx-empty { text-align: center; padding: 30px; color: #94a3b8; font-size: 13px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+    .pill-recharge { background: #dcfce7; color: #166534; }
+    .pill-pd { background: #dbeafe; color: #1e40af; }
+    .pill-bl { background: #fef3c7; color: #92400e; }
+    .pill-cr { background: #f3e8ff; color: #7e22ce; }
+    .pill-other { background: #f1f5f9; color: #475467; }
+    .amt-credit { color: #16a34a; font-weight: 700; }
+    .amt-debit { color: #dc2626; font-weight: 700; }
+
+    /* Service cards */
     .svc-card { display: flex; gap: 14px; align-items: center; padding: 16px; border: 1.5px solid #e5e7eb; border-radius: 12px; text-decoration: none; color: #0f172a; transition: all .12s; margin-bottom: 12px; cursor: pointer; background: #fff; }
     .svc-card:hover { border-color: #1f6feb; box-shadow: 0 4px 18px rgba(31,111,235,.12); transform: translateY(-1px); }
     .svc-icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; font-size: 26px; color: #fff; flex-shrink: 0; }
@@ -47,51 +74,73 @@
   </div>
 </header>
 
-<!-- LOGIN VIEW (when not signed in) -->
+<!-- LOGIN VIEW -->
 <main id="loginView" class="auth-wrap hidden">
-  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate onsubmit="return false;">
     <h1>Sign in</h1>
     <p class="lede">Welcome back to Cursive — sign in to your account.</p>
-    <p id="welcomeMsg" class="success hidden"></p>
     <label for="email">Email</label>
     <input id="email" name="email" type="email" required autocomplete="email" />
     <label for="password">Password</label>
     <input id="password" name="password" type="password" required autocomplete="current-password" />
-    <button type="submit" id="loginBtn" class="btn-primary">Sign in &rarr;</button>
+    <button type="button" id="loginBtn" class="btn-primary">Sign in &rarr;</button>
     <p id="loginError" class="error hidden"></p>
     <div class="auth-foot">
       New here? <a href="/pdtracker/signup.html"><b>Create a free account &rarr;</b></a>
     </div>
-    <ul style="list-style:none;padding:0;margin:14px 0 0;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:12px;color:#475467;">
-      <li><span style="color:#16a34a;font-weight:700;">&#10003;</span> No credit card required</li>
-      <li><span style="color:#16a34a;font-weight:700;">&#10003;</span> Unified wallet across all Cursive services</li>
-      <li><span style="color:#16a34a;font-weight:700;">&#10003;</span> Add Pro tools any time</li>
-    </ul>
-    <p class="legal-line" style="margin-top:14px;font-size:11px;color:#94a3b8;text-align:center;">
-      A part of <b>cursive&reg;</b> &middot; India&rsquo;s seller toolkit
-    </p>
     <p class="auth-foot" style="margin-top:8px;">
       <a href="/pdtracker/reset-password.html" style="font-size:12px;color:#64748b;">Forgot password?</a>
     </p>
   </form>
 </main>
 
-<!-- HOME VIEW (after sign in) -->
+<!-- HOME VIEW -->
 <main id="homeView" class="home-wrap hidden">
   <div class="home-grid">
 
-    <!-- LEFT: Wallet (iframe of /pdtracker/wallet.html) -->
+    <!-- LEFT COLUMN: Wallet -->
     <div>
-      <div class="panel">
-        <h2 style="display:flex;align-items:center;justify-content:space-between;">
-          <span>&#128176; Your Wallet</span>
-          <a href="/pdtracker/wallet.html" target="_blank" style="font-size:12px;font-weight:600;color:#1f6feb;text-decoration:none;">Open in full page &rarr;</a>
-        </h2>
-        <iframe id="walletFrame" class="wallet-frame" src="/pdtracker/wallet.html"></iframe>
+      <!-- Balance hero -->
+      <div class="bal-hero">
+        <div>
+          <div class="bal-label">Wallet Balance</div>
+          <div class="bal-amount" id="balAmt">₹0.00</div>
+          <div style="font-size:11px;opacity:.85;margin-top:4px;">Universal — used across all services</div>
+        </div>
+        <a id="addBalBtn" href="/pdtracker/wallet.html" class="add-btn">+ Add Balance</a>
+      </div>
+
+      <!-- Transactions -->
+      <div class="panel" style="margin-top:16px;">
+        <h2>Transactions</h2>
+        <div class="filters-row">
+          <label>Service:</label>
+          <select id="filterService">
+            <option value="">All services</option>
+            <option value="pd_tracker">PD Tracker</option>
+            <option value="business_launcher">Business Launcher</option>
+            <option value="creators">Creators</option>
+            <option value="recharge">Recharge</option>
+            <option value="referral">Referral</option>
+          </select>
+          <label>Type:</label>
+          <select id="filterType">
+            <option value="">All types</option>
+            <option value="credit">Credit (money in)</option>
+            <option value="debit">Debit (money out)</option>
+          </select>
+          <span id="txCount" style="font-size:12px;color:#64748b;margin-left:auto;"></span>
+        </div>
+        <div id="txWrap">
+          <div class="tx-empty">Loading transactions…</div>
+        </div>
+        <div style="text-align:center;margin-top:14px;">
+          <a href="/pdtracker/wallet.html" style="font-size:12px;color:#1f6feb;font-weight:700;">Open full wallet page &rarr;</a>
+        </div>
       </div>
     </div>
 
-    <!-- RIGHT: Services + Sign out -->
+    <!-- RIGHT COLUMN: Services -->
     <div>
       <div class="panel">
         <h2>Your services</h2>
@@ -100,7 +149,7 @@
           <div class="svc-icon" style="background:#1f6feb;">&#128202;</div>
           <div style="flex:1;">
             <div class="svc-name">PD Tracker</div>
-            <div class="svc-desc">Marketplace product tracking &middot; Health score &middot; Reports</div>
+            <div class="svc-desc">Marketplace tracking · Health score · Reports</div>
           </div>
           <div class="svc-cta">Open &rarr;</div>
         </a>
@@ -144,34 +193,99 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSessio
 const $ = (s) => document.querySelector(s);
 const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (paise) => "₹" + (Math.abs(paise) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+const SERVICE_LABEL = { pd_tracker: ["PD Tracker", "pill-pd"], business_launcher: ["Business Launcher", "pill-bl"], creators: ["Creators", "pill-cr"], recharge: ["Recharge", "pill-recharge"], referral: ["Referral", "pill-recharge"] };
+const TYPE_LABEL = {
+  credit_recharge: "Recharge", debit_upload: "Upload", debit_renewal: "Renewal",
+  refund: "Refund", manual_adjust: "Adjusted", credit_referral: "Referral commission",
+};
+
+let _CACHED_TX = [];
 
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    showHome(session);
+    await showHome(session);
   } else {
     showLogin();
   }
 }
 
 function showLogin() {
-  hide($("#homeView"));
-  show($("#loginView"));
+  hide($("#homeView")); show($("#loginView"));
   hide($("#emailChip"));
 }
 
-function showHome(session) {
-  hide($("#loginView"));
-  show($("#homeView"));
+async function showHome(session) {
+  hide($("#loginView")); show($("#homeView"));
   $("#emailChip").textContent = session.user.email;
   show($("#emailChip"));
+  await loadWallet(session);
 }
 
-$("#loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+async function loadWallet(session) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=200`, {
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      $("#balAmt").textContent = "—";
+      $("#txWrap").innerHTML = `<div class="tx-empty">Could not load: ${esc(j.error || "")}</div>`;
+      return;
+    }
+    $("#balAmt").textContent = "₹" + j.balance_rupees;
+    _CACHED_TX = j.transactions || [];
+    renderTx();
+  } catch (e) {
+    $("#txWrap").innerHTML = `<div class="tx-empty">Network error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderTx() {
+  const svcFilter = $("#filterService").value;
+  const typeFilter = $("#filterType").value;
+  let rows = _CACHED_TX.slice();
+  if (svcFilter) rows = rows.filter(t => (t.service_tag || "pd_tracker") === svcFilter);
+  if (typeFilter === "credit") rows = rows.filter(t => (t.type || "").startsWith("credit") || t.type === "refund");
+  if (typeFilter === "debit") rows = rows.filter(t => (t.type || "").startsWith("debit"));
+
+  $("#txCount").textContent = rows.length + " transaction" + (rows.length === 1 ? "" : "s");
+
+  if (rows.length === 0) {
+    $("#txWrap").innerHTML = `<div class="tx-empty">No transactions match the filter.</div>`;
+    return;
+  }
+  let html = `<table class="tx-table"><thead><tr><th>Date</th><th>Service</th><th>Description</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Balance</th></tr></thead><tbody>`;
+  for (const t of rows) {
+    const svc = t.service_tag || "pd_tracker";
+    const [svcName, svcClass] = SERVICE_LABEL[svc] || ["Other", "pill-other"];
+    const type = t.type || "";
+    const isCredit = type.startsWith("credit") || type === "refund";
+    html += `<tr>
+      <td><div style="font-weight:600;color:#0f172a;">${fmtDate(t.created_at)}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">${esc(TYPE_LABEL[type] || type)}</div></td>
+      <td><span class="pill ${svcClass}">${esc(svcName)}</span></td>
+      <td>${esc(t.description || "")}${t.reference ? `<br><small style="color:#94a3b8;">${esc(t.reference)}</small>` : ""}</td>
+      <td style="text-align:right;" class="${isCredit ? "amt-credit" : "amt-debit"}">${isCredit ? "+" : "-"}${fmt(t.amount_paise)}</td>
+      <td style="text-align:right;color:#475467;font-weight:600;">${fmt(t.balance_after_paise)}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  $("#txWrap").innerHTML = html;
+}
+
+$("#filterService").addEventListener("change", renderTx);
+$("#filterType").addEventListener("change", renderTx);
+
+// LOGIN — button click handler (no form submit so no accidental navigation)
+async function doLogin() {
   hide($("#loginError"));
   const email = $("#email").value.trim();
   const pwd = $("#password").value;
+  if (!email || !pwd) { $("#loginError").textContent = "Email + password required"; show($("#loginError")); return; }
   $("#loginBtn").disabled = true;
   $("#loginBtn").textContent = "Signing in...";
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
@@ -182,8 +296,11 @@ $("#loginForm").addEventListener("submit", async (e) => {
     show($("#loginError"));
     return;
   }
-  showHome(data.session);
-});
+  await showHome(data.session);
+}
+$("#loginBtn").addEventListener("click", doLogin);
+$("#password").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
+$("#email").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
 
 $("#signOutBtn")?.addEventListener("click", async () => {
   await sb.auth.signOut();
