@@ -7,7 +7,98 @@
  *   4. Show action chooser: Pay (Razorpay) OR Request callback
  *   5a. Pay -> service_pay_initiate -> Razorpay -> service_pay_complete
  *   5b. Callback -> done (lead already in sheet via OTP verify)
+ *
+ * If user is already signed in (Supabase session in localStorage):
+ *   - Topbar swaps "Login" for "Home" + "Logout"
+ *   - Lead modal skips Mobile/Email/OTP and opens directly on action step
  */
+
+// ---- Session helper + topbar nav swap (runs on EVERY page that loads home.js) ----
+(function () {
+  "use strict";
+
+  // Read Supabase session straight from localStorage (no supabase-js needed here).
+  // The /home/, /pdtracker/, etc. pages persist auth under storageKey "pd_tracker_auth".
+  function readCursiveSession() {
+    try {
+      var raw = localStorage.getItem("pd_tracker_auth");
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      // supabase-js stores as { currentSession: {...} } in older versions OR direct object in newer.
+      var s = (obj && obj.currentSession) ? obj.currentSession : obj;
+      if (!s || !s.access_token) return null;
+      // Check token not expired
+      if (s.expires_at && s.expires_at * 1000 < Date.now()) return null;
+      var email = (s.user && s.user.email) || s.email || "";
+      var mobile = (s.user && s.user.user_metadata && (s.user.user_metadata.phone || s.user.user_metadata.mobile)) || "";
+      return { access_token: s.access_token, email: email, mobile: mobile };
+    } catch (e) { return null; }
+  }
+  // Expose for the main IIFE below
+  window.__cursiveSession = readCursiveSession;
+
+  function signOutAndGoHome() {
+    try { localStorage.removeItem("pd_tracker_auth"); } catch (e) {}
+    window.location.href = "/";
+  }
+  window.__cursiveSignOut = signOutAndGoHome;
+
+  function swapTopbarNav() {
+    var sess = readCursiveSession();
+    if (!sess) return; // not logged in -> leave Login button alone
+
+    // Find every "Login" anchor / button on the page and replace it with
+    // a Home + Logout pair sized & styled the same way.
+    var nodes = document.querySelectorAll("a, button");
+    var loginNodes = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var txt = (n.textContent || "").trim().toLowerCase();
+      if (txt === "login" || txt === "🔒 login" || txt === "🔒 login" || txt.indexOf("login") === 0 && txt.length < 12) {
+        loginNodes.push(n);
+      }
+    }
+
+    loginNodes.forEach(function (loginEl) {
+      // Container we'll replace into
+      var parent = loginEl.parentNode;
+      if (!parent) return;
+
+      var className = loginEl.className || "";
+
+      // Home button (primary blue, same style as login)
+      var homeBtn = document.createElement("a");
+      homeBtn.href = "/home/";
+      homeBtn.className = className;
+      homeBtn.style.marginRight = "8px";
+      homeBtn.textContent = "Home";
+
+      // Logout button (ghost-ish — neutral style)
+      var outBtn = document.createElement("button");
+      outBtn.type = "button";
+      outBtn.className = className;
+      outBtn.style.background = "#fff";
+      outBtn.style.color = "#1f6feb";
+      outBtn.style.border = "1px solid #1f6feb";
+      outBtn.textContent = "Logout";
+      outBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        signOutAndGoHome();
+      });
+
+      parent.insertBefore(homeBtn, loginEl);
+      parent.insertBefore(outBtn, loginEl);
+      parent.removeChild(loginEl);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", swapTopbarNav);
+  } else {
+    swapTopbarNav();
+  }
+})();
+
 (function () {
   "use strict";
 
@@ -156,6 +247,30 @@
     // Remove any inline mini-form (we already get the number from OTP)
     var oldKp = document.getElementById("leadKpForm"); if (oldKp) oldKp.remove();
 
+    // Remove any previously-injected "Register now to pay" button so we can
+    // re-decide whether to add it based on the *current* session state.
+    var oldReg = document.getElementById("leadRegisterBtn"); if (oldReg) oldReg.remove();
+
+    // ---- If user is already signed in: skip Mobile/Email/OTP entirely ----
+    // - Pre-fill currentEmail from session
+    // - Jump straight to action step
+    // - Hide native Pay button
+    // - DO NOT inject "Register now to pay" (no need — they're logged in already)
+    var sess = (typeof window.__cursiveSession === "function") ? window.__cursiveSession() : null;
+    if (sess && sess.email) {
+      currentEmail  = sess.email;
+      currentMobile = sess.mobile || "";
+      if (stepAction) {
+        if (payBtn) payBtn.style.display = "none";
+        var existingQty = document.getElementById("leadQtyWrap");
+        if (existingQty) existingQty.remove();
+        showStep("action");
+        overlay.classList.remove("hidden");
+        return;
+      }
+    }
+
+    // Not signed in -> normal OTP flow
     showStep("contact");
     overlay.classList.remove("hidden");
     setTimeout(function () { mobileEl.focus(); }, 50);
