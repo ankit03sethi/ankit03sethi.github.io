@@ -152,9 +152,27 @@
     if (payBtn) setBusy(payBtn, false, payBtnLabel());
     if (callbackBtn) setBusy(callbackBtn, false, "Request callback instead");
 
-    showStep("contact");
+    // Knowledge-page mode: skip OTP entirely. Show only Call / WhatsApp / Callback.
+    // The Pay button is hidden because payment now happens via /home/ wallet.
+    if (payBtn) payBtn.style.display = "none";
+    var oldQty = document.getElementById("leadQtyWrap");
+    if (oldQty) oldQty.remove();
+
+    // Inject a minimal name+mobile mini-form inside stepAction (once)
+    if (stepAction && !document.getElementById("leadKpForm")) {
+      var miniForm = document.createElement("div");
+      miniForm.id = "leadKpForm";
+      miniForm.style.cssText = "margin:10px 0 14px;padding:14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;text-align:left;";
+      miniForm.innerHTML =
+        '<div style="font-weight:600;color:#0f172a;margin-bottom:8px;font-size:13px;">For callback / WhatsApp</div>' +
+        '<input id="leadKpName" type="text" placeholder="Your name" style="width:100%;padding:9px 11px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;" />' +
+        '<input id="leadKpMobile" type="tel" placeholder="Mobile number" style="width:100%;padding:9px 11px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;box-sizing:border-box;" />';
+      stepAction.insertBefore(miniForm, stepAction.querySelector(".lead-actions") || stepAction.firstChild.nextSibling);
+    }
+
+    showStep("action");
     overlay.classList.remove("hidden");
-    setTimeout(function () { mobileEl.focus(); }, 50);
+    setTimeout(function () { var nm = document.getElementById("leadKpName"); if (nm) nm.focus(); }, 50);
   }
   function payBtnLabel() {
     return "🔒 Pay ₹" + (currentPriceNum || "") + "/- now";
@@ -474,21 +492,38 @@
     setTimeout(function () { mobileEl.focus(); }, 50);
   });
 
-  // ---- STEP 3a - Callback (lead already saved on OTP verify) ----
+  // ---- Callback button (knowledge-page mode: no OTP, mini-form Name+Mobile) ----
   if (callbackBtn) {
     callbackBtn.addEventListener("click", function () {
-      // Log the callback request before showing the thank-you step
-      if (currentEmail) {
-        postAS("lead_cta", {
-          email:        currentEmail,
-          mobile:       currentMobile,
-          serviceType:  currentServiceTag,
-          serviceName:  currentService,
-          servicePrice: currentPrice,
-          channel:      "callback",
-          origin:       window.location.pathname
-        });
+      var nameEl = document.getElementById("leadKpName");
+      var mobEl  = document.getElementById("leadKpMobile");
+      var name = (nameEl && nameEl.value || "").trim();
+      var mob  = (mobEl && mobEl.value || "").trim().replace(/\D/g, "");
+      if (!name || mob.length < 10) {
+        if (mobEl) mobEl.style.borderColor = "#dc2626";
+        if (nameEl && !name) nameEl.style.borderColor = "#dc2626";
+        var hint = document.getElementById("leadKpHint");
+        if (!hint && stepAction) {
+          hint = document.createElement("p");
+          hint.id = "leadKpHint";
+          hint.style.cssText = "color:#dc2626;font-size:12px;margin:6px 0 0;";
+          hint.textContent = "Please enter your name + 10-digit mobile.";
+          var miniForm = document.getElementById("leadKpForm");
+          if (miniForm) miniForm.appendChild(hint);
+        }
+        return;
       }
+      // Log the callback request
+      postAS("lead_cta", {
+        email:        "",   // not collected in knowledge mode
+        mobile:       mob,
+        name:         name,
+        serviceType:  currentServiceTag,
+        serviceName:  currentService,
+        servicePrice: currentPrice,
+        channel:      "callback",
+        origin:       window.location.pathname
+      }).catch(function () { /* non-blocking */ });
       showStep("callback");
     });
   }
