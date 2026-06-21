@@ -220,6 +220,13 @@ function showLogin() {
 }
 
 async function showHome(session) {
+  // If user came from a deep link, send them back there now that they're signed in
+  const qp = new URLSearchParams(location.search);
+  const ret = qp.get("return");
+  if (ret && /^\/[a-z0-9_\-\/]+$/i.test(ret)) {
+    location.href = ret;
+    return;
+  }
   hide($("#loginView")); show($("#homeView"));
   $("#emailChip").textContent = session.user.email;
   show($("#emailChip"));
