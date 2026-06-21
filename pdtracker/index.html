@@ -222,7 +222,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
   const { data: { session } } = await sb.auth.getSession();
   if (session) bootDash();
-  else { show($("#loginView")); }
+  else {
+    // No direct login here — all logins go through /home/
+    location.href = "/home/?return=" + encodeURIComponent("/pdtracker/");
+  }
 });
 
 async function onResetData() {
@@ -319,8 +322,9 @@ async function onLogin(e) {
 
 async function onSignOut() {
   await sb.auth.signOut();
-  hide($("#dashView")); show($("#loginView"));
+  hide($("#dashView"));
   hide($("#emailChip")); hide($("#signOutBtn")); hide($("#trackerStatus")); hide($("#homeChip"));
+  location.href = "/home/";
 }
 
 async function bootDash() {
