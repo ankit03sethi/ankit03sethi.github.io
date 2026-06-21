@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Reports &middot; Cursive PD Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Reports</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <a href="/pdtracker/" class="btn-ghost" style="text-decoration:none;">&larr; Dashboard</a>
+    <span id="emailChip" class="email-chip hidden"></span>
+  </div>
+</header>
+
+<main class="auth-wrap" style="max-width:760px;">
+  <div class="auth-card" style="text-align:left;">
+    <h1 style="margin-top:0;">Health &amp; Action Reports <span style="background:#16a34a;color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;margin-left:6px;vertical-align:middle;font-weight:800;">NEW</span></h1>
+    <p class="lede" style="color:#475467;">Comprehensive Excel report with health score, action items, and 90-day trends per product.</p>
+
+    <div id="loading" style="text-align:center;padding:40px 0;">
+      <div style="display:inline-block;width:40px;height:40px;border:4px solid #e5e7eb;border-top:4px solid #1f6feb;border-radius:50%;animation:spin 1s linear infinite;"></div>
+      <p style="color:#64748b;margin-top:16px;">Loading...</p>
+    </div>
+
+    <div id="content" class="hidden">
+      <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:18px;">
+        <div style="font-weight:700;color:#0f172a;margin-bottom:8px;">What's in the report</div>
+        <ul style="margin:0;padding-left:20px;color:#475467;font-size:13px;line-height:1.8;">
+          <li><b>Action Items</b> &mdash; SKUs grouped by issue type with a fixed playbook</li>
+          <li><b>Health Score</b> &mdash; 5 timeframe scores (7d/15d/30d/60d/90d) + components</li>
+          <li><b>Rating, Count, Price</b> &mdash; daily values + 5 finals (7d/15d/30d/60d/90d)</li>
+          <li><b>Buy Box Lost</b> &mdash; per-day 0/1 + total per timeframe (needs seller code)</li>
+          <li><b>Not Available</b> &mdash; per-day 0/1 + total per timeframe</li>
+          <li><b>Combined</b> &mdash; all 5 metrics per product</li>
+        </ul>
+      </div>
+
+      <div id="statsBox" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:18px;">
+        <div style="font-size:12px;color:#1e40af;font-weight:700;letter-spacing:.4px;text-transform:uppercase;">Your data right now</div>
+        <div id="statsText" style="font-size:14px;color:#0f172a;margin-top:6px;">&mdash;</div>
+      </div>
+
+      <button id="downloadBtn" class="btn-primary" style="width:100%;padding:14px;font-size:16px;">
+        <span style="font-size:18px;vertical-align:middle;">&#11015;</span>
+        <span style="vertical-align:middle;margin-left:6px;">Download Report (Excel)</span>
+      </button>
+
+      <p id="errorMsg" class="error hidden" style="margin-top:12px;"></p>
+      <p id="successMsg" class="success hidden" style="margin-top:12px;"></p>
+
+      <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px;margin-top:18px;font-size:12px;color:#78350f;">
+        <b>Note:</b> Buy Box Lost data requires you to set your seller name (per product) in the upload sheet. Without it, that section is skipped for those products.
+      </div>
+    </div>
+
+    <p style="margin-top:24px;color:#94a3b8;font-size:11px;text-align:center;">
+      A part of <b>cursive&reg;</b> &middot; India&rsquo;s seller toolkit
+    </p>
+  </div>
+</main>
+
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyODg0MDgsImV4cCI6MjA5NDg2NDQwOH0.kbpqEi0jPmlljbAEgWzM2eAJ4DZxSGy54NwJ7HZ0_8U";
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const $ = (id) => document.getElementById(id);
+const show = (id) => $(id).classList.remove("hidden");
+const hide = (id) => $(id).classList.add("hidden");
+
+let CACHED = null;
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = "/pdtracker/"; return; }
+
+  $("emailChip").textContent = session.user.email;
+  show("emailChip");
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-reports-data`, {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    });
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    CACHED = await res.json();
+
+    const nProducts = (CACHED.products || []).length;
+    const sellerCount = new Set((CACHED.products || []).map(p => (p.sellerCode || "").trim()).filter(Boolean)).size;
+    const platforms = new Set((CACHED.products || []).map(p => p.platform));
+    $("statsText").innerHTML = `<b>${nProducts}</b> products tracked across <b>${platforms.size}</b> platforms&nbsp;&middot;&nbsp;<b>${sellerCount}</b> seller code(s) set`;
+
+    hide("loading"); show("content");
+  } catch (e) {
+    hide("loading"); show("content");
+    $("errorMsg").textContent = "Could not load report data: " + e.message;
+    show("errorMsg");
+  }
+}
+init();
+
+$("downloadBtn").addEventListener("click", async () => {
+  hide("errorMsg"); hide("successMsg");
+  if (!CACHED) { $("errorMsg").textContent = "No data loaded yet"; show("errorMsg"); return; }
+  try {
+    buildAndDownloadExcel(CACHED);
+    $("successMsg").textContent = "Excel downloaded.";
+    show("successMsg");
+  } catch (e) {
+    $("errorMsg").textContent = "Could not build Excel: " + e.message;
+    show("errorMsg");
+  }
+});
+
+// ============== EXCEL BUILDER ==============
+
+const TIMEFRAMES = [7, 15, 30, 60, 90];
+const COMPONENT_WEIGHTS = { rating: 30, count: 20, bbox: 20, avail: 20, price: 10 };
+
+function calcHealthSliced(prod, startIdx, days) {
+  const slice = prod.daily.slice(startIdx, startIdx + days).filter(d => d !== null);
+  if (slice.length < 2) return null;
+
+  const ratings = slice.map(d => d.rating).filter(v => v != null);
+  const counts = slice.map(d => d.count).filter(v => v != null);
+  const prices = slice.map(d => d.price).filter(v => v != null);
+  const bbls = slice.map(d => d.bbl);
+  const nas = slice.map(d => d.na);
+
+  let rs = 0;
+  if (ratings.length > 0) {
+    const latestR = ratings[0];
+    if (latestR >= 4.8) rs = 30;
+    else if (latestR >= 4.5) rs = 27;
+    else if (latestR >= 4.0) rs = 22;
+    else if (latestR >= 3.5) rs = 16;
+    else if (latestR >= 3.0) rs = 10;
+  }
+
+  let mom = 0;
+  if (counts.length >= 2) {
+    const newR = counts[0] - counts[counts.length - 1];
+    if (newR > 0) mom = 14;
+    if (counts.length >= 14) {
+      const rg = counts[0] - (counts[6] ?? counts[counts.length - 1]);
+      const og = (counts[7] ?? counts[counts.length - 1]) - (counts[13] ?? counts[counts.length - 1]);
+      if (rg > og * 1.1) mom = 20;
+      else if (rg < og * 0.9 && rg > 0) mom = 8;
+    }
+  }
+
+  const bbDays = slice.length;
+  const bs = Math.round(((bbDays - bbls.reduce((a, b) => a + b, 0)) / bbDays) * 200) / 10;
+  const as_ = Math.round(((bbDays - nas.reduce((a, b) => a + b, 0)) / bbDays) * 200) / 10;
+
+  let ps = 10;
+  if (prices.length >= 2) {
+    const half = Math.max(1, Math.floor(prices.length / 2));
+    const recAvg = prices.slice(0, half).reduce((a, b) => a + b, 0) / half;
+    const olderArr = prices.slice(half);
+    const oldAvg = olderArr.length ? olderArr.reduce((a, b) => a + b, 0) / olderArr.length : recAvg;
+    const changePct = oldAvg ? (recAvg - oldAvg) / oldAvg : 0;
+    if (changePct >= -0.01) ps = 10;
+    else if (changePct >= -0.05) ps = 7;
+    else if (changePct >= -0.10) ps = 5;
+    else ps = 2;
+  }
+
+  const total = Math.min(100, Math.round(rs + mom + bs + as_ + ps));
+  return { total, rating: rs, count: mom, bbox: bs, avail: as_, price: ps };
+}
+
+function statusFor(score) {
+  if (score == null) return "—";
+  if (score >= 85) return "🟢 Healthy";
+  if (score >= 70) return "🟡 Watch";
+  if (score >= 50) return "🟠 Needs Action";
+  return "🔴 Critical";
+}
+
+function trendFor(s7, s90) {
+  if (s7 == null || s90 == null) return "—";
+  const diff = s7 - s90;
+  if (diff >= 5) return "⬆⬆ Improving";
+  if (diff >= 2) return "⬆ Up";
+  if (diff <= -10) return "⬇⬇ Decline FAST";
+  if (diff <= -5) return "⬇ Declining";
+  return "→ Stable";
+}
+
+function buildAndDownloadExcel(data) {
+  const wb = XLSX.utils.book_new();
+  const products = data.products || [];
+  const dateKeys = data.dateKeys || [];
+  const N = dateKeys.length;
+
+  // ===== COVER =====
+  const coverRows = [
+    ["CURSIVE PD TRACKER — REPORT"],
+    [`Customer: ${data.customer.email}`],
+    [`Generated: ${new Date(data.generatedAt).toLocaleString()}`],
+    [`Products: ${products.length}`],
+    [],
+    ["WHAT'S INSIDE"],
+    ["Sheet", "Description"],
+    ["1. Action Items", "SKUs grouped by issue type + playbook"],
+    ["2. Health Score", "5 timeframe scores + components + status"],
+    ["3. Rating", "Daily rating + 5 Finals (delta)"],
+    ["4. Count", "Daily review count + 5 Finals (new reviews)"],
+    ["5. Price", "Daily price + 5 Finals"],
+    ["6. Buy Box Lost", "Per-day 0/1 + 5 Finals (sum) — needs seller code"],
+    ["7. Not Available", "Per-day 0/1 + 5 Finals (sum)"],
+    ["8. Combined", "All 5 metrics per product"],
+    [],
+    ["HEALTH SCORE WEIGHTS"],
+    ["Rating", 30, "Higher rating = more points"],
+    ["Ratings Count", 20, "New reviews growing = more"],
+    ["Buy Box", 20, "% days held"],
+    ["Availability", 20, "% days in stock"],
+    ["Price", 10, "Stable/rising = full marks"],
+    [],
+    ["STATUS BANDS"],
+    ["🟢 Healthy", "85-100"],
+    ["🟡 Watch", "70-84"],
+    ["🟠 Needs Action", "50-69"],
+    ["🔴 Critical", "0-49"],
+  ];
+  const wsCover = XLSX.utils.aoa_to_sheet(coverRows);
+  wsCover["!cols"] = [{ wch: 24 }, { wch: 38 }, { wch: 36 }];
+  XLSX.utils.book_append_sheet(wb, wsCover, "Cover");
+
+  // ===== ACTION ITEMS =====
+  const sections = [
+    {
+      header: "🔴 RATING DROPPING",
+      filter: (p) => {
+        const r = calcHealthSliced(p, 0, 15); const b = calcHealthSliced(p, 15, 75);
+        return r && b && r.rating < b.rating;
+      },
+      type: "Rating",
+      playbook: [
+        "✓ Read recent 1-2 star reviews",
+        "✓ Quality / batch verification",
+        "✓ Packaging condition check",
+        "✓ Thank-you card / instructions?",
+        "✓ Pricing aligned with quality?",
+        "✓ Product description accuracy",
+      ]
+    },
+    {
+      header: "🔴 RATINGS COUNT SLOWING",
+      filter: (p) => {
+        const r = calcHealthSliced(p, 0, 15); const b = calcHealthSliced(p, 15, 75);
+        return r && b && r.count < b.count - 2;
+      },
+      type: "Ratings Count",
+      playbook: [
+        "✓ Visibility / search rank check",
+        "✓ Ad spend status",
+        "✓ Listing freshness",
+        "✓ Competitor stealing traffic?",
+        "✓ Run promotion / coupon",
+      ]
+    },
+    {
+      header: "🟡 BUY BOX LOST",
+      filter: (p) => {
+        if (!p.sellerCode) return false;
+        const r = calcHealthSliced(p, 0, 15);
+        return r && r.bbox < 18;
+      },
+      type: "Buy Box",
+      playbook: [
+        "✓ Identify winning competitor",
+        "✓ Check their pricing",
+        "✓ MAP policy violation?",
+        "✓ Using Prime / Fulfilled?",
+        "✓ Price match or report",
+      ]
+    },
+    {
+      header: "🟡 NOT AVAILABLE",
+      filter: (p) => {
+        const r = calcHealthSliced(p, 0, 15);
+        return r && r.avail < 18;
+      },
+      type: "Not Available",
+      playbook: [
+        "✓ Restock immediately",
+        "✓ Increase safety stock",
+        "✓ Supplier reliability check",
+        "✓ Backup supplier identified?",
+        "✓ Listing removed by marketplace?",
+      ]
+    },
+    {
+      header: "🟢 PRICE DROPPING",
+      filter: (p) => {
+        const r = calcHealthSliced(p, 0, 15);
+        return r && r.price < 10;
+      },
+      type: "Price",
+      playbook: [
+        "✓ Competitor analysis",
+        "✓ Marketplace dynamic pricing?",
+        "✓ Self-applied discount?",
+        "✓ Hold vs match decision",
+        "✓ Consider bundling / upsell",
+      ]
+    },
+  ];
+
+  // Build Action Items side-by-side layout (5 sections, 4 cols each + 1 gap col)
+  const SEC_W = 4;
+  const GAP = 1;
+  const headerLabels = ["Seller Code", "Issue Type", "Platform", "Product ID"];
+  const aiRows = [
+    ["ACTION ITEMS — sections side by side (top: Issue, middle: Playbook, bottom: SKUs)"],
+    [],
+  ];
+  // Find max rows needed
+  let maxPlaybookLines = 0, maxSkus = 0;
+  const sectionData = sections.map(sec => {
+    const skus = products.filter(sec.filter);
+    if (skus.length > maxSkus) maxSkus = skus.length;
+    if (sec.playbook.length > maxPlaybookLines) maxPlaybookLines = sec.playbook.length;
+    return { ...sec, skus };
+  });
+
+  // Row 4: Issue header (merged in each section)
+  // Row 5..N: Playbook lines (one per row)
+  // Row M+1: SKU header
+  // Row M+2..: SKU data
+  const ROW_HEADER = 4;
+  const ROW_PB_START = 5;
+  const ROW_SKU_HEADER = ROW_PB_START + maxPlaybookLines;
+  const ROW_SKU_START = ROW_SKU_HEADER + 1;
+
+  // Compute total cols
+  const totalCols = sections.length * (SEC_W + GAP);
+
+  // Init empty grid
+  const grid = [];
+  for (let r = 0; r < ROW_SKU_START + maxSkus; r++) {
+    grid.push(new Array(totalCols).fill(""));
+  }
+  // Set title row
+  grid[0][0] = "ACTION ITEMS — sections side by side";
+
+  const merges = [];
+
+  sectionData.forEach((sec, si) => {
+    const startCol = si * (SEC_W + GAP);
+    // Header row
+    grid[ROW_HEADER - 1][startCol] = sec.header;
+    merges.push({ s: { r: ROW_HEADER - 1, c: startCol }, e: { r: ROW_HEADER - 1, c: startCol + SEC_W - 1 } });
+    // Playbook rows
+    sec.playbook.forEach((line, i) => {
+      grid[ROW_PB_START - 1 + i][startCol] = line;
+      merges.push({ s: { r: ROW_PB_START - 1 + i, c: startCol }, e: { r: ROW_PB_START - 1 + i, c: startCol + SEC_W - 1 } });
+    });
+    // SKU header
+    headerLabels.forEach((lbl, i) => {
+      grid[ROW_SKU_HEADER - 1][startCol + i] = lbl;
+    });
+    // SKU data
+    sec.skus.forEach((sku, i) => {
+      grid[ROW_SKU_START - 1 + i][startCol + 0] = sku.sellerCode || "—";
+      grid[ROW_SKU_START - 1 + i][startCol + 1] = sec.type;
+      grid[ROW_SKU_START - 1 + i][startCol + 2] = sku.platform;
+      grid[ROW_SKU_START - 1 + i][startCol + 3] = sku.productId;
+    });
+  });
+
+  const wsAI = XLSX.utils.aoa_to_sheet(grid);
+  wsAI["!merges"] = merges;
+  const colWidths = [];
+  for (let si = 0; si < sections.length; si++) {
+    colWidths.push({ wch: 14 }, { wch: 16 }, { wch: 11 }, { wch: 18 }, { wch: 2 });
+  }
+  wsAI["!cols"] = colWidths;
+  XLSX.utils.book_append_sheet(wb, wsAI, "1. Action Items");
+
+  // ===== HEALTH SCORE =====
+  const hsHeader = ["Seller Code", "Platform", "Product ID", "7d", "15d", "30d", "60d", "90d", "Trend", "Status", "Rating 30", "Ratings Count 20", "Buy Box 20", "Availability 20", "Price 10"];
+  const hsRows = [
+    ["HEALTH SCORE — Points / Colors"],
+    ["Components based on last 15 days vs baseline (days 16-90)"],
+    [],
+    hsHeader,
+  ];
+  for (const p of products) {
+    const scores = TIMEFRAMES.map(tf => { const r = calcHealthSliced(p, 0, tf); return r ? r.total : null; });
+    const status = statusFor(scores[1] ?? scores[0]); // use 15d
+    const trend = trendFor(scores[0], scores[4]);
+    const comp = calcHealthSliced(p, 0, 15);
+    hsRows.push([
+      p.sellerCode || "—",
+      p.platform,
+      p.productId,
+      scores[0] ?? "—",
+      scores[1] ?? "—",
+      scores[2] ?? "—",
+      scores[3] ?? "—",
+      scores[4] ?? "—",
+      trend,
+      status,
+      comp ? comp.rating : "—",
+      comp ? comp.count : "—",
+      comp ? comp.bbox : "—",
+      comp ? comp.avail : "—",
+      comp ? comp.price : "—",
+    ]);
+  }
+  const wsHS = XLSX.utils.aoa_to_sheet(hsRows);
+  wsHS["!cols"] = [{ wch: 14 }, { wch: 11 }, { wch: 16 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 17 }, { wch: 18 }, { wch: 11 }, { wch: 15 }, { wch: 11 }, { wch: 12 }, { wch: 10 }];
+  wsHS["!freeze"] = { xSplit: 3, ySplit: 4 };
+  XLSX.utils.book_append_sheet(wb, wsHS, "2. Health Score");
+
+  // ===== METRIC SHEETS (3-7) =====
+  const FIXED_COLS_M = 3;
+  function buildMetricSheet(title, metricKey, finalType) {
+    const headerRow = ["Seller Code", "Platform", "Product ID", ...TIMEFRAMES.map(t => `${t}d`), ...dateKeys.map(k => k.slice(5))];
+    const rows = [[title], [], [], headerRow];
+    for (const p of products) {
+      const vals = p.daily.map(d => d ? d[metricKey] : null);
+      const finals = TIMEFRAMES.map(tf => {
+        if (finalType === "delta") {
+          const v0 = vals[0]; const vN = vals[tf - 1];
+          if (v0 == null || vN == null) return "—";
+          return Math.round((v0 - vN) * 100) / 100;
+        } else { // sum
+          let s = 0; let valid = false;
+          for (let i = 0; i < tf && i < vals.length; i++) { if (vals[i] != null) { s += vals[i]; valid = true; } }
+          return valid ? s : "—";
+        }
+      });
+      rows.push([p.sellerCode || "—", p.platform, p.productId, ...finals, ...vals.map(v => v == null ? "" : v)]);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const cols = [{ wch: 12 }, { wch: 10 }, { wch: 14 }];
+    for (let i = 0; i < TIMEFRAMES.length; i++) cols.push({ wch: 8 });
+    for (let i = 0; i < dateKeys.length; i++) cols.push({ wch: 6 });
+    ws["!cols"] = cols;
+    ws["!freeze"] = { xSplit: FIXED_COLS_M + TIMEFRAMES.length, ySplit: 4 };
+    return ws;
+  }
+
+  XLSX.utils.book_append_sheet(wb, buildMetricSheet("RATING — daily + 5 Finals (delta)", "rating", "delta"), "3. Rating");
+  XLSX.utils.book_append_sheet(wb, buildMetricSheet("COUNT — daily + 5 Finals (new reviews)", "count", "delta"), "4. Count");
+  XLSX.utils.book_append_sheet(wb, buildMetricSheet("PRICE — daily + 5 Finals (delta)", "price", "delta"), "5. Price");
+
+  // Buy Box: only products with seller code
+  const bbHeader = ["Seller Code", "Platform", "Product ID", ...TIMEFRAMES.map(t => `${t}d`), ...dateKeys.map(k => k.slice(5))];
+  const bbRows = [["BUY BOX LOST — per-day 0/1 + 5 Finals (sum)"], ["Products without seller code are skipped"], [], bbHeader];
+  for (const p of products) {
+    if (!p.sellerCode) continue;
+    const vals = p.daily.map(d => d ? d.bbl : 0);
+    const finals = TIMEFRAMES.map(tf => {
+      let s = 0; for (let i = 0; i < tf && i < vals.length; i++) s += vals[i]; return s;
+    });
+    bbRows.push([p.sellerCode, p.platform, p.productId, ...finals, ...vals]);
+  }
+  const wsBB = XLSX.utils.aoa_to_sheet(bbRows);
+  const bbCols = [{ wch: 12 }, { wch: 10 }, { wch: 14 }];
+  for (let i = 0; i < TIMEFRAMES.length; i++) bbCols.push({ wch: 8 });
+  for (let i = 0; i < dateKeys.length; i++) bbCols.push({ wch: 6 });
+  wsBB["!cols"] = bbCols;
+  wsBB["!freeze"] = { xSplit: FIXED_COLS_M + TIMEFRAMES.length, ySplit: 4 };
+  XLSX.utils.book_append_sheet(wb, wsBB, "6. Buy Box Lost");
+
+  XLSX.utils.book_append_sheet(wb, buildMetricSheet("NOT AVAILABLE — per-day 0/1 + 5 Finals (sum)", "na", "sum"), "7. Not Available");
+
+  // ===== COMBINED =====
+  const combHeader = ["Seller Code", "Platform", "Product ID", "Parameter", ...TIMEFRAMES.map(t => `${t}d`), ...dateKeys.map(k => k.slice(5))];
+  const combRows = [["COMBINED — all 5 metrics per product"], [], [], combHeader];
+  for (const p of products) {
+    const metrics = [
+      { name: "Rating", key: "rating", type: "delta" },
+      { name: "Count", key: "count", type: "delta" },
+      { name: "Price", key: "price", type: "delta" },
+    ];
+    if (p.sellerCode) metrics.push({ name: "Buy Box Lost", key: "bbl", type: "sum" });
+    metrics.push({ name: "Not Available", key: "na", type: "sum" });
+
+    for (const m of metrics) {
+      const vals = p.daily.map(d => d ? (d[m.key] ?? 0) : (m.type === "sum" ? 0 : null));
+      const finals = TIMEFRAMES.map(tf => {
+        if (m.type === "delta") {
+          const v0 = vals[0]; const vN = vals[tf - 1];
+          if (v0 == null || vN == null) return "—";
+          return Math.round((v0 - vN) * 100) / 100;
+        } else {
+          let s = 0; for (let i = 0; i < tf && i < vals.length; i++) s += vals[i]; return s;
+        }
+      });
+      combRows.push([p.sellerCode || "—", p.platform, p.productId, m.name, ...finals, ...vals.map(v => v == null ? "" : v)]);
+    }
+  }
+  const wsComb = XLSX.utils.aoa_to_sheet(combRows);
+  const combCols = [{ wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
+  for (let i = 0; i < TIMEFRAMES.length; i++) combCols.push({ wch: 8 });
+  for (let i = 0; i < dateKeys.length; i++) combCols.push({ wch: 6 });
+  wsComb["!cols"] = combCols;
+  wsComb["!freeze"] = { xSplit: 4 + TIMEFRAMES.length, ySplit: 4 };
+  XLSX.utils.book_append_sheet(wb, wsComb, "8. Combined");
+
+  // Write
+  const today = new Date().toISOString().slice(0, 10);
+  const filename = `Cursive_PD_Tracker_Report_${today}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+</script>
+
+</body>
+</html>
