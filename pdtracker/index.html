@@ -34,6 +34,7 @@
     </div>
   </a>
   <div class="topbar-right">
+    <a id="homeChip" href="/home/" class="email-chip hidden" style="text-decoration:none;color:#0f172a;background:#eff6ff;border-color:#bfdbfe;font-weight:700;" title="Back to Home">&#8962; Home</a>
     <span id="trackerStatus" class="scraper-status offline hidden"><span class="dot"></span> <span id="statusText">Offline</span></span>
 
     <!-- Pricing dropdown -->
@@ -319,14 +320,14 @@ async function onLogin(e) {
 async function onSignOut() {
   await sb.auth.signOut();
   hide($("#dashView")); show($("#loginView"));
-  hide($("#emailChip")); hide($("#signOutBtn")); hide($("#trackerStatus"));
+  hide($("#emailChip")); hide($("#signOutBtn")); hide($("#trackerStatus")); hide($("#homeChip"));
 }
 
 async function bootDash() {
   hide($("#loginView")); show($("#dashView"));
   const { data: { user } } = await sb.auth.getUser();
   $("#emailChip").textContent = user?.email || "";
-  show($("#emailChip")); show($("#signOutBtn")); show($("#trackerStatus"));
+  show($("#emailChip")); show($("#signOutBtn")); show($("#trackerStatus")); show($("#homeChip"));
   refreshWalletChip().catch(() => {});
   await refreshDash();
   startAutoRefresh();
