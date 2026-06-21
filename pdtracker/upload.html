@@ -36,7 +36,6 @@
       box-shadow: 0 4px 10px rgba(31,111,235,.28);
     }
   </style>
-  <script src="/analytics.js" defer></script>
 </head>
 <body>
 
@@ -77,7 +76,7 @@
 
     <div class="upload-step">
       <h3>Step 1: Download the template</h3>
-      <p class="muted" style="margin:0 0 10px;font-size:13px;">Excel with 4 columns. Just pick <b>Platform</b> from the dropdown in column A and paste the <b>Product ID</b> in column C. Columns B and D auto-fill — don't edit them.</p>
+      <p class="muted" style="margin:0 0 10px;font-size:13px;">Excel with 2 columns: <b>Platform</b> (Amazon / Flipkart / Meesho / Myntra / FirstCry) and <b>Product Id</b>.</p>
       <div style="margin:12px 0 6px;padding:12px 14px;background:#fffbeb;border:1.5px solid #fde68a;border-left:4px solid #f59e0b;border-radius:8px;color:#78350f;font-size:13px;line-height:1.5;">
         &#9888; <b>Double-check before you upload.</b> Once a row is added we can&rsquo;t change its <b>Platform</b> or <b>Product Id</b>, and <b>no refund / adjustment</b> is possible.
       </div>
@@ -259,6 +258,8 @@ function handleFile(file) {
         row_num: i + 2,
         platform: String(r.Platform ?? r.platform ?? "").trim(),
         product_id: String(r["Product Id"] ?? r["Product ID"] ?? r.product_id ?? "").trim(),
+        seller_code: String(r["Seller Code"] ?? r["seller_code"] ?? "").trim(),
+        seller_name: String(r["Seller Name"] ?? r["seller_name"] ?? "").trim(),
       })).filter(r => r.platform && r.product_id);
 
       if (parsedRows.length === 0) throw new Error("No valid rows. Make sure Platform and Product Id columns are filled.");
@@ -398,7 +399,7 @@ $("#uploadTrialBtn").addEventListener("click", async () => {
       },
       body: JSON.stringify({
         plan: "subscription",
-        rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id })),
+        rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id, seller_code: r.seller_code || "", seller_name: r.seller_name || "" })),
       }),
     });
     const j = await r.json();
@@ -530,7 +531,7 @@ payNowBtn.addEventListener("click", async () => {
       },
       body: JSON.stringify({
         plan: selectedPlan,
-        rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id })),
+        rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id, seller_code: r.seller_code || "", seller_name: r.seller_name || "" })),
       }),
     });
     const j = await r.json();
