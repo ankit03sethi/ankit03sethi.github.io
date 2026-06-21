@@ -71,6 +71,7 @@
   </a>
   <div class="topbar-right">
     <span id="emailChip" class="email-chip hidden"></span>
+    <button id="topSignOutBtn" class="btn-ghost hidden" type="button" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;">Sign out</button>
   </div>
 </header>
 
@@ -172,7 +173,6 @@
           <div class="svc-cta">Open &rarr;</div>
         </a>
 
-        <button id="signOutBtn" class="signout-btn" type="button">Sign out</button>
       </div>
 
       <p style="margin-top:14px;color:#94a3b8;font-size:11px;text-align:center;">
@@ -216,7 +216,7 @@ async function init() {
 
 function showLogin() {
   hide($("#homeView")); show($("#loginView"));
-  hide($("#emailChip"));
+  hide($("#emailChip")); hide($("#topSignOutBtn"));
 }
 
 async function showHome(session) {
@@ -230,6 +230,7 @@ async function showHome(session) {
   hide($("#loginView")); show($("#homeView"));
   $("#emailChip").textContent = session.user.email;
   show($("#emailChip"));
+  show($("#topSignOutBtn"));
   await loadWallet(session);
 }
 
@@ -309,10 +310,11 @@ $("#loginBtn").addEventListener("click", doLogin);
 $("#password").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
 $("#email").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
 
-$("#signOutBtn")?.addEventListener("click", async () => {
+async function doSignOut() {
   await sb.auth.signOut();
   location.reload();
-});
+}
+$("#topSignOutBtn")?.addEventListener("click", doSignOut);
 
 init();
 </script>
