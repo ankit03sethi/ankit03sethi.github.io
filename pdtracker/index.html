@@ -161,22 +161,41 @@
   <div id="filterBar" class="hidden" style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #eaecf0;">
     <input id="searchInput" type="search" placeholder="Search Product Id or Seller..." style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;" />
 
+    <!-- Platform dropdown is populated DYNAMICALLY in rebuildPlatformFilter() from the customer's actual products -->
     <select id="platformFilter" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;">
       <option value="">All platforms</option>
-      <option value="Amazon">Amazon</option>
-      <option value="Flipkart">Flipkart</option>
-      <option value="Meesho">Meesho</option>
-      <option value="Myntra">Myntra</option>
-      <option value="Firstcry">Firstcry</option>
     </select>
 
+    <!-- Buy Box Winner (was: All sellers) -->
     <div id="sellerFilterWrap" style="position:relative;">
-      <button id="sellerFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:140px;text-align:left;">All sellers <span style="float:right;color:#94a3b8;">&#9662;</span></button>
+      <button id="sellerFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:160px;text-align:left;">Buy Box Winner <span style="float:right;color:#94a3b8;">&#9662;</span></button>
       <div id="sellerFilterPanel" class="hidden" style="position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d0d5dd;border-radius:8px;padding:8px;min-width:240px;max-height:280px;overflow-y:auto;box-shadow:0 4px 18px rgba(0,0,0,.1);z-index:50;">
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;font-weight:600;border-bottom:1px solid #eaecf0;margin-bottom:4px;cursor:pointer;">
           <input type="checkbox" id="sellerAllChk" checked /> Select all
         </label>
         <div id="sellerList"></div>
+      </div>
+    </div>
+
+    <!-- Seller Code (multi-select dropdown, same pattern as Buy Box Winner) -->
+    <div id="sellerCodeFilterWrap" style="position:relative;">
+      <button id="sellerCodeFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:140px;text-align:left;">Seller Code <span style="float:right;color:#94a3b8;">&#9662;</span></button>
+      <div id="sellerCodeFilterPanel" class="hidden" style="position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d0d5dd;border-radius:8px;padding:8px;min-width:240px;max-height:280px;overflow-y:auto;box-shadow:0 4px 18px rgba(0,0,0,.1);z-index:50;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;font-weight:600;border-bottom:1px solid #eaecf0;margin-bottom:4px;cursor:pointer;">
+          <input type="checkbox" id="sellerCodeAllChk" checked /> Select all
+        </label>
+        <div id="sellerCodeList"></div>
+      </div>
+    </div>
+
+    <!-- Seller Name (multi-select dropdown, same pattern as Buy Box Winner) -->
+    <div id="sellerNameFilterWrap" style="position:relative;">
+      <button id="sellerNameFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:140px;text-align:left;">Seller Name <span style="float:right;color:#94a3b8;">&#9662;</span></button>
+      <div id="sellerNameFilterPanel" class="hidden" style="position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d0d5dd;border-radius:8px;padding:8px;min-width:240px;max-height:280px;overflow-y:auto;box-shadow:0 4px 18px rgba(0,0,0,.1);z-index:50;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;font-weight:600;border-bottom:1px solid #eaecf0;margin-bottom:4px;cursor:pointer;">
+          <input type="checkbox" id="sellerNameAllChk" checked /> Select all
+        </label>
+        <div id="sellerNameList"></div>
       </div>
     </div>
 
@@ -441,7 +460,10 @@ async function refreshDash() {
     if (total > 0) show($("#filterBar"));
     else hide($("#filterBar"));
 
+    rebuildPlatformFilter();
     rebuildSellerFilter();
+    rebuildSellerCodeFilter();
+    rebuildSellerNameFilter();
     if (!_pinnedApplied) {
       _pinnedApplied = true;
       let saved = null;
@@ -532,11 +554,15 @@ function renderTable() {
   if (platform) rows = rows.filter(r => r.platform === platform);
   if (q) rows = rows.filter(r =>
     (r.product_id || "").toLowerCase().includes(q) ||
-    (r.seller || "").toLowerCase().includes(q)
+    (r.seller || "").toLowerCase().includes(q) ||
+    (r.seller_code || "").toLowerCase().includes(q) ||
+    (r.seller_name || "").toLowerCase().includes(q)
   );
   if (sellerChecks.length > 0 && anySellerChecked) {
     rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
   }
+  // Apply Seller Code + Seller Name filters
+  rows = applySellerCodeNameFilter(rows);
 
 
   const sorters = {
@@ -678,6 +704,11 @@ window.addEventListener("DOMContentLoaded", () => {
     const rst = document.querySelector("#resetFiltersBtn");
     if (rst) rst.addEventListener("click", () => {
       ["#searchInput","#platformFilter","#priceMin","#priceMax","#ratingMin","#reviewsMin"].forEach(s => { const el = document.querySelector(s); if (el) el.value = ""; });
+      // Re-check all options in the 3 multi-select dropdowns
+      document.querySelectorAll("#sellerCodeList input[type=checkbox]").forEach(c => c.checked = true);
+      document.querySelectorAll("#sellerNameList input[type=checkbox]").forEach(c => c.checked = true);
+      syncMultiButtonLabel(SELLER_CODE_OPTS); syncMultiAllChk(SELLER_CODE_OPTS);
+      syncMultiButtonLabel(SELLER_NAME_OPTS); syncMultiAllChk(SELLER_NAME_OPTS);
       _sortKey = "created_desc";
       document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => c.checked = true);
       syncSellerButtonLabel(); syncSellerAllCheck();
@@ -823,6 +854,142 @@ document.addEventListener("change", (e) => {
   }
 });
 
+// ============================================================================
+// Dynamic Platform / Seller Code / Seller Name filters
+// ============================================================================
+
+// Platform dropdown -- only shows platforms the customer actually has products in.
+// Values are kept in DB casing (e.g. "Amazon", "FirstCry") so .eq() comparisons match.
+function rebuildPlatformFilter() {
+  const sel = document.querySelector("#platformFilter");
+  if (!sel) return;
+  const previous = sel.value || "";
+  const platforms = new Set();
+  for (const r of _cachedRows) {
+    const p = (r.platform || "").trim();
+    if (p) platforms.add(p);
+  }
+  const arr = Array.from(platforms).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">All platforms</option>' +
+    arr.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
+  // restore previous selection if still valid
+  if (previous && arr.indexOf(previous) !== -1) sel.value = previous;
+}
+
+// Generic multi-select dropdown builder for Seller Code / Seller Name
+function buildMultiSelectFilter(opts) {
+  // opts = { listId, allChkId, btnId, label, values }
+  const list = document.querySelector("#" + opts.listId);
+  if (!list) return;
+  const arr = Array.from(opts.values).sort((a, b) => String(a).localeCompare(String(b)));
+  const priorChecked = {};
+  list.querySelectorAll("input[type=checkbox]").forEach(c => { priorChecked[c.value] = c.checked; });
+  list.innerHTML = arr.map(v => {
+    const wasChecked = priorChecked[v] !== false;
+    const label = v === "(blank)" ? "<i>(blank)</i>" : esc(v);
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;cursor:pointer;"><input type="checkbox" value="${esc(v)}" ${wasChecked ? "checked" : ""} /> ${label}</label>`;
+  }).join("");
+  list.querySelectorAll("input[type=checkbox]").forEach(c => c.addEventListener("change", () => {
+    syncMultiButtonLabel(opts);
+    syncMultiAllChk(opts);
+    renderTable();
+  }));
+  syncMultiButtonLabel(opts);
+  syncMultiAllChk(opts);
+}
+function syncMultiButtonLabel(opts) {
+  const btn = document.querySelector("#" + opts.btnId);
+  if (!btn) return;
+  const checks = document.querySelectorAll("#" + opts.listId + " input[type=checkbox]");
+  const total = checks.length;
+  let checked = 0;
+  checks.forEach(c => { if (c.checked) checked++; });
+  if (total === 0)         btn.innerHTML = `${opts.label} <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else if (checked === total) btn.innerHTML = `${opts.label} <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else if (checked === 0)  btn.innerHTML = `No ${opts.label.toLowerCase()} <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else                     btn.innerHTML = `${checked} of ${total} ${opts.label.toLowerCase()} <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+}
+function syncMultiAllChk(opts) {
+  const all = document.querySelector("#" + opts.allChkId);
+  if (!all) return;
+  const checks = document.querySelectorAll("#" + opts.listId + " input[type=checkbox]");
+  let allOn = true, anyOn = false;
+  checks.forEach(c => { if (c.checked) anyOn = true; else allOn = false; });
+  all.checked = allOn;
+  all.indeterminate = anyOn && !allOn;
+}
+
+const SELLER_CODE_OPTS = { listId: "sellerCodeList", allChkId: "sellerCodeAllChk", btnId: "sellerCodeFilterBtn", label: "Seller Code" };
+const SELLER_NAME_OPTS = { listId: "sellerNameList", allChkId: "sellerNameAllChk", btnId: "sellerNameFilterBtn", label: "Seller Name" };
+
+function rebuildSellerCodeFilter() {
+  const values = new Set();
+  for (const r of _cachedRows) {
+    const v = (r.seller_code || "").trim();
+    values.add(v === "" ? "(blank)" : v);
+  }
+  buildMultiSelectFilter({ ...SELLER_CODE_OPTS, values });
+}
+function rebuildSellerNameFilter() {
+  const values = new Set();
+  for (const r of _cachedRows) {
+    const v = (r.seller_name || "").trim();
+    values.add(v === "" ? "(blank)" : v);
+  }
+  buildMultiSelectFilter({ ...SELLER_NAME_OPTS, values });
+}
+
+// Toggle panels + Select-all wiring (same pattern as the Buy Box Winner dropdown)
+document.addEventListener("click", (e) => {
+  [
+    { btnId: "sellerCodeFilterBtn", panelId: "sellerCodeFilterPanel" },
+    { btnId: "sellerNameFilterBtn", panelId: "sellerNameFilterPanel" }
+  ].forEach(({ btnId, panelId }) => {
+    const btn = document.getElementById(btnId);
+    const panel = document.getElementById(panelId);
+    if (!btn || !panel) return;
+    if (e.target === btn || btn.contains(e.target)) { panel.classList.toggle("hidden"); }
+    else if (!panel.contains(e.target)) { panel.classList.add("hidden"); }
+  });
+});
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.id === "sellerCodeAllChk") {
+    const v = e.target.checked;
+    document.querySelectorAll("#sellerCodeList input[type=checkbox]").forEach(c => { c.checked = v; });
+    syncMultiButtonLabel(SELLER_CODE_OPTS); renderTable();
+  }
+  if (e.target && e.target.id === "sellerNameAllChk") {
+    const v = e.target.checked;
+    document.querySelectorAll("#sellerNameList input[type=checkbox]").forEach(c => { c.checked = v; });
+    syncMultiButtonLabel(SELLER_NAME_OPTS); renderTable();
+  }
+});
+
+// Helper used by renderTable / onResetData / getFilteredRows to apply the
+// Seller Code and Seller Name filters in one place.
+function applySellerCodeNameFilter(rows) {
+  const codeChecks = document.querySelectorAll("#sellerCodeList input[type=checkbox]");
+  const nameChecks = document.querySelectorAll("#sellerNameList input[type=checkbox]");
+  const codeAllowed = new Set();
+  const nameAllowed = new Set();
+  let codeAny = false, nameAny = false;
+  codeChecks.forEach(c => { if (c.checked) { codeAllowed.add(c.value); codeAny = true; } });
+  nameChecks.forEach(c => { if (c.checked) { nameAllowed.add(c.value); nameAny = true; } });
+  if (codeChecks.length > 0 && codeAny) {
+    rows = rows.filter(r => {
+      const v = (r.seller_code || "").trim();
+      return codeAllowed.has(v === "" ? "(blank)" : v);
+    });
+  }
+  if (nameChecks.length > 0 && nameAny) {
+    rows = rows.filter(r => {
+      const v = (r.seller_name || "").trim();
+      return nameAllowed.has(v === "" ? "(blank)" : v);
+    });
+  }
+  return rows;
+}
+
 // =============================================================
 // COMPREHENSIVE REPORT BUILDER (with colors, all sheets, filters)
 // =============================================================
@@ -837,8 +1004,9 @@ function getFilteredRows() {
   sellerChecks.forEach(c => { if (c.checked) { allowedSellers.add(c.value); anySellerChecked = true; } });
   let rows = (typeof _cachedRows !== "undefined" && _cachedRows) ? _cachedRows.slice() : [];
   if (platform) rows = rows.filter(r => r.platform === platform);
-  if (q) rows = rows.filter(r => (r.product_id || "").toLowerCase().includes(q) || (r.seller || "").toLowerCase().includes(q));
+  if (q) rows = rows.filter(r => (r.product_id || "").toLowerCase().includes(q) || (r.seller || "").toLowerCase().includes(q) || (r.seller_code || "").toLowerCase().includes(q) || (r.seller_name || "").toLowerCase().includes(q));
   if (sellerChecks.length > 0 && anySellerChecked) rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
+  rows = applySellerCodeNameFilter(rows);
   return rows;
 }
 
