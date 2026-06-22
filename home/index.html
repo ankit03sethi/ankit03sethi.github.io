@@ -362,10 +362,21 @@ function renderTx() {
   }
   let html = `<table class="tx-table"><thead><tr><th>Date</th><th>Service</th><th>Description</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Balance</th></tr></thead><tbody>`;
   for (const t of rows) {
-    const svc = t.service_tag || "pd_tracker";
-    const [svcName, svcClass] = SERVICE_LABEL[svc] || ["Other", "pill-other"];
     const type = t.type || "";
     const isCredit = type.startsWith("credit") || type === "refund";
+    // For credits (recharge / referral / refund) -> always "Recharged" label, regardless of service_tag
+    // For debits -> show the actual service the debit was for
+    let svcName, svcClass;
+    if (isCredit) {
+      if (type === "credit_referral")      { svcName = "Referral";  svcClass = "pill-recharge"; }
+      else if (type === "refund")          { svcName = "Refund";    svcClass = "pill-recharge"; }
+      else                                  { svcName = "Recharged"; svcClass = "pill-recharge"; }
+    } else {
+      const svc = t.service_tag || "pd_tracker";
+      const labelEntry = SERVICE_LABEL[svc] || ["Other", "pill-other"];
+      svcName = labelEntry[0];
+      svcClass = labelEntry[1];
+    }
     html += `<tr>
       <td><div style="font-weight:600;color:#0f172a;">${fmtDate(t.created_at)}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">${esc(TYPE_LABEL[type] || type)}</div></td>
       <td><span class="pill ${svcClass}">${esc(svcName)}</span></td>
