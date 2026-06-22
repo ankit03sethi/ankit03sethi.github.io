@@ -42,30 +42,64 @@
       <button id="pricingChip" type="button" class="email-chip" style="background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a;font-weight:700;cursor:pointer;" title="See pricing">
         &#8377; Pricing &#9662;
       </button>
-      <div id="pricingPanel" class="hidden" style="position:absolute;right:0;top:calc(100% + 8px);width:340px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 18px 38px rgba(15,23,42,.18);padding:16px;z-index:200;text-align:left;">
+      <div id="pricingPanel" class="hidden" style="position:absolute;right:0;top:calc(100% + 8px);width:380px;max-height:calc(100vh - 120px);overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 18px 38px rgba(15,23,42,.18);padding:16px;z-index:200;text-align:left;">
         <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px;">How Cursive PD Tracker is priced</div>
-        <p style="font-size:12px;color:#64748b;margin:0 0 12px;line-height:1.5;">Every new account gets 10 free trial rows. Beyond that you pick a plan per upload.</p>
+        <p style="font-size:12px;color:#64748b;margin:0 0 12px;line-height:1.5;">Every new account gets 10 free trial rows. Pick a plan per upload, or buy bulk capacity in advance.</p>
 
-        <div style="border:1.5px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:10px;background:#eff6ff;">
+        <div style="font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 6px;">Pay per row</div>
+
+        <div style="border:1.5px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:8px;background:#eff6ff;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-            <span style="font-weight:700;font-size:12px;color:#1f6feb;text-transform:uppercase;letter-spacing:.4px;">One-time check</span>
+            <span style="font-weight:700;font-size:12px;color:#1f6feb;text-transform:uppercase;letter-spacing:.4px;">&#9889; One-time check</span>
             <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;2.36<span style="font-size:11px;font-weight:500;color:#6b7280;"> / row</span></span>
           </div>
-          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;2 + 18% GST</div>
-          <div style="font-size:12px;color:#374151;line-height:1.5;">Captures <b>Buy Box, Ratings, Ratings Count &amp; Price</b> &mdash; one time. Auto-retries up to 3 times if the check fails, then stops. No renewal.</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;2 + 18% GST &middot; single scan, no renewal</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Buy Box, Ratings, Ratings Count &amp; Price &mdash; captured once. Best for one-off checks.</div>
         </div>
 
-        <div style="border:1.5px solid #bbf7d0;border-radius:10px;padding:12px;background:#f0fdf4;position:relative;">
+        <div style="border:1.5px solid #bbf7d0;border-radius:10px;padding:12px;background:#f0fdf4;position:relative;margin-bottom:14px;">
           <span style="position:absolute;top:-9px;right:10px;background:#16a34a;color:#fff;font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;letter-spacing:.3px;">RECOMMENDED</span>
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-            <span style="font-weight:700;font-size:12px;color:#16a34a;text-transform:uppercase;letter-spacing:.4px;">30-day tracking</span>
+            <span style="font-weight:700;font-size:12px;color:#16a34a;text-transform:uppercase;letter-spacing:.4px;">&#11088; Starter &middot; 30-day tracking</span>
             <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;5.90<span style="font-size:11px;font-weight:500;color:#6b7280;"> / row</span></span>
           </div>
-          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;5 + 18% GST</div>
-          <div style="font-size:12px;color:#374151;line-height:1.5;">Captures <b>Buy Box, Ratings, Ratings Count &amp; Price</b> &mdash; re-checked every few hours for 30 days. Shows the latest values, updated day by day. Auto-renews from wallet on day 30.</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;5 + 18% GST &middot; auto-renews from wallet day 30</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Re-checked every few hours for 30 days. Daily updates of all 4 metrics.</div>
         </div>
 
-        <div style="font-size:11px;color:#94a3b8;margin-top:10px;text-align:center;">All prices in INR. Paid via Razorpay (UPI / cards / netbanking).</div>
+        <div style="font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 6px;">Bulk packs &middot; save big at scale</div>
+
+        <div style="border:1.5px solid #e9d5ff;border-radius:10px;padding:12px;margin-bottom:8px;background:#faf5ff;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:12px;color:#7c3aed;text-transform:uppercase;letter-spacing:.4px;">&#128142; Plan 1</span>
+            <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;11,800<span style="font-size:11px;font-weight:500;color:#6b7280;"> total</span></span>
+          </div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;10,000 + 18% GST &middot; up to <b>5,000 rows</b> &middot; 30-day validity</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Effective <b>&#8377;2.36/row</b> if fully used &mdash; cheaper than Starter at scale.</div>
+        </div>
+
+        <div style="border:1.5px solid #e9d5ff;border-radius:10px;padding:12px;margin-bottom:8px;background:#faf5ff;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:12px;color:#7c3aed;text-transform:uppercase;letter-spacing:.4px;">&#128142; Plan 2</span>
+            <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;17,700<span style="font-size:11px;font-weight:500;color:#6b7280;"> total</span></span>
+          </div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;15,000 + 18% GST &middot; up to <b>10,000 rows</b> &middot; 30-day validity</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Effective <b>&#8377;1.77/row</b> if fully used &mdash; ~30% off Starter.</div>
+        </div>
+
+        <div style="border:1.5px solid #e9d5ff;border-radius:10px;padding:12px;margin-bottom:8px;background:#faf5ff;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:12px;color:#7c3aed;text-transform:uppercase;letter-spacing:.4px;">&#128142; Plan 3</span>
+            <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;23,600<span style="font-size:11px;font-weight:500;color:#6b7280;"> total</span></span>
+          </div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;20,000 + 18% GST &middot; up to <b>20,000 rows</b> &middot; 30-day validity</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Effective <b>&#8377;1.18/row</b> if fully used &mdash; best value for serious sellers.</div>
+        </div>
+
+        <div style="font-size:11px;color:#94a3b8;margin-top:10px;text-align:center;line-height:1.5;">
+          Bulk caps are <b>ceiling</b>, not guarantee. Unused capacity lapses after 30 days.<br>
+          All prices in INR. Paid via Razorpay (UPI / cards / netbanking).
+        </div>
       </div>
     </div>
 
@@ -1198,6 +1232,14 @@ function renderLedger(data) {
     return lines;
   }
 
+  // Helper to render an inline "Details" expandable section
+  function detailsBlock(id, content) {
+    return `<details style="margin-top:8px;border-top:1px dashed #e2e8f0;padding-top:6px;">
+      <summary style="font-size:10.5px;color:#1f6feb;cursor:pointer;font-weight:600;list-style:none;">&#9432; Plan details</summary>
+      <div style="font-size:11px;color:#475467;line-height:1.55;margin-top:6px;background:#f8fafc;padding:7px 9px;border-radius:5px;">${content}</div>
+    </details>`;
+  }
+
   // LEFT — One-time (₹2)
   const leftCard = `<div style="${card3D}">
     <div style="font-size:11px;font-weight:700;color:#0891b2;text-transform:uppercase;letter-spacing:0.6px;">&#9889; One-time</div>
@@ -1205,6 +1247,7 @@ function renderLedger(data) {
     <div style="font-size:32px;font-weight:800;color:#0f172a;line-height:1;margin-top:10px;">${totals.onetime.toLocaleString()}</div>
     <div style="font-size:11px;color:#64748b;margin-bottom:6px;">rows</div>
     ${expiryLines('topup', buckets.onetime)}
+    ${detailsBlock('onetime', '<b>Price:</b> &#8377;2 + 18% GST = &#8377;2.36 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; captured once<br><b>Retries:</b> Auto-retries up to 3 times if the scan fails<br><b>Renewal:</b> None &mdash; one-time only<br><a href="/pdtracker/upload.html?plan=topup" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add One-time rows &rarr;</a>')}
   </div>`;
 
   // MIDDLE — Starter (₹5)
@@ -1214,15 +1257,16 @@ function renderLedger(data) {
     <div style="font-size:32px;font-weight:800;color:#0f172a;line-height:1;margin-top:10px;">${totals.starter.toLocaleString()}</div>
     <div style="font-size:11px;color:#64748b;margin-bottom:6px;">rows</div>
     ${expiryLines('subscription', buckets.starter)}
+    ${detailsBlock('starter', '<b>Price:</b> &#8377;5 + 18% GST = &#8377;5.90 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; refreshed every few hours for 30 days<br><b>Renewal:</b> Auto-renews from wallet at day 30 (if balance available)<br><b>Cancel:</b> Don\\'t top up wallet &mdash; rows just expire<br><a href="/pdtracker/upload.html?plan=subscription" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add Starter rows &rarr;</a>')}
   </div>`;
 
   // RIGHT — Bulk plans (Plan 1/2/3)
   const packsByTier = { plan_10k: [], plan_15k: [], plan_20k: [] };
   for (const p of packs) { if (packsByTier[p.plan]) packsByTier[p.plan].push(p); }
   const TIER_META = {
-    plan_10k: { label: "Plan 1", capLabel: "5K", price: "&#8377;10,000" },
-    plan_15k: { label: "Plan 2", capLabel: "10K", price: "&#8377;15,000" },
-    plan_20k: { label: "Plan 3", capLabel: "20K", price: "&#8377;20,000" }
+    plan_10k: { label: "Plan 1", capLabel: "5K", price: "&#8377;10,000", total: "&#8377;11,800", perRow: "&#8377;2.36", capNum: 5000 },
+    plan_15k: { label: "Plan 2", capLabel: "10K", price: "&#8377;15,000", total: "&#8377;17,700", perRow: "&#8377;1.77", capNum: 10000 },
+    plan_20k: { label: "Plan 3", capLabel: "20K", price: "&#8377;20,000", total: "&#8377;23,600", perRow: "&#8377;1.18", capNum: 20000 }
   };
   let bulkHtml = "";
   for (const tier of ["plan_10k", "plan_15k", "plan_20k"]) {
@@ -1232,9 +1276,20 @@ function renderLedger(data) {
       bulkHtml += `<div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:6px;padding:7px 9px;margin-top:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div style="font-size:12px;color:#64748b;"><b>${meta.label}</b> &middot; ${meta.capLabel} rows</div>
-          <a href="/pdtracker/upload.html" style="font-size:10.5px;color:#1f6feb;font-weight:700;text-decoration:none;">Buy ${meta.price}</a>
+          <a href="/pdtracker/upload.html?plan=${tier}" style="font-size:10.5px;color:#fff;background:#1f6feb;padding:3px 8px;border-radius:4px;font-weight:700;text-decoration:none;">Buy ${meta.price}</a>
         </div>
         <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">Not purchased</div>
+        <details style="margin-top:4px;">
+          <summary style="font-size:10px;color:#1f6feb;cursor:pointer;font-weight:600;list-style:none;">&#9432; Details</summary>
+          <div style="font-size:10.5px;color:#475467;line-height:1.55;margin-top:4px;background:#fff;padding:6px 8px;border-radius:4px;border:1px solid #e9d5ff;">
+            <b>Total:</b> ${meta.total} (incl. 18% GST)<br>
+            <b>Capacity:</b> Up to ${meta.capNum.toLocaleString()} rows<br>
+            <b>Validity:</b> 30 days from purchase<br>
+            <b>Effective rate:</b> ${meta.perRow}/row if fully used<br>
+            <b>Tracking:</b> Each row gets continuous 30-day tracking<br>
+            <b>Unused:</b> Lapses after 30 days (no refund / carry-over)
+          </div>
+        </details>
       </div>`;
     } else {
       for (const p of tps) {
