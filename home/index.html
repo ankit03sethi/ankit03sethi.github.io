@@ -44,13 +44,38 @@
     .amt-debit { color: #dc2626; font-weight: 700; }
 
     /* Service grid */
-    .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 540px) { .svc-grid { grid-template-columns: 1fr; } }
-    .svc-card { display: flex; gap: 10px; align-items: center; padding: 12px; border: 1.5px solid #e5e7eb; border-radius: 10px; text-decoration: none; color: #0f172a; transition: all .12s; cursor: pointer; background: #fff; min-height: 64px; }
-    .svc-card:hover { border-color: #1f6feb; box-shadow: 0 4px 14px rgba(31,111,235,.10); transform: translateY(-1px); }
-    .svc-icon { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; font-size: 18px; color: #fff; flex-shrink: 0; }
-    .svc-name { font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.2; }
-    .svc-desc { font-size: 11px; color: #64748b; margin-top: 2px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .svc-card {
+      display: flex; gap: 11px; align-items: center; padding: 13px 14px;
+      border: 1px solid #e2e8f0; border-radius: 11px;
+      text-decoration: none !important; color: #0f172a;
+      cursor: pointer; min-height: 64px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      box-shadow:
+        0 4px 10px rgba(15,23,42,0.06),
+        0 1px 2px rgba(15,23,42,0.04),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .svc-card:hover {
+      border-color: #1f6feb;
+      box-shadow:
+        0 10px 24px rgba(31,111,235,0.18),
+        0 4px 8px rgba(15,23,42,0.08),
+        inset 0 1px 0 rgba(255,255,255,1);
+      transform: translateY(-3px);
+    }
+    .svc-card:active { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(31,111,235,0.12); }
+    .svc-card, .svc-card * { text-decoration: none !important; }
+    .svc-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: grid; place-items: center; font-size: 18px;
+      color: #fff; flex-shrink: 0; font-weight: 700;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .svc-name { font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.2; }
+    .svc-desc { font-size: 11.5px; color: #64748b; margin-top: 2px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   </style>
 </head>
 <body>
@@ -110,34 +135,38 @@
         <a id="addBalBtn" href="/pdtracker/wallet.html" class="add-btn">+ Add Balance</a>
       </div>
 
-      <!-- Transactions -->
-      <div class="panel" style="margin-top:16px;">
-        <h2>Transactions</h2>
-        <div class="filters-row">
-          <label>Service:</label>
-          <select id="filterService">
-            <option value="">All services</option>
-            <option value="pd_tracker">PD Tracker</option>
-            <option value="business_launcher">Business Launcher</option>
-            <option value="creators">Creators</option>
-            <option value="recharge">Recharge</option>
-            <option value="referral">Referral</option>
-          </select>
-          <label>Type:</label>
-          <select id="filterType">
-            <option value="">All types</option>
-            <option value="credit">Credit (money in)</option>
-            <option value="debit">Debit (money out)</option>
-          </select>
-          <span id="txCount" style="font-size:12px;color:#64748b;margin-left:auto;"></span>
+      <!-- Transactions — collapsed by default, click to open -->
+      <details id="txDetails" class="panel" style="margin-top:16px;">
+        <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;font-size:15px;font-weight:700;color:#0f172a;">
+          <span>&#128202; Transactions <span id="txCountHeader" style="font-size:12px;font-weight:500;color:#64748b;margin-left:6px;"></span></span>
+          <span id="txToggleLabel" style="font-size:12px;color:#1f6feb;font-weight:600;">Click here to open &darr;</span>
+        </summary>
+        <div style="margin-top:14px;">
+          <div class="filters-row">
+            <label>Service:</label>
+            <select id="filterService">
+              <option value="">All services</option>
+              <option value="pd_tracker">PD Tracker</option>
+              <option value="business_launcher">Business Launcher</option>
+              <option value="recharge">Recharge</option>
+              <option value="referral">Referral</option>
+            </select>
+            <label>Type:</label>
+            <select id="filterType">
+              <option value="">All types</option>
+              <option value="credit">Credit (money in)</option>
+              <option value="debit">Debit (money out)</option>
+            </select>
+            <span id="txCount" style="font-size:12px;color:#64748b;margin-left:auto;"></span>
+          </div>
+          <div id="txWrap">
+            <div class="tx-empty">Loading transactions…</div>
+          </div>
+          <div style="text-align:center;margin-top:14px;">
+            <a href="/pdtracker/wallet.html" style="font-size:12px;color:#1f6feb;font-weight:700;">Open full wallet page &rarr;</a>
+          </div>
         </div>
-        <div id="txWrap">
-          <div class="tx-empty">Loading transactions…</div>
-        </div>
-        <div style="text-align:center;margin-top:14px;">
-          <a href="/pdtracker/wallet.html" style="font-size:12px;color:#1f6feb;font-weight:700;">Open full wallet page &rarr;</a>
-        </div>
-      </div>
+      </details>
     </div>
 
     <!-- RIGHT COLUMN: Services -->
@@ -168,14 +197,6 @@
             <div style="flex:1;min-width:0;">
               <div class="svc-name">GST Registration</div>
               <div class="svc-desc">Get your GSTIN, CA-backed</div>
-            </div>
-          </a>
-
-          <a class="svc-card" href="/current-account/">
-            <div class="svc-icon" style="background:#f97316;">&#127974;</div>
-            <div style="flex:1;min-width:0;">
-              <div class="svc-name">Current Account</div>
-              <div class="svc-desc">Zero balance, instant open</div>
             </div>
           </a>
 
@@ -224,14 +245,6 @@
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Website Creation</div>
               <div class="svc-desc">Custom e-commerce or business site</div>
-            </div>
-          </a>
-
-          <a class="svc-card" href="/creators/">
-            <div class="svc-icon" style="background:#a855f7;">&#127908;</div>
-            <div style="flex:1;min-width:0;">
-              <div class="svc-name">Creators</div>
-              <div class="svc-desc">Hire YouTubers &amp; influencers</div>
             </div>
           </a>
 
