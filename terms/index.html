@@ -248,20 +248,31 @@
     <h3>10.1 Plan structure</h3>
     <p>PD Tracker offers the following commercial plans (subject to revision):</p>
     <table>
-      <tr><th>Plan</th><th>Cap / Term</th><th>Price (excl. GST)</th></tr>
-      <tr><td>Trial</td><td>10 rows / one-time</td><td>Free</td></tr>
-      <tr><td>One-time (₹2)</td><td>Single scan per row</td><td>₹2 per row</td></tr>
-      <tr><td>Starter (₹5)</td><td>30-day rolling tracking per row</td><td>₹5 per row</td></tr>
-      <tr><td>Plan 1</td><td>Up to 5,000 rows, 30 days</td><td>₹10,000</td></tr>
-      <tr><td>Plan 2</td><td>Up to 10,000 rows, 30 days</td><td>₹15,000</td></tr>
-      <tr><td>Plan 3</td><td>Up to 20,000 rows, 30 days</td><td>₹20,000</td></tr>
+      <tr><th>Plan</th><th>Cap / Term</th><th>Price (excl. GST)</th><th>Data retention</th></tr>
+      <tr><td>Trial</td><td>10 rows, one-time</td><td>Free</td><td>3 days from scan</td></tr>
+      <tr><td>One-time (₹2)</td><td>Single scan per row</td><td>₹2 per row</td><td>3 days from scan, then auto-deleted</td></tr>
+      <tr><td>Starter (₹5)</td><td>30-day continuous tracking per row</td><td>₹5 per row</td><td>30 days + 3-day grace, then auto-deleted</td></tr>
+      <tr><td>Plan 1</td><td>Up to 5,000 rows, 30 days from purchase</td><td>₹10,000</td><td>30 days + 3-day grace, then auto-deleted</td></tr>
+      <tr><td>Plan 2</td><td>Up to 10,000 rows, 30 days from purchase</td><td>₹15,000</td><td>30 days + 3-day grace, then auto-deleted</td></tr>
+      <tr><td>Plan 3</td><td>Up to 20,000 rows, 30 days from purchase</td><td>₹20,000</td><td>30 days + 3-day grace, then auto-deleted</td></tr>
     </table>
-    <h3>10.2 Row credit rules</h3>
+    <h3>10.2 Row credit rules &amp; data retention</h3>
     <ol>
       <li>Row credits within a bulk plan (Plan 1 / 2 / 3) expire 30 days from the date of purchase. Unused credits lapse and are not refundable, transferable, or carried over.</li>
       <li>Bulk plan capacity is a ceiling, not a guarantee of usage. If you do not utilise the full capacity within the validity period, the unutilised portion is forfeited.</li>
       <li>Starter (₹5) row tracking is renewed only when you re-upload or top up; tracking is automatically suspended for any row whose 30-day window has elapsed without renewal.</li>
       <li>One-time (₹2) rows are scanned once and not refreshed thereafter.</li>
+      <li>
+        <strong>Data retention policy (all plan types):</strong>
+        <ul>
+          <li><strong>One-time (₹2):</strong> Scraped data is available in your dashboard for <strong>3 days</strong> from the date of scan completion. After 3 days, the row and its data are <strong>automatically and permanently deleted</strong>. You must download the data within this 3-day window if you wish to retain it.</li>
+          <li><strong>Starter (₹5):</strong> Continuous tracking runs for 30 days from purchase. Following expiry, a <strong>3-day grace period</strong> applies during which you may renew the row from your wallet, or download its data. On <strong>day 33 from the original purchase date</strong>, any row that has not been renewed is <strong>automatically and permanently deleted</strong>.</li>
+          <li><strong>Bulk plans (Plan 1 / 2 / 3):</strong> The pack and all rows linked to it expire 30 days from the date of purchase, irrespective of how much capacity was utilised. A <strong>3-day grace period</strong> follows expiry during which you may purchase a new pack to retain the rows, or download the existing data. On <strong>day 33 from the original purchase date</strong>, all rows belonging to the pack are <strong>automatically and permanently deleted</strong>.</li>
+        </ul>
+      </li>
+      <li>Deletion under the data retention policy is <strong>irreversible</strong>. Cursive does not maintain backups of deleted row data and cannot restore deleted rows on customer request. You acknowledge and accept this retention model when purchasing.</li>
+      <li>Auto-deletion is the system default and applies even if you have not been notified individually. Cursive may, at its discretion, send a reminder email before deletion but is not obliged to do so.</li>
+      <li>You may at any time download all current row data via the PD Tracker dashboard's Reports / Download functions, or via the dedicated download links on the row ledger. We strongly recommend periodic downloads if you wish to retain historical data outside of the Service.</li>
     </ol>
     <h3>10.3 Refund Policy</h3>
     <div class="callout">
