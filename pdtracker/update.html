@@ -127,42 +127,74 @@ downloadBtn.addEventListener("click", async () => {
       return;
     }
 
-    setStatus(downloadStat, "Building Excel from master template...");
-    const tplResp = await fetch(TEMPLATE_URL, { cache: "no-store" });
-    if (!tplResp.ok) throw new Error("Could not fetch master template (" + tplResp.status + ")");
-    const tplBuf = await tplResp.arrayBuffer();
+    setStatus(downloadStat, "Building Excel...");
 
-    // Load with ExcelJS — preserves formulas, dropdowns, sheet protection, cell protection
+    // Build a CLEAN workbook from scratch — only N rows, no extras.
+    // This prevents customer from adding new products via empty rows below.
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(tplBuf);
-    const ws = wb.getWorksheet("Template") || wb.worksheets[0];
+    wb.creator = "Cursive PD Tracker";
+    wb.created = new Date();
+    const ws = wb.addWorksheet("Update");
+
+    ws.columns = [
+      { header: "Platform",    key: "platform",   width: 14 },
+      { header: "ID Name",     key: "idname",     width: 14 },
+      { header: "Product ID",  key: "productid",  width: 22 },
+      { header: "Note",        key: "note",       width: 60 },
+      { header: "Seller Code", key: "sellercode", width: 18 },
+      { header: "Seller Name", key: "sellername", width: 28 }
+    ];
+    const header = ws.getRow(1);
+    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F6FEB" } };
+    header.alignment = { vertical: "middle", horizontal: "center" };
+    header.height = 22;
+
+    function idNameFor(p) {
+      const s = String(p || "").toLowerCase();
+      if (s === "amazon")   return "ASIN";
+      if (s === "flipkart") return "FSN";
+      if (s === "meesho")   return "Product ID";
+      if (s === "myntra")   return "Style ID";
+      if (s === "firstcry") return "FC ID";
+      return "";
+    }
+
+    const greyFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
 
     rows.forEach((r, i) => {
       const rowNum = i + 2;
-      const platform = platformDisplay(r.platform);
+      const platform  = platformDisplay(r.platform);
+      const productId = String(r.product_id || "");
+      const idName    = idNameFor(platform);
+      const noteText  = productId
+        ? "Once uploaded, this row cannot be edited. Please double-check Platform and Product ID before uploading."
+        : "";
 
-      // A = Platform — set value AND LOCK it (override the template's A-unlocked default)
-      const cellA = ws.getCell("A" + rowNum);
-      cellA.value = platform;
-      cellA.protection = { locked: true };
+      ws.getCell("A" + rowNum).value = platform;
+      ws.getCell("B" + rowNum).value = idName;
+      ws.getCell("C" + rowNum).value = productId;
+      ws.getCell("D" + rowNum).value = noteText;
+      ws.getCell("E" + rowNum).value = String(r.seller_code || "");
+      ws.getCell("F" + rowNum).value = String(r.seller_name || "");
 
-      // C = Product ID — set value (template already has C locked)
-      const cellC = ws.getCell("C" + rowNum);
-      cellC.value = String(r.product_id || "");
-      cellC.protection = { locked: true };
+      // LOCK A, B, C, D. UNLOCK E, F.
+      ws.getCell("A" + rowNum).protection = { locked: true };
+      ws.getCell("B" + rowNum).protection = { locked: true };
+      ws.getCell("C" + rowNum).protection = { locked: true };
+      ws.getCell("D" + rowNum).protection = { locked: true };
+      ws.getCell("E" + rowNum).protection = { locked: false };
+      ws.getCell("F" + rowNum).protection = { locked: false };
 
-      // E = Seller Code — UNLOCKED so customer can edit
-      const cellE = ws.getCell("E" + rowNum);
-      cellE.value = String(r.seller_code || "");
-      cellE.protection = { locked: false };
-
-      // F = Seller Name — UNLOCKED so customer can edit
-      const cellF = ws.getCell("F" + rowNum);
-      cellF.value = String(r.seller_name || "");
-      cellF.protection = { locked: false };
-
-      // B (ID Name) and D (Note) keep their template formulas — leave them alone
+      // Grey background on locked columns so visually obvious
+      ws.getCell("A" + rowNum).fill = greyFill;
+      ws.getCell("B" + rowNum).fill = greyFill;
+      ws.getCell("C" + rowNum).fill = greyFill;
+      ws.getCell("D" + rowNum).fill = greyFill;
     });
+
+    // Lock header row too
+    for (let c = 1; c <= 6; c++) ws.getCell(1, c).protection = { locked: true };
 
     // Lock the sheet with a permanent password so customer cannot un-protect via right-click.
     // (Server is still the real security boundary — it ignores any tampered platform/product_id
@@ -195,7 +227,7 @@ downloadBtn.addEventListener("click", async () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
 
-    setStatus(downloadStat, `Downloaded ${rows.length} products. Edit only Seller Code / Seller Name (columns E & F). Other columns are locked. Save the file, then upload below.`, "ok");
+    setStatus(downloadStat, `Downloaded ${rows.length} products (no extras). Edit only Seller Code (E) and Seller Name (F) -- everything else is locked. Save the file, then upload below.`, "ok");
   } catch (err) {
     setStatus(downloadStat, "Could not download: " + (err.message || err), "error");
   } finally {
