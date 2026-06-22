@@ -123,6 +123,15 @@
     </div>
   </div>
 
+  <!-- Row Credits Ledger (bulk plans + per-plan summary) -->
+  <div id="ledgerCard" class="hidden" style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid #eaecf0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;">&#128202; Your PD Tracker Row Ledger</div>
+      <a href="/pdtracker/upload.html" style="font-size:12px;color:#1f6feb;text-decoration:none;font-weight:600;">+ Buy more rows</a>
+    </div>
+    <div id="ledgerBody" style="font-size:13px;color:#334155;line-height:1.6;"></div>
+  </div>
+
   <div id="trialBanner" class="trial-banner hidden">
     <div class="text">
       <strong>Free trial:</strong> <span id="trialLeft">10</span> of <span id="trialQuota">10</span> of your own products left to add.
@@ -199,9 +208,23 @@
       </div>
     </div>
 
+    <!-- Plan (Trial / One-time / Starter / Plan 1 / 2 / 3) multi-select -->
+    <div id="planFilterWrap" style="position:relative;">
+      <button id="planFilterBtn" type="button" style="padding:8px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:120px;text-align:left;">Plan <span style="float:right;color:#94a3b8;">&#9662;</span></button>
+      <div id="planFilterPanel" class="hidden" style="position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d0d5dd;border-radius:8px;padding:8px;min-width:200px;max-height:280px;overflow-y:auto;box-shadow:0 4px 18px rgba(0,0,0,.1);z-index:50;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;font-weight:600;border-bottom:1px solid #eaecf0;margin-bottom:4px;cursor:pointer;">
+          <input type="checkbox" id="planAllChk" checked /> Select all
+        </label>
+        <div id="planList"></div>
+      </div>
+    </div>
+
     <button id="saveFiltersBtn" class="btn btn-primary-sm" style="font-size:12px;padding:8px 14px;" title="Fix current filters so they auto-apply next time you sign in">&#128204; Fix filters</button>
     <button id="resetFiltersBtn" class="btn btn-outline" style="font-size:12px;padding:8px 12px;">Reset</button>
     <span id="filtersSavedHint" style="font-size:11px;color:#047857;font-weight:600;" class="hidden">&#10003; Fixed</span>
+
+    <!-- "Showing X of Y rows" counter -->
+    <span id="rowCounter" style="font-size:12px;color:#64748b;font-weight:600;margin-left:auto;"></span>
   </div>
   <div id="productsContainer"></div>
 </main>
@@ -464,6 +487,8 @@ async function refreshDash() {
     rebuildSellerFilter();
     rebuildSellerCodeFilter();
     rebuildSellerNameFilter();
+    rebuildPlanFilter();
+    fetchLedgerSummary();
     if (!_pinnedApplied) {
       _pinnedApplied = true;
       let saved = null;
@@ -563,7 +588,11 @@ function renderTable() {
   }
   // Apply Seller Code + Seller Name filters
   rows = applySellerCodeNameFilter(rows);
+  // Apply Plan filter (Trial/One-time/Starter/Plan 1/2/3)
+  rows = applyPlanFilter(rows);
 
+  // Update "Showing X of Y rows" counter
+  updateRowCounter(rows.length, _cachedRows.length);
 
   const sorters = {
     created_desc: (a, b) => new Date(b.created_at) - new Date(a.created_at),
@@ -707,8 +736,10 @@ window.addEventListener("DOMContentLoaded", () => {
       // Re-check all options in the 3 multi-select dropdowns
       document.querySelectorAll("#sellerCodeList input[type=checkbox]").forEach(c => c.checked = true);
       document.querySelectorAll("#sellerNameList input[type=checkbox]").forEach(c => c.checked = true);
+      document.querySelectorAll("#planList input[type=checkbox]").forEach(c => c.checked = true);
       syncMultiButtonLabel(SELLER_CODE_OPTS); syncMultiAllChk(SELLER_CODE_OPTS);
       syncMultiButtonLabel(SELLER_NAME_OPTS); syncMultiAllChk(SELLER_NAME_OPTS);
+      syncPlanButtonLabel();
       _sortKey = "created_desc";
       document.querySelectorAll("#sellerList input[type=checkbox]").forEach(c => c.checked = true);
       syncSellerButtonLabel(); syncSellerAllCheck();
@@ -990,6 +1021,146 @@ function applySellerCodeNameFilter(rows) {
   return rows;
 }
 
+// ===== Plan filter (Trial / One-time / Starter / Plan 1 / 2 / 3) =====
+const PLAN_LABELS = {
+  "trial": "Trial",
+  "topup": "One-time",
+  "subscription": "Starter",
+  "plan_10k": "Plan 1 (5K)",
+  "plan_15k": "Plan 2 (10K)",
+  "plan_20k": "Plan 3 (20K)"
+};
+function planLabel(plan) { return PLAN_LABELS[plan] || (plan || "—"); }
+function rebuildPlanFilter() {
+  const list = document.querySelector("#planList");
+  if (!list) return;
+  // Build from PLANS the customer actually has rows for
+  const present = new Set();
+  for (const r of _cachedRows) present.add(r.plan || "unknown");
+  const arr = Array.from(present).sort((a, b) => {
+    // Sort by predefined order
+    const order = ["trial", "topup", "subscription", "plan_10k", "plan_15k", "plan_20k"];
+    return order.indexOf(a) - order.indexOf(b);
+  });
+  const priorChecked = {};
+  list.querySelectorAll("input[type=checkbox]").forEach(c => { priorChecked[c.value] = c.checked; });
+  list.innerHTML = arr.map(p => {
+    const wasChecked = priorChecked[p] !== false;
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px;cursor:pointer;"><input type="checkbox" value="${esc(p)}" ${wasChecked ? "checked" : ""} /> ${esc(planLabel(p))}</label>`;
+  }).join("");
+  list.querySelectorAll("input[type=checkbox]").forEach(c => c.addEventListener("change", () => {
+    syncPlanButtonLabel(); renderTable();
+  }));
+  syncPlanButtonLabel();
+}
+function syncPlanButtonLabel() {
+  const btn = document.querySelector("#planFilterBtn");
+  if (!btn) return;
+  const checks = document.querySelectorAll("#planList input[type=checkbox]");
+  const total = checks.length;
+  let checked = 0;
+  checks.forEach(c => { if (c.checked) checked++; });
+  if (total === 0 || checked === total) btn.innerHTML = `Plan <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else if (checked === 0) btn.innerHTML = `No plan <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+  else btn.innerHTML = `${checked} of ${total} plans <span style="float:right;color:#94a3b8;">&#9662;</span>`;
+}
+function applyPlanFilter(rows) {
+  const checks = document.querySelectorAll("#planList input[type=checkbox]");
+  const allowed = new Set();
+  let any = false;
+  checks.forEach(c => { if (c.checked) { allowed.add(c.value); any = true; } });
+  if (checks.length === 0 || !any) return rows;
+  return rows.filter(r => allowed.has(r.plan || "unknown"));
+}
+document.addEventListener("click", (e) => {
+  const btn = document.getElementById("planFilterBtn");
+  const panel = document.getElementById("planFilterPanel");
+  if (!btn || !panel) return;
+  if (e.target === btn || btn.contains(e.target)) { panel.classList.toggle("hidden"); }
+  else if (!panel.contains(e.target)) { panel.classList.add("hidden"); }
+});
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.id === "planAllChk") {
+    const v = e.target.checked;
+    document.querySelectorAll("#planList input[type=checkbox]").forEach(c => { c.checked = v; });
+    syncPlanButtonLabel(); renderTable();
+  }
+});
+
+// ===== Ledger summary card =====
+async function fetchLedgerSummary() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-ledger-summary`, {
+      headers: { "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.ok) return;
+    renderLedger(data);
+  } catch (e) { /* silent */ }
+}
+function renderLedger(data) {
+  const card = document.getElementById("ledgerCard");
+  const body = document.getElementById("ledgerBody");
+  if (!card || !body) return;
+  const packs = data.credit_packs || [];
+  const buckets = data.plan_buckets || [];
+  if (packs.length === 0 && buckets.length === 0) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  function daysLeft(iso) {
+    if (!iso) return null;
+    return Math.ceil((new Date(iso) - new Date()) / 86400000);
+  }
+
+  let html = "";
+  // 1) Bulk packs (most informative — show cap, used, remaining, expiry)
+  for (const p of packs) {
+    const used = p.credits_used;
+    const remaining = p.credits_remaining;
+    const cap = p.credits_purchased;
+    const dl = daysLeft(p.expires_at);
+    const expiringSoon = dl !== null && dl <= 7 && dl >= 0;
+    const expired = dl !== null && dl < 0;
+    const dlText = dl === null ? "" : expired ? "Expired" : `${dl} day${dl === 1 ? "" : "s"} left`;
+    html += `<div style="padding:10px 0;border-bottom:1px dashed #eaecf0;">
+      <div style="font-weight:600;color:#0f172a;">${esc(p.label)} &middot; ${cap.toLocaleString()} rows</div>
+      <div style="font-size:12px;color:#475467;margin-top:3px;">
+        Used: <b>${used.toLocaleString()}</b> &middot; Remaining: <b>${remaining.toLocaleString()}</b>
+        &middot; Started ${fmtDate(p.purchased_at)} &middot; Expires ${fmtDate(p.expires_at)}
+        ${expired ? `<span style="color:#b91c1c;font-weight:600;"> (${dlText})</span>` : (expiringSoon ? `<span style="color:#92400e;font-weight:600;"> (${dlText})</span>` : ` (${dlText})`)}
+      </div>
+    </div>`;
+  }
+  // 2) Per-plan buckets (trial / starter / one-time)
+  const noncreditBuckets = buckets.filter(b => b.plan !== "plan_10k" && b.plan !== "plan_15k" && b.plan !== "plan_20k");
+  for (const b of noncreditBuckets) {
+    const ex = b.earliest_expiry ? ` &middot; Earliest expiry ${fmtDate(b.earliest_expiry)}` : ` &middot; No expiry`;
+    html += `<div style="padding:6px 0;font-size:12px;color:#475467;">
+      <b>${esc(b.label)}</b> &middot; ${b.rows.toLocaleString()} row${b.rows === 1 ? "" : "s"}${ex}
+    </div>`;
+  }
+  html += `<div style="margin-top:8px;font-size:12px;color:#0f172a;font-weight:600;">
+    Total active rows: ${(data.total_active_rows || 0).toLocaleString()}
+  </div>`;
+  body.innerHTML = html;
+}
+
+// ===== Row counter ("Showing X of Y rows" near filters) =====
+function updateRowCounter(filteredCount, totalCount) {
+  const el = document.getElementById("rowCounter");
+  if (!el) return;
+  if (totalCount === 0) { el.textContent = ""; return; }
+  if (filteredCount === totalCount) el.textContent = `${totalCount.toLocaleString()} rows`;
+  else el.textContent = `Showing ${filteredCount.toLocaleString()} of ${totalCount.toLocaleString()} rows`;
+}
+
 // =============================================================
 // COMPREHENSIVE REPORT BUILDER (with colors, all sheets, filters)
 // =============================================================
@@ -1007,6 +1178,7 @@ function getFilteredRows() {
   if (q) rows = rows.filter(r => (r.product_id || "").toLowerCase().includes(q) || (r.seller || "").toLowerCase().includes(q) || (r.seller_code || "").toLowerCase().includes(q) || (r.seller_name || "").toLowerCase().includes(q));
   if (sellerChecks.length > 0 && anySellerChecked) rows = rows.filter(r => allowedSellers.has(r.seller || "(unknown)"));
   rows = applySellerCodeNameFilter(rows);
+  rows = applyPlanFilter(rows);
   return rows;
 }
 
