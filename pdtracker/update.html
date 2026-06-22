@@ -11,6 +11,7 @@
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 <body>
 
@@ -103,12 +104,13 @@ function platformDisplay(p) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ---- Step 1: Download = fetch master template + inject customer data ----
+// ---- Step 1: Download = fetch master template via ExcelJS + inject customer data ----
+//   ExcelJS preserves cell-level protection from the template AND lets us flip A from
+//   unlocked (the master template's default for Add-new flow) to LOCKED for this update flow.
 downloadBtn.addEventListener("click", async () => {
   setStatus(downloadStat, "Fetching your products...");
   downloadBtn.disabled = true;
   try {
-    // Fetch customer products
     const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-update-products`, {
       method: "GET",
       headers: {
@@ -125,39 +127,64 @@ downloadBtn.addEventListener("click", async () => {
       return;
     }
 
-    // Fetch the master template (same one the Add new products button serves)
     setStatus(downloadStat, "Building Excel from master template...");
     const tplResp = await fetch(TEMPLATE_URL, { cache: "no-store" });
     if (!tplResp.ok) throw new Error("Could not fetch master template (" + tplResp.status + ")");
     const tplBuf = await tplResp.arrayBuffer();
 
-    // Read it, preserving formulas + sheet protection + data validations
-    const wb = XLSX.read(tplBuf, { type: "array", cellFormula: true, cellStyles: true, bookVBA: true });
-    const sheetName = wb.SheetNames.includes("Template") ? "Template" : wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
+    // Load with ExcelJS — preserves formulas, dropdowns, sheet protection, cell protection
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(tplBuf);
+    const ws = wb.getWorksheet("Template") || wb.worksheets[0];
 
-    // Inject customer data into rows 2..N+1
-    // Column A = Platform, Column C = Product ID, Column E = Seller Code, Column F = Seller Name
-    // Columns B (ID Name) and D (Note) already have formulas — they'll auto-fill when A and C are set.
     rows.forEach((r, i) => {
-      const rowNum = i + 2; // row 1 is header
+      const rowNum = i + 2;
       const platform = platformDisplay(r.platform);
-      // Write Platform (A)
-      XLSX.utils.sheet_add_aoa(ws, [[platform]], { origin: "A" + rowNum });
-      // Write Product ID (C)
-      XLSX.utils.sheet_add_aoa(ws, [[String(r.product_id || "")]], { origin: "C" + rowNum });
-      // Write Seller Code (E) — pre-filled with current value
-      XLSX.utils.sheet_add_aoa(ws, [[String(r.seller_code || "")]], { origin: "E" + rowNum });
-      // Write Seller Name (F) — pre-filled with current value
-      XLSX.utils.sheet_add_aoa(ws, [[String(r.seller_name || "")]], { origin: "F" + rowNum });
+
+      // A = Platform — set value AND LOCK it (override the template's A-unlocked default)
+      const cellA = ws.getCell("A" + rowNum);
+      cellA.value = platform;
+      cellA.protection = { locked: true };
+
+      // C = Product ID — set value (template already has C locked)
+      const cellC = ws.getCell("C" + rowNum);
+      cellC.value = String(r.product_id || "");
+      cellC.protection = { locked: true };
+
+      // E = Seller Code — UNLOCKED so customer can edit
+      const cellE = ws.getCell("E" + rowNum);
+      cellE.value = String(r.seller_code || "");
+      cellE.protection = { locked: false };
+
+      // F = Seller Name — UNLOCKED so customer can edit
+      const cellF = ws.getCell("F" + rowNum);
+      cellF.value = String(r.seller_name || "");
+      cellF.protection = { locked: false };
+
+      // B (ID Name) and D (Note) keep their template formulas — leave them alone
     });
 
-    // Recompute !ref so the new rows are included
-    const lastRow = rows.length + 1;
-    ws["!ref"] = "A1:Z" + Math.max(lastRow, 501);
+    // Lock the sheet with a permanent password so customer cannot un-protect via right-click.
+    // (Server is still the real security boundary — it ignores any tampered platform/product_id
+    // values regardless of what the file looks like.)
+    const SHEET_PASSWORD = "Q@z301290";
+    await ws.protect(SHEET_PASSWORD, {
+      selectLockedCells: true,
+      selectUnlockedCells: true,
+      formatCells: false,
+      formatColumns: false,
+      formatRows: false,
+      insertColumns: false,
+      insertRows: false,
+      insertHyperlinks: false,
+      deleteColumns: false,
+      deleteRows: false,
+      sort: true,
+      autoFilter: true,
+      pivotTables: false
+    }).catch(() => { /* protect() may reject silently if already protected — ignore */ });
 
-    // Write file (preserve as much as we can)
-    const out = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true, bookSST: false });
+    const out = await wb.xlsx.writeBuffer();
     const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const stamp = new Date().toISOString().slice(0, 10);
     const a = document.createElement("a");
@@ -168,13 +195,42 @@ downloadBtn.addEventListener("click", async () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
 
-    setStatus(downloadStat, `Downloaded ${rows.length} products. Edit Seller Code / Seller Name (columns E & F), save, then upload below.`, "ok");
+    setStatus(downloadStat, `Downloaded ${rows.length} products. Edit only Seller Code / Seller Name (columns E & F). Other columns are locked. Save the file, then upload below.`, "ok");
   } catch (err) {
     setStatus(downloadStat, "Could not download: " + (err.message || err), "error");
   } finally {
     downloadBtn.disabled = false;
   }
 });
+
+// ---- Helper: build + download an Excel of skipped rows so customer can review/fix ----
+function downloadSkippedRows(skippedRows) {
+  // Columns: Platform | Product ID | Seller Code | Seller Name | Why this row was skipped
+  const aoa = [
+    ["Platform", "Product ID", "Seller Code", "Seller Name", "Why this row was skipped"]
+  ];
+  skippedRows.forEach(r => {
+    aoa.push([
+      r.platform || "",
+      r.product_id || "",
+      r.seller_code || "",
+      r.seller_name || "",
+      r.reason || ""
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    { wch: 16 }, // Platform
+    { wch: 22 }, // Product ID
+    { wch: 16 }, // Seller Code
+    { wch: 24 }, // Seller Name
+    { wch: 56 }  // Reason
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Skipped");
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `cursive_pdtracker_skipped_${stamp}.xlsx`);
+}
 
 // ---- Step 2: parse + upload ----
 let parsedUpdates = [];
@@ -223,6 +279,7 @@ fileInput.addEventListener("change", async (e) => {
 uploadBtn.addEventListener("click", async () => {
   if (parsedUpdates.length === 0) return;
   uploadBtn.disabled = true;
+  uploadStat.innerHTML = "";
   setStatus(uploadStat, "Applying updates...");
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-update-products`, {
@@ -237,9 +294,66 @@ uploadBtn.addEventListener("click", async () => {
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
 
-    let msg = `Updated ${data.updated} row(s).`;
-    if (data.skipped > 0) msg += ` Skipped ${data.skipped} (no matching Platform + Product ID).`;
-    setStatus(uploadStat, msg + " You can return to the dashboard now.", "ok");
+    // Build a rich result panel with separate success + warning blocks
+    const updated = data.updated || 0;
+    const skipped = data.skipped || 0;
+    uploadStat.textContent = "";
+    uploadStat.style.color = "";
+
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "display:flex;flex-direction:column;gap:10px;margin-top:6px;";
+
+    // Success block
+    const okBox = document.createElement("div");
+    okBox.style.cssText = "padding:12px 14px;border:1.5px solid #bbf7d0;background:#f0fdf4;border-left:4px solid #16a34a;border-radius:8px;color:#14532d;font-size:14px;line-height:1.5;";
+    okBox.innerHTML = `<b>&#10003; ${updated} row${updated === 1 ? "" : "s"} updated successfully.</b><br><span style="font-size:12px;color:#15803d;">Seller Code and Seller Name have been saved for these products.</span>`;
+    wrap.appendChild(okBox);
+
+    // Warning block — only when there are skipped rows. Also offers a downloadable Excel
+    // containing JUST the skipped rows + a "Reason" column so customer can review and fix.
+    if (skipped > 0) {
+      const warnBox = document.createElement("div");
+      warnBox.style.cssText = "padding:12px 14px;border:1.5px solid #fde68a;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:8px;color:#78350f;font-size:14px;line-height:1.5;";
+      warnBox.innerHTML =
+        `<b>&#9888; ${skipped} row${skipped === 1 ? "" : "s"} could not be updated.</b><br>` +
+        `<span style="font-size:12px;">The <b>Platform</b> and <b>Product ID</b> in ${skipped === 1 ? "that row did" : "those rows did"} not match any existing product in your account.</span><br>` +
+        `<span style="font-size:12px;margin-top:6px;display:inline-block;">Common reasons:</span>` +
+        `<ul style="margin:4px 0 0 18px;font-size:12px;color:#92400e;">` +
+        `<li>The Product ID was changed in Excel</li>` +
+        `<li>The Platform spelling was changed</li>` +
+        `<li>The row is for a product you never added (use <a href="/pdtracker/upload.html" style="color:#1f6feb;font-weight:600;">+ Add new products</a> to add new ones)</li>` +
+        `</ul>`;
+
+      // Download skipped rows button
+      const skippedRows = Array.isArray(data.skippedRows) ? data.skippedRows : [];
+      if (skippedRows.length > 0) {
+        const dlWrap = document.createElement("div");
+        dlWrap.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px dashed #fde68a;";
+        const dlBtn = document.createElement("button");
+        dlBtn.type = "button";
+        dlBtn.textContent = "⬇ Download skipped rows (Excel)";
+        dlBtn.style.cssText = "padding:8px 14px;background:#f59e0b;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;";
+        dlBtn.addEventListener("click", () => {
+          downloadSkippedRows(skippedRows);
+        });
+        const hint = document.createElement("div");
+        hint.style.cssText = "margin-top:6px;font-size:11px;color:#92400e;";
+        hint.textContent = "Review the file, fix the Platform / Product ID issues, then re-upload.";
+        dlWrap.appendChild(dlBtn);
+        dlWrap.appendChild(hint);
+        warnBox.appendChild(dlWrap);
+      }
+
+      wrap.appendChild(warnBox);
+    }
+
+    // Footer link back to dashboard
+    const foot = document.createElement("div");
+    foot.style.cssText = "margin-top:4px;font-size:13px;color:#475467;";
+    foot.innerHTML = `Done. <a href="/pdtracker/" style="color:#1f6feb;font-weight:600;">&larr; Back to dashboard</a> to see the changes.`;
+    wrap.appendChild(foot);
+
+    uploadStat.appendChild(wrap);
   } catch (err) {
     setStatus(uploadStat, "Failed: " + (err.message || err), "error");
     uploadBtn.disabled = false;
