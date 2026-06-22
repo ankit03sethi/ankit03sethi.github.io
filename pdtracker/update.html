@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Update data &mdash; Cursive PD Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/pdtracker/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <a href="/pdtracker/" class="btn-ghost">&larr; Back to dashboard</a>
+  </div>
+</header>
+
+<main>
+  <div class="upload-card">
+    <h1 style="margin:0 0 6px;font-size:22px;">&#9998; Update existing product data</h1>
+    <p class="muted" style="margin:0 0 20px;font-size:14px;">
+      Edit <b>Seller Code</b>, <b>Seller Name</b>, and <b>Notes</b> for products you've already added.
+      <span style="color:#92400e;">Platform &amp; Product ID stay locked &mdash; if you want to track a new product, use <a href="/pdtracker/upload.html" style="color:#1f6feb;font-weight:600;">+ Add new products</a> instead.</span>
+    </p>
+
+    <!-- Step 1 -->
+    <div class="upload-step">
+      <h3>Step 1: Download your current data</h3>
+      <p class="muted" style="margin:0 0 10px;font-size:13px;">
+        We'll generate an Excel of all your products. <b>Platform</b> and <b>Product ID</b> columns are locked (do not edit).
+        Edit <b>Seller Code</b>, <b>Seller Name</b>, and <b>Notes</b> as needed, then save.
+      </p>
+      <button type="button" id="downloadBtn" class="btn btn-primary">&#11015; Download my data (Excel)</button>
+      <div id="downloadStatus" class="muted" style="margin-top:8px;font-size:13px;"></div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="upload-step" style="margin-top:24px;">
+      <h3>Step 2: Upload your edited file</h3>
+      <p class="muted" style="margin:0 0 10px;font-size:13px;">
+        We'll match each row by Platform + Product ID and update only the Seller Code, Seller Name, and Notes.
+      </p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin:8px 0;font-size:14px;" />
+      <div>
+        <button type="button" id="uploadBtn" class="btn btn-primary" disabled>&#11014; Apply updates</button>
+      </div>
+      <div id="uploadStatus" style="margin-top:10px;font-size:13px;"></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, storageKey: "pd_tracker_auth" }
+});
+
+const downloadBtn   = document.getElementById("downloadBtn");
+const downloadStat  = document.getElementById("downloadStatus");
+const fileInput     = document.getElementById("fileInput");
+const uploadBtn     = document.getElementById("uploadBtn");
+const uploadStat    = document.getElementById("uploadStatus");
+
+// ---- Auth gate ----
+const { data: { session } } = await sb.auth.getSession();
+if (!session) {
+  window.location.href = "/home/?return=" + encodeURIComponent("/pdtracker/update.html");
+}
+const token = session?.access_token || "";
+
+function setStatus(el, msg, kind) {
+  el.textContent = msg || "";
+  el.style.color = kind === "error" ? "#b91c1c"
+                 : kind === "ok"    ? "#15803d"
+                 : "#475467";
+}
+
+function platformDisplay(p) {
+  const s = String(p || "").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ---- Step 1: Download current data as Excel ----
+downloadBtn.addEventListener("click", async () => {
+  setStatus(downloadStat, "Fetching your products...");
+  downloadBtn.disabled = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-update-products`, {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "apikey": SUPABASE_ANON_KEY
+      }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+    const rows = data.products || [];
+    if (rows.length === 0) {
+      setStatus(downloadStat, "You don't have any products yet. Use 'Add new products' first.", "error");
+      downloadBtn.disabled = false;
+      return;
+    }
+
+    // Build worksheet
+    const aoa = [
+      ["Platform (LOCKED — do not edit)", "Product ID (LOCKED — do not edit)", "Seller Code", "Seller Name", "Notes"]
+    ];
+    rows.forEach(r => {
+      aoa.push([
+        platformDisplay(r.platform),
+        String(r.product_id || ""),
+        r.seller_code || "",
+        r.seller_name || "",
+        r.notes || ""
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [
+      { wch: 32 }, // Platform
+      { wch: 28 }, // Product ID
+      { wch: 16 }, // Seller Code
+      { wch: 28 }, // Seller Name
+      { wch: 30 }  // Notes
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Update");
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `cursive_pdtracker_update_${stamp}.xlsx`);
+
+    setStatus(downloadStat, `Downloaded ${rows.length} products. Edit the file, save it, then upload below.`, "ok");
+  } catch (err) {
+    setStatus(downloadStat, "Could not download: " + (err.message || err), "error");
+  } finally {
+    downloadBtn.disabled = false;
+  }
+});
+
+// ---- Step 2: parse + upload ----
+let parsedUpdates = [];
+
+fileInput.addEventListener("change", async (e) => {
+  parsedUpdates = [];
+  uploadBtn.disabled = true;
+  setStatus(uploadStat, "");
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const sheetName = wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    if (!aoa || aoa.length < 2) throw new Error("File is empty.");
+
+    const header = aoa[0].map(x => String(x || "").toLowerCase());
+    // Be tolerant on header names — find columns by partial match
+    function colIdx(needle) {
+      for (let i = 0; i < header.length; i++) {
+        if (header[i].indexOf(needle) !== -1) return i;
+      }
+      return -1;
+    }
+    const iPlat = colIdx("platform");
+    const iPid  = colIdx("product id");
+    const iSc   = colIdx("seller code");
+    const iSn   = colIdx("seller name");
+    const iNote = colIdx("note");
+
+    if (iPlat < 0 || iPid < 0) {
+      throw new Error("File missing Platform or Product ID columns. Download a fresh file using Step 1.");
+    }
+
+    const updates = [];
+    for (let r = 1; r < aoa.length; r++) {
+      const row = aoa[r] || [];
+      const platform  = String(row[iPlat] || "").trim().toLowerCase();
+      const productId = String(row[iPid]  || "").trim();
+      if (!platform || !productId) continue;
+
+      const u = { platform, product_id: productId };
+      if (iSc   >= 0) u.seller_code = String(row[iSc]   || "").trim();
+      if (iSn   >= 0) u.seller_name = String(row[iSn]   || "").trim();
+      if (iNote >= 0) u.notes       = String(row[iNote] || "").trim();
+      updates.push(u);
+    }
+
+    if (updates.length === 0) throw new Error("No valid rows found.");
+    parsedUpdates = updates;
+    uploadBtn.disabled = false;
+    setStatus(uploadStat, `Ready to apply ${updates.length} updates. Click 'Apply updates' below.`, "ok");
+  } catch (err) {
+    setStatus(uploadStat, err.message || String(err), "error");
+  }
+});
+
+uploadBtn.addEventListener("click", async () => {
+  if (parsedUpdates.length === 0) return;
+  uploadBtn.disabled = true;
+  setStatus(uploadStat, "Applying updates...");
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-update-products`, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "apikey": SUPABASE_ANON_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ updates: parsedUpdates })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+
+    let msg = `Updated ${data.updated} row(s).`;
+    if (data.skipped > 0) msg += ` Skipped ${data.skipped} (no matching Platform + Product ID).`;
+    setStatus(uploadStat, msg + " You can return to the dashboard now.", "ok");
+  } catch (err) {
+    setStatus(uploadStat, "Failed: " + (err.message || err), "error");
+    uploadBtn.disabled = false;
+  }
+});
+</script>
+<script src="/home.js?v=2026062143" defer></script>
+</body>
+</html>
