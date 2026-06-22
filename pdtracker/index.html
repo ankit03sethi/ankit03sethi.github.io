@@ -117,7 +117,8 @@
       </div>
     </div>
     <div class="dash-actions">
-      <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Upload your products</a>
+      <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Add new products</a>
+      <a href="/pdtracker/update.html" class="btn btn-primary-sm" style="background:#fff;color:#1f6feb;border:1px solid #1f6feb;" title="Edit Seller Code / Seller Name / Notes for existing products (Platform & Product ID stay locked)">&#9998; Update data</a>
       <a href="/pdtracker/install-extension.html" id="installExtBtn" class="btn btn-install-pulse hidden" title="Required for paid plans — your PC tracks your own products" style="padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;">Install extension</a>
     </div>
   </div>
@@ -513,7 +514,7 @@ function planPill(p) {
 function renderTable() {
   const container = $("#productsContainer");
   if (_cachedRows.length === 0) {
-    container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Upload your products</a></div>';
+    container.innerHTML = '<div class="empty"><div class="big">No products yet</div><div>Upload your first batch to start tracking.</div><a class="btn btn-primary-sm" href="/pdtracker/upload.html">+ Add new products</a></div>';
     return;
   }
 
