@@ -10,7 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
-  <script src="/analytics.js" defer></script>
 </head>
 <body>
 
@@ -43,7 +42,21 @@
     <label for="password">Password (6+ characters)</label>
     <input id="password" name="password" type="password" minlength="6" required autocomplete="new-password" />
 
-    <button type="submit" id="signupBtn" class="btn-primary">Send OTP &rarr;</button>
+    <!-- Click-wrap consent (Layer A) -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin:12px 0 6px;font-size:13px;line-height:1.55;">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="termsCheck" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;cursor:pointer;" />
+        <span style="color:#1f2937;">
+          I have read and accept the
+          <a href="#" id="openTermsModal" style="color:#1f6feb;font-weight:600;text-decoration:underline;">Terms of Service</a>,
+          <a href="/privacy/" target="_blank" style="color:#1f6feb;font-weight:600;text-decoration:underline;">Privacy Policy</a> and
+          <a href="/refund/" target="_blank" style="color:#1f6feb;font-weight:600;text-decoration:underline;">Refund Policy</a>.
+          A copy will be emailed to me.
+        </span>
+      </label>
+    </div>
+
+    <button type="submit" id="signupBtn" class="btn-primary" disabled style="opacity:0.5;cursor:not-allowed;">Send OTP &rarr;</button>
     <p id="signupError" class="error hidden"></p>
     <p id="signupSuccess" class="success hidden"></p>
 
@@ -56,17 +69,67 @@
   </form>
 </main>
 
+<!-- Terms of Service modal (scrollable preview) -->
+<div id="termsModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:720px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="padding:18px 22px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:#0f172a;">Terms of Service · Cursive</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;">Version 1.0 · 22 June 2026 · Please scroll to read</div>
+      </div>
+      <button id="closeTermsModal" type="button" style="background:#f1f5f9;border:none;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:18px;color:#64748b;">&times;</button>
+    </div>
+    <iframe src="/terms/" style="border:none;flex:1;width:100%;background:#fafbfc;"></iframe>
+    <div style="padding:14px 22px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <div style="font-size:12px;color:#64748b;">Privacy Policy and Refund Policy also apply.</div>
+      <button id="acceptInModal" type="button" style="background:#1f6feb;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">I have read &amp; accept</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
 
 const $ = (s) => document.querySelector(s);
+const TERMS_VERSION = "1.0-2026-06-22";
+
+// ===== Click-wrap: checkbox toggles submit button =====
+function syncSubmitState() {
+  const btn = $("#signupBtn");
+  const checked = $("#termsCheck").checked;
+  btn.disabled = !checked;
+  btn.style.opacity = checked ? "1" : "0.5";
+  btn.style.cursor = checked ? "pointer" : "not-allowed";
+}
+$("#termsCheck").addEventListener("change", syncSubmitState);
+
+// ===== Modal open/close =====
+const modal = $("#termsModal");
+$("#openTermsModal").addEventListener("click", (e) => {
+  e.preventDefault();
+  modal.style.display = "flex";
+});
+$("#closeTermsModal").addEventListener("click", () => modal.style.display = "none");
+$("#acceptInModal").addEventListener("click", () => {
+  $("#termsCheck").checked = true;
+  syncSubmitState();
+  modal.style.display = "none";
+});
+modal.addEventListener("click", (e) => {
+  if (e.target === modal) modal.style.display = "none";
+});
 
 $("#signupForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const err = $("#signupError"); const ok = $("#signupSuccess");
   err.classList.add("hidden"); ok.classList.add("hidden");
+  if (!$("#termsCheck").checked) {
+    err.textContent = "Please accept the Terms of Service to continue.";
+    err.classList.remove("hidden");
+    return;
+  }
   const btn = $("#signupBtn");
   btn.disabled = true; btn.textContent = "Sending OTP...";
   try {
@@ -74,6 +137,8 @@ $("#signupForm").addEventListener("submit", async (e) => {
       email: $("#email").value.trim().toLowerCase(),
       password: $("#password").value,
       mobile: $("#mobile").value.trim().replace(/\D/g, ""),
+      terms_accepted: true,
+      terms_version: TERMS_VERSION,
     };
     const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-signup", {
       method: "POST",
@@ -89,9 +154,11 @@ $("#signupForm").addEventListener("submit", async (e) => {
     err.textContent = e2.message;
     err.classList.remove("hidden");
   } finally {
-    btn.disabled = false; btn.textContent = "Send OTP →";
+    btn.textContent = "Send OTP →";
+    syncSubmitState();
   }
 });
 </script>
+<script>(function(){if(document.getElementById('cursiveFooter'))return;var f=document.createElement('footer');f.id='cursiveFooter';f.style.cssText='margin:40px auto 0;padding:20px 16px;border-top:1px solid #e2e8f0;background:#f8fafc;text-align:center;color:#64748b;font-size:12.5px;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;';f.innerHTML='© '+new Date().getFullYear()+' Cursive. All rights reserved. · <a href="/terms/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Terms</a> · <a href="/privacy/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Privacy</a> · <a href="/refund/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Refund</a> · <a href="mailto:support@cursive.world" style="color:#1f6feb;text-decoration:none;font-weight:600;">Contact</a>';document.body.appendChild(f);})();</script>
 </body>
 </html>
