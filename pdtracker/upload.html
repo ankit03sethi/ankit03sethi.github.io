@@ -63,6 +63,11 @@
       &#127881; Account verified! Now: download the template, fill it with your products, and upload it back here.
     </div>
 
+    <!-- Plan preselected banner — shown when user clicked Buy from ledger -->
+    <div id="planPreBanner" class="hidden" style="margin-bottom:18px;padding:14px 16px;background:#faf5ff;border:1.5px solid #e9d5ff;border-left:4px solid #7c3aed;border-radius:10px;color:#581c87;font-size:14px;line-height:1.55;">
+      &#128142; You picked <b id="planPreLabel">Plan 1</b>. Upload your products below to claim your pack and pay.
+    </div>
+
     <!-- Wizard steps indicator -->
     <div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;">
       <div style="flex:1;height:6px;border-radius:3px;background:#1f6feb;" title="Step 1: Signup ✓"></div>
@@ -142,7 +147,8 @@
       <button id="modalCloseBtn" class="btn btn-outline" style="padding:6px 12px;font-size:14px;">&times; Close</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;" id="planCards">
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Pay per row</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;" id="planCards">
       <div class="plan-card" data-plan="topup" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;">
         <div style="font-weight:700;font-size:14px;color:#1f6feb;text-transform:uppercase;letter-spacing:.5px;">One-time check</div>
         <div style="font-size:28px;font-weight:700;margin:6px 0 2px;">&#8377;2.36<span style="font-size:14px;color:#6b7280;font-weight:500;"> / row</span></div>
@@ -180,6 +186,47 @@
           <li>Auto-renew if wallet has balance</li>
         </ul>
       </div>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Bulk packs &middot; save big at scale</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;" id="planCardsBulk">
+      <div class="plan-card" data-plan="plan_10k" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;background:#faf5ff;">
+        <div style="font-weight:700;font-size:14px;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">&#128142; Plan 1</div>
+        <div style="font-size:24px;font-weight:700;margin:6px 0 2px;">&#8377;11,800<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;10,000 + 18% GST</div>
+        <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#374151;line-height:1.6;">
+          <li>Up to <b>5,000 rows</b></li>
+          <li>30-day validity</li>
+          <li>Continuous tracking on every row</li>
+          <li style="color:#7c3aed;font-weight:600;">Effective &#8377;2.36/row if fully used</li>
+        </ul>
+      </div>
+      <div class="plan-card" data-plan="plan_15k" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;background:#faf5ff;position:relative;">
+        <div style="position:absolute;top:-10px;right:14px;background:#7c3aed;color:#fff;font-size:10px;padding:3px 10px;border-radius:10px;font-weight:600;">BEST VALUE</div>
+        <div style="font-weight:700;font-size:14px;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">&#128142; Plan 2</div>
+        <div style="font-size:24px;font-weight:700;margin:6px 0 2px;">&#8377;17,700<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;15,000 + 18% GST</div>
+        <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#374151;line-height:1.6;">
+          <li>Up to <b>10,000 rows</b></li>
+          <li>30-day validity</li>
+          <li>Continuous tracking on every row</li>
+          <li style="color:#7c3aed;font-weight:600;">Effective &#8377;1.77/row if fully used</li>
+        </ul>
+      </div>
+      <div class="plan-card" data-plan="plan_20k" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;background:#faf5ff;">
+        <div style="font-weight:700;font-size:14px;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">&#128142; Plan 3</div>
+        <div style="font-size:24px;font-weight:700;margin:6px 0 2px;">&#8377;23,600<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;20,000 + 18% GST</div>
+        <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#374151;line-height:1.6;">
+          <li>Up to <b>20,000 rows</b></li>
+          <li>30-day validity</li>
+          <li>Continuous tracking on every row</li>
+          <li style="color:#7c3aed;font-weight:600;">Effective &#8377;1.18/row if fully used</li>
+        </ul>
+      </div>
+    </div>
+    <div style="background:#fff7ed;border-left:3px solid #d97706;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e;line-height:1.55;">
+      &#9888; <b>Bulk plans are fixed-price:</b> you pay the full amount regardless of how many rows you upload now. Unused capacity lapses after 30 days. Best when you have many products to track.
     </div>
 
     <div id="quoteBox" class="hidden" style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px;background:#f9fafb;">
@@ -372,7 +419,28 @@ let selectedPlan = null;
 let currentQuote = null;
 
 const planModal = $("#planModal");
+// Pick up bulk plan cards too (added below first 2 cards in markup)
 const planCards = document.querySelectorAll(".plan-card");
+
+// Read ?plan= query string — if present, auto-open the picker and preselect that plan
+// (called from /pdtracker/ ledger card "Buy ₹..." buttons)
+const PRE_SELECTED_PLAN = new URLSearchParams(location.search).get("plan");
+
+// Show banner for preselected plan
+if (PRE_SELECTED_PLAN) {
+  const LABELS = {
+    topup: "One-time (₹2.36/row)",
+    subscription: "Starter (₹5.90/row · 30-day)",
+    plan_10k: "Plan 1 (5K rows · ₹11,800)",
+    plan_15k: "Plan 2 (10K rows · ₹17,700)",
+    plan_20k: "Plan 3 (20K rows · ₹23,600)"
+  };
+  const lbl = LABELS[PRE_SELECTED_PLAN];
+  if (lbl) {
+    $("#planPreLabel").textContent = lbl;
+    $("#planPreBanner").classList.remove("hidden");
+  }
+}
 const quoteBox = $("#quoteBox");
 const payNowBtn = $("#payNowBtn");
 const addMoneyBtn = $("#addMoneyBtn");
@@ -427,6 +495,11 @@ $("#uploadBtn").addEventListener("click", async () => {
   $("#paySuccess").classList.add("hidden");
   $("#freeTrialBanner").classList.add("hidden");
   planModal.classList.remove("hidden");
+  // If ?plan= was specified (e.g., from ledger Buy buttons), pre-click that card
+  if (PRE_SELECTED_PLAN) {
+    const target = document.querySelector(`.plan-card[data-plan="${PRE_SELECTED_PLAN}"]`);
+    if (target) setTimeout(() => target.click(), 100);
+  }
   // Fetch free quota to show banner if any
   try {
     const { data: { session } } = await sb.auth.getSession();
