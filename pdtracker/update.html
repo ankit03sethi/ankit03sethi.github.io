@@ -36,16 +36,17 @@
   <div class="upload-card">
     <h1 style="margin:0 0 6px;font-size:22px;">&#9998; Update existing product data</h1>
     <p class="muted" style="margin:0 0 20px;font-size:14px;">
-      Edit <b>Seller Code</b>, <b>Seller Name</b>, and <b>Notes</b> for products you've already added.
-      <span style="color:#92400e;">Platform &amp; Product ID stay locked &mdash; if you want to track a new product, use <a href="/pdtracker/upload.html" style="color:#1f6feb;font-weight:600;">+ Add new products</a> instead.</span>
+      Edit <b>Seller Code</b> and <b>Seller Name</b> for products you've already added.
+      <span style="color:#92400e;">Platform, ID Name, Product ID, and Note columns stay locked &mdash; if you want to track a new product, use <a href="/pdtracker/upload.html" style="color:#1f6feb;font-weight:600;">+ Add new products</a> instead.</span>
     </p>
 
     <!-- Step 1 -->
     <div class="upload-step">
       <h3>Step 1: Download your current data</h3>
       <p class="muted" style="margin:0 0 10px;font-size:13px;">
-        We'll generate an Excel of all your products. <b>Platform</b> and <b>Product ID</b> columns are locked (do not edit).
-        Edit <b>Seller Code</b>, <b>Seller Name</b>, and <b>Notes</b> as needed, then save.
+        We'll generate the same Excel format as the new-products template, pre-filled with your existing rows.
+        Columns <b>A</b> (Platform), <b>B</b> (ID Name), <b>C</b> (Product ID), <b>D</b> (Note) are locked.
+        Edit <b>E</b> (Seller Code) and <b>F</b> (Seller Name) as needed, then save.
       </p>
       <button type="button" id="downloadBtn" class="btn btn-primary">&#11015; Download my data (Excel)</button>
       <div id="downloadStatus" class="muted" style="margin-top:8px;font-size:13px;"></div>
@@ -55,7 +56,7 @@
     <div class="upload-step" style="margin-top:24px;">
       <h3>Step 2: Upload your edited file</h3>
       <p class="muted" style="margin:0 0 10px;font-size:13px;">
-        We'll match each row by Platform + Product ID and update only the Seller Code, Seller Name, and Notes.
+        We'll match each row by Platform + Product ID and update only the Seller Code and Seller Name.
       </p>
       <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin:8px 0;font-size:14px;" />
       <div>
@@ -74,6 +75,8 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, storageKey: "pd_tracker_auth" }
 });
+
+const TEMPLATE_URL = "/pdtracker/cursive_Trial_Template.xlsx";
 
 const downloadBtn   = document.getElementById("downloadBtn");
 const downloadStat  = document.getElementById("downloadStatus");
@@ -100,11 +103,12 @@ function platformDisplay(p) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ---- Step 1: Download current data as Excel ----
+// ---- Step 1: Download = fetch master template + inject customer data ----
 downloadBtn.addEventListener("click", async () => {
   setStatus(downloadStat, "Fetching your products...");
   downloadBtn.disabled = true;
   try {
+    // Fetch customer products
     const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-update-products`, {
       method: "GET",
       headers: {
@@ -121,36 +125,50 @@ downloadBtn.addEventListener("click", async () => {
       return;
     }
 
-    // Build worksheet
-    const aoa = [
-      ["Platform (LOCKED — do not edit)", "Product ID (LOCKED — do not edit)", "Seller Code", "Seller Name", "Notes"]
-    ];
-    rows.forEach(r => {
-      aoa.push([
-        platformDisplay(r.platform),
-        String(r.product_id || ""),
-        r.seller_code || "",
-        r.seller_name || "",
-        r.notes || ""
-      ]);
+    // Fetch the master template (same one the Add new products button serves)
+    setStatus(downloadStat, "Building Excel from master template...");
+    const tplResp = await fetch(TEMPLATE_URL, { cache: "no-store" });
+    if (!tplResp.ok) throw new Error("Could not fetch master template (" + tplResp.status + ")");
+    const tplBuf = await tplResp.arrayBuffer();
+
+    // Read it, preserving formulas + sheet protection + data validations
+    const wb = XLSX.read(tplBuf, { type: "array", cellFormula: true, cellStyles: true, bookVBA: true });
+    const sheetName = wb.SheetNames.includes("Template") ? "Template" : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+
+    // Inject customer data into rows 2..N+1
+    // Column A = Platform, Column C = Product ID, Column E = Seller Code, Column F = Seller Name
+    // Columns B (ID Name) and D (Note) already have formulas — they'll auto-fill when A and C are set.
+    rows.forEach((r, i) => {
+      const rowNum = i + 2; // row 1 is header
+      const platform = platformDisplay(r.platform);
+      // Write Platform (A)
+      XLSX.utils.sheet_add_aoa(ws, [[platform]], { origin: "A" + rowNum });
+      // Write Product ID (C)
+      XLSX.utils.sheet_add_aoa(ws, [[String(r.product_id || "")]], { origin: "C" + rowNum });
+      // Write Seller Code (E) — pre-filled with current value
+      XLSX.utils.sheet_add_aoa(ws, [[String(r.seller_code || "")]], { origin: "E" + rowNum });
+      // Write Seller Name (F) — pre-filled with current value
+      XLSX.utils.sheet_add_aoa(ws, [[String(r.seller_name || "")]], { origin: "F" + rowNum });
     });
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [
-      { wch: 32 }, // Platform
-      { wch: 28 }, // Product ID
-      { wch: 16 }, // Seller Code
-      { wch: 28 }, // Seller Name
-      { wch: 30 }  // Notes
-    ];
+    // Recompute !ref so the new rows are included
+    const lastRow = rows.length + 1;
+    ws["!ref"] = "A1:Z" + Math.max(lastRow, 501);
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Update");
-
+    // Write file (preserve as much as we can)
+    const out = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true, bookSST: false });
+    const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const stamp = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `cursive_pdtracker_update_${stamp}.xlsx`);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cursive_pdtracker_update_${stamp}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
 
-    setStatus(downloadStat, `Downloaded ${rows.length} products. Edit the file, save it, then upload below.`, "ok");
+    setStatus(downloadStat, `Downloaded ${rows.length} products. Edit Seller Code / Seller Name (columns E & F), save, then upload below.`, "ok");
   } catch (err) {
     setStatus(downloadStat, "Could not download: " + (err.message || err), "error");
   } finally {
@@ -171,44 +189,29 @@ fileInput.addEventListener("change", async (e) => {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
-    const sheetName = wb.SheetNames[0];
+    const sheetName = wb.SheetNames.includes("Template") ? "Template" : wb.SheetNames[0];
     const ws = wb.Sheets[sheetName];
     const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
     if (!aoa || aoa.length < 2) throw new Error("File is empty.");
 
-    const header = aoa[0].map(x => String(x || "").toLowerCase());
-    // Be tolerant on header names — find columns by partial match
-    function colIdx(needle) {
-      for (let i = 0; i < header.length; i++) {
-        if (header[i].indexOf(needle) !== -1) return i;
-      }
-      return -1;
-    }
-    const iPlat = colIdx("platform");
-    const iPid  = colIdx("product id");
-    const iSc   = colIdx("seller code");
-    const iSn   = colIdx("seller name");
-    const iNote = colIdx("note");
-
-    if (iPlat < 0 || iPid < 0) {
-      throw new Error("File missing Platform or Product ID columns. Download a fresh file using Step 1.");
-    }
-
+    // Expected columns: A=Platform, B=ID Name(formula), C=Product ID, D=Note(formula), E=Seller Code, F=Seller Name
     const updates = [];
     for (let r = 1; r < aoa.length; r++) {
       const row = aoa[r] || [];
-      const platform  = String(row[iPlat] || "").trim().toLowerCase();
-      const productId = String(row[iPid]  || "").trim();
+      const platform  = String(row[0] || "").trim().toLowerCase();
+      const productId = String(row[2] || "").trim();
       if (!platform || !productId) continue;
 
-      const u = { platform, product_id: productId };
-      if (iSc   >= 0) u.seller_code = String(row[iSc]   || "").trim();
-      if (iSn   >= 0) u.seller_name = String(row[iSn]   || "").trim();
-      if (iNote >= 0) u.notes       = String(row[iNote] || "").trim();
+      const u = {
+        platform,
+        product_id: productId,
+        seller_code: String(row[4] || "").trim(),
+        seller_name: String(row[5] || "").trim()
+      };
       updates.push(u);
     }
 
-    if (updates.length === 0) throw new Error("No valid rows found.");
+    if (updates.length === 0) throw new Error("No valid rows found. Make sure you downloaded the file using Step 1.");
     parsedUpdates = updates;
     uploadBtn.disabled = false;
     setStatus(uploadStat, `Ready to apply ${updates.length} updates. Click 'Apply updates' below.`, "ok");
