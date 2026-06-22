@@ -11,6 +11,7 @@
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     @keyframes pd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     #refreshIcon.spinning { animation: pd-spin 0.6s linear; color: #1f6feb !important; }
@@ -54,7 +55,7 @@
             <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;2.36<span style="font-size:11px;font-weight:500;color:#6b7280;"> / row</span></span>
           </div>
           <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;2 + 18% GST &middot; single scan, no renewal</div>
-          <div style="font-size:12px;color:#374151;line-height:1.5;">Buy Box, Ratings, Ratings Count &amp; Price &mdash; captured once. Best for one-off checks.</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Buy Box, Ratings, Ratings Count &amp; Price &mdash; captured once. Data available <b>3 days</b>, then auto-deleted.</div>
         </div>
 
         <div style="border:1.5px solid #bbf7d0;border-radius:10px;padding:12px;background:#f0fdf4;position:relative;margin-bottom:14px;">
@@ -64,7 +65,7 @@
             <span style="font-size:16px;font-weight:700;color:#0f172a;">&#8377;5.90<span style="font-size:11px;font-weight:500;color:#6b7280;"> / row</span></span>
           </div>
           <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">&#8377;5 + 18% GST &middot; auto-renews from wallet day 30</div>
-          <div style="font-size:12px;color:#374151;line-height:1.5;">Re-checked every few hours for 30 days. Daily updates of all 4 metrics.</div>
+          <div style="font-size:12px;color:#374151;line-height:1.5;">Re-checked every few hours for 30 days. Daily updates of all 4 metrics. <b>3-day grace</b> after expiry, then auto-deleted if not renewed.</div>
         </div>
 
         <div style="font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 6px;">Bulk packs &middot; save big at scale</div>
@@ -98,10 +99,22 @@
 
         <div style="font-size:11px;color:#94a3b8;margin-top:10px;text-align:center;line-height:1.5;">
           Bulk caps are <b>ceiling</b>, not guarantee. Unused capacity lapses after 30 days.<br>
+          All rows get a <b>3-day grace period</b> after expiry to download or renew &mdash; then auto-deleted.<br>
           All prices in INR. Paid via Razorpay (UPI / cards / netbanking).
         </div>
       </div>
     </div>
+
+    <!-- Auto-renew toggle (calls pdtracker-toggle-auto-renew) -->
+    <label id="autoRenewToggle" class="email-chip hidden" style="cursor:pointer;background:#fff;border:1px solid #e5e7eb;color:#0f172a;display:inline-flex;align-items:center;gap:7px;padding:4px 10px;" title="When ON, expiring rows auto-debit from your wallet. When OFF, rows lapse without charge.">
+      <span style="font-size:12px;font-weight:600;">Auto-debit</span>
+      <span style="position:relative;display:inline-block;width:32px;height:18px;">
+        <input type="checkbox" id="autoRenewChk" style="opacity:0;width:0;height:0;" checked>
+        <span id="autoRenewSlider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#16a34a;border-radius:18px;transition:.2s;"></span>
+        <span id="autoRenewKnob" style="position:absolute;content:'';height:14px;width:14px;left:16px;bottom:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></span>
+      </span>
+      <span id="autoRenewLabel" style="font-size:11px;color:#16a34a;font-weight:700;">ON</span>
+    </label>
 
     <a id="walletChip" href="/pdtracker/wallet.html" class="email-chip hidden" style="text-decoration:none;color:#0f172a;background:#dcfce7;border-color:#86efac;" title="View wallet & transaction list"><span style="font-weight:700;">&#8377;</span><span id="walletBalanceTxt">&mdash;</span></a>
     <span id="emailChip" class="email-chip hidden"></span>
@@ -1255,7 +1268,7 @@ function renderLedger(data) {
 
   // LEFT — One-time (₹2)
   const leftCard = `<div style="${card3D}">
-    ${nameLine('&#9889;', 'One-time', '#0891b2', '<b>Price:</b> &#8377;2 + 18% GST = &#8377;2.36 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; captured once<br><b>Retries:</b> Auto-retries up to 3 times if the scan fails<br><b>Renewal:</b> None &mdash; one-time only<br><a href="/pdtracker/upload.html?plan=topup" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add One-time rows &rarr;</a>')}
+    ${nameLine('&#9889;', 'One-time', '#0891b2', '<b>Price:</b> &#8377;2 + 18% GST = &#8377;2.36 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; captured once<br><b>Retries:</b> Auto-retries up to 3 times if the scan fails<br><b>Data available:</b> 3 days after scan &mdash; download before it expires<br><b style="color:#b91c1c;">After day 3:</b> Auto-deleted if not converted to Starter / Bulk<br><a href="/pdtracker/upload.html?plan=topup" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add One-time rows &rarr;</a>')}
     <div style="font-size:10px;color:#94a3b8;margin-top:2px;">&#8377;2 / row &middot; single scan</div>
     <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px;">
       <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">${totals.onetime.toLocaleString()}</div>
@@ -1266,7 +1279,7 @@ function renderLedger(data) {
 
   // MIDDLE — Starter (₹5) — 30 days continuous tracking
   const middleCard = `<div style="${card3D}">
-    ${nameLine('&#11088;', 'Starter', '#1f6feb', '<b>Price:</b> &#8377;5 + 18% GST = &#8377;5.90 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; refreshed every few hours<br><b>Validity:</b> 30 days from purchase &mdash; continuous tracking on each row<br><b>Renewal:</b> Auto-renews from wallet at day 30 (if balance available)<br><b>Cancel:</b> Skip the wallet top-up &mdash; rows just expire<br><a href="/pdtracker/upload.html?plan=subscription" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add Starter rows &rarr;</a>')}
+    ${nameLine('&#11088;', 'Starter', '#1f6feb', '<b>Price:</b> &#8377;5 + 18% GST = &#8377;5.90 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; refreshed every few hours<br><b>Validity:</b> 30 days from purchase &mdash; continuous tracking on each row<br><b>Renewal:</b> Auto-renews from wallet at day 30 (if balance available)<br><b>Grace period:</b> 3 days after day 30 to renew or download data<br><b style="color:#b91c1c;">After day 33:</b> Auto-deleted if not renewed &mdash; no recovery<br><a href="/pdtracker/upload.html?plan=subscription" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add Starter rows &rarr;</a>')}
     <div style="font-size:10px;color:#94a3b8;margin-top:2px;">&#8377;5 / row &middot; 30 days continuous tracking</div>
     <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px;">
       <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">${totals.starter.toLocaleString()}</div>
@@ -1300,7 +1313,9 @@ function renderLedger(data) {
             <b>Capacity:</b> Up to ${meta.capNum.toLocaleString()} rows &middot; 30 days continuous tracking<br>
             <b>Validity:</b> 30 days from <u>purchase date</u> (not from upload)<br>
             <b>Effective rate:</b> ${meta.perRow}/row if fully used<br>
-            <b style="color:#b91c1c;">All rows expire on day 30</b> &mdash; used or unused. No carry-over, no refund.
+            <b>All rows expire on day 30</b> &mdash; used or unused. No carry-over, no refund.<br>
+            <b>Grace period:</b> 3 days after day 30 to download data or renew<br>
+            <b style="color:#b91c1c;">After day 33:</b> All rows auto-deleted if not renewed
           </div>
         </details>
       </div>`;
@@ -1378,11 +1393,162 @@ window.downloadPackRows = function (packId) {
   buildAndSaveLedgerExcel(rows, `cursive_pack_${packId}.xlsx`, `Pack #${packId} rows`);
 };
 
-// Stub: opens the direct-pay flow for a bulk plan. Full Razorpay modal coming next.
-// For now, falls back to the upload page with plan pre-selected.
-window.openBuyPackModal = function (tier) {
-  window.location.href = "/pdtracker/upload.html?plan=" + encodeURIComponent(tier);
+// =============================================================
+// BUY BULK PACK — direct Razorpay flow (no upload required)
+// =============================================================
+const BULK_TIER_META = {
+  plan_10k: { label: "Plan 1", capLabel: "5,000 rows", base: 10000, gst: 1800,  total: 11800 },
+  plan_15k: { label: "Plan 2", capLabel: "10,000 rows", base: 15000, gst: 2700,  total: 17700 },
+  plan_20k: { label: "Plan 3", capLabel: "20,000 rows", base: 20000, gst: 3600,  total: 23600 },
 };
+
+window.openBuyPackModal = function (tier) {
+  const meta = BULK_TIER_META[tier];
+  if (!meta) { alert("Unknown plan tier"); return; }
+  const modal = document.getElementById("buyPackModal");
+  const fmt = n => "₹" + Number(n).toLocaleString("en-IN");
+  document.getElementById("buyPackName").textContent = meta.label + " · " + meta.capLabel;
+  document.getElementById("buyPackCap").textContent = meta.capLabel;
+  document.getElementById("buyPackBase").textContent = fmt(meta.base);
+  document.getElementById("buyPackGst").textContent = fmt(meta.gst);
+  document.getElementById("buyPackTotal").textContent = fmt(meta.total);
+  document.getElementById("buyPackPayAmt").textContent = fmt(meta.total);
+  document.getElementById("buyPackError").style.display = "none";
+  const payBtn = document.getElementById("buyPackPayBtn");
+  payBtn.disabled = false;
+  payBtn.innerHTML = '🔒 Pay <span id="buyPackPayAmt">' + fmt(meta.total) + '</span> via Razorpay →';
+  modal.style.display = "flex";
+
+  payBtn.onclick = async () => {
+    payBtn.disabled = true;
+    payBtn.textContent = "Creating order...";
+    document.getElementById("buyPackError").style.display = "none";
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { alert("Please sign in again."); return; }
+      const r = await fetch(SUPABASE_URL + "/functions/v1/pdtracker-buy-pack", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + session.access_token,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ plan_tier: tier }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Order creation failed");
+
+      const rzp = new Razorpay({
+        key: j.key_id,
+        amount: j.amount_paise,
+        currency: j.currency,
+        order_id: j.order_id,
+        name: "Cursive World",
+        description: j.plan_label,
+        prefill: { email: session.user.email, contact: session.user.user_metadata?.mobile || "" },
+        theme: { color: "#7c3aed" },
+        handler: async function (response) {
+          payBtn.textContent = "Confirming payment...";
+          try {
+            const cr = await fetch(SUPABASE_URL + "/functions/v1/pdtracker-confirm-pack-payment", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + session.access_token,
+                "apikey": SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const cj = await cr.json();
+            if (!cj.ok) throw new Error(cj.error || "Confirmation failed");
+            modal.style.display = "none";
+            alert("✅ " + j.plan_label + " activated! Your " + meta.capLabel + " capacity is ready. Pack expires in 30 days.");
+            location.reload();
+          } catch (e) {
+            document.getElementById("buyPackError").textContent = "Payment received but confirmation failed: " + e.message + ". Contact support with payment ID " + response.razorpay_payment_id;
+            document.getElementById("buyPackError").style.display = "block";
+            payBtn.disabled = false;
+            payBtn.innerHTML = "Retry confirmation";
+          }
+        },
+        modal: { ondismiss: function () { payBtn.disabled = false; payBtn.innerHTML = '🔒 Pay ' + fmt(meta.total) + ' via Razorpay →'; } },
+      });
+      rzp.open();
+    } catch (e) {
+      document.getElementById("buyPackError").textContent = e.message;
+      document.getElementById("buyPackError").style.display = "block";
+      payBtn.disabled = false;
+      payBtn.innerHTML = '🔒 Pay ' + fmt(meta.total) + ' via Razorpay →';
+    }
+  };
+};
+
+// Close modal handlers
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("buyPackModal");
+  if (!modal) return;
+  if (e.target === modal || e.target.id === "buyPackClose") {
+    modal.style.display = "none";
+  }
+});
+
+// =============================================================
+// AUTO-RENEW TOGGLE — loads current state, persists changes
+// =============================================================
+async function loadAutoRenewState() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const r = await fetch(SUPABASE_URL + "/functions/v1/pdtracker-toggle-auto-renew", {
+      method: "GET",
+      headers: { "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await r.json();
+    if (j.ok) {
+      const chk = document.getElementById("autoRenewChk");
+      const lbl = document.getElementById("autoRenewLabel");
+      const slider = document.getElementById("autoRenewSlider");
+      const knob = document.getElementById("autoRenewKnob");
+      chk.checked = j.auto_renew_enabled;
+      lbl.textContent = j.auto_renew_enabled ? "ON" : "OFF";
+      lbl.style.color = j.auto_renew_enabled ? "#16a34a" : "#dc2626";
+      slider.style.background = j.auto_renew_enabled ? "#16a34a" : "#94a3b8";
+      knob.style.left = j.auto_renew_enabled ? "16px" : "2px";
+      document.getElementById("autoRenewToggle").classList.remove("hidden");
+    }
+  } catch (e) { /* silent */ }
+}
+async function saveAutoRenewState(enabled) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await fetch(SUPABASE_URL + "/functions/v1/pdtracker-toggle-auto-renew", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ enabled }),
+    });
+  } catch (e) { /* silent */ }
+}
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.id === "autoRenewChk") {
+    const enabled = e.target.checked;
+    const lbl = document.getElementById("autoRenewLabel");
+    const slider = document.getElementById("autoRenewSlider");
+    const knob = document.getElementById("autoRenewKnob");
+    lbl.textContent = enabled ? "ON" : "OFF";
+    lbl.style.color = enabled ? "#16a34a" : "#dc2626";
+    slider.style.background = enabled ? "#16a34a" : "#94a3b8";
+    knob.style.left = enabled ? "16px" : "2px";
+    saveAutoRenewState(enabled);
+  }
+});
+// Load auto-renew state after auth is ready (best effort)
+setTimeout(loadAutoRenewState, 1500);
+setInterval(loadAutoRenewState, 60000);
 
 function buildAndSaveLedgerExcel(rows, filename, title) {
   // Columns: Platform | Product ID | Seller Code | Seller Name | Buy Box Seller | Price | Rating | Reviews | Plan | Paid Until | Last Updated | Product Link
@@ -1909,6 +2075,53 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 </script>
+<!-- Buy Bulk Pack modal (opens from openBuyPackModal) -->
+<div id="buyPackModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#faf5ff 0%,#f3e8ff 100%);">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.5px;">💎 Buy bulk pack</div>
+          <div id="buyPackName" style="font-size:20px;font-weight:800;color:#0f172a;margin-top:2px;">Plan 1</div>
+        </div>
+        <button id="buyPackClose" type="button" style="background:#fff;border:none;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:18px;color:#64748b;">&times;</button>
+      </div>
+    </div>
+    <div style="padding:18px 22px;">
+      <div style="background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
+          <span style="color:#64748b;">Capacity</span>
+          <span id="buyPackCap" style="color:#0f172a;font-weight:600;">5,000 rows</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
+          <span style="color:#64748b;">Validity</span>
+          <span style="color:#0f172a;font-weight:600;">30 days from purchase</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
+          <span style="color:#64748b;">Base price</span>
+          <span id="buyPackBase" style="color:#0f172a;font-weight:600;">₹10,000</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
+          <span style="color:#64748b;">GST (18%)</span>
+          <span id="buyPackGst" style="color:#0f172a;font-weight:600;">₹1,800</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding:8px 0 0;margin-top:8px;border-top:1px solid #e2e8f0;">
+          <span style="color:#0f172a;">Total to pay</span>
+          <span id="buyPackTotal" style="color:#7c3aed;">₹11,800</span>
+        </div>
+      </div>
+      <div style="background:#fff7ed;border-left:3px solid #d97706;border-radius:6px;padding:8px 10px;margin-bottom:14px;font-size:12px;color:#92400e;line-height:1.55;">
+        ⚠ All rows expire <b>30 days from purchase</b> (used or unused). 3-day grace, then auto-deleted if not renewed.
+      </div>
+      <p id="buyPackError" style="color:#dc2626;font-size:13px;display:none;margin:0 0 10px;"></p>
+      <button id="buyPackPayBtn" type="button" style="width:100%;background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 12px rgba(31,111,235,0.3);">
+        🔒 Pay <span id="buyPackPayAmt">₹11,800</span> via Razorpay →
+      </button>
+      <div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">Secure payment via UPI, cards, netbanking. Pack credits available immediately on success.</div>
+    </div>
+  </div>
+</div>
+
 <script>(function(){if(document.getElementById('cursiveFooter'))return;var f=document.createElement('footer');f.id='cursiveFooter';f.style.cssText='margin:40px auto 0;padding:20px 16px;border-top:1px solid #e2e8f0;background:#f8fafc;text-align:center;color:#64748b;font-size:12.5px;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;';f.innerHTML='© '+new Date().getFullYear()+' Cursive. All rights reserved. · <a href="/terms/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Terms</a> · <a href="/privacy/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Privacy</a> · <a href="/refund/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Refund</a> · <a href="mailto:support@cursive.world" style="color:#1f6feb;text-decoration:none;font-weight:600;">Contact</a>';document.body.appendChild(f);})();</script>
 </body>
 </html>
