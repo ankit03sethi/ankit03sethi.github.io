@@ -123,13 +123,16 @@
     </div>
   </div>
 
-  <!-- Row Credits Ledger (bulk plans + per-plan summary) -->
-  <div id="ledgerCard" class="hidden" style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid #eaecf0;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:14px;font-weight:700;color:#0f172a;">&#128202; Your PD Tracker Row Ledger</div>
-      <a href="/pdtracker/upload.html" style="font-size:12px;color:#1f6feb;text-decoration:none;font-weight:600;">+ Buy more rows</a>
+  <!-- Row Credits Ledger (always open, 3-column 3D card layout) -->
+  <div id="ledgerCard" class="hidden" style="background:linear-gradient(135deg,#ffffff 0%,#f8fafc 100%);border-radius:14px;margin-bottom:14px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 4px 16px rgba(15,23,42,0.08),0 1px 3px rgba(15,23,42,0.04);">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:linear-gradient(135deg,#f8fafc 0%,#eef2f7 100%);border-bottom:1px solid #e2e8f0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:700;color:#0f172a;">&#128202; Your PD Tracker Row Ledger</span>
+        <span id="ledgerSummary" style="font-size:12px;color:#64748b;font-weight:500;"></span>
+      </div>
+      <a href="/pdtracker/upload.html" style="font-size:12px;color:#fff;background:#1f6feb;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:600;box-shadow:0 2px 6px rgba(31,111,235,0.3);">+ Buy more rows</a>
     </div>
-    <div id="ledgerBody" style="font-size:13px;color:#334155;line-height:1.6;"></div>
+    <div id="ledgerBody" style="font-size:13px;color:#334155;line-height:1.5;padding:14px 16px;"></div>
   </div>
 
   <div id="trialBanner" class="trial-banner hidden">
@@ -1104,11 +1107,10 @@ async function fetchLedgerSummary() {
 function renderLedger(data) {
   const card = document.getElementById("ledgerCard");
   const body = document.getElementById("ledgerBody");
+  const summary = document.getElementById("ledgerSummary");
   if (!card || !body) return;
   const packs = data.credit_packs || [];
-  const buckets = data.plan_buckets || [];
-  if (packs.length === 0 && buckets.length === 0) { card.classList.add("hidden"); return; }
-  card.classList.remove("hidden");
+  card.classList.remove("hidden"); // always show ledger (placeholders for unpurchased plans)
 
   function fmtDate(iso) {
     if (!iso) return "—";
@@ -1118,38 +1120,237 @@ function renderLedger(data) {
     if (!iso) return null;
     return Math.ceil((new Date(iso) - new Date()) / 86400000);
   }
+  // Alert window: 7 days before → 3 days after expiry. Outside this, hide the date.
+  function inAlertWindow(dl) { return dl !== null && dl >= -3 && dl <= 7; }
+  function alertColor(dl) {
+    if (dl === null) return "#64748b";
+    if (dl < 0) return "#b91c1c";   // red — expired
+    if (dl <= 2) return "#dc2626";  // urgent red
+    return "#d97706";               // amber — upcoming
+  }
+  function alertBg(dl) {
+    if (dl < 0) return "#fee2e2";
+    if (dl <= 2) return "#fee2e2";
+    return "#fef3c7";
+  }
+  function alertText(dl) {
+    if (dl < 0) return `Expired ${Math.abs(dl)}d ago`;
+    if (dl === 0) return "Expires today";
+    return `${dl} day${dl === 1 ? "" : "s"} left`;
+  }
 
-  let html = "";
-  // 1) Bulk packs (most informative — show cap, used, remaining, expiry)
-  for (const p of packs) {
-    const used = p.credits_used;
-    const remaining = p.credits_remaining;
-    const cap = p.credits_purchased;
-    const dl = daysLeft(p.expires_at);
-    const expiringSoon = dl !== null && dl <= 7 && dl >= 0;
-    const expired = dl !== null && dl < 0;
-    const dlText = dl === null ? "" : expired ? "Expired" : `${dl} day${dl === 1 ? "" : "s"} left`;
-    html += `<div style="padding:10px 0;border-bottom:1px dashed #eaecf0;">
-      <div style="font-weight:600;color:#0f172a;">${esc(p.label)} &middot; ${cap.toLocaleString()} rows</div>
-      <div style="font-size:12px;color:#475467;margin-top:3px;">
-        Used: <b>${used.toLocaleString()}</b> &middot; Remaining: <b>${remaining.toLocaleString()}</b>
-        &middot; Started ${fmtDate(p.purchased_at)} &middot; Expires ${fmtDate(p.expires_at)}
-        ${expired ? `<span style="color:#b91c1c;font-weight:600;"> (${dlText})</span>` : (expiringSoon ? `<span style="color:#92400e;font-weight:600;"> (${dlText})</span>` : ` (${dlText})`)}
-      </div>
-    </div>`;
+  // Bucket rows: topup → onetime, trial+subscription → starter, bulk handled separately
+  const PLAN_TO_SECTION = { "topup": "onetime", "trial": "starter", "subscription": "starter" };
+  const buckets = { onetime: {}, starter: {} };
+  const totals = { onetime: 0, starter: 0 };
+  let totalActive = 0, expiringSoon = 0;
+
+  for (const r of (_cachedRows || [])) {
+    const p = r.plan || "";
+    if (p === "plan_10k" || p === "plan_15k" || p === "plan_20k") continue;
+    const sec = PLAN_TO_SECTION[p];
+    if (!sec) continue;
+    const key = r.paid_until || "no_expiry";
+    buckets[sec][key] = (buckets[sec][key] || 0) + 1;
+    totals[sec]++;
+    totalActive++;
+    const dl = daysLeft(r.paid_until);
+    if (inAlertWindow(dl)) expiringSoon++;
   }
-  // 2) Per-plan buckets (trial / starter / one-time)
-  const noncreditBuckets = buckets.filter(b => b.plan !== "plan_10k" && b.plan !== "plan_15k" && b.plan !== "plan_20k");
-  for (const b of noncreditBuckets) {
-    const ex = b.earliest_expiry ? ` &middot; Earliest expiry ${fmtDate(b.earliest_expiry)}` : ` &middot; No expiry`;
-    html += `<div style="padding:6px 0;font-size:12px;color:#475467;">
-      <b>${esc(b.label)}</b> &middot; ${b.rows.toLocaleString()} row${b.rows === 1 ? "" : "s"}${ex}
-    </div>`;
+
+  // Add bulk pack remaining to total + count expiring packs
+  for (const pk of packs) {
+    totalActive += (pk.credits_remaining || 0);
+    const dl = daysLeft(pk.expires_at);
+    if (inAlertWindow(dl)) expiringSoon += (pk.credits_remaining || 0);
   }
-  html += `<div style="margin-top:8px;font-size:12px;color:#0f172a;font-weight:600;">
-    Total active rows: ${(data.total_active_rows || 0).toLocaleString()}
+
+  // 3D card base style (gradient + multi-layer shadow + inset highlight)
+  const card3D = "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border-radius:12px;padding:14px;box-shadow:0 8px 20px rgba(15,23,42,0.10),0 2px 4px rgba(15,23,42,0.05),inset 0 1px 0 rgba(255,255,255,0.9);border:1px solid #e2e8f0;transition:transform 0.15s,box-shadow 0.15s;";
+
+  // Helper: render expiry alert lines for a column (only within alert window)
+  function expiryLines(planFilter, dateMap) {
+    const dateKeys = Object.keys(dateMap).sort();
+    let inWin = [];
+    let beyond = 0;
+    for (const dk of dateKeys) {
+      if (dk === "no_expiry") continue;
+      const iso = dk + "T00:00:00";
+      const dl = daysLeft(iso);
+      const count = dateMap[dk];
+      if (inAlertWindow(dl)) inWin.push({ dk, iso, dl, count });
+      else if (dl !== null && dl > 7) beyond += count;
+    }
+    let lines = "";
+    if (inWin.length === 0 && beyond === 0) {
+      lines += `<div style="font-size:11px;color:#94a3b8;font-style:italic;padding:6px 0;">No upcoming expiry</div>`;
+    }
+    for (const w of inWin) {
+      const c = alertColor(w.dl);
+      lines += `<div style="background:${alertBg(w.dl)};border-left:3px solid ${c};border-radius:4px;padding:6px 8px;margin-top:6px;">
+        <div style="font-size:11.5px;color:${c};font-weight:700;">&#9888; <b>${w.count}</b> row${w.count === 1 ? "" : "s"} &middot; ${alertText(w.dl)}</div>
+        <div style="font-size:10.5px;color:#475467;margin-top:2px;">${fmtDate(w.iso)} <a href="#" onclick="downloadExpiringRows('${planFilter}', '${w.dk}'); return false;" style="margin-left:4px;color:#1f6feb;font-weight:700;text-decoration:none;">&#11015; Download</a></div>
+      </div>`;
+    }
+    if (beyond > 0) {
+      lines += `<div style="font-size:10.5px;color:#94a3b8;margin-top:6px;">+${beyond} row${beyond === 1 ? "" : "s"} expiring later</div>`;
+    }
+    return lines;
+  }
+
+  // LEFT — One-time (₹2)
+  const leftCard = `<div style="${card3D}">
+    <div style="font-size:11px;font-weight:700;color:#0891b2;text-transform:uppercase;letter-spacing:0.6px;">&#9889; One-time</div>
+    <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">&#8377;2 / row &middot; single scan</div>
+    <div style="font-size:32px;font-weight:800;color:#0f172a;line-height:1;margin-top:10px;">${totals.onetime.toLocaleString()}</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:6px;">rows</div>
+    ${expiryLines('topup', buckets.onetime)}
   </div>`;
-  body.innerHTML = html;
+
+  // MIDDLE — Starter (₹5)
+  const middleCard = `<div style="${card3D}">
+    <div style="font-size:11px;font-weight:700;color:#1f6feb;text-transform:uppercase;letter-spacing:0.6px;">&#11088; Starter</div>
+    <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">&#8377;5 / row &middot; 30-day rolling</div>
+    <div style="font-size:32px;font-weight:800;color:#0f172a;line-height:1;margin-top:10px;">${totals.starter.toLocaleString()}</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:6px;">rows</div>
+    ${expiryLines('subscription', buckets.starter)}
+  </div>`;
+
+  // RIGHT — Bulk plans (Plan 1/2/3)
+  const packsByTier = { plan_10k: [], plan_15k: [], plan_20k: [] };
+  for (const p of packs) { if (packsByTier[p.plan]) packsByTier[p.plan].push(p); }
+  const TIER_META = {
+    plan_10k: { label: "Plan 1", capLabel: "5K", price: "&#8377;10,000" },
+    plan_15k: { label: "Plan 2", capLabel: "10K", price: "&#8377;15,000" },
+    plan_20k: { label: "Plan 3", capLabel: "20K", price: "&#8377;20,000" }
+  };
+  let bulkHtml = "";
+  for (const tier of ["plan_10k", "plan_15k", "plan_20k"]) {
+    const tps = packsByTier[tier];
+    const meta = TIER_META[tier];
+    if (tps.length === 0) {
+      bulkHtml += `<div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:6px;padding:7px 9px;margin-top:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:12px;color:#64748b;"><b>${meta.label}</b> &middot; ${meta.capLabel} rows</div>
+          <a href="/pdtracker/upload.html" style="font-size:10.5px;color:#1f6feb;font-weight:700;text-decoration:none;">Buy ${meta.price}</a>
+        </div>
+        <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">Not purchased</div>
+      </div>`;
+    } else {
+      for (const p of tps) {
+        const cap = p.credits_purchased;
+        const used = p.credits_used;
+        const remaining = p.credits_remaining;
+        const dl = daysLeft(p.expires_at);
+        const usedPct = cap > 0 ? Math.round((used / cap) * 100) : 0;
+        const expBadge = inAlertWindow(dl) ? `<span style="background:${alertBg(dl)};color:${alertColor(dl)};font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;font-size:10px;">&#9888; ${alertText(dl)}</span>` : "";
+        bulkHtml += `<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;padding:7px 9px;margin-top:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:12px;color:#0f172a;font-weight:700;">${meta.label} &middot; ${meta.capLabel} &#10003;</div>
+            <div style="font-size:10.5px;color:#7c3aed;font-weight:700;">${usedPct}%</div>
+          </div>
+          <div style="height:5px;background:#e9d5ff;border-radius:3px;margin:4px 0;overflow:hidden;">
+            <div style="height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);width:${usedPct}%;"></div>
+          </div>
+          <div style="font-size:10.5px;color:#475467;">
+            ${used.toLocaleString()} used &middot; <b style="color:#15803d;">${remaining.toLocaleString()} left</b>${expBadge}
+            <a href="#" onclick="downloadPackRows(${p.id}); return false;" style="margin-left:4px;color:#1f6feb;font-weight:700;text-decoration:none;">&#11015;</a>
+          </div>
+        </div>`;
+      }
+    }
+  }
+  const rightCard = `<div style="${card3D}">
+    <div style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.6px;">&#128142; Bulk Plans</div>
+    <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">capacity packs</div>
+    ${bulkHtml}
+  </div>`;
+
+  // Update header summary
+  let summaryParts = [];
+  if (totalActive) summaryParts.push(`${totalActive.toLocaleString()} active rows`);
+  if (expiringSoon > 0) summaryParts.push(`<span style="color:#dc2626;font-weight:700;">&#9888; ${expiringSoon} expiring in 7d</span>`);
+  if (summary) summary.innerHTML = summaryParts.length ? `&middot; ${summaryParts.join(" &middot; ")}` : "";
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+      ${leftCard}${middleCard}${rightCard}
+    </div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eaecf0;font-size:13px;color:#0f172a;text-align:center;">
+      <b>Total active rows: ${totalActive.toLocaleString()}</b>${expiringSoon > 0 ? ` &middot; <span style="color:#dc2626;font-weight:700;">${expiringSoon} expiring in next 7 days</span>` : ""}
+    </div>
+  `;
+}
+
+// =====================================================================
+// Download expiring rows as Excel (for per-row plans grouped by date)
+// =====================================================================
+window.downloadExpiringRows = function (plan, paidUntilDate) {
+  if (typeof XLSX === "undefined") { alert("Excel library not loaded — please refresh and try again."); return; }
+  const rows = (_cachedRows || []).filter(r =>
+    (r.plan || "") === plan && (r.paid_until || "") === paidUntilDate
+  );
+  if (rows.length === 0) { alert("No rows match this expiry."); return; }
+  const planName = {
+    "trial": "Trial",
+    "topup": "One-time",
+    "subscription": "Starter"
+  }[plan] || plan;
+  buildAndSaveLedgerExcel(rows, `cursive_expiring_${plan}_${paidUntilDate}.xlsx`,
+    `${planName} rows expiring ${paidUntilDate}`);
+};
+
+// =====================================================================
+// Download all rows belonging to a specific bulk pack
+// =====================================================================
+window.downloadPackRows = function (packId) {
+  if (typeof XLSX === "undefined") { alert("Excel library not loaded — please refresh and try again."); return; }
+  const rows = (_cachedRows || []).filter(r => Number(r.credit_pack_id) === Number(packId));
+  if (rows.length === 0) { alert("No rows in this pack yet."); return; }
+  buildAndSaveLedgerExcel(rows, `cursive_pack_${packId}.xlsx`, `Pack #${packId} rows`);
+};
+
+function buildAndSaveLedgerExcel(rows, filename, title) {
+  // Columns: Platform | Product ID | Seller Code | Seller Name | Buy Box Seller | Price | Rating | Reviews | Plan | Paid Until | Last Updated | Product Link
+  const header = ["Platform", "Product ID", "Seller Code", "Seller Name", "Buy Box Seller", "Price (₹)", "Rating", "Reviews", "Plan", "Paid Until", "Last Updated", "Product Link"];
+  const planLabelMap = {
+    "trial": "Trial",
+    "topup": "One-time",
+    "subscription": "Starter",
+    "plan_10k": "Plan 1 (5K)",
+    "plan_15k": "Plan 2 (10K)",
+    "plan_20k": "Plan 3 (20K)"
+  };
+  const aoa = [header];
+  for (const r of rows) {
+    aoa.push([
+      r.platform || "",
+      r.product_id || "",
+      r.seller_code || "",
+      r.seller_name || "",
+      r.seller || "",
+      r.price != null ? r.price : "",
+      r.rating != null ? r.rating : "",
+      r.review_count != null ? r.review_count : "",
+      planLabelMap[r.plan] || r.plan || "",
+      r.paid_until || "",
+      r.last_checked_at ? new Date(r.last_checked_at).toLocaleString("en-IN") : "",
+      r.product_url || ""
+    ]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 24 }, { wch: 22 },
+    { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 50 }
+  ];
+  // Bold header
+  for (let c = 0; c < header.length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[ref]) ws[ref].s = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1F6FEB" } }, alignment: { horizontal: "center" } };
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Rows");
+  XLSX.writeFile(wb, filename);
 }
 
 // ===== Row counter ("Showing X of Y rows" near filters) =====
@@ -1634,5 +1835,6 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 </script>
+<script>(function(){if(document.getElementById('cursiveFooter'))return;var f=document.createElement('footer');f.id='cursiveFooter';f.style.cssText='margin:40px auto 0;padding:20px 16px;border-top:1px solid #e2e8f0;background:#f8fafc;text-align:center;color:#64748b;font-size:12.5px;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;';f.innerHTML='© '+new Date().getFullYear()+' Cursive. All rights reserved. · <a href="/terms/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Terms</a> · <a href="/privacy/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Privacy</a> · <a href="/refund/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Refund</a> · <a href="mailto:support@cursive.world" style="color:#1f6feb;text-decoration:none;font-weight:600;">Contact</a>';document.body.appendChild(f);})();</script>
 </body>
 </html>
