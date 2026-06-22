@@ -869,3 +869,32 @@
     rzp.open();
   }
 })();
+
+/* ============================================================
+ * Universal policy-link footer
+ * Auto-injected on every page that loads home.js.
+ * Adds: Terms · Privacy · Refund · Contact
+ * Skips injection if the page already has a footer with id "cursiveFooter".
+ * ============================================================ */
+(function injectCursiveFooter() {
+  try {
+    if (document.getElementById("cursiveFooter")) return;
+    function build() {
+      if (document.getElementById("cursiveFooter")) return;
+      var f = document.createElement("footer");
+      f.id = "cursiveFooter";
+      f.style.cssText = "margin:40px auto 0;padding:20px 16px;border-top:1px solid #e2e8f0;background:#f8fafc;text-align:center;color:#64748b;font-size:12.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.7;";
+      f.innerHTML = '© ' + new Date().getFullYear() + ' Cursive. All rights reserved.' +
+        ' &middot; <a href="/terms/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Terms</a>' +
+        ' &middot; <a href="/privacy/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Privacy</a>' +
+        ' &middot; <a href="/refund/" style="color:#1f6feb;text-decoration:none;font-weight:600;">Refund</a>' +
+        ' &middot; <a href="mailto:support@cursive.world" style="color:#1f6feb;text-decoration:none;font-weight:600;">Contact</a>';
+      document.body.appendChild(f);
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", build);
+    } else {
+      build();
+    }
+  } catch (e) { /* silent */ }
+})();
