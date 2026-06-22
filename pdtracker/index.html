@@ -1181,9 +1181,14 @@ function renderLedger(data) {
     return "#fef3c7";
   }
   function alertText(dl) {
-    if (dl < 0) return `Expired ${Math.abs(dl)}d ago`;
+    if (dl < 0) {
+      const ago = Math.abs(dl);
+      const left = 3 - ago; // days left in 3-day grace before auto-delete
+      if (left > 0) return `Expired ${ago}d ago · auto-delete in ${left}d if not renewed`;
+      return `Expired ${ago}d ago · auto-deletes today`;
+    }
     if (dl === 0) return "Expires today";
-    return `${dl} day${dl === 1 ? "" : "s"} left`;
+    return `Expiring in ${dl} day${dl === 1 ? "" : "s"}`;
   }
 
   // Bucket rows: topup → onetime, trial+subscription → starter, bulk handled separately
@@ -1212,8 +1217,8 @@ function renderLedger(data) {
     if (inAlertWindow(dl)) expiringSoon += (pk.credits_remaining || 0);
   }
 
-  // 3D card base style (compact)
-  const card3D = "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border-radius:10px;padding:10px 12px;box-shadow:0 4px 12px rgba(15,23,42,0.08),0 1px 3px rgba(15,23,42,0.04),inset 0 1px 0 rgba(255,255,255,0.9);border:1px solid #e2e8f0;";
+  // 3D card base style (ultra-compact)
+  const card3D = "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border-radius:8px;padding:8px 10px;box-shadow:0 3px 8px rgba(15,23,42,0.06),inset 0 1px 0 rgba(255,255,255,0.9);border:1px solid #e2e8f0;";
 
   // Helper: render expiry alert lines for a column (only within alert window)
   function expiryLines(planFilter, dateMap) {
@@ -1266,13 +1271,13 @@ function renderLedger(data) {
     </details>`;
   }
 
+  // Compact card: name + ⓘ on top, big-number + subtitle inline, then optional expiry
   // LEFT — One-time (₹2)
   const leftCard = `<div style="${card3D}">
     ${nameLine('&#9889;', 'One-time', '#0891b2', '<b>Price:</b> &#8377;2 + 18% GST = &#8377;2.36 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; captured once<br><b>Retries:</b> Auto-retries up to 3 times if the scan fails<br><b>Data available:</b> 3 days after scan &mdash; download before it expires<br><b style="color:#b91c1c;">After day 3:</b> Auto-deleted if not converted to Starter / Bulk<br><a href="/pdtracker/upload.html?plan=topup" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add One-time rows &rarr;</a>')}
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">&#8377;2 / row &middot; single scan</div>
-    <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px;">
-      <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">${totals.onetime.toLocaleString()}</div>
-      <div style="font-size:10.5px;color:#64748b;">rows</div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-top:3px;">
+      <div style="font-size:18px;font-weight:800;color:#0f172a;line-height:1;">${totals.onetime.toLocaleString()}</div>
+      <div style="font-size:10px;color:#64748b;">rows &middot; &#8377;2 / single scan</div>
     </div>
     ${expiryLines('topup', buckets.onetime)}
   </div>`;
@@ -1280,10 +1285,9 @@ function renderLedger(data) {
   // MIDDLE — Starter (₹5) — 30 days continuous tracking
   const middleCard = `<div style="${card3D}">
     ${nameLine('&#11088;', 'Starter', '#1f6feb', '<b>Price:</b> &#8377;5 + 18% GST = &#8377;5.90 per row<br><b>What you get:</b> Buy Box, Ratings, Ratings Count, Price &mdash; refreshed every few hours<br><b>Validity:</b> 30 days from purchase &mdash; continuous tracking on each row<br><b>Renewal:</b> Auto-renews from wallet at day 30 (if balance available)<br><b>Grace period:</b> 3 days after day 30 to renew or download data<br><b style="color:#b91c1c;">After day 33:</b> Auto-deleted if not renewed &mdash; no recovery<br><a href="/pdtracker/upload.html?plan=subscription" style="color:#1f6feb;font-weight:600;text-decoration:none;">+ Add Starter rows &rarr;</a>')}
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">&#8377;5 / row &middot; 30 days continuous tracking</div>
-    <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px;">
-      <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">${totals.starter.toLocaleString()}</div>
-      <div style="font-size:10.5px;color:#64748b;">rows</div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-top:3px;">
+      <div style="font-size:18px;font-weight:800;color:#0f172a;line-height:1;">${totals.starter.toLocaleString()}</div>
+      <div style="font-size:10px;color:#64748b;">rows &middot; &#8377;5 / 30-day</div>
     </div>
     ${expiryLines('subscription', buckets.starter)}
   </div>`;
@@ -1326,7 +1330,11 @@ function renderLedger(data) {
         const remaining = p.credits_remaining;
         const dl = daysLeft(p.expires_at);
         const usedPct = cap > 0 ? Math.round((used / cap) * 100) : 0;
-        const expBadge = inAlertWindow(dl) ? `<span style="background:${alertBg(dl)};color:${alertColor(dl)};font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;font-size:10px;">&#9888; ${alertText(dl)}</span>` : "";
+        // Consistent expiry alert in same format as Starter card
+        const expAlert = inAlertWindow(dl) ? `<div style="background:${alertBg(dl)};border-left:3px solid ${alertColor(dl)};border-radius:4px;padding:5px 7px;margin-top:5px;">
+          <div style="font-size:11px;color:${alertColor(dl)};font-weight:700;">&#9888; <b>${cap.toLocaleString()}</b> rows &middot; ${alertText(dl)}</div>
+          <div style="font-size:10px;color:#475467;margin-top:1px;">${fmtDate(p.expires_at)} <a href="#" onclick="downloadPackRows(${p.id}); return false;" style="margin-left:4px;color:#1f6feb;font-weight:700;text-decoration:none;">&#11015; Download</a></div>
+        </div>` : "";
         bulkHtml += `<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;padding:7px 9px;margin-top:6px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="font-size:12px;color:#0f172a;font-weight:700;">${meta.label} &middot; ${meta.capLabel} &#10003;</div>
@@ -1336,9 +1344,10 @@ function renderLedger(data) {
             <div style="height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);width:${usedPct}%;"></div>
           </div>
           <div style="font-size:10.5px;color:#475467;">
-            ${used.toLocaleString()} used &middot; <b style="color:#15803d;">${remaining.toLocaleString()} left</b>${expBadge}
+            ${used.toLocaleString()} used &middot; <b style="color:#15803d;">${remaining.toLocaleString()} left</b>
             <a href="#" onclick="downloadPackRows(${p.id}); return false;" style="margin-left:4px;color:#1f6feb;font-weight:700;text-decoration:none;">&#11015;</a>
           </div>
+          ${expAlert}
         </div>`;
       }
     }
