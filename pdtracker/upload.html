@@ -782,13 +782,13 @@ addMoneyBtn.addEventListener("click", async () => {
           err.textContent = "Recharge succeeded but upload failed: " + e.message + " · Payment ID: " + response.razorpay_payment_id;
           err.classList.remove("hidden");
           addMoneyBtn.disabled = false;
-          addMoneyBtn.innerHTML = "Pay &#8377;" + Math.ceil(need_paise/100) + " &rarr;";
+          addMoneyBtn.innerHTML = "Pay &#8377;<span id=\"addAmt\">" + Math.ceil(need_paise/100) + "</span> &rarr;";
         }
       },
       modal: {
         ondismiss: function () {
           addMoneyBtn.disabled = false;
-          addMoneyBtn.innerHTML = "Pay &#8377;" + Math.ceil(need_paise/100) + " &rarr;";
+          addMoneyBtn.innerHTML = "Pay &#8377;<span id=\"addAmt\">" + Math.ceil(need_paise/100) + "</span> &rarr;";
         },
       },
     });
@@ -797,7 +797,7 @@ addMoneyBtn.addEventListener("click", async () => {
     err.textContent = e.message;
     err.classList.remove("hidden");
     addMoneyBtn.disabled = false;
-    addMoneyBtn.innerHTML = "Pay &#8377;" + Math.ceil(need_paise/100) + " &rarr;";
+    addMoneyBtn.innerHTML = "Pay &#8377;<span id=\"addAmt\">" + Math.ceil(need_paise/100) + "</span> &rarr;";
   }
 });
 
