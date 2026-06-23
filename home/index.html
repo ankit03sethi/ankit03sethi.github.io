@@ -192,7 +192,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/gst/">
+          <a class="svc-card" href="#" onclick="openServiceModal('gst'); return false;">
             <div class="svc-icon" style="background:#f97316;">GST</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">GST Registration</div>
@@ -200,7 +200,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/trademark/">
+          <a class="svc-card" href="#" onclick="openServiceModal('trademark'); return false;">
             <div class="svc-icon" style="background:#a855f7;">&reg;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Trademark</div>
@@ -208,7 +208,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/udyam/">
+          <a class="svc-card" href="#" onclick="openServiceModal('udyam'); return false;">
             <div class="svc-icon" style="background:#10b981;">&#127981;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Udyam (MSME)</div>
@@ -216,7 +216,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/iec/">
+          <a class="svc-card" href="#" onclick="openServiceModal('iec'); return false;">
             <div class="svc-icon" style="background:#06b6d4;">&#127757;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">IEC Code</div>
@@ -224,7 +224,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/marketplace/">
+          <a class="svc-card" href="#" onclick="openServiceModal('platform_account'); return false;">
             <div class="svc-icon" style="background:#ec4899;">&#128722;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Marketplace Setup</div>
@@ -232,7 +232,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/imaging/">
+          <a class="svc-card" href="#" onclick="openServiceModal('imaging'); return false;">
             <div class="svc-icon" style="background:#8b5cf6;">&#128247;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Product Imaging</div>
@@ -240,7 +240,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/website/">
+          <a class="svc-card" href="#" onclick="openServiceModal('website'); return false;">
             <div class="svc-icon" style="background:#10b981;">&#127760;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Website Creation</div>
@@ -248,7 +248,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/listing/">
+          <a class="svc-card" href="#" onclick="openServiceModal('listing'); return false;">
             <div class="svc-icon" style="background:#0ea5e9;">&#128221;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Listing Service</div>
@@ -256,7 +256,7 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/account-management/">
+          <a class="svc-card" href="#" onclick="openServiceModal('service'); return false;">
             <div class="svc-icon" style="background:#3b82f6;">&#128188;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Account Mgmt</div>
@@ -275,6 +275,66 @@
 
   </div>
 </main>
+
+<!-- Service-pay modal (all non-PD services on /home/) -->
+<div id="svcPayModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
+    <div style="padding:18px 22px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#1f6feb;text-transform:uppercase;letter-spacing:0.5px;">Buy service</div>
+          <div id="svcPayName" style="font-size:18px;font-weight:800;color:#0f172a;margin-top:2px;">Service</div>
+        </div>
+        <button id="svcPayClose" type="button" style="background:#fff;border:none;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:18px;color:#64748b;">&times;</button>
+      </div>
+    </div>
+    <div style="padding:18px 22px;">
+      <!-- Qty -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0 12px;border-bottom:1px solid #f1f5f9;">
+        <span style="font-size:13px;font-weight:600;color:#0f172a;">Quantity</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="svcQtyMinus" type="button" style="width:30px;height:30px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;font-weight:700;font-size:16px;">−</button>
+          <input id="svcQty" type="number" value="1" min="1" max="100" style="width:50px;height:30px;text-align:center;border:1px solid #d0d7de;border-radius:6px;font-size:14px;">
+          <button id="svcQtyPlus" type="button" style="width:30px;height:30px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;font-weight:700;font-size:16px;">+</button>
+        </div>
+      </div>
+      <!-- Price breakdown -->
+      <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;margin:12px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+          <span style="color:#64748b;">Unit price</span>
+          <span id="svcPayUnit" style="color:#0f172a;">₹999</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+          <span style="color:#64748b;">Subtotal (<span id="svcPayQtyEcho">1</span>×)</span>
+          <span id="svcPaySubtotal" style="color:#0f172a;">₹999</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+          <span style="color:#64748b;">GST (18%)</span>
+          <span id="svcPayGst" style="color:#0f172a;">₹180</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding:8px 0 0;margin-top:8px;border-top:1px solid #e2e8f0;">
+          <span style="color:#0f172a;">Total</span>
+          <span id="svcPayTotal" style="color:#1f6feb;">₹1,179</span>
+        </div>
+      </div>
+      <!-- Referral (placeholder for future) -->
+      <div style="margin:12px 0;">
+        <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Referral code <span style="color:#94a3b8;font-weight:400;">(optional)</span></label>
+        <input id="svcRefCode" type="text" placeholder="Leave blank if none" style="width:100%;padding:8px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;box-sizing:border-box;">
+      </div>
+      <!-- Wallet balance info -->
+      <div id="svcWalletInfo" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#0c4a6e;">
+        Wallet balance: <b id="svcWalletBal">₹0</b>
+      </div>
+      <p id="svcPayError" style="color:#dc2626;font-size:13px;display:none;margin:0 0 10px;"></p>
+      <p id="svcPaySuccess" style="color:#16a34a;font-size:13px;display:none;margin:0 0 10px;font-weight:600;"></p>
+      <button id="svcPayBtn" type="button" style="width:100%;background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 12px rgba(31,111,235,0.3);">
+        🔒 Pay <span id="svcPayBtnAmt">₹1,179</span> from wallet
+      </button>
+      <div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">If wallet is short, you'll be prompted to recharge first.</div>
+    </div>
+  </div>
+</div>
 
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
@@ -421,6 +481,144 @@ async function doSignOut() {
 $("#topSignOutBtn")?.addEventListener("click", doSignOut);
 
 init();
+
+// =====================================================================
+// SERVICE PAY MODAL — opens when a non-PD service card is clicked
+// =====================================================================
+const SVC_CATALOG = {
+  gst:              { name: "GST Registration",                  price: 999  },
+  trademark:        { name: "Trademark Registration",            price: 6999 },
+  udyam:            { name: "Udyam (MSME) Certificate",          price: 999  },
+  iec:              { name: "IEC (Import-Export Code)",          price: 1499 },
+  platform_account: { name: "Marketplace Seller Account Opening",price: 999  },
+  imaging:          { name: "Product Imaging",                   price: 499  },
+  website:          { name: "Website Creation",                  price: 4999 },
+  listing:          { name: "Product Listing",                   price: 50   },
+  service:          { name: "Account Management",                price: 4999 },
+};
+let _currentSvc = null;
+
+function rupees(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
+function paiseToRupees(p) { return "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function recalcSvcModal() {
+  if (!_currentSvc) return;
+  const qty = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
+  $("#svcQty").value = qty;
+  const sub = _currentSvc.price * qty;
+  const gst = Math.round(sub * 0.18);
+  const total = sub + gst;
+  $("#svcPayUnit").textContent = rupees(_currentSvc.price);
+  $("#svcPayQtyEcho").textContent = qty;
+  $("#svcPaySubtotal").textContent = rupees(sub);
+  $("#svcPayGst").textContent = rupees(gst);
+  $("#svcPayTotal").textContent = rupees(total);
+  $("#svcPayBtnAmt").textContent = rupees(total);
+}
+
+window.openServiceModal = async function (tag) {
+  const cat = SVC_CATALOG[tag];
+  if (!cat) { alert("Unknown service"); return; }
+  _currentSvc = { tag, ...cat };
+  $("#svcPayName").textContent = cat.name;
+  $("#svcQty").value = 1;
+  $("#svcRefCode").value = "";
+  $("#svcPayError").style.display = "none";
+  $("#svcPaySuccess").style.display = "none";
+  recalcSvcModal();
+
+  // Load fresh wallet balance
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=1`, {
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await res.json();
+    if (j.ok) $("#svcWalletBal").textContent = "₹" + j.balance_rupees;
+  } catch (e) { /* silent */ }
+
+  $("#svcPayBtn").disabled = false;
+  $("#svcPayBtn").innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayTotal").textContent + '</span> from wallet';
+  $("#svcPayModal").style.display = "flex";
+};
+
+// Qty +/- buttons
+$("#svcQtyMinus").addEventListener("click", () => {
+  $("#svcQty").value = Math.max(1, (parseInt($("#svcQty").value, 10) || 1) - 1);
+  recalcSvcModal();
+});
+$("#svcQtyPlus").addEventListener("click", () => {
+  $("#svcQty").value = Math.min(100, (parseInt($("#svcQty").value, 10) || 1) + 1);
+  recalcSvcModal();
+});
+$("#svcQty").addEventListener("input", recalcSvcModal);
+$("#svcQty").addEventListener("change", recalcSvcModal);
+
+// Close
+$("#svcPayClose").addEventListener("click", () => { $("#svcPayModal").style.display = "none"; });
+$("#svcPayModal").addEventListener("click", (e) => { if (e.target === $("#svcPayModal")) $("#svcPayModal").style.display = "none"; });
+
+// Pay button
+$("#svcPayBtn").addEventListener("click", async () => {
+  if (!_currentSvc) return;
+  const btn = $("#svcPayBtn");
+  const err = $("#svcPayError");
+  const ok = $("#svcPaySuccess");
+  err.style.display = "none";
+  ok.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "Processing…";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { err.textContent = "Please sign in again."; err.style.display = "block"; return; }
+    const qty = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
+    const ref = $("#svcRefCode").value.trim();
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-service`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        service_tag: _currentSvc.tag,
+        qty,
+        referral_code: ref || null,
+      }),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      ok.textContent = "✓ Paid " + paiseToRupees(j.total_paise) + " for " + j.service_name + " (qty " + qty + "). New balance: " + paiseToRupees(j.new_balance_paise) + ". Our team will contact you shortly.";
+      ok.style.display = "block";
+      btn.style.display = "none";
+      // Refresh wallet display
+      setTimeout(async () => {
+        const { data: { session: s2 } } = await sb.auth.getSession();
+        if (s2) await loadWallet(s2);
+      }, 800);
+      // Auto-close after 3 seconds
+      setTimeout(() => { $("#svcPayModal").style.display = "none"; btn.style.display = ""; recalcSvcModal(); }, 3500);
+      return;
+    }
+    if (j.code === "insufficient") {
+      const shortRs = Math.ceil(j.shortfall_paise / 100);
+      err.innerHTML = "Wallet short by <b>₹" + shortRs + "</b>. Please recharge first → <a href='/pdtracker/wallet.html?recharge=" + shortRs + "' style='color:#1f6feb;font-weight:700;'>Add ₹" + shortRs + " to wallet</a>";
+      err.style.display = "block";
+      btn.disabled = false;
+      btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+      return;
+    }
+    err.textContent = j.error || "Payment failed.";
+    err.style.display = "block";
+    btn.disabled = false;
+    btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+  } catch (e) {
+    err.textContent = "Network error: " + e.message;
+    err.style.display = "block";
+    btn.disabled = false;
+    btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+  }
+});
 </script>
 
 </body>
