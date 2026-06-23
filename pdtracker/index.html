@@ -493,7 +493,7 @@ async function refreshDash() {
     const platforms = new Set(_cachedRows.map(p => p.platform)).size;
     $("#kpiTotal").textContent = total;
     $("#kpiPlatforms").textContent = platforms;
-    $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString() + " (auto-refresh every 60s)";
+    $("#lastUpdate").textContent = "Last refreshed: " + new Date().toLocaleTimeString() + " (auto-refresh every 5 min · click Refresh for instant)";
 
     // Hide the golden free-trial banner the moment the customer has ANY
     // subscription row — they're no longer 'just on trial' even if their
@@ -829,14 +829,14 @@ async function refreshWalletChip() {
   } catch {}
 }
 
-// Auto-refresh every 60s (always — was previously gated on visibilityState which
-// blocked refresh when the tab was in the background or browser misreported state)
+// Auto-refresh every 5 minutes (reduced from 60s to save Supabase edge-function quota — Jun 23).
+// Customers can hit the "Refresh" card on the dashboard for immediate refresh.
 let _autoRefresh = null;
 function startAutoRefresh() {
   if (_autoRefresh) clearInterval(_autoRefresh);
   _autoRefresh = setInterval(() => {
     refreshDash().catch(() => {});
-  }, 60000);
+  }, 300000); // 5 minutes
   // Also catch up the moment the user returns to the tab
   document.removeEventListener("visibilitychange", _onVisibility);
   document.addEventListener("visibilitychange", _onVisibility);
@@ -1556,9 +1556,10 @@ document.addEventListener("change", (e) => {
     saveAutoRenewState(enabled);
   }
 });
-// Load auto-renew state after auth is ready (best effort)
+// Load auto-renew state ONCE after auth is ready (was polling every 60s — killed to save quota)
 setTimeout(loadAutoRenewState, 1500);
-setInterval(loadAutoRenewState, 60000);
+// Re-load when user manually clicks the dashboard refresh button (if any)
+window.reloadAutoRenewState = loadAutoRenewState;
 
 function buildAndSaveLedgerExcel(rows, filename, title) {
   // Columns: Platform | Product ID | Seller Code | Seller Name | Buy Box Seller | Price | Rating | Reviews | Plan | Paid Until | Last Updated | Product Link
