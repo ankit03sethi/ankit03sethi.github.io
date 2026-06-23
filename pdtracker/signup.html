@@ -36,8 +36,8 @@
     <label for="email">Email</label>
     <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@yourbrand.com" />
 
-    <label for="mobile">Mobile (10 digits)</label>
-    <input id="mobile" name="mobile" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" autocomplete="tel-national" placeholder="9876543210" />
+    <label for="mobile">Mobile (10 digits) <span style="color:#dc2626;">*</span></label>
+    <input id="mobile" name="mobile" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" required autocomplete="tel-national" placeholder="9876543210" />
 
     <label for="password">Password (6+ characters)</label>
     <input id="password" name="password" type="password" minlength="6" required autocomplete="new-password" />
@@ -130,13 +130,19 @@ $("#signupForm").addEventListener("submit", async (e) => {
     err.classList.remove("hidden");
     return;
   }
+  const emailVal = $("#email").value.trim().toLowerCase();
+  const pwdVal = $("#password").value;
+  const mobileVal = $("#mobile").value.trim().replace(/\D/g, "");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) { err.textContent = "Enter a valid email."; err.classList.remove("hidden"); return; }
+  if (pwdVal.length < 6) { err.textContent = "Password must be at least 6 characters."; err.classList.remove("hidden"); return; }
+  if (!/^\d{10}$/.test(mobileVal)) { err.textContent = "Enter a valid 10-digit mobile number."; err.classList.remove("hidden"); return; }
   const btn = $("#signupBtn");
   btn.disabled = true; btn.textContent = "Sending verification email...";
   try {
     const body = {
-      email: $("#email").value.trim().toLowerCase(),
-      password: $("#password").value,
-      mobile: $("#mobile").value.trim().replace(/\D/g, ""),
+      email: emailVal,
+      password: pwdVal,
+      mobile: mobileVal,
       terms_accepted: true,
       terms_version: TERMS_VERSION,
     };
