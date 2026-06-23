@@ -585,6 +585,11 @@ const AM_PLATFORMS = [
   { tag: "myntra",   name: "Myntra",   color: "#a855f7" },
   { tag: "firstcry", name: "FirstCry", color: "#22c55e" },
 ];
+const MP_PLATFORMS = [
+  { tag: "amazon",   name: "Amazon",   color: "#f97316" },
+  { tag: "flipkart", name: "Flipkart", color: "#1f6feb" },
+  { tag: "meesho",   name: "Meesho",   color: "#ec4899" },
+];
 let _currentSvc = null;
 let _currentBLTier = "growth"; // default selection
 
@@ -600,9 +605,9 @@ function recalcSvcModal() {
     unit = t.price;
     qtyDisplay = 1;
     sub = unit;
-  } else if (_currentSvc.tag === "service") {
-    // Account Mgmt: sum per-platform qty × ₹4999
-    unit = 4999;
+  } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
+    // Multi-platform with per-platform qty (Account Mgmt: 5 plats @ ₹4999, Marketplace Setup: 3 plats @ ₹999)
+    unit = _currentSvc.tag === "service" ? 4999 : 999;
     qtyDisplay = 0;
     document.querySelectorAll(".am-qty-input").forEach(i => {
       qtyDisplay += Math.max(0, Math.min(120, parseInt(i.value, 10) || 0));
@@ -680,10 +685,10 @@ function selectBLTier(tier) {
   recalcSvcModal();
 }
 
-function buildAMRows() {
+function buildAMRows(platformList) {
   const wrap = $("#svcAMRows");
   wrap.innerHTML = "";
-  for (const p of AM_PLATFORMS) {
+  for (const p of platformList) {
     const row = document.createElement("div");
     row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;";
     row.innerHTML =
@@ -742,7 +747,13 @@ window.openServiceModal = async function (tag) {
   } else if (tag === "service") {
     amSection.style.display = "";
     qtySection.style.display = "none";
-    buildAMRows();
+    amSection.querySelector("div").innerHTML = "Pick platforms &amp; qty (&#8377;4,999 per platform/month):";
+    buildAMRows(AM_PLATFORMS);
+  } else if (tag === "platform_account") {
+    amSection.style.display = "";
+    qtySection.style.display = "none";
+    amSection.querySelector("div").innerHTML = "Pick platforms &amp; qty (&#8377;999 per platform):";
+    buildAMRows(MP_PLATFORMS);
   } else {
     $("#svcQty").value = 1;
   }
@@ -797,7 +808,7 @@ function buildPayBody(qty, ref) {
   const body = { service_tag: _currentSvc.tag, referral_code: ref || null };
   if (_currentSvc.tag === "business_launcher") {
     body.variant = _currentBLTier;
-  } else if (_currentSvc.tag === "service") {
+  } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
     const platforms = [];
     document.querySelectorAll(".am-qty-input").forEach(i => {
       const q = parseInt(i.value, 10) || 0;
