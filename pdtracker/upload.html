@@ -137,7 +137,7 @@
 
 <!-- Plan picker modal -->
 <div id="planModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;">
-  <div style="background:#fff;border-radius:14px;max-width:680px;width:100%;padding:28px;box-shadow:0 24px 60px rgba(0,0,0,.25);">
+  <div style="background:#fff;border-radius:14px;max-width:780px;width:100%;padding:18px 22px;box-shadow:0 24px 60px rgba(0,0,0,.25);max-height:92vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
       <div>
         <h2 style="margin:0 0 4px;font-size:20px;">Pick a plan</h2>
@@ -149,9 +149,9 @@
 
     <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Pay per row</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;" id="planCards">
-      <div class="plan-card" data-plan="topup" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;">
+      <div class="plan-card" data-plan="topup" style="border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;">
         <div style="font-weight:700;font-size:14px;color:#1f6feb;text-transform:uppercase;letter-spacing:.5px;">One-time check</div>
-        <div style="font-size:28px;font-weight:700;margin:6px 0 2px;">&#8377;2.36<span style="font-size:14px;color:#6b7280;font-weight:500;"> / row</span></div>
+        <div style="font-size:20px;font-weight:700;margin:3px 0 1px;">&#8377;2.36<span style="font-size:14px;color:#6b7280;font-weight:500;"> / row</span></div>
         <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;2 + 18% GST</div>
         <ul style="margin:0;padding-left:18px;font-size:13px;color:#374151;line-height:1.7;">
           <li style="list-style:none;margin-left:-18px;padding:6px 0;">
@@ -168,10 +168,10 @@
           <li style="color:#b91c1c;font-weight:600;">Data kept 3 days, then auto-deleted</li>
         </ul>
       </div>
-      <div class="plan-card" data-plan="subscription" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;position:relative;">
+      <div class="plan-card" data-plan="subscription" style="border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;position:relative;">
         <div style="position:absolute;top:-10px;right:14px;background:#16a34a;color:#fff;font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600;">RECOMMENDED</div>
         <div style="font-weight:700;font-size:14px;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;">30-day tracking</div>
-        <div style="font-size:28px;font-weight:700;margin:6px 0 2px;">&#8377;5.90<span style="font-size:14px;color:#6b7280;font-weight:500;"> / row</span></div>
+        <div style="font-size:20px;font-weight:700;margin:3px 0 1px;">&#8377;5.90<span style="font-size:14px;color:#6b7280;font-weight:500;"> / row</span></div>
         <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;5 + 18% GST</div>
         <ul style="margin:0;padding-left:18px;font-size:13px;color:#374151;line-height:1.7;">
           <li>Re-checked every few hours for 30 days</li>
@@ -192,9 +192,9 @@
 
     <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Bulk packs &middot; save big at scale</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;" id="planCardsBulk">
-      <div class="plan-card" data-plan="plan_10k" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;background:#faf5ff;">
+      <div class="plan-card" data-plan="plan_10k" style="border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;background:#faf5ff;">
         <div style="font-weight:700;font-size:14px;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">&#128142; Plan 1</div>
-        <div style="font-size:24px;font-weight:700;margin:6px 0 2px;">&#8377;11,800<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
+        <div style="font-size:18px;font-weight:700;margin:3px 0 1px;">&#8377;11,800<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
         <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;10,000 + 18% GST</div>
         <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#374151;line-height:1.6;">
           <li>Up to <b>5,000 rows</b></li>
@@ -204,10 +204,10 @@
           <li style="color:#7c3aed;font-weight:600;">Effective &#8377;2.36/row if fully used</li>
         </ul>
       </div>
-      <div class="plan-card" data-plan="plan_15k" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;background:#faf5ff;position:relative;">
+      <div class="plan-card" data-plan="plan_15k" style="border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;background:#faf5ff;position:relative;">
         <div style="position:absolute;top:-10px;right:14px;background:#7c3aed;color:#fff;font-size:10px;padding:3px 10px;border-radius:10px;font-weight:600;">BEST VALUE</div>
         <div style="font-weight:700;font-size:14px;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">&#128142; Plan 2</div>
-        <div style="font-size:24px;font-weight:700;margin:6px 0 2px;">&#8377;17,700<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
+        <div style="font-size:18px;font-weight:700;margin:3px 0 1px;">&#8377;17,700<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
         <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;15,000 + 18% GST</div>
         <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#374151;line-height:1.6;">
           <li>Up to <b>10,000 rows</b></li>
@@ -217,9 +217,9 @@
           <li style="color:#7c3aed;font-weight:600;">Effective &#8377;1.77/row if fully used</li>
         </ul>
       </div>
-      <div class="plan-card" data-plan="plan_20k" style="border:2px solid #e5e7eb;border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;background:#faf5ff;">
+      <div class="plan-card" data-plan="plan_20k" style="border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;background:#faf5ff;">
         <div style="font-weight:700;font-size:14px;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">&#128142; Plan 3</div>
-        <div style="font-size:24px;font-weight:700;margin:6px 0 2px;">&#8377;23,600<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
+        <div style="font-size:18px;font-weight:700;margin:3px 0 1px;">&#8377;23,600<span style="font-size:13px;color:#6b7280;font-weight:500;"> total</span></div>
         <div class="muted" style="font-size:12px;margin-bottom:10px;">&#8377;20,000 + 18% GST</div>
         <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#374151;line-height:1.6;">
           <li>Up to <b>20,000 rows</b></li>
@@ -531,6 +531,13 @@ planCards.forEach(card => {
   });
 });
 
+// Bulk plan pricing (fixed-price, server-validated)
+const BULK_PLAN_PRICES = {
+  plan_10k: { base_inr: 10000, cap: 5000,  label: "Plan 1 (5K rows)" },
+  plan_15k: { base_inr: 15000, cap: 10000, label: "Plan 2 (10K rows)" },
+  plan_20k: { base_inr: 20000, cap: 20000, label: "Plan 3 (20K rows)" },
+};
+
 async function refreshQuote() {
   $("#payError").classList.add("hidden");
   quoteBox.classList.remove("hidden");
@@ -538,6 +545,46 @@ async function refreshQuote() {
   addMoneyBtn.classList.add("hidden");
   try {
     const { data: { session } } = await sb.auth.getSession();
+
+    // ===== BULK PLANS — fixed price, client-computed (avoids NaN) =====
+    if (BULK_PLAN_PRICES[selectedPlan]) {
+      const meta = BULK_PLAN_PRICES[selectedPlan];
+      // Fetch only wallet balance from server
+      const walletRes = await fetch(SUPABASE_URL + "/functions/v1/analytics-wallet-summary?limit=1", {
+        headers: { Authorization: "Bearer " + session.access_token, apikey: SUPABASE_ANON_KEY },
+      });
+      const wj = await walletRes.json();
+      const balance_paise = wj.balance_paise ?? Math.round(parseFloat(String(wj.balance_rupees || "0").replace(/,/g,"")) * 100);
+
+      const subtotal_paise = meta.base_inr * 100;
+      const gst_paise = Math.round(subtotal_paise * 0.18);
+      const total_paise = subtotal_paise + gst_paise;
+      const shortfall_paise = Math.max(0, total_paise - balance_paise);
+
+      currentQuote = { plan: selectedPlan, total_paise, subtotal_paise, gst_paise, balance_paise, shortfall_paise, billable_rows: meta.cap };
+
+      $("#qPlan").textContent = meta.label;
+      $("#qRows").textContent = meta.cap.toLocaleString();
+      $("#qSubtotal").textContent = rupees(subtotal_paise);
+      $("#qGst").textContent = rupees(gst_paise);
+      $("#qTotal").textContent = rupees(total_paise);
+      $("#qBalance").textContent = rupees(balance_paise);
+      $("#qFreeRowsLine").classList.add("hidden");
+
+      payNowBtn.textContent = "Pay & upload →";
+      if (shortfall_paise > 0) {
+        $("#qShortfall").classList.remove("hidden");
+        $("#qShortVal").textContent = rupees(shortfall_paise);
+        $("#addAmt").textContent = Math.ceil(shortfall_paise / 100);
+        addMoneyBtn.classList.remove("hidden");
+      } else {
+        $("#qShortfall").classList.add("hidden");
+        payNowBtn.classList.remove("hidden");
+      }
+      return;
+    }
+
+    // ===== PER-ROW PLANS (topup, subscription) — server quote =====
     const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-upload-quote", {
       method: "POST",
       headers: {
@@ -547,8 +594,11 @@ async function refreshQuote() {
       },
       body: JSON.stringify({ row_count: parsedRows.length, plan: selectedPlan }),
     });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || "Quote failed");
+    const raw = await r.json();
+    if (!raw.ok) throw new Error(raw.error || "Quote failed");
+    // v4 response shape: { ok, quote:{...}, balance_paise, free_quota_remaining }
+    // Older shape was flat. Handle both for safety.
+    const j = raw.quote ? { ...raw.quote, balance_paise: raw.balance_paise ?? raw.quote.balance_paise } : raw;
     currentQuote = j;
     $("#qPlan").textContent = selectedPlan === "topup" ? "₹2.00" : "₹5.00";
     $("#qRows").textContent = j.billable_rows;
@@ -563,7 +613,6 @@ async function refreshQuote() {
       $("#qFreeRowsLine").classList.add("hidden");
     }
     if (j.total_paise === 0) {
-      // Entirely free — hide payment lines, just show Pay button
       payNowBtn.textContent = "Activate " + j.free_rows + " free rows →";
       payNowBtn.classList.remove("hidden");
       addMoneyBtn.classList.add("hidden");
