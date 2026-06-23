@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     .home-wrap { max-width: 1280px; margin: 28px auto; padding: 0 18px; }
     .home-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: flex-start; }
@@ -385,6 +386,16 @@ async function showHome(session) {
   show($("#emailChip"));
   show($("#topSignOutBtn"));
   await loadWallet(session);
+
+  // Auto-open service modal if ?service=TAG was passed (from service-page redirect)
+  const svc = qp.get("service");
+  if (svc) {
+    setTimeout(() => {
+      try { window.openServiceModal(svc); } catch (e) { /* silent */ }
+      // Clean URL so refresh doesn't re-open
+      history.replaceState({}, "", location.pathname);
+    }, 300);
+  }
 }
 
 async function loadWallet(session) {
@@ -558,7 +569,115 @@ $("#svcQty").addEventListener("change", recalcSvcModal);
 $("#svcPayClose").addEventListener("click", () => { $("#svcPayModal").style.display = "none"; });
 $("#svcPayModal").addEventListener("click", (e) => { if (e.target === $("#svcPayModal")) $("#svcPayModal").style.display = "none"; });
 
-// Pay button
+// Shared helper: try to debit from wallet. Returns { paid: true } on success.
+async function tryWalletDebit(session, qty, ref) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-service`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + session.access_token,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      service_tag: _currentSvc.tag,
+      qty,
+      referral_code: ref || null,
+    }),
+  });
+  return await r.json();
+}
+
+// After a successful Razorpay recharge, auto-debit the service payment
+async function autoDebitAfterRecharge(session, qty, ref, btn, err, ok) {
+  btn.textContent = "Debiting service payment…";
+  const j = await tryWalletDebit(session, qty, ref);
+  if (j.ok) {
+    ok.innerHTML = "✓ <b>Paid " + paiseToRupees(j.total_paise) + "</b> for " + j.service_name + " (qty " + qty + ").<br>New wallet balance: <b>" + paiseToRupees(j.new_balance_paise) + "</b>.<br><span style='color:#64748b;font-size:12px;'>Our team will contact you shortly.</span>";
+    ok.style.display = "block";
+    btn.style.display = "none";
+    const { data: { session: s2 } } = await sb.auth.getSession();
+    if (s2) await loadWallet(s2);
+    setTimeout(() => { $("#svcPayModal").style.display = "none"; btn.style.display = ""; recalcSvcModal(); }, 4000);
+    return;
+  }
+  // Should rarely happen — wallet was just credited
+  err.textContent = "Recharge succeeded but auto-debit failed: " + (j.error || j.message || "unknown") + ". Try Pay again.";
+  err.style.display = "block";
+  btn.disabled = false;
+  btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+}
+
+// Open Razorpay for the shortfall amount, then auto-debit the service
+async function rechargeAndPay(session, shortfall_paise, qty, ref, btn, err, ok) {
+  btn.textContent = "Opening payment gateway…";
+  try {
+    const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-order`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ amount_paise: shortfall_paise }),
+    });
+    const order = await orderRes.json();
+    if (!order.ok) throw new Error(order.error || "Could not create payment order");
+
+    if (typeof Razorpay === "undefined") throw new Error("Payment library not loaded — please refresh.");
+
+    const rzp = new Razorpay({
+      key: order.key_id,
+      amount: order.amount_paise,
+      currency: order.currency,
+      order_id: order.order_id,
+      name: "Cursive World",
+      description: "Recharge ₹" + (shortfall_paise/100).toFixed(2) + " to pay for " + _currentSvc.name,
+      prefill: { email: session.user.email, contact: session.user.user_metadata?.mobile || "" },
+      theme: { color: "#1f6feb" },
+      handler: async function (response) {
+        btn.textContent = "Crediting wallet…";
+        try {
+          const cr = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-confirm`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + session.access_token,
+              "apikey": SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const cj = await cr.json();
+          if (!cj.ok) throw new Error(cj.error || "Recharge confirmation failed");
+          // Wallet now has the funds — auto-debit the service
+          await autoDebitAfterRecharge(session, qty, ref, btn, err, ok);
+        } catch (e) {
+          err.textContent = "Recharge confirmation failed: " + e.message + ". Contact support with payment ID " + response.razorpay_payment_id;
+          err.style.display = "block";
+          btn.disabled = false;
+          btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          btn.disabled = false;
+          btn.innerHTML = '💳 Recharge ₹' + Math.ceil(shortfall_paise/100) + ' & Pay now';
+        },
+      },
+    });
+    rzp.open();
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = "block";
+    btn.disabled = false;
+    btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+  }
+}
+
+// Pay button — tries wallet first, falls back to recharge+pay chain
 $("#svcPayBtn").addEventListener("click", async () => {
   if (!_currentSvc) return;
   const btn = $("#svcPayBtn");
@@ -570,45 +689,42 @@ $("#svcPayBtn").addEventListener("click", async () => {
   btn.textContent = "Processing…";
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { err.textContent = "Please sign in again."; err.style.display = "block"; return; }
+    if (!session) { err.textContent = "Please sign in again."; err.style.display = "block"; btn.disabled = false; return; }
     const qty = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
     const ref = $("#svcRefCode").value.trim();
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-service`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + session.access_token,
-        "apikey": SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({
-        service_tag: _currentSvc.tag,
-        qty,
-        referral_code: ref || null,
-      }),
-    });
-    const j = await r.json();
+
+    const j = await tryWalletDebit(session, qty, ref);
+
     if (j.ok) {
-      ok.textContent = "✓ Paid " + paiseToRupees(j.total_paise) + " for " + j.service_name + " (qty " + qty + "). New balance: " + paiseToRupees(j.new_balance_paise) + ". Our team will contact you shortly.";
+      // Direct debit succeeded
+      ok.innerHTML = "✓ <b>Paid " + paiseToRupees(j.total_paise) + "</b> for " + j.service_name + " (qty " + qty + ").<br>New wallet balance: <b>" + paiseToRupees(j.new_balance_paise) + "</b>.<br><span style='color:#64748b;font-size:12px;'>Our team will contact you shortly.</span>";
       ok.style.display = "block";
       btn.style.display = "none";
-      // Refresh wallet display
-      setTimeout(async () => {
-        const { data: { session: s2 } } = await sb.auth.getSession();
-        if (s2) await loadWallet(s2);
-      }, 800);
-      // Auto-close after 3 seconds
-      setTimeout(() => { $("#svcPayModal").style.display = "none"; btn.style.display = ""; recalcSvcModal(); }, 3500);
+      const { data: { session: s2 } } = await sb.auth.getSession();
+      if (s2) await loadWallet(s2);
+      setTimeout(() => { $("#svcPayModal").style.display = "none"; btn.style.display = ""; recalcSvcModal(); }, 4000);
       return;
     }
     if (j.code === "insufficient") {
+      // Switch button to "Recharge & Pay" mode and trigger Razorpay
       const shortRs = Math.ceil(j.shortfall_paise / 100);
-      err.innerHTML = "Wallet short by <b>₹" + shortRs + "</b>. Please recharge first → <a href='/pdtracker/wallet.html?recharge=" + shortRs + "' style='color:#1f6feb;font-weight:700;'>Add ₹" + shortRs + " to wallet</a>";
+      err.innerHTML = "Wallet is short by <b>₹" + shortRs + "</b>. Opening payment gateway — you'll be auto-charged for the service the moment recharge clears.";
+      err.style.color = "#92400e";
+      err.style.background = "#fffbeb";
+      err.style.borderLeft = "3px solid #d97706";
+      err.style.padding = "8px 10px";
+      err.style.borderRadius = "6px";
       err.style.display = "block";
-      btn.disabled = false;
-      btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
+      btn.innerHTML = '💳 Recharge ₹' + shortRs + ' & Pay now';
+      // Auto-trigger Razorpay (no second click needed)
+      await rechargeAndPay(session, j.shortfall_paise, qty, ref, btn, err, ok);
       return;
     }
     err.textContent = j.error || "Payment failed.";
+    err.style.color = "#dc2626";
+    err.style.background = "";
+    err.style.borderLeft = "";
+    err.style.padding = "";
     err.style.display = "block";
     btn.disabled = false;
     btn.innerHTML = '🔒 Pay ' + $("#svcPayTotal").textContent + ' from wallet';
