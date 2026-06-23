@@ -147,6 +147,18 @@
       <button id="modalCloseBtn" class="btn btn-outline" style="padding:6px 12px;font-size:14px;">&times; Close</button>
     </div>
 
+    <!-- ACTIVE PACK BANNER — shown when customer already has bulk credits covering this upload -->
+    <div id="activePackBanner" class="hidden" style="margin-bottom:16px;background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-left:5px solid #16a34a;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:13px;font-weight:700;color:#14532d;margin-bottom:4px;">&#10003; Your existing bulk plan covers this upload</div>
+      <div style="font-size:13px;color:#15803d;line-height:1.55;" id="activePackInfo">&mdash;</div>
+      <button id="useExistingPackBtn" type="button" style="margin-top:10px;background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 8px rgba(22,163,74,0.3);">
+        &#10003; Use credits &amp; upload &rarr;
+      </button>
+      <div style="font-size:11px;color:#15803d;margin-top:6px;">No payment needed. Rows will be linked to your existing pack.</div>
+    </div>
+
+    <!-- Plan picker sections (hidden when active pack covers upload) -->
+    <div id="planPickerWrap">
     <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Pay per row</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;" id="planCards">
       <div class="plan-card" data-plan="topup" style="border:2px solid #e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;">
@@ -233,6 +245,7 @@
     <div style="background:#fff7ed;border-left:3px solid #d97706;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e;line-height:1.55;">
       &#9888; <b>Bulk plans are fixed-price:</b> you pay the full amount regardless of how many rows you upload now. Unused capacity lapses after 30 days. Best when you have many products to track.
     </div>
+    </div><!-- /planPickerWrap -->
 
     <div id="quoteBox" class="hidden" style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px;background:#f9fafb;">
       <div id="qFreeRowsLine" class="hidden" style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;color:#16a34a;font-weight:600;"><span>Free trial covers</span><span><span id="qFreeRows">0</span> rows &mdash; &#8377;0.00</span></div>
@@ -499,7 +512,41 @@ $("#uploadBtn").addEventListener("click", async () => {
   $("#payError").classList.add("hidden");
   $("#paySuccess").classList.add("hidden");
   $("#freeTrialBanner").classList.add("hidden");
+  $("#activePackBanner").classList.add("hidden");
+  $("#planPickerWrap").classList.remove("hidden");
   planModal.classList.remove("hidden");
+
+  // === NEW: Check for active pack credits that fully cover this upload ===
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const checkRes = await fetch(SUPABASE_URL + "/functions/v1/analytics-upload-quote", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ row_count: parsedRows.length }), // no plan = get all quotes + packs
+    });
+    const checkJ = await checkRes.json();
+    if (checkJ.ok && checkJ.packs_cover_all && Array.isArray(checkJ.active_packs) && checkJ.active_packs.length > 0) {
+      const totalRem = checkJ.active_packs.reduce((s, p) => s + p.credits_remaining, 0);
+      const planLabels = checkJ.active_packs.map(p => p.label + " (" + p.credits_remaining.toLocaleString() + " left)").join(", ");
+      $("#activePackInfo").innerHTML =
+        "Your active pack" + (checkJ.active_packs.length > 1 ? "s have" : " has") +
+        " <b>" + totalRem.toLocaleString() + "</b> credits remaining. " +
+        "Uploading <b>" + parsedRows.length.toLocaleString() + "</b> rows.<br>" +
+        "<span style='font-size:11.5px;color:#15803d;'>" + planLabels + "</span>";
+      $("#activePackBanner").classList.remove("hidden");
+      $("#planPickerWrap").classList.add("hidden");
+      // Wire the "Use credits" button
+      $("#useExistingPackBtn").onclick = () => uploadUsingExistingPack();
+      return;
+    }
+  } catch (e) {
+    console.warn("active pack check failed (non-fatal):", e);
+  }
+
   // If ?plan= was specified (e.g., from ledger Buy buttons), pre-click that card
   if (PRE_SELECTED_PLAN) {
     const target = document.querySelector(`.plan-card[data-plan="${PRE_SELECTED_PLAN}"]`);
@@ -641,6 +688,39 @@ addMoneyBtn.addEventListener("click", () => {
   const amt = Math.ceil(need / 100) * 100; // round up to nearest 100
   location.href = "/pdtracker/wallet.html?prefill=" + amt + "&back=" + encodeURIComponent(location.pathname);
 });
+
+// === Use existing pack credits (no payment) ===
+async function uploadUsingExistingPack() {
+  const btn = $("#useExistingPackBtn");
+  const err = $("#payError");
+  const ok = $("#paySuccess");
+  err.classList.add("hidden"); ok.classList.add("hidden");
+  btn.disabled = true; btn.textContent = "Uploading using credits…";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-upload-confirm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        plan: "use_existing_pack",
+        rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id, seller_code: r.seller_code || "", seller_name: r.seller_name || "" })),
+      }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "Could not use credits");
+    ok.textContent = "✓ " + j.inserted_count + " rows added using your existing pack credits. Redirecting…";
+    ok.classList.remove("hidden");
+    setTimeout(() => location.href = "/pdtracker/", 1800);
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove("hidden");
+    btn.disabled = false; btn.innerHTML = "&#10003; Use credits &amp; upload &rarr;";
+  }
+}
 
 payNowBtn.addEventListener("click", async () => {
   $("#payError").classList.add("hidden");
