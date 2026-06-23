@@ -294,6 +294,15 @@
       <div style="text-align:center;color:#94a3b8;padding:30px;">Loading...</div>
     </div>
     <div id="cartFooter" style="padding:14px 18px;border-top:1px solid #e2e8f0;background:#f8fafc;">
+      <!-- Cart-level coupon -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#64748b;font-weight:600;display:block;margin-bottom:4px;">Apply coupon to items without one</label>
+        <div style="display:flex;gap:6px;">
+          <input id="cartCouponInput" type="text" placeholder="Coupon code" style="flex:1;padding:8px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;text-transform:uppercase;" />
+          <button id="cartCouponApplyBtn" type="button" style="background:#1f6feb;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-weight:600;font-size:12.5px;cursor:pointer;">Apply</button>
+        </div>
+        <p id="cartCouponMsg" style="font-size:11.5px;margin:4px 0 0;display:none;"></p>
+      </div>
       <div id="cartBreakdown" style="margin-bottom:10px;"></div>
       <p id="cartError" style="color:#dc2626;font-size:12.5px;display:none;margin:0 0 8px;"></p>
       <button id="cartPayBtn" type="button" style="width:100%;background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 12px rgba(31,111,235,0.3);">
@@ -594,9 +603,15 @@ function addCurrentSvcToCart() {
   const sub_paise = Math.round(parseFloat($("#svcPaySubtotal").textContent.replace(/[^\d.]/g, "") || "0") * 100);
   const gst_paise = Math.round(parseFloat($("#svcPayGst").textContent.replace(/[^\d.]/g, "") || "0") * 100);
   const total_paise = Math.round(parseFloat($("#svcPayTotal").textContent.replace(/[^\d.]/g, "") || "0") * 100);
+  // Capture optional coupon code entered in the service modal
+  const couponInput = $("#svcRefCode");
+  const couponCode = couponInput ? (couponInput.value || "").trim().toUpperCase() : "";
   const item = { id: "ci_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
     service_tag: _currentSvc.tag, service_name: _currentSvc.name,
-    sub_paise, gst_paise, total_paise };
+    sub_paise, gst_paise, total_paise,
+    coupon_code: couponCode || null,
+    discount_paise: 0 // will be filled by cart on validation
+  };
   if (_currentSvc.tag === "business_launcher") {
     item.variant = _currentBLTier;
     item.label = (BL_TIERS[_currentBLTier]?.name || _currentSvc.name);
@@ -616,6 +631,27 @@ function addCurrentSvcToCart() {
   const cart = getCart(); cart.push(item); saveCart(cart);
   $("#svcPayModal").style.display = "none";
   showCartToast(item.label);
+  // Validate per-item coupon AFTER push so the item is findable when async completes
+  if (item.coupon_code) {
+    (async () => {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/validate-coupon`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+          body: JSON.stringify({ code: item.coupon_code, service_tag: item.service_tag, base_paise: item.total_paise }),
+        });
+        const j = await r.json();
+        const cart2 = getCart();
+        const target = cart2.find(x => x.id === item.id);
+        if (target) {
+          if (j.ok) { target.discount_paise = j.discount_paise; }
+          else { target.coupon_code = null; target.discount_paise = 0; }
+          saveCart(cart2);
+        }
+      } catch (e) { /* ignore */ }
+    })();
+  }
 }
 function showCartToast(label) {
   let t = document.getElementById("cartToast");
@@ -661,6 +697,14 @@ function openCartModal() {
     } catch (e) { /* silent */ }
   })();
 }
+function effectivePaise(it) { return Math.max(0, (it.total_paise || 0) - (it.discount_paise || 0)); }
+function cartTotalsBreakdown() {
+  const cart = getCart();
+  const gross = cart.reduce((s, it) => s + (it.total_paise || 0), 0);
+  const itemDiscount = cart.reduce((s, it) => s + (it.discount_paise || 0), 0);
+  const net = gross - itemDiscount;
+  return { gross, itemDiscount, net };
+}
 function renderCartModal() {
   const cart = getCart();
   $("#cartHeaderCount").textContent = cart.length + " item" + (cart.length === 1 ? "" : "s");
@@ -673,29 +717,89 @@ function renderCartModal() {
   $("#cartFooter").style.display = "block";
   let html = "";
   for (const it of cart) {
-    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+    const eff = effectivePaise(it);
+    const couponLine = it.coupon_code ?
+      `<div style="font-size:11.5px;color:#16a34a;margin-top:2px;">&#10003; Coupon <b>${escapeHtml(it.coupon_code)}</b>${it.discount_paise ? ` saved ₹${(it.discount_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.discount_paise % 100 ? 2 : 0 })}` : ""}</div>` : "";
+    const priceCol = it.discount_paise > 0 ?
+      `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
+       <div style="font-size:14px;font-weight:700;color:#16a34a;">₹${(eff/100).toLocaleString("en-IN", { minimumFractionDigits: eff % 100 ? 2 : 0 })}</div>` :
+      `<div style="font-size:14px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9;">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13.5px;font-weight:600;color:#0f172a;">${escapeHtml(it.label)}</div>
         <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${escapeHtml(it.service_name)} · ${it.qty_display} unit${it.qty_display === 1 ? "" : "s"}</div>
+        ${couponLine}
       </div>
       <div style="text-align:right;margin-left:10px;flex-shrink:0;">
-        <div style="font-size:14px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
+        ${priceCol}
         <button onclick="removeCartItem('${it.id}')" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:2px;font-weight:600;">Remove</button>
       </div>
     </div>`;
   }
   body.innerHTML = html;
-  const total = cartTotalPaise();
-  const adj = Math.min(_cartWalletPaise, total);
-  const due = Math.max(0, total - _cartWalletPaise);
+  const { gross, itemDiscount, net } = cartTotalsBreakdown();
+  const adj = Math.min(_cartWalletPaise, net);
+  const due = Math.max(0, net - _cartWalletPaise);
   const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits: p % 100 ? 2 : 0 });
   $("#cartBreakdown").innerHTML =
-    `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span style="color:#64748b;">Cart total</span><span style="color:#0f172a;font-weight:600;">${fmt(total)}</span></div>` +
+    `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span style="color:#64748b;">Cart subtotal</span><span style="color:#0f172a;font-weight:600;">${fmt(gross)}</span></div>` +
+    (itemDiscount > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#16a34a;"><span>Coupon discount</span><span>−${fmt(itemDiscount)}</span></div>` : "") +
     (adj > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#16a34a;"><span>Adjustment from wallet</span><span>−${fmt(adj)}</span></div>` : "") +
     `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:6px 0 0;margin-top:4px;border-top:1px solid #e2e8f0;"><span style="color:#0f172a;">Amount to pay</span><span style="color:#1f6feb;">${fmt(due)}</span></div>` +
     `<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Wallet balance: ${fmt(_cartWalletPaise)}</div>`;
   $("#cartPayBtnAmt").textContent = fmt(due);
 }
+
+// Cart-level coupon: applies ONLY to items without an existing coupon
+document.addEventListener("click", async (e) => {
+  if (e.target && e.target.id === "cartCouponApplyBtn") {
+    const code = ($("#cartCouponInput").value || "").trim().toUpperCase();
+    const msg = $("#cartCouponMsg");
+    msg.style.display = "none";
+    if (!code) { msg.textContent = "Enter a coupon code."; msg.style.color = "#dc2626"; msg.style.display = "block"; return; }
+    const cart = getCart();
+    const eligibleItems = cart.filter(it => !it.coupon_code);
+    if (eligibleItems.length === 0) {
+      msg.textContent = "All cart items already have a coupon. This code can't be applied.";
+      msg.style.color = "#92400e"; msg.style.display = "block"; return;
+    }
+    e.target.disabled = true; e.target.textContent = "Applying…";
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      let appliedCount = 0;
+      let totalSaved = 0;
+      for (const it of eligibleItems) {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/validate-coupon`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+          body: JSON.stringify({ code, service_tag: it.service_tag, base_paise: it.total_paise }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          it.coupon_code = j.code;
+          it.discount_paise = j.discount_paise;
+          appliedCount++;
+          totalSaved += j.discount_paise;
+        }
+      }
+      if (appliedCount === 0) {
+        msg.textContent = "Coupon not valid for any cart item.";
+        msg.style.color = "#dc2626"; msg.style.display = "block";
+      } else {
+        saveCart(cart);
+        msg.innerHTML = "&#10003; Applied to <b>" + appliedCount + "</b> item" + (appliedCount === 1 ? "" : "s") + " · Saved <b>₹" + (totalSaved/100).toLocaleString("en-IN", { minimumFractionDigits: totalSaved % 100 ? 2 : 0 }) + "</b>";
+        msg.style.color = "#16a34a"; msg.style.display = "block";
+        $("#cartCouponInput").value = "";
+        renderCartModal();
+      }
+    } catch (err) {
+      msg.textContent = "Network error: " + err.message;
+      msg.style.color = "#dc2626"; msg.style.display = "block";
+    } finally {
+      e.target.disabled = false; e.target.textContent = "Apply";
+    }
+  }
+});
 window.removeCartItem = function (id) {
   const cart = getCart().filter(it => it.id !== id);
   saveCart(cart);
