@@ -571,7 +571,9 @@
               imaging: "imaging",
               website: "website",
               listing: "listing",
-              service: "service"
+              service: "service",
+              business: "business_launcher",
+              business_launcher: "business_launcher"
             };
             var svcParam = tagMap[currentServiceTag] || "";
             var target = svcParam
