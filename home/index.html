@@ -911,8 +911,15 @@ async function rechargeAndPay(session, shortfall_paise, qty, ref, btn, err, ok) 
       },
       modal: {
         ondismiss: function () {
+          // Reset to pre-click state — looks like a fresh first attempt
           btn.disabled = false;
-          btn.innerHTML = '💳 Recharge ₹' + Math.ceil(shortfall_paise/100) + ' & Pay now';
+          btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+          // Hide the orange "opening payment gateway" warning
+          err.style.display = "none";
+          err.style.background = "";
+          err.style.borderLeft = "";
+          err.style.padding = "";
+          err.style.color = "";
         },
       },
     });
