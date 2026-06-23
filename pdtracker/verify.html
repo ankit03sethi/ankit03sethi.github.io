@@ -90,15 +90,15 @@ $("#verifyForm").addEventListener("submit", async (e) => {
       sessionStorage.removeItem("pd_signup_email");
       sessionStorage.removeItem("pd_signup_password");
       if (sErr) {
-        // Fall back to login page
-        setTimeout(() => location.href = "/pdtracker/?welcome=1&email=" + encodeURIComponent(email), 1200);
+        // Fall back to home (login form) if auto-signin fails
+        setTimeout(() => location.href = "/home/?welcome=1", 1200);
         return;
       }
-      // Logged in — go to upload page (download template + upload in one screen)
-      setTimeout(() => location.href = "/pdtracker/upload.html?welcome=1", 800);
+      // Logged in — land on /home/ (services hub + wallet) instead of upload page
+      setTimeout(() => location.href = "/home/?welcome=1", 800);
     } else {
       sessionStorage.removeItem("pd_signup_email");
-      setTimeout(() => location.href = "/pdtracker/?welcome=1&email=" + encodeURIComponent(email), 1200);
+      setTimeout(() => location.href = "/home/?welcome=1", 1200);
     }
   } catch (e2) {
     err.textContent = e2.message;
