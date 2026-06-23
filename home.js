@@ -559,10 +559,25 @@
           regBtn.className = "btn btn-primary lead-submit lead-pay-btn";
           regBtn.innerHTML = '<span class="lead-pay-emoji">&#128274;</span> Register now to pay';
           regBtn.addEventListener("click", function () {
-            // Send to login/signup hub. Pass return path so user lands back
-            // on the same service knowledge page after sign-in.
-            var ret = encodeURIComponent(window.location.pathname);
-            window.location.href = "/home/?return=" + ret;
+            // Send to /home/ — pass ?service=TAG so the pay modal auto-opens
+            // with wallet-first auto-debit (recharge + pay in one tap if short).
+            // Maps our internal serviceTag values to the catalog tags wallet-pay-service knows.
+            var tagMap = {
+              gst: "gst",
+              trademark: "trademark",
+              udyam: "udyam",
+              iec: "iec",
+              platform_account: "platform_account",
+              imaging: "imaging",
+              website: "website",
+              listing: "listing",
+              service: "service"
+            };
+            var svcParam = tagMap[currentServiceTag] || "";
+            var target = svcParam
+              ? "/home/?service=" + encodeURIComponent(svcParam)
+              : "/home/?return=" + encodeURIComponent(window.location.pathname);
+            window.location.href = target;
           });
           // Insert as the FIRST action in the stacked-actions block so it sits
           // directly under the "Verified! What next?" header, above Callback.
