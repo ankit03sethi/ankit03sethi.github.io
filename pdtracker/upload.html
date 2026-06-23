@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
     .kpi-chip {
@@ -260,9 +261,10 @@
     <p id="paySuccess" class="success hidden" style="margin-bottom:12px;"></p>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button id="addMoneyBtn" class="btn btn-primary-sm hidden" style="padding:12px 24px;background:#1f6feb;color:#fff;border:none;">Add &#8377;<span id="addAmt">0</span> to wallet</button>
+      <button id="addMoneyBtn" class="btn btn-primary-sm hidden" style="padding:12px 24px;background:#1f6feb;color:#fff;border:none;">Pay &#8377;<span id="addAmt">0</span> &rarr;</button>
       <button id="payNowBtn" class="btn btn-primary-sm hidden" style="padding:12px 24px;">Pay &amp; upload &rarr;</button>
     </div>
+    <div style="font-size:11px;color:#94a3b8;text-align:right;margin-top:6px;">If wallet is short, Razorpay opens — the moment it succeeds we credit the wallet and complete the upload automatically. No second click needed.</div>
   </div>
 </div>
 
@@ -682,11 +684,87 @@ async function refreshQuote() {
   }
 }
 
-addMoneyBtn.addEventListener("click", () => {
+// === Inline Razorpay → wallet credit → auto-debit upload (no redirect) ===
+addMoneyBtn.addEventListener("click", async () => {
   if (!currentQuote) return;
-  const need = Math.ceil(currentQuote.shortfall_paise / 100);
-  const amt = Math.ceil(need / 100) * 100; // round up to nearest 100
-  location.href = "/pdtracker/wallet.html?prefill=" + amt + "&back=" + encodeURIComponent(location.pathname);
+  const need_paise = currentQuote.shortfall_paise;
+  if (!(need_paise > 0)) return;
+  const err = $("#payError");
+  err.classList.add("hidden");
+  addMoneyBtn.disabled = true;
+  addMoneyBtn.textContent = "Opening payment…";
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error("Please sign in again.");
+
+    // 1) Create Razorpay order for the shortfall
+    const orderRes = await fetch(SUPABASE_URL + "/functions/v1/analytics-wallet-recharge-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ amount_paise: need_paise }),
+    });
+    const order = await orderRes.json();
+    if (!order.ok) throw new Error(order.error || "Could not create payment order");
+    if (typeof Razorpay === "undefined") throw new Error("Payment library not loaded — please refresh.");
+
+    const rzp = new Razorpay({
+      key: order.key_id,
+      amount: order.amount_paise,
+      currency: order.currency,
+      order_id: order.order_id,
+      name: "Cursive World",
+      description: "Recharge ₹" + (need_paise/100).toFixed(2) + " for upload",
+      prefill: { email: session.user.email, contact: session.user.user_metadata?.mobile || "" },
+      theme: { color: "#1f6feb" },
+      handler: async function (response) {
+        addMoneyBtn.textContent = "Crediting wallet…";
+        try {
+          // 2) Confirm recharge → credits wallet
+          const cr = await fetch(SUPABASE_URL + "/functions/v1/analytics-wallet-recharge-confirm", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + session.access_token,
+              "apikey": SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const cj = await cr.json();
+          if (!cj.ok) throw new Error(cj.error || "Recharge confirmation failed");
+
+          // 3) Immediately trigger the upload (which debits the wallet)
+          addMoneyBtn.textContent = "Uploading…";
+          payNowBtn.click(); // existing handler does the upload-confirm + redirect to dashboard
+        } catch (e) {
+          err.textContent = "Recharge succeeded but upload failed: " + e.message + " · Payment ID: " + response.razorpay_payment_id;
+          err.classList.remove("hidden");
+          addMoneyBtn.disabled = false;
+          addMoneyBtn.innerHTML = "Pay &#8377;" + Math.ceil(need_paise/100) + " &rarr;";
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          addMoneyBtn.disabled = false;
+          addMoneyBtn.innerHTML = "Pay &#8377;" + Math.ceil(need_paise/100) + " &rarr;";
+        },
+      },
+    });
+    rzp.open();
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove("hidden");
+    addMoneyBtn.disabled = false;
+    addMoneyBtn.innerHTML = "Pay &#8377;" + Math.ceil(need_paise/100) + " &rarr;";
+  }
 });
 
 // === Use existing pack credits (no payment) ===
