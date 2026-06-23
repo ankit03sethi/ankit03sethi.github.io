@@ -10,7 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="stylesheet" href="pdtracker.css?v=2026053002" />
-  <script src="/analytics.js" defer></script>
 </head>
 <body>
 
@@ -41,8 +40,13 @@
     <p id="verifyError" class="error hidden"></p>
     <p id="verifySuccess" class="success hidden"></p>
 
-    <div class="auth-foot">
-      Didn't get it? <a href="/pdtracker/signup.html">Try again</a> &middot; Check spam folder
+    <div class="auth-foot" style="display:flex;flex-direction:column;gap:8px;align-items:center;">
+      <div>
+        Didn't get it? <button type="button" id="resendBtn" style="background:none;border:none;color:#1f6feb;font-weight:700;cursor:pointer;text-decoration:underline;font-size:13px;padding:0;">Resend OTP</button>
+        <span id="resendCooldown" style="color:#94a3b8;font-size:12px;margin-left:4px;"></span>
+      </div>
+      <p id="resendMsg" style="font-size:12px;margin:0;display:none;"></p>
+      <div style="font-size:12px;color:#64748b;">Check spam if it doesn't arrive in 30 seconds &middot; <a href="/pdtracker/signup.html" style="color:#64748b;">Start over</a></div>
     </div>
   </form>
 </main>
@@ -107,6 +111,67 @@ $("#verifyForm").addEventListener("submit", async (e) => {
 $("#otp").addEventListener("input", (e) => {
   if (/^\d{6}$/.test(e.target.value)) $("#verifyBtn").click();
 });
+
+// === Resend OTP with 30s cooldown ===
+const resendBtn = $("#resendBtn");
+const resendCd  = $("#resendCooldown");
+const resendMsg = $("#resendMsg");
+let _resendTimer = null;
+
+function startResendCooldown(sec) {
+  resendBtn.disabled = true;
+  resendBtn.style.opacity = "0.5";
+  resendBtn.style.cursor = "not-allowed";
+  let left = sec;
+  resendCd.textContent = `(${left}s)`;
+  clearInterval(_resendTimer);
+  _resendTimer = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(_resendTimer);
+      resendCd.textContent = "";
+      resendBtn.disabled = false;
+      resendBtn.style.opacity = "1";
+      resendBtn.style.cursor = "pointer";
+    } else {
+      resendCd.textContent = `(${left}s)`;
+    }
+  }, 1000);
+}
+
+resendBtn.addEventListener("click", async () => {
+  resendMsg.style.display = "none";
+  resendBtn.disabled = true;
+  resendBtn.textContent = "Sending...";
+  try {
+    const r = await fetch(SUPABASE_URL + "/functions/v1/analytics-resend-signup-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email }),
+    });
+    const j = await r.json();
+    resendBtn.textContent = "Resend OTP";
+    if (j.ok) {
+      resendMsg.textContent = "✓ Fresh OTP sent. Check your inbox.";
+      resendMsg.style.color = "#16a34a";
+      resendMsg.style.display = "block";
+      startResendCooldown(30);
+    } else {
+      resendMsg.textContent = j.message || "Could not resend.";
+      resendMsg.style.color = "#dc2626";
+      resendMsg.style.display = "block";
+      resendBtn.disabled = false;
+    }
+  } catch (e) {
+    resendMsg.textContent = "Network error: " + e.message;
+    resendMsg.style.color = "#dc2626";
+    resendMsg.style.display = "block";
+    resendBtn.textContent = "Resend OTP";
+    resendBtn.disabled = false;
+  }
+});
+// Start with a 30s cooldown so users can't spam on arrival
+startResendCooldown(30);
 </script>
 </body>
 </html>
