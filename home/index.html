@@ -185,11 +185,11 @@
             </div>
           </a>
 
-          <a class="svc-card" href="/business-launcher/">
+          <a class="svc-card" href="#" onclick="openServiceModal('business_launcher'); return false;">
             <div class="svc-icon" style="background:#16a34a;">&#128640;</div>
             <div style="flex:1;min-width:0;">
               <div class="svc-name">Business Launcher</div>
-              <div class="svc-desc">Launch your seller business</div>
+              <div class="svc-desc">3 tiers · ₹20K / ₹35K / ₹50K</div>
             </div>
           </a>
 
@@ -290,8 +290,49 @@
       </div>
     </div>
     <div style="padding:18px 22px;">
-      <!-- Qty -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0 12px;border-bottom:1px solid #f1f5f9;">
+      <!-- BL TIER PICKER (only shown for business_launcher) -->
+      <div id="svcBLTiers" style="display:none;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:8px;">Choose a tier:</div>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+          <label class="bl-tier-opt" data-tier="starter" style="display:block;border:2px solid #e5e7eb;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:14px;">Starter</div>
+                <div style="font-size:11.5px;color:#64748b;margin-top:1px;">Up to 20 products</div>
+              </div>
+              <div style="font-size:18px;font-weight:800;color:#16a34a;">₹20,000</div>
+            </div>
+          </label>
+          <label class="bl-tier-opt" data-tier="growth" style="display:block;border:2px solid #16a34a;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;background:#f0fdf4;position:relative;">
+            <div style="position:absolute;top:-9px;right:12px;background:#16a34a;color:#fff;font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;">MOST PICKED</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:14px;">Growth</div>
+                <div style="font-size:11.5px;color:#64748b;margin-top:1px;">Up to 50 products</div>
+              </div>
+              <div style="font-size:18px;font-weight:800;color:#16a34a;">₹35,000</div>
+            </div>
+          </label>
+          <label class="bl-tier-opt" data-tier="scale" style="display:block;border:2px solid #e5e7eb;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:14px;">Scale</div>
+                <div style="font-size:11.5px;color:#64748b;margin-top:1px;">Up to 100 products</div>
+              </div>
+              <div style="font-size:18px;font-weight:800;color:#16a34a;">₹50,000</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- ACCOUNT MGMT PLATFORMS (only shown for service) -->
+      <div id="svcAMPlatforms" style="display:none;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:8px;">Pick platforms &amp; qty (₹4,999 per platform/month):</div>
+        <div id="svcAMRows" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- Standard QTY (hidden for BL and Account Mgmt) -->
+      <div id="svcQtyRow" style="display:flex;align-items:center;justify-content:space-between;padding:8px 0 12px;border-bottom:1px solid #f1f5f9;">
         <span style="font-size:13px;font-weight:600;color:#0f172a;">Quantity</span>
         <div style="display:flex;align-items:center;gap:8px;">
           <button id="svcQtyMinus" type="button" style="width:30px;height:30px;border:1px solid #d0d7de;background:#fff;border-radius:6px;cursor:pointer;font-weight:700;font-size:16px;">−</button>
@@ -522,25 +563,119 @@ const SVC_CATALOG = {
   website:          { name: "Website Creation",                  price: 4999 },
   listing:          { name: "Product Listing",                   price: 50   },
   service:          { name: "Account Management",                price: 4999 },
+  business_launcher:{ name: "Business Launcher",                 price: 0    }, // variant-priced
 };
+const BL_TIERS = {
+  starter: { name: "Starter — Up to 20 products", price: 20000 },
+  growth:  { name: "Growth — Up to 50 products",  price: 35000 },
+  scale:   { name: "Scale — Up to 100 products",  price: 50000 },
+};
+const AM_PLATFORMS = [
+  { tag: "amazon",   name: "Amazon",   color: "#f97316" },
+  { tag: "flipkart", name: "Flipkart", color: "#1f6feb" },
+  { tag: "meesho",   name: "Meesho",   color: "#ec4899" },
+  { tag: "myntra",   name: "Myntra",   color: "#a855f7" },
+  { tag: "firstcry", name: "FirstCry", color: "#22c55e" },
+];
 let _currentSvc = null;
+let _currentBLTier = "growth"; // default selection
 
 function rupees(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
 function paiseToRupees(p) { return "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function recalcSvcModal() {
   if (!_currentSvc) return;
-  const qty = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
-  $("#svcQty").value = qty;
-  const sub = _currentSvc.price * qty;
+  let sub = 0, unit = 0, qtyDisplay = 1;
+
+  if (_currentSvc.tag === "business_launcher") {
+    const t = BL_TIERS[_currentBLTier] || BL_TIERS.growth;
+    unit = t.price;
+    qtyDisplay = 1;
+    sub = unit;
+  } else if (_currentSvc.tag === "service") {
+    // Account Mgmt: sum per-platform qty × ₹4999
+    unit = 4999;
+    qtyDisplay = 0;
+    document.querySelectorAll(".am-qty-input").forEach(i => {
+      qtyDisplay += Math.max(0, Math.min(120, parseInt(i.value, 10) || 0));
+    });
+    sub = unit * qtyDisplay;
+  } else {
+    unit = _currentSvc.price;
+    qtyDisplay = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
+    $("#svcQty").value = qtyDisplay;
+    sub = unit * qtyDisplay;
+  }
+
   const gst = Math.round(sub * 0.18);
   const total = sub + gst;
-  $("#svcPayUnit").textContent = rupees(_currentSvc.price);
-  $("#svcPayQtyEcho").textContent = qty;
+  $("#svcPayUnit").textContent = rupees(unit);
+  $("#svcPayQtyEcho").textContent = qtyDisplay;
   $("#svcPaySubtotal").textContent = rupees(sub);
   $("#svcPayGst").textContent = rupees(gst);
   $("#svcPayTotal").textContent = rupees(total);
   $("#svcPayBtnAmt").textContent = rupees(total);
+  // If qty is 0 (Account Mgmt with nothing selected), disable Pay button
+  const payBtn = $("#svcPayBtn");
+  if (qtyDisplay === 0) {
+    payBtn.disabled = true;
+    payBtn.style.opacity = "0.5";
+    payBtn.style.cursor = "not-allowed";
+  } else {
+    payBtn.disabled = false;
+    payBtn.style.opacity = "1";
+    payBtn.style.cursor = "pointer";
+  }
+}
+
+function selectBLTier(tier) {
+  _currentBLTier = tier;
+  document.querySelectorAll(".bl-tier-opt").forEach(el => {
+    if (el.dataset.tier === tier) {
+      el.style.borderColor = "#16a34a";
+      el.style.background = "#f0fdf4";
+    } else {
+      el.style.borderColor = "#e5e7eb";
+      el.style.background = "#fff";
+    }
+  });
+  recalcSvcModal();
+}
+
+function buildAMRows() {
+  const wrap = $("#svcAMRows");
+  wrap.innerHTML = "";
+  for (const p of AM_PLATFORMS) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;";
+    row.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + p.color + ';"></span>' +
+        '<span style="font-size:13px;font-weight:600;color:#0f172a;">' + p.name + '</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;">' +
+        '<button type="button" class="am-minus" data-tag="' + p.tag + '" style="width:26px;height:26px;border:1px solid #d0d7de;background:#fff;border-radius:5px;cursor:pointer;font-weight:700;">−</button>' +
+        '<input class="am-qty-input" data-tag="' + p.tag + '" type="number" value="0" min="0" max="120" style="width:46px;height:26px;text-align:center;border:1px solid #d0d7de;border-radius:5px;font-size:13px;">' +
+        '<button type="button" class="am-plus" data-tag="' + p.tag + '" style="width:26px;height:26px;border:1px solid #d0d7de;background:#fff;border-radius:5px;cursor:pointer;font-weight:700;">+</button>' +
+      '</div>';
+    wrap.appendChild(row);
+  }
+  wrap.addEventListener("click", (e) => {
+    const tag = e.target.dataset?.tag;
+    if (!tag) return;
+    const inp = wrap.querySelector('.am-qty-input[data-tag="' + tag + '"]');
+    if (!inp) return;
+    if (e.target.classList.contains("am-minus")) {
+      inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) - 1);
+      recalcSvcModal();
+    } else if (e.target.classList.contains("am-plus")) {
+      inp.value = Math.min(120, (parseInt(inp.value, 10) || 0) + 1);
+      recalcSvcModal();
+    }
+  });
+  wrap.addEventListener("input", (e) => {
+    if (e.target.classList.contains("am-qty-input")) recalcSvcModal();
+  });
 }
 
 window.openServiceModal = async function (tag) {
@@ -548,10 +683,31 @@ window.openServiceModal = async function (tag) {
   if (!cat) { alert("Unknown service"); return; }
   _currentSvc = { tag, ...cat };
   $("#svcPayName").textContent = cat.name;
-  $("#svcQty").value = 1;
   $("#svcRefCode").value = "";
   $("#svcPayError").style.display = "none";
   $("#svcPaySuccess").style.display = "none";
+
+  // Show/hide the right input section
+  const blSection = $("#svcBLTiers");
+  const amSection = $("#svcAMPlatforms");
+  const qtySection = $("#svcQtyRow");
+
+  blSection.style.display = "none";
+  amSection.style.display = "none";
+  qtySection.style.display = "";
+
+  if (tag === "business_launcher") {
+    blSection.style.display = "";
+    qtySection.style.display = "none";
+    _currentBLTier = "growth";
+    selectBLTier("growth"); // default to Growth (most picked)
+  } else if (tag === "service") {
+    amSection.style.display = "";
+    qtySection.style.display = "none";
+    buildAMRows();
+  } else {
+    $("#svcQty").value = 1;
+  }
   recalcSvcModal();
 
   // Load fresh wallet balance
@@ -564,10 +720,17 @@ window.openServiceModal = async function (tag) {
     if (j.ok) $("#svcWalletBal").textContent = "₹" + j.balance_rupees;
   } catch (e) { /* silent */ }
 
-  $("#svcPayBtn").disabled = false;
   $("#svcPayBtn").innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayTotal").textContent + '</span> from wallet';
   $("#svcPayModal").style.display = "flex";
 };
+
+// Wire BL tier card clicks (delegated)
+document.addEventListener("click", (e) => {
+  const opt = e.target.closest(".bl-tier-opt");
+  if (opt && opt.dataset.tier) {
+    selectBLTier(opt.dataset.tier);
+  }
+});
 
 // Qty +/- buttons
 $("#svcQtyMinus").addEventListener("click", () => {
@@ -585,7 +748,25 @@ $("#svcQty").addEventListener("change", recalcSvcModal);
 $("#svcPayClose").addEventListener("click", () => { $("#svcPayModal").style.display = "none"; });
 $("#svcPayModal").addEventListener("click", (e) => { if (e.target === $("#svcPayModal")) $("#svcPayModal").style.display = "none"; });
 
-// Shared helper: try to debit from wallet. Returns { paid: true } on success.
+// Build request body based on service type
+function buildPayBody(qty, ref) {
+  const body = { service_tag: _currentSvc.tag, referral_code: ref || null };
+  if (_currentSvc.tag === "business_launcher") {
+    body.variant = _currentBLTier;
+  } else if (_currentSvc.tag === "service") {
+    const platforms = [];
+    document.querySelectorAll(".am-qty-input").forEach(i => {
+      const q = parseInt(i.value, 10) || 0;
+      if (q > 0) platforms.push({ tag: i.dataset.tag, qty: q });
+    });
+    body.platforms = platforms;
+  } else {
+    body.qty = qty;
+  }
+  return body;
+}
+
+// Shared helper: try to debit from wallet. Returns { ok: true } on success.
 async function tryWalletDebit(session, qty, ref) {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-service`, {
     method: "POST",
@@ -594,11 +775,7 @@ async function tryWalletDebit(session, qty, ref) {
       "Authorization": "Bearer " + session.access_token,
       "apikey": SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({
-      service_tag: _currentSvc.tag,
-      qty,
-      referral_code: ref || null,
-    }),
+    body: JSON.stringify(buildPayBody(qty, ref)),
   });
   return await r.json();
 }
