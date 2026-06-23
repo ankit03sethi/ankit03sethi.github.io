@@ -852,7 +852,7 @@ async function autoDebitAfterRecharge(session, qty, ref, btn, err, ok) {
   err.textContent = "Recharge succeeded but auto-debit failed: " + (j.error || j.message || "unknown") + ". Try Pay again.";
   err.style.display = "block";
   btn.disabled = false;
-  btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+  btn.innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayDue").textContent + '</span>';
 }
 
 // Open Razorpay for the shortfall amount, then auto-debit the service
@@ -906,14 +906,14 @@ async function rechargeAndPay(session, shortfall_paise, qty, ref, btn, err, ok) 
           err.textContent = "Recharge confirmation failed: " + e.message + ". Contact support with payment ID " + response.razorpay_payment_id;
           err.style.display = "block";
           btn.disabled = false;
-          btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+          btn.innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayDue").textContent + '</span>';
         }
       },
       modal: {
         ondismiss: function () {
           // Reset to pre-click state — looks like a fresh first attempt
           btn.disabled = false;
-          btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+          btn.innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayDue").textContent + '</span>';
           // Hide the orange "opening payment gateway" warning
           err.style.display = "none";
           err.style.background = "";
@@ -928,7 +928,7 @@ async function rechargeAndPay(session, shortfall_paise, qty, ref, btn, err, ok) 
     err.textContent = e.message;
     err.style.display = "block";
     btn.disabled = false;
-    btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+    btn.innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayDue").textContent + '</span>';
   }
 }
 
@@ -982,12 +982,12 @@ $("#svcPayBtn").addEventListener("click", async () => {
     err.style.padding = "";
     err.style.display = "block";
     btn.disabled = false;
-    btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+    btn.innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayDue").textContent + '</span>';
   } catch (e) {
     err.textContent = "Network error: " + e.message;
     err.style.display = "block";
     btn.disabled = false;
-    btn.innerHTML = '🔒 Pay ' + $("#svcPayDue").textContent;
+    btn.innerHTML = '🔒 Pay <span id="svcPayBtnAmt">' + $("#svcPayDue").textContent + '</span>';
   }
 });
 </script>
