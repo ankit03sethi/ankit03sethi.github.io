@@ -493,6 +493,22 @@ $("#topSignOutBtn")?.addEventListener("click", doSignOut);
 
 init();
 
+// Toggle "Click here to open ↓" ↔ "Click here to close ↑" on the transactions panel
+(function wireTxToggle() {
+  const det = document.getElementById("txDetails");
+  const lbl = document.getElementById("txToggleLabel");
+  if (!det || !lbl) return;
+  function sync() {
+    if (det.open) {
+      lbl.innerHTML = "Click here to close &uarr;";
+    } else {
+      lbl.innerHTML = "Click here to open &darr;";
+    }
+  }
+  det.addEventListener("toggle", sync);
+  sync();
+})();
+
 // =====================================================================
 // SERVICE PAY MODAL — opens when a non-PD service card is clicked
 // =====================================================================
@@ -502,7 +518,7 @@ const SVC_CATALOG = {
   udyam:            { name: "Udyam (MSME) Certificate",          price: 999  },
   iec:              { name: "IEC (Import-Export Code)",          price: 1499 },
   platform_account: { name: "Marketplace Seller Account Opening",price: 999  },
-  imaging:          { name: "Product Imaging",                   price: 499  },
+  imaging:          { name: "Product Imaging",                   price: 299  },
   website:          { name: "Website Creation",                  price: 4999 },
   listing:          { name: "Product Listing",                   price: 50   },
   service:          { name: "Account Management",                price: 4999 },
