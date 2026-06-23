@@ -1114,7 +1114,7 @@ async function autoDebitAfterRecharge(session, qty, ref, btn, err, ok) {
 
 // Open Razorpay for the shortfall amount, then auto-debit the service
 async function rechargeAndPay(session, shortfall_paise, qty, ref, btn, err, ok) {
-  btn.textContent = "Opening payment gateway…";
+  btn.textContent = "Processing…";
   try {
     const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-order`, {
       method: "POST",
@@ -1218,17 +1218,8 @@ $("#svcPayBtn").addEventListener("click", async () => {
       return;
     }
     if (j.code === "insufficient") {
-      // Switch button to "Recharge & Pay" mode and trigger Razorpay
-      const shortRs = Math.ceil(j.shortfall_paise / 100);
-      err.innerHTML = "Wallet is short by <b>₹" + shortRs + "</b>. Opening payment gateway — you'll be auto-charged for the service the moment recharge clears.";
-      err.style.color = "#92400e";
-      err.style.background = "#fffbeb";
-      err.style.borderLeft = "3px solid #d97706";
-      err.style.padding = "8px 10px";
-      err.style.borderRadius = "6px";
-      err.style.display = "block";
-      btn.innerHTML = '💳 Recharge ₹' + shortRs + ' & Pay now';
-      // Auto-trigger Razorpay (no second click needed)
+      // Open Razorpay directly — no noisy intermediate banner / button text change.
+      // Button stays in "Processing…" state; if Razorpay is dismissed, ondismiss restores the original Pay button.
       await rechargeAndPay(session, j.shortfall_paise, qty, ref, btn, err, ok);
       return;
     }
