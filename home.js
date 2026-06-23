@@ -320,6 +320,14 @@
       var pageTag = (b && b.getAttribute("data-service-tag")) || "";
       var mapped = SVC_TAG_TO_HOME[pageTag];
       if (isLoggedIn() && mapped) {
+        // Show a full-page loading overlay so the customer sees instant feedback
+        var overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(255,255,255,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;";
+        overlay.innerHTML = '<div style="width:48px;height:48px;border:4px solid #e2e8f0;border-top-color:#1f6feb;border-radius:50%;animation:cursive_spin 0.8s linear infinite;"></div>' +
+          '<div style="font-size:15px;font-weight:600;color:#0f172a;">Opening payment…</div>' +
+          '<div style="font-size:12.5px;color:#64748b;">Just a second</div>' +
+          '<style>@keyframes cursive_spin { to { transform: rotate(360deg); } }</style>';
+        document.body.appendChild(overlay);
         // Logged in + service is in /home/ pay modal — skip modal, jump straight to pay flow
         window.location.href = "/home/?service=" + encodeURIComponent(mapped);
         return;
