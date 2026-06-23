@@ -148,14 +148,13 @@
       <button id="modalCloseBtn" class="btn btn-outline" style="padding:6px 12px;font-size:14px;">&times; Close</button>
     </div>
 
-    <!-- ACTIVE PACK BANNER — shown when customer already has bulk credits covering this upload -->
-    <div id="activePackBanner" class="hidden" style="margin-bottom:16px;background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-left:5px solid #16a34a;border-radius:10px;padding:14px 16px;">
-      <div style="font-size:13px;font-weight:700;color:#14532d;margin-bottom:4px;">&#10003; Your existing bulk plan covers this upload</div>
+    <!-- ACTIVE PACK BANNER — credit-usage status (always shown when customer has active packs) -->
+    <div id="activePackBanner" class="hidden" style="margin-bottom:14px;background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-left:5px solid #16a34a;border-radius:10px;padding:12px 16px;">
+      <div style="font-size:13px;font-weight:700;color:#14532d;margin-bottom:4px;" id="activePackTitle">&#10003; Using your existing credits</div>
       <div style="font-size:13px;color:#15803d;line-height:1.55;" id="activePackInfo">&mdash;</div>
-      <button id="useExistingPackBtn" type="button" style="margin-top:10px;background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 8px rgba(22,163,74,0.3);">
+      <button id="useExistingPackBtn" type="button" class="hidden" style="margin-top:10px;background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 8px rgba(22,163,74,0.3);">
         &#10003; Use credits &amp; upload &rarr;
       </button>
-      <div style="font-size:11px;color:#15803d;margin-top:6px;">No payment needed. Rows will be linked to your existing pack.</div>
     </div>
 
     <!-- Plan picker sections (hidden when active pack covers upload) -->
@@ -437,6 +436,8 @@ $("#cancelBtn").addEventListener("click", () => {
 // === Plan picker / paid upload flow ===
 let selectedPlan = null;
 let currentQuote = null;
+let _packCreditsToUse = 0;   // # of rows that will be allocated to existing pack credits
+let _paidRowsCount = 0;       // # of rows that need a paid plan (= parsedRows.length - _packCreditsToUse)
 
 const planModal = $("#planModal");
 // Pick up bulk plan cards too (added below first 2 cards in markup)
@@ -515,10 +516,13 @@ $("#uploadBtn").addEventListener("click", async () => {
   $("#paySuccess").classList.add("hidden");
   $("#freeTrialBanner").classList.add("hidden");
   $("#activePackBanner").classList.add("hidden");
+  $("#useExistingPackBtn").classList.add("hidden");
   $("#planPickerWrap").classList.remove("hidden");
+  _packCreditsToUse = 0;
+  _paidRowsCount = parsedRows.length;
   planModal.classList.remove("hidden");
 
-  // === NEW: Check for active pack credits that fully cover this upload ===
+  // Check for active pack credits — used by ALL 3 paths (full, partial, none)
   try {
     const { data: { session } } = await sb.auth.getSession();
     const checkRes = await fetch(SUPABASE_URL + "/functions/v1/analytics-upload-quote", {
@@ -528,22 +532,37 @@ $("#uploadBtn").addEventListener("click", async () => {
         "Authorization": "Bearer " + session.access_token,
         "apikey": SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ row_count: parsedRows.length }), // no plan = get all quotes + packs
+      body: JSON.stringify({ row_count: parsedRows.length }),
     });
     const checkJ = await checkRes.json();
-    if (checkJ.ok && checkJ.packs_cover_all && Array.isArray(checkJ.active_packs) && checkJ.active_packs.length > 0) {
-      const totalRem = checkJ.active_packs.reduce((s, p) => s + p.credits_remaining, 0);
+    const totalRem = (checkJ?.active_packs || []).reduce((s, p) => s + p.credits_remaining, 0);
+    if (checkJ.ok && totalRem > 0) {
+      const free_rows = Math.min(totalRem, parsedRows.length);
+      const paid_rows = parsedRows.length - free_rows;
+      _packCreditsToUse = free_rows;
+      _paidRowsCount = paid_rows;
       const planLabels = checkJ.active_packs.map(p => p.label + " (" + p.credits_remaining.toLocaleString() + " left)").join(", ");
-      $("#activePackInfo").innerHTML =
-        "Your active pack" + (checkJ.active_packs.length > 1 ? "s have" : " has") +
-        " <b>" + totalRem.toLocaleString() + "</b> credits remaining. " +
-        "Uploading <b>" + parsedRows.length.toLocaleString() + "</b> rows.<br>" +
-        "<span style='font-size:11.5px;color:#15803d;'>" + planLabels + "</span>";
-      $("#activePackBanner").classList.remove("hidden");
-      $("#planPickerWrap").classList.add("hidden");
-      // Wire the "Use credits" button
-      $("#useExistingPackBtn").onclick = () => uploadUsingExistingPack();
-      return;
+
+      if (paid_rows === 0) {
+        // FULL COVERAGE — single click, no plan picker
+        $("#activePackTitle").innerHTML = "&#10003; All " + free_rows.toLocaleString() + " rows covered by your existing credits";
+        $("#activePackInfo").innerHTML = planLabels + "<br><span style='font-size:11.5px;color:#15803d;'>No payment needed.</span>";
+        $("#activePackBanner").classList.remove("hidden");
+        $("#useExistingPackBtn").classList.remove("hidden");
+        $("#useExistingPackBtn").innerHTML = "&#10003; Use " + free_rows.toLocaleString() + " credits &amp; upload &rarr;";
+        $("#planPickerWrap").classList.add("hidden");
+        $("#useExistingPackBtn").onclick = () => uploadUsingExistingPack();
+        return;
+      } else {
+        // PARTIAL COVERAGE — banner + plan picker for remaining rows
+        $("#activePackTitle").innerHTML = "&#10003; " + free_rows.toLocaleString() + " of " + parsedRows.length.toLocaleString() + " rows covered FREE by existing credits";
+        $("#activePackInfo").innerHTML =
+          planLabels + "<br>" +
+          "<span style='font-size:12.5px;color:#15803d;'>Pick a plan for the remaining <b>" + paid_rows.toLocaleString() + "</b> rows below &darr;</span>";
+        $("#activePackBanner").classList.remove("hidden");
+        $("#modalRowCount").textContent = paid_rows; // scope picker to overage
+        // continue to plan picker
+      }
     }
   } catch (e) {
     console.warn("active pack check failed (non-fatal):", e);
@@ -595,6 +614,9 @@ async function refreshQuote() {
   try {
     const { data: { session } } = await sb.auth.getSession();
 
+    // Effective row count for quote = paid rows (after pack credits absorb the rest)
+    const effectiveRows = _paidRowsCount > 0 ? _paidRowsCount : parsedRows.length;
+
     // ===== BULK PLANS — fixed price, client-computed (avoids NaN) =====
     if (BULK_PLAN_PRICES[selectedPlan]) {
       const meta = BULK_PLAN_PRICES[selectedPlan];
@@ -613,7 +635,7 @@ async function refreshQuote() {
       currentQuote = { plan: selectedPlan, total_paise, subtotal_paise, gst_paise, balance_paise, shortfall_paise, billable_rows: meta.cap };
 
       $("#qPlan").textContent = meta.label;
-      $("#qRows").textContent = meta.cap.toLocaleString();
+      $("#qRows").textContent = effectiveRows.toLocaleString();
       $("#qSubtotal").textContent = rupees(subtotal_paise);
       $("#qGst").textContent = rupees(gst_paise);
       $("#qTotal").textContent = rupees(total_paise);
@@ -641,7 +663,7 @@ async function refreshQuote() {
         "Authorization": "Bearer " + session.access_token,
         "apikey": SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ row_count: parsedRows.length, plan: selectedPlan }),
+      body: JSON.stringify({ row_count: effectiveRows, plan: selectedPlan }),
     });
     const raw = await r.json();
     if (!raw.ok) throw new Error(raw.error || "Quote failed");
@@ -817,6 +839,7 @@ payNowBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         plan: selectedPlan,
         rows: parsedRows.map(r => ({ platform: r.platform, product_id: r.product_id, seller_code: r.seller_code || "", seller_name: r.seller_name || "" })),
+        pack_first_n: _packCreditsToUse, // hybrid: first N rows allocated to existing pack credits (free)
       }),
     });
     const j = await r.json();
