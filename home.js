@@ -286,9 +286,45 @@
   function closeLeadModal() { overlay.classList.add("hidden"); }
 
   // ---- wire up triggers ----
+  // If customer is already signed in AND the service has a /home/ pay modal,
+  // skip the OTP/callback dance — redirect straight to /home/?service=TAG
+  // so the pay modal auto-opens with wallet-first flow.
+  var SVC_TAG_TO_HOME = {
+    gst: "gst",
+    trademark: "trademark",
+    udyam: "udyam",
+    iec: "iec",
+    platform_account: "platform_account",
+    imaging: "imaging",
+    website: "website",
+    listing: "listing",
+    service: "service",
+    business: "business_launcher",
+    business_launcher: "business_launcher"
+  };
+  function isLoggedIn() {
+    try {
+      var raw = localStorage.getItem("pd_tracker_auth");
+      if (!raw) return false;
+      var s = JSON.parse(raw);
+      // valid session if has access_token and not expired
+      if (s && s.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) return true;
+      return false;
+    } catch (e) { return false; }
+  }
   document.querySelectorAll("[data-open-lead]").forEach(function (btn) {
     btn.addEventListener("click", function (e) {
       e.preventDefault();
+      // Resolve service tag from page body (each service page has data-service-tag)
+      var b = document.body;
+      var pageTag = (b && b.getAttribute("data-service-tag")) || "";
+      var mapped = SVC_TAG_TO_HOME[pageTag];
+      if (isLoggedIn() && mapped) {
+        // Logged in + service is in /home/ pay modal — skip modal, jump straight to pay flow
+        window.location.href = "/home/?service=" + encodeURIComponent(mapped);
+        return;
+      }
+      // Not logged in OR service not in /home/ — original lead-modal flow (OTP, callback options)
       openLeadModal(btn);
     });
   });
