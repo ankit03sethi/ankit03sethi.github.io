@@ -95,6 +95,9 @@
     </div>
   </a>
   <div class="topbar-right">
+    <button id="cartChip" type="button" class="email-chip hidden" style="cursor:pointer;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;" title="View cart">
+      &#128722; Cart <span id="cartCount" style="background:#92400e;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;min-width:18px;text-align:center;">0</span>
+    </button>
     <span id="emailChip" class="email-chip hidden"></span>
     <button id="topSignOutBtn" class="btn-ghost hidden" type="button" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;">Sign out</button>
   </div>
@@ -277,6 +280,30 @@
   </div>
 </main>
 
+<!-- Cart modal -->
+<div id="cartModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.5px;">🛒 Your Cart</div>
+        <div id="cartHeaderCount" style="font-size:16px;font-weight:800;color:#0f172a;margin-top:2px;">0 items</div>
+      </div>
+      <button id="cartCloseBtn" type="button" style="background:#fff;border:none;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:18px;color:#64748b;">&times;</button>
+    </div>
+    <div id="cartBody" style="padding:14px 18px;overflow-y:auto;flex:1;">
+      <div style="text-align:center;color:#94a3b8;padding:30px;">Loading...</div>
+    </div>
+    <div id="cartFooter" style="padding:14px 18px;border-top:1px solid #e2e8f0;background:#f8fafc;">
+      <div id="cartBreakdown" style="margin-bottom:10px;"></div>
+      <p id="cartError" style="color:#dc2626;font-size:12.5px;display:none;margin:0 0 8px;"></p>
+      <button id="cartPayBtn" type="button" style="width:100%;background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 12px rgba(31,111,235,0.3);">
+        🔒 Pay <span id="cartPayBtnAmt">₹0</span>
+      </button>
+      <div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:8px;">Wallet covers what it can. Razorpay opens for the rest, then all items get activated.</div>
+    </div>
+  </div>
+</div>
+
 <!-- Service-pay modal (all non-PD services on /home/) -->
 <div id="svcPayModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
   <div style="background:#fff;border-radius:14px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
@@ -378,10 +405,15 @@
       </div>
       <p id="svcPayError" style="color:#dc2626;font-size:13px;display:none;margin:0 0 10px;"></p>
       <p id="svcPaySuccess" style="color:#16a34a;font-size:13px;display:none;margin:0 0 10px;font-weight:600;"></p>
-      <button id="svcPayBtn" type="button" style="width:100%;background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 12px rgba(31,111,235,0.3);">
-        🔒 Pay <span id="svcPayBtnAmt">₹1,179</span>
-      </button>
-      <div id="svcPayHint" style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">Razorpay will open. Payment auto-credits your wallet, then debits the service.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button id="svcAddToCartBtn" type="button" style="background:#fff;color:#1f6feb;border:2px solid #1f6feb;padding:10px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">
+          🛒 Add to cart
+        </button>
+        <button id="svcPayBtn" type="button" style="background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 12px rgba(31,111,235,0.3);">
+          🔒 Pay <span id="svcPayBtnAmt">₹1,179</span>
+        </button>
+      </div>
+      <div id="svcPayHint" style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">Pay now opens Razorpay. Add to cart lets you bundle multiple services and pay once.</div>
     </div>
   </div>
 </div>
@@ -541,6 +573,231 @@ async function doSignOut() {
 $("#topSignOutBtn")?.addEventListener("click", doSignOut);
 
 init();
+
+// =====================================================================
+// SHOPPING CART — additive, doesn't touch existing pay flow
+// =====================================================================
+const CART_KEY = "cursive_cart_v1";
+function getCart() { try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]"); } catch { return []; } }
+function saveCart(arr) { localStorage.setItem(CART_KEY, JSON.stringify(arr)); refreshCartChip(); }
+function refreshCartChip() {
+  const cart = getCart();
+  const chip = $("#cartChip"); const cnt = $("#cartCount");
+  if (!chip || !cnt) return;
+  cnt.textContent = cart.length;
+  if (cart.length > 0) chip.classList.remove("hidden");
+  else chip.classList.add("hidden");
+}
+function cartTotalPaise() { return getCart().reduce((s, it) => s + (it.total_paise || 0), 0); }
+function addCurrentSvcToCart() {
+  if (!_currentSvc) return;
+  const sub_paise = Math.round(parseFloat($("#svcPaySubtotal").textContent.replace(/[^\d.]/g, "") || "0") * 100);
+  const gst_paise = Math.round(parseFloat($("#svcPayGst").textContent.replace(/[^\d.]/g, "") || "0") * 100);
+  const total_paise = Math.round(parseFloat($("#svcPayTotal").textContent.replace(/[^\d.]/g, "") || "0") * 100);
+  const item = { id: "ci_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+    service_tag: _currentSvc.tag, service_name: _currentSvc.name,
+    sub_paise, gst_paise, total_paise };
+  if (_currentSvc.tag === "business_launcher") {
+    item.variant = _currentBLTier;
+    item.label = (BL_TIERS[_currentBLTier]?.name || _currentSvc.name);
+    item.qty_display = 1;
+  } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
+    const platforms = [];
+    document.querySelectorAll(".am-qty-input").forEach(i => { const q = parseInt(i.value, 10) || 0; if (q > 0) platforms.push({ tag: i.dataset.tag, qty: q }); });
+    if (platforms.length === 0) { alert("Pick at least one platform first."); return; }
+    item.platforms = platforms;
+    item.qty_display = platforms.reduce((s, p) => s + p.qty, 0);
+    item.label = _currentSvc.name + " (" + platforms.map(p => p.tag + "×" + p.qty).join(", ") + ")";
+  } else {
+    const qty = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
+    item.qty = qty; item.qty_display = qty;
+    item.label = _currentSvc.name + (qty > 1 ? " ×" + qty : "");
+  }
+  const cart = getCart(); cart.push(item); saveCart(cart);
+  $("#svcPayModal").style.display = "none";
+  showCartToast(item.label);
+}
+function showCartToast(label) {
+  let t = document.getElementById("cartToast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "cartToast";
+    t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#15803d;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:99999;display:flex;align-items:center;gap:12px;";
+    document.body.appendChild(t);
+  }
+  t.innerHTML = "✓ Added: " + escapeHtml(label).substring(0, 40) +
+    " <button onclick=\"document.getElementById('cartChip').click();this.parentNode.remove();\" style=\"background:rgba(255,255,255,0.2);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;\">View cart →</button>" +
+    " <button onclick=\"this.parentNode.remove();\" style=\"background:transparent;color:#fff;border:none;font-size:18px;cursor:pointer;padding:0 4px;\">×</button>";
+  t.style.display = "flex";
+  clearTimeout(t._tm); t._tm = setTimeout(() => { if (t.parentNode) t.remove(); }, 6000);
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.id === "svcAddToCartBtn") addCurrentSvcToCart();
+});
+refreshCartChip();
+
+// =====================================================================
+// CART MODAL
+// =====================================================================
+let _cartWalletPaise = 0;
+
+function openCartModal() {
+  renderCartModal();
+  $("#cartModal").style.display = "flex";
+  // Fetch wallet
+  (async () => {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=1`, {
+        headers: { Authorization: "Bearer " + session.access_token, apikey: SUPABASE_ANON_KEY },
+      });
+      const j = await r.json();
+      if (j.ok) {
+        _cartWalletPaise = j.balance_paise ?? Math.round(parseFloat(String(j.balance_rupees || "0").replace(/,/g,"")) * 100);
+        renderCartModal();
+      }
+    } catch (e) { /* silent */ }
+  })();
+}
+function renderCartModal() {
+  const cart = getCart();
+  $("#cartHeaderCount").textContent = cart.length + " item" + (cart.length === 1 ? "" : "s");
+  const body = $("#cartBody");
+  if (cart.length === 0) {
+    body.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px;font-size:14px;">Your cart is empty.<br><span style="font-size:12px;">Add services from the home page to get started.</span></div>';
+    $("#cartFooter").style.display = "none";
+    return;
+  }
+  $("#cartFooter").style.display = "block";
+  let html = "";
+  for (const it of cart) {
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:600;color:#0f172a;">${escapeHtml(it.label)}</div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${escapeHtml(it.service_name)} · ${it.qty_display} unit${it.qty_display === 1 ? "" : "s"}</div>
+      </div>
+      <div style="text-align:right;margin-left:10px;flex-shrink:0;">
+        <div style="font-size:14px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
+        <button onclick="removeCartItem('${it.id}')" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:2px;font-weight:600;">Remove</button>
+      </div>
+    </div>`;
+  }
+  body.innerHTML = html;
+  const total = cartTotalPaise();
+  const adj = Math.min(_cartWalletPaise, total);
+  const due = Math.max(0, total - _cartWalletPaise);
+  const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits: p % 100 ? 2 : 0 });
+  $("#cartBreakdown").innerHTML =
+    `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span style="color:#64748b;">Cart total</span><span style="color:#0f172a;font-weight:600;">${fmt(total)}</span></div>` +
+    (adj > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#16a34a;"><span>Adjustment from wallet</span><span>−${fmt(adj)}</span></div>` : "") +
+    `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:6px 0 0;margin-top:4px;border-top:1px solid #e2e8f0;"><span style="color:#0f172a;">Amount to pay</span><span style="color:#1f6feb;">${fmt(due)}</span></div>` +
+    `<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Wallet balance: ${fmt(_cartWalletPaise)}</div>`;
+  $("#cartPayBtnAmt").textContent = fmt(due);
+}
+window.removeCartItem = function (id) {
+  const cart = getCart().filter(it => it.id !== id);
+  saveCart(cart);
+  renderCartModal();
+};
+document.addEventListener("click", (e) => {
+  if (!e.target) return;
+  if (e.target.id === "cartChip" || e.target.closest && e.target.closest("#cartChip")) { openCartModal(); return; }
+  if (e.target.id === "cartCloseBtn") { $("#cartModal").style.display = "none"; return; }
+  if (e.target.id === "cartModal") { $("#cartModal").style.display = "none"; return; }
+});
+
+// Cart Pay button — process items sequentially after wallet is funded
+$("#cartPayBtn").addEventListener("click", async () => {
+  const cart = getCart();
+  if (cart.length === 0) return;
+  const total = cartTotalPaise();
+  const due = Math.max(0, total - _cartWalletPaise);
+  const btn = $("#cartPayBtn");
+  const err = $("#cartError");
+  err.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = due > 0 ? "Opening payment…" : "Processing…";
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { err.textContent = "Please sign in."; err.style.display = "block"; btn.disabled = false; return; }
+
+  async function processCartItems() {
+    for (let i = 0; i < cart.length; i++) {
+      const it = cart[i];
+      btn.textContent = "Processing " + (i+1) + "/" + cart.length + "…";
+      const body = { service_tag: it.service_tag };
+      if (it.variant) body.variant = it.variant;
+      if (it.platforms) body.platforms = it.platforms;
+      if (it.qty) body.qty = it.qty;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-service`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(`Item "${it.label}" failed: ${j.error || j.message}`);
+    }
+    // Clear cart
+    saveCart([]);
+    $("#cartModal").style.display = "none";
+    alert("✓ All " + cart.length + " item(s) purchased successfully. Our team will reach out shortly.");
+    if (session) await loadWallet(session);
+  }
+
+  try {
+    if (due === 0) {
+      // Wallet covers everything
+      await processCartItems();
+      return;
+    }
+    // Need Razorpay for shortfall
+    const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ amount_paise: due }),
+    });
+    const order = await orderRes.json();
+    if (!order.ok) throw new Error(order.error || "Could not create order");
+    if (typeof Razorpay === "undefined") throw new Error("Payment library not loaded — refresh and retry.");
+    const rzp = new Razorpay({
+      key: order.key_id, amount: order.amount_paise, currency: order.currency, order_id: order.order_id,
+      name: "Cursive World", description: "Cart payment · " + cart.length + " items",
+      prefill: { email: session.user.email, contact: session.user.user_metadata?.mobile || "" },
+      theme: { color: "#1f6feb" },
+      handler: async function (response) {
+        btn.textContent = "Crediting wallet…";
+        try {
+          const cr = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-recharge-confirm`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const cj = await cr.json();
+          if (!cj.ok) throw new Error(cj.error || "Recharge failed");
+          await processCartItems();
+        } catch (e) {
+          err.textContent = "Recharge succeeded but processing failed: " + e.message + " · Payment ID: " + response.razorpay_payment_id;
+          err.style.display = "block";
+          btn.disabled = false;
+          renderCartModal();
+        }
+      },
+      modal: { ondismiss: function () { btn.disabled = false; renderCartModal(); } },
+    });
+    rzp.open();
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = "block";
+    btn.disabled = false;
+    renderCartModal();
+  }
+});
 
 // Toggle "Click here to open ↓" ↔ "Click here to close ↑" on the transactions panel
 (function wireTxToggle() {
