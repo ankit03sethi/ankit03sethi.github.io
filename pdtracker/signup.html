@@ -56,7 +56,7 @@
       </label>
     </div>
 
-    <button type="submit" id="signupBtn" class="btn-primary" disabled style="opacity:0.5;cursor:not-allowed;">Send OTP &rarr;</button>
+    <button type="submit" id="signupBtn" class="btn-primary" disabled style="opacity:0.5;cursor:not-allowed;">Proceed &rarr;</button>
     <p id="signupError" class="error hidden"></p>
     <p id="signupSuccess" class="success hidden"></p>
 
@@ -131,7 +131,7 @@ $("#signupForm").addEventListener("submit", async (e) => {
     return;
   }
   const btn = $("#signupBtn");
-  btn.disabled = true; btn.textContent = "Sending OTP...";
+  btn.disabled = true; btn.textContent = "Sending verification email...";
   try {
     const body = {
       email: $("#email").value.trim().toLowerCase(),
@@ -154,7 +154,7 @@ $("#signupForm").addEventListener("submit", async (e) => {
     err.textContent = e2.message;
     err.classList.remove("hidden");
   } finally {
-    btn.textContent = "Send OTP →";
+    btn.textContent = "Proceed →";
     syncSubmitState();
   }
 });
