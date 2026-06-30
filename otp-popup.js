@@ -94,12 +94,15 @@
       var noteHtml = isPartial
         ? '<div style="margin-top:10px;padding:12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1e40af;line-height:1.5;">' +
             '<b>🔓 How this works:</b><br>' +
-            '<span style="display:block;margin-top:4px;">1. Enter OTP to give consent for wallet debit (₹' + (walletDebit/100).toFixed(2) + ')</span>' +
-            '<span style="display:block;">2. You\'ll be redirected to Razorpay to pay the rest ₹' + (razorpayPart/100).toFixed(2) + '</span>' +
-            '<span style="display:block;">3. After payment of ₹' + (razorpayPart/100).toFixed(2) + ', the total ₹' + ((b.total_paise || 0)/100).toFixed(2) + ' will be debited from wallet</span>' +
-            '<span style="display:block;margin-top:6px;color:#7f1d1d;font-weight:600;">⚠️ If you cancel Razorpay, wallet will NOT be debited.</span>' +
+            '<span style="display:block;margin-top:4px;">1. You\'ll be redirected to Razorpay to pay the shortfall of ₹' + (razorpayPart/100).toFixed(2) + '</span>' +
+            '<span style="display:block;">2. After payment of ₹' + (razorpayPart/100).toFixed(2) + ', the total ₹' + ((b.total_paise || 0)/100).toFixed(2) + ' will be debited from your wallet</span>' +
+            '<span style="display:block;margin-top:6px;color:#7f1d1d;font-weight:600;">⚠️ If you cancel Razorpay, wallet will NOT be debited (no half-payments).</span>' +
+            '<span style="display:block;margin-top:10px;padding-top:8px;border-top:1px solid #93c5fd;color:#0f172a;font-weight:700;">📧 Enter the OTP below to give consent for this transaction.</span>' +
           '</div>'
-        : '';
+        : '<div style="margin-top:10px;padding:12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1e40af;line-height:1.5;">' +
+            '<b>🔓 How this works:</b><br>' +
+            '<span style="display:block;margin-top:4px;">Enter the OTP below to give consent for wallet debit of ₹' + ((b.total_paise || 0)/100).toFixed(2) + '</span>' +
+          '</div>';
 
       return (
         '<div style="background:' + headerBg + ';border:1px solid ' + headerBorder + ';border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
