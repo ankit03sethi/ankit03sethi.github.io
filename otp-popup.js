@@ -48,9 +48,9 @@
     var b = otpInfo.breakdown || {};
     var kind = b.kind || "generic";
 
-    if (kind === "wallet_debit") {
-      var insuf = b.sufficient === false;
-      var afterStr = b.wallet_after_paise < 0 ? rupees(0) : rupees(b.wallet_after_paise);
+    if (kind === "wallet_debit" || kind === "wallet_pay") {
+      var insuf = b.sufficient === false || (b.wallet_after_paise !== undefined && b.wallet_after_paise < 0);
+      var afterStr = (b.wallet_after_paise === undefined || b.wallet_after_paise < 0) ? rupees(0) : rupees(b.wallet_after_paise);
       var row = function (label, value, opts) {
         opts = opts || {};
         var style = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:#475467;";
