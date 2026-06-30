@@ -416,6 +416,11 @@ proceedBtn.addEventListener("click", async () => {
     const j = await res.json();
     if (!j.ok) { alert("Could not start payment: " + (j.error || "unknown")); proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay"; return; }
     if (typeof Razorpay === "undefined") { alert("Razorpay library failed to load. Refresh and try again."); proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay"; return; }
+    // Razorpay UX hardening: 60-sec timeout + better error handling
+    let rzpTimeout = null;
+    let rzpFinished = false;
+    const stopTimer = () => { if (rzpTimeout) { clearTimeout(rzpTimeout); rzpTimeout = null; } };
+
     const rzp = new Razorpay({
       key: j.key_id,
       order_id: j.order_id,
@@ -430,6 +435,7 @@ proceedBtn.addEventListener("click", async () => {
       },
       theme: { color: "#1f6feb" },
       handler: async function (response) {
+        rzpFinished = true; stopTimer();
         // Razorpay called handler with signed payment proof. Send it to our
         // confirm endpoint, which verifies the signature and credits the wallet.
         modal.classList.remove("open");
@@ -469,10 +475,36 @@ proceedBtn.addEventListener("click", async () => {
       },
       modal: {
         ondismiss: function () {
+          stopTimer(); rzpFinished = true;
           proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
         },
       },
     });
+
+    // Better error UI on Razorpay payment.failed (Too Many Requests, etc.)
+    rzp.on("payment.failed", function (response) {
+      stopTimer(); rzpFinished = true;
+      const err = (response && response.error) || {};
+      const desc = String(err.description || "").toLowerCase();
+      const reason = String(err.reason || "").toLowerCase();
+      try { rzp.close(); } catch (e) {}
+      if (desc.indexOf("too many") !== -1 || desc.indexOf("rate") !== -1 || reason.indexOf("rate_limit") !== -1) {
+        alert("⚠️ Payment system busy right now.\n\nIf you ALREADY completed UPI payment, wait 2-5 minutes — your wallet will update once Razorpay confirms.\n\nIf not, please try again in a few minutes.");
+      } else {
+        alert("Payment failed: " + (err.description || err.reason || "Unknown error") + "\n\nIf money was deducted, WhatsApp +91 96257 37475 with the payment details.");
+      }
+      proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+    });
+
+    // 60-second timeout: auto-close Razorpay if no payment completed
+    rzpTimeout = setTimeout(function () {
+      if (rzpFinished) return;
+      rzpFinished = true;
+      try { rzp.close(); } catch (e) {}
+      alert("⏱ Payment window closed (60-second timeout).\n\nIf you completed the UPI payment, your wallet will update in 1-2 minutes — no action needed.\n\nIf you didn't pay, just click 'Add money' to try again.");
+      proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+    }, 60 * 1000);
+
     rzp.open();
   } catch (e) {
     alert("Payment error: " + e.message);
