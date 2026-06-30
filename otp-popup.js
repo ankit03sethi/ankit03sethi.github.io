@@ -49,32 +49,64 @@
     var kind = b.kind || "generic";
 
     if (kind === "wallet_debit" || kind === "wallet_pay") {
-      var insuf = b.sufficient === false || (b.wallet_after_paise !== undefined && b.wallet_after_paise < 0);
-      var afterStr = (b.wallet_after_paise === undefined || b.wallet_after_paise < 0) ? rupees(0) : rupees(b.wallet_after_paise);
+      var mode = b.mode || (b.wallet_balance_paise >= b.total_paise ? "wallet_full" : "wallet_partial");
+      var walletDebit = (b.wallet_debit_paise !== undefined) ? Number(b.wallet_debit_paise) : Math.min(b.wallet_balance_paise || 0, b.total_paise || 0);
+      var razorpayPart = (b.razorpay_paise !== undefined) ? Number(b.razorpay_paise) : Math.max(0, (b.total_paise || 0) - walletDebit);
+      var isPartial = razorpayPart > 0;
+
       var row = function (label, value, opts) {
         opts = opts || {};
         var style = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:#475467;";
         if (opts.bold) style += "font-weight:700;color:#0f172a;font-size:14px;";
         if (opts.danger) style += "color:#dc2626;";
         if (opts.success) style += "color:#16a34a;";
+        if (opts.warn) style += "color:#92400e;";
         if (opts.border) style += "border-top:1px solid #e2e8f0;margin-top:6px;padding-top:10px;";
         return '<div style="' + style + '"><span>' + escapeHtml(label) + '</span><span>' + escapeHtml(value) + '</span></div>';
       };
-      var insufNote = insuf
-        ? '<div style="margin-top:10px;padding:10px;background:#fee2e2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#7f1d1d;"><b>⚠️ Insufficient balance.</b> You need ' + rupees(b.shortfall_paise) + ' more in your wallet. Please recharge first.</div>'
-        : "";
-      return (
-        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
-          '<div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">💳 Wallet Deduction</div>' +
-          row("Service", escapeHtml(b.service_name || "")) +
-          row("Base", rupees(b.base_paise)) +
-          row("GST (18%)", rupees(b.gst_paise)) +
-          row("Total amount", rupees(b.total_paise), { bold: true, border: true }) +
-          '<div style="height:8px;"></div>' +
+
+      // Header label changes based on mode
+      var headerLabel = isPartial ? "💰 Split Payment" : "💳 Wallet Deduction";
+      var headerColor = isPartial ? "#92400e" : "#1f6feb";
+      var headerBg = isPartial ? "#fef3c7" : "#f8fafc";
+      var headerBorder = isPartial ? "#fde68a" : "#e2e8f0";
+
+      var rowsHtml = (
+        row("Service", escapeHtml(b.service_name || "")) +
+        row("Base", rupees(b.base_paise)) +
+        row("GST (18%)", rupees(b.gst_paise)) +
+        row("Total amount", rupees(b.total_paise), { bold: true, border: true }) +
+        '<div style="height:8px;"></div>'
+      );
+
+      if (isPartial) {
+        // Split payment breakdown
+        rowsHtml +=
+          row("From your wallet", "−" + rupees(walletDebit), { success: true }) +
+          row("Pay via Razorpay", "−" + rupees(razorpayPart), { warn: true, bold: true });
+      } else {
+        // Full wallet payment
+        rowsHtml +=
           row("Current wallet balance", rupees(b.wallet_balance_paise)) +
-          row("After this deduction", afterStr, { success: !insuf, danger: insuf, bold: true }) +
+          row("After this deduction", rupees(Math.max(0, (b.wallet_balance_paise || 0) - (b.total_paise || 0))), { success: true, bold: true });
+      }
+
+      var noteHtml = isPartial
+        ? '<div style="margin-top:10px;padding:12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1e40af;line-height:1.5;">' +
+            '<b>🔓 How this works:</b><br>' +
+            '<span style="display:block;margin-top:4px;">1. Enter OTP to give consent for wallet debit (₹' + (walletDebit/100).toFixed(2) + ')</span>' +
+            '<span style="display:block;">2. You\'ll be redirected to Razorpay to pay the rest ₹' + (razorpayPart/100).toFixed(2) + '</span>' +
+            '<span style="display:block;">3. After payment of ₹' + (razorpayPart/100).toFixed(2) + ', the total ₹' + ((b.total_paise || 0)/100).toFixed(2) + ' will be debited from wallet</span>' +
+            '<span style="display:block;margin-top:6px;color:#7f1d1d;font-weight:600;">⚠️ If you cancel Razorpay, wallet will NOT be debited.</span>' +
+          '</div>'
+        : '';
+
+      return (
+        '<div style="background:' + headerBg + ';border:1px solid ' + headerBorder + ';border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
+          '<div style="font-size:11px;color:' + headerColor + ';font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">' + headerLabel + '</div>' +
+          rowsHtml +
         '</div>' +
-        insufNote
+        noteHtml
       );
     }
 
