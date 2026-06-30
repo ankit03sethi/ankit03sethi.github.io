@@ -280,6 +280,53 @@ function syncProceedState() {
   proceedBtn.disabled = !(v > 0);
 }
 
+// === 60-sec status check polling after Razorpay closes ===
+let _walletPollTimer = null;
+function startWalletPollAfterRazorpay(expectedAmountPaise) {
+  const beforeEl = document.getElementById("walletBalance");
+  const beforeText = (beforeEl && beforeEl.textContent || "").trim();
+  const beforeBalance = parseFloat(beforeText.replace(/[^0-9.]/g, "")) || 0;
+
+  if (_walletPollTimer) { clearInterval(_walletPollTimer); _walletPollTimer = null; }
+
+  let elapsedMs = 0;
+  const intervalMs = 10000;
+  const maxMs = 60000;
+
+  let notice = document.getElementById("rzpStatusNotice");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "rzpStatusNotice";
+    notice.style.cssText = "position:fixed;bottom:20px;right:20px;background:#1f6feb;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:99999;max-width:340px;";
+    document.body.appendChild(notice);
+  }
+  notice.textContent = "⏳ Checking payment status (up to 60 sec)...";
+
+  _walletPollTimer = setInterval(async () => {
+    elapsedMs += intervalMs;
+    try {
+      if (typeof load === "function") await load();
+      const afterText = (document.getElementById("walletBalance")?.textContent || "").trim().replace(/[^0-9.]/g, "");
+      const afterBalance = parseFloat(afterText) || 0;
+      const delta = afterBalance - beforeBalance;
+      const expectedRupees = expectedAmountPaise / 100;
+      if (delta >= expectedRupees * 0.95) {
+        clearInterval(_walletPollTimer); _walletPollTimer = null;
+        notice.style.background = "#16a34a";
+        notice.textContent = "✓ Payment received! ₹" + delta.toFixed(2) + " added to wallet.";
+        setTimeout(() => { if (notice.parentNode) notice.parentNode.removeChild(notice); }, 5000);
+        return;
+      }
+    } catch (e) { /* ignore */ }
+    if (elapsedMs >= maxMs) {
+      clearInterval(_walletPollTimer); _walletPollTimer = null;
+      notice.style.background = "#f59e0b";
+      notice.innerHTML = "⚠️ No payment detected in 60 sec. If you paid, wait 2-5 min then refresh. <span style=\"text-decoration:underline;cursor:pointer;margin-left:6px;\" onclick=\"location.reload()\">Refresh</span>";
+      setTimeout(() => { if (notice.parentNode) notice.parentNode.removeChild(notice); }, 30000);
+    }
+  }, intervalMs);
+}
+
 $("#rechargeBtn").addEventListener("click", () => { modal.classList.add("open"); amtInput.focus(); });
 $("#rechargeCancel").addEventListener("click", () => modal.classList.remove("open"));
 modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
@@ -479,6 +526,7 @@ proceedBtn.addEventListener("click", async () => {
         ondismiss: function () {
           stopTimer(); rzpFinished = true;
           proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+          startWalletPollAfterRazorpay(amount_paise);
         },
       },
     });
@@ -496,6 +544,7 @@ proceedBtn.addEventListener("click", async () => {
         alert("Payment failed: " + (err.description || err.reason || "Unknown error") + "\n\nIf money was deducted, WhatsApp +91 96257 37475 with the payment details.");
       }
       proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+      startWalletPollAfterRazorpay(amount_paise);
     });
 
     // 60-second timeout: auto-close Razorpay if no payment completed
@@ -505,6 +554,7 @@ proceedBtn.addEventListener("click", async () => {
       try { rzp.close(); } catch (e) {}
       alert("⏱ Payment window closed (30-second timeout).\n\nIf you completed the UPI payment, your wallet will update in 1-2 minutes — no action needed.\n\nIf you didn't pay, just click 'Add money' to try again.");
       proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
+      startWalletPollAfterRazorpay(amount_paise);
     }, 30 * 1000);
 
     rzp.open();
