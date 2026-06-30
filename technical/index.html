@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Technical Admin &middot; Cursive</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23dc2626'/><text x='32' y='44' text-anchor='middle' font-size='32' font-family='monospace' fill='white' font-weight='bold'>T</text></svg>" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    .topbar { background: #1e293b; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #dc2626; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+    .brand .dot { width: 12px; height: 12px; border-radius: 999px; background: #dc2626; box-shadow: 0 0 8px #dc2626; }
+    .who { font-size: 13px; color: #94a3b8; }
+    .who b { color: #e2e8f0; }
+    .who button { margin-left: 10px; background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .who button:hover { background: #334155; color: #fff; }
+    main { max-width: 1400px; margin: 24px auto; padding: 0 24px; }
+    .login-card { max-width: 460px; margin: 60px auto; background: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155; }
+    .login-card h1 { margin: 0 0 8px; font-size: 22px; }
+    .login-card .sub { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+    .login-card label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; }
+    .login-card input { width: 100%; padding: 11px 14px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 8px; font-size: 14px; margin-bottom: 14px; font-family: inherit; }
+    .login-card input:focus { outline: none; border-color: #dc2626; }
+    .login-card button.primary { width: 100%; padding: 12px; background: #dc2626; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; }
+    .login-card button.primary:hover { background: #b91c1c; }
+    .login-card button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-msg { margin-top: 14px; font-size: 13px; padding: 10px; border-radius: 6px; }
+    .login-msg.err { background: #7f1d1d; color: #fecaca; }
+    .login-msg.ok { background: #14532d; color: #bbf7d0; }
+    .header-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    .header-bar h1 { margin: 0; font-size: 20px; }
+    .search-bar { display: flex; gap: 10px; align-items: center; }
+    .search-bar input { padding: 10px 14px; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 8px; font-size: 14px; width: 320px; font-family: inherit; }
+    .search-bar input:focus { outline: none; border-color: #dc2626; }
+    .search-bar select { padding: 10px 14px; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; }
+    .stats-strip { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat-box { background: #1e293b; padding: 14px 20px; border-radius: 10px; border: 1px solid #334155; flex: 1; min-width: 160px; }
+    .stat-box .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-box .value { font-size: 22px; font-weight: 700; color: #e2e8f0; margin-top: 4px; }
+    .stat-box.paid .value { color: #4ade80; }
+    .stat-box.trial .value { color: #fbbf24; }
+    .stat-box.blocked .value { color: #f87171; }
+    table { width: 100%; background: #1e293b; border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid #334155; font-size: 13px; }
+    thead th { background: #0f172a; padding: 12px 14px; text-align: left; font-weight: 600; color: #cbd5e1; border-bottom: 1px solid #334155; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; user-select: none; }
+    thead th:hover { color: #fff; }
+    thead th .arrow { color: #dc2626; margin-left: 4px; }
+    tbody td { padding: 11px 14px; border-bottom: 1px solid #334155; }
+    tbody tr:hover { background: #273449; }
+    tbody tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .badge.paid { background: #166534; color: #bbf7d0; }
+    .badge.trial { background: #854d0e; color: #fef3c7; }
+    .badge.blocked { background: #7f1d1d; color: #fecaca; }
+    .badge.inactive { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .badge.dot-ext { background: transparent; padding: 0; font-size: 14px; }
+    .view-btn { background: #dc2626; color: #fff; border: none; padding: 6px 13px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer; }
+    .view-btn:hover { background: #b91c1c; }
+    .view-btn:disabled { opacity: 0.5; cursor: progress; }
+    .pagination { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; color: #94a3b8; font-size: 13px; }
+    .pagination .pages { display: flex; gap: 4px; }
+    .pagination button { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .pagination button:hover { background: #273449; color: #fff; }
+    .pagination button.active { background: #dc2626; color: #fff; border-color: #dc2626; }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .empty { padding: 60px; text-align: center; color: #94a3b8; }
+    .loading { padding: 60px; text-align: center; color: #94a3b8; }
+    .row-msg { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+    .row-msg.err { background: #7f1d1d; color: #fecaca; }
+    .small { font-size: 11px; color: #94a3b8; }
+    .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: #94a3b8; }
+    .footnote { margin-top: 24px; padding: 14px; background: #1e293b; border-radius: 8px; font-size: 12px; color: #94a3b8; line-height: 1.6; border: 1px solid #334155; }
+    .footnote b { color: #cbd5e1; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <span>CURSIVE TECHNICAL ADMIN</span>
+  </div>
+  <div class="who" id="whoBox">Not signed in</div>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, storageKey: "pd_tracker_auth" },
+});
+
+const main = document.getElementById("main");
+const whoBox = document.getElementById("whoBox");
+
+// State
+let allCustomers = [];
+let filteredCustomers = [];
+let currentPage = 1;
+const PER_PAGE = 50;
+let sortKey = "signup_at";
+let sortDir = "desc";
+let adminEmail = "";
+let adminUserId = "";
+
+(async function init() {
+  // Check session
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session || !session.user) {
+    renderLogin();
+    return;
+  }
+  adminEmail = session.user.email || "";
+  adminUserId = session.user.id;
+
+  // Try to load customers (this is where admin check happens server-side)
+  await loadCustomers();
+})();
+
+function renderLogin() {
+  whoBox.textContent = "Not signed in";
+  main.innerHTML = `
+    <div class="login-card">
+      <h1>🔒 Admin Login</h1>
+      <div class="sub">Sign in with your cursive.world admin credentials. Only authorised admin emails can access this panel.</div>
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" placeholder="ankit03sethi@gmail.com">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" placeholder="Your cursive password">
+      <button class="primary" id="loginBtn">Sign In</button>
+      <div id="loginMsg"></div>
+    </div>
+  `;
+  document.getElementById("loginBtn").addEventListener("click", doLogin);
+  document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+}
+
+async function doLogin() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const btn = document.getElementById("loginBtn");
+  const msg = document.getElementById("loginMsg");
+  msg.className = "";
+  msg.textContent = "";
+  if (!email || !password) {
+    msg.className = "login-msg err"; msg.textContent = "Email and password required";
+    return;
+  }
+  btn.disabled = true; btn.textContent = "Signing in…";
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    adminEmail = data.user.email;
+    adminUserId = data.user.id;
+    await loadCustomers();
+  } catch (e) {
+    msg.className = "login-msg err"; msg.textContent = "Login failed: " + (e.message || e);
+    btn.disabled = false; btn.textContent = "Sign In";
+  }
+}
+
+async function loadCustomers() {
+  main.innerHTML = `<div class="loading">Loading customers…</div>`;
+  whoBox.innerHTML = `Admin: <b>${esc(adminEmail)}</b> <button id="logoutBtn">Sign Out</button>`;
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await sb.auth.signOut();
+    sessionStorage.removeItem("pd_admin_impersonation");
+    sessionStorage.removeItem("pd_admin_backup_session");
+    renderLogin();
+  });
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-list-customers`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      if (resp.status === 403) {
+        main.innerHTML = `<div class="login-card"><h1>⛔ Access Denied</h1><div class="sub">Your account (<b>${esc(adminEmail)}</b>) is not in the admin list. If this is wrong, contact the project owner.</div><button class="primary" id="logoutBtn2">Sign Out</button></div>`;
+        document.getElementById("logoutBtn2").addEventListener("click", async () => { await sb.auth.signOut(); renderLogin(); });
+        return;
+      }
+      throw new Error(txt || "Failed to load customers");
+    }
+    const j = await resp.json();
+    allCustomers = j.customers || [];
+    renderDashboard();
+  } catch (e) {
+    main.innerHTML = `<div class="login-card"><h1>❌ Error</h1><div class="sub">${esc(e.message || String(e))}</div><button class="primary" id="retry">Retry</button></div>`;
+    document.getElementById("retry").addEventListener("click", loadCustomers);
+  }
+}
+
+function statusOf(c) {
+  if (c.pd_blocked) return "blocked";
+  if ((c.user_tier || "").toLowerCase() === "paid") return "paid";
+  return "trial";
+}
+
+function renderDashboard() {
+  applyFilters();
+  const stats = {
+    total: allCustomers.length,
+    paid: allCustomers.filter(c => statusOf(c) === "paid").length,
+    trial: allCustomers.filter(c => statusOf(c) === "trial").length,
+    blocked: allCustomers.filter(c => statusOf(c) === "blocked").length,
+    installed: allCustomers.filter(c => c.pd_extension_installed).length,
+  };
+  main.innerHTML = `
+    <div class="header-bar">
+      <h1>Customers (${allCustomers.length})</h1>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="🔍 Search by email, mobile, ID…">
+        <select id="filterStatus">
+          <option value="">All statuses</option>
+          <option value="paid">Paid only</option>
+          <option value="trial">Trial only</option>
+          <option value="blocked">Blocked only</option>
+          <option value="installed">Extension installed</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-box"><div class="label">Total</div><div class="value">${stats.total}</div></div>
+      <div class="stat-box paid"><div class="label">Paid</div><div class="value">${stats.paid}</div></div>
+      <div class="stat-box trial"><div class="label">Trial</div><div class="value">${stats.trial}</div></div>
+      <div class="stat-box blocked"><div class="label">Blocked</div><div class="value">${stats.blocked}</div></div>
+      <div class="stat-box"><div class="label">Extension Installed</div><div class="value">${stats.installed}</div></div>
+    </div>
+
+    <div id="tableArea"></div>
+
+    <div class="footnote">
+      <b>📋 How to use:</b> Click "View Account" on any row to login as that customer.
+      You'll see their dashboard, products, wallet — everything they see.
+      A yellow "ADMIN MODE" banner will appear on every page during impersonation.
+      Click "Exit" in the banner to return here. <b>READ-ONLY mode is active</b> — destructive actions are disabled while impersonating.
+      Session auto-expires in 30 minutes.
+      <br><br>
+      <b>🛡️ Audit Log:</b> Every action you take while impersonating is logged for DPDP Act compliance.
+    </div>
+  `;
+
+  document.getElementById("searchInput").addEventListener("input", () => { applyFilters(); renderTable(); });
+  document.getElementById("filterStatus").addEventListener("change", () => { applyFilters(); renderTable(); });
+  renderTable();
+}
+
+function applyFilters() {
+  const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
+  const status = document.getElementById("filterStatus")?.value || "";
+  filteredCustomers = allCustomers.filter(c => {
+    if (q) {
+      const hay = ((c.email || "") + " " + (c.mobile || "") + " " + (c.user_id || "")).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (status) {
+      if (status === "installed") return c.pd_extension_installed;
+      if (statusOf(c) !== status) return false;
+    }
+    return true;
+  });
+  sortList();
+  currentPage = 1;
+}
+
+function sortList() {
+  filteredCustomers.sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (sortKey === "signup_at" || sortKey === "last_sign_in_at") {
+      av = av ? new Date(av).getTime() : 0;
+      bv = bv ? new Date(bv).getTime() : 0;
+    } else if (typeof av === "string") {
+      av = (av || "").toLowerCase(); bv = (bv || "").toLowerCase();
+    } else {
+      av = av || 0; bv = bv || 0;
+    }
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function renderTable() {
+  const tableArea = document.getElementById("tableArea");
+  if (!filteredCustomers.length) {
+    tableArea.innerHTML = `<div class="empty">No customers match these filters.</div>`;
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / PER_PAGE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PER_PAGE;
+  const slice = filteredCustomers.slice(start, start + PER_PAGE);
+
+  const sortIcon = (k) => sortKey === k ? `<span class="arrow">${sortDir === "asc" ? "▲" : "▼"}</span>` : "";
+
+  tableArea.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th data-k="email">Email ${sortIcon("email")}</th>
+          <th data-k="mobile">Mobile ${sortIcon("mobile")}</th>
+          <th data-k="user_tier">Status ${sortIcon("user_tier")}</th>
+          <th data-k="wallet_balance_paise">Wallet ${sortIcon("wallet_balance_paise")}</th>
+          <th>Ext</th>
+          <th data-k="signup_at">Signup ${sortIcon("signup_at")}</th>
+          <th data-k="last_sign_in_at">Last seen ${sortIcon("last_sign_in_at")}</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${slice.map(c => rowHtml(c)).join("")}
+      </tbody>
+    </table>
+    <div class="pagination">
+      <div>Showing ${start + 1}-${Math.min(start + PER_PAGE, filteredCustomers.length)} of ${filteredCustomers.length}</div>
+      <div class="pages">
+        <button id="prevPage" ${currentPage === 1 ? "disabled" : ""}>← Prev</button>
+        <span style="padding:6px 12px;">Page ${currentPage} of ${totalPages}</span>
+        <button id="nextPage" ${currentPage === totalPages ? "disabled" : ""}>Next →</button>
+      </div>
+    </div>
+    <div id="rowMsg"></div>
+  `;
+
+  // Sort handlers
+  document.querySelectorAll("thead th[data-k]").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.getAttribute("data-k");
+      if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc";
+      else { sortKey = k; sortDir = "desc"; }
+      sortList(); renderTable();
+    });
+  });
+  document.getElementById("prevPage")?.addEventListener("click", () => { currentPage--; renderTable(); });
+  document.getElementById("nextPage")?.addEventListener("click", () => { currentPage++; renderTable(); });
+  document.querySelectorAll(".view-btn").forEach(b => {
+    b.addEventListener("click", () => doImpersonate(b.getAttribute("data-email"), b));
+  });
+}
+
+function rowHtml(c) {
+  const status = statusOf(c);
+  const badge = `<span class="badge ${status}">${status}</span>`;
+  const ext = c.pd_extension_installed ? `<span class="badge dot-ext" title="Extension installed">✅</span>` : `<span class="badge dot-ext" title="No install">—</span>`;
+  const wallet = `₹${((c.wallet_balance_paise || 0) / 100).toFixed(2)}`;
+  const signup = c.signup_at ? fmtDate(c.signup_at) : "—";
+  const last = c.last_sign_in_at ? fmtRel(c.last_sign_in_at) : "—";
+  return `
+    <tr>
+      <td>${esc(c.email || "—")}<br><span class="mono">${esc((c.user_id || "").slice(0, 8))}…</span></td>
+      <td>${esc(c.mobile || "—")}</td>
+      <td>${badge}</td>
+      <td>${wallet}</td>
+      <td style="text-align:center">${ext}</td>
+      <td>${signup}</td>
+      <td>${last}</td>
+      <td><button class="view-btn" data-email="${esc(c.email || "")}">View Account →</button></td>
+    </tr>
+  `;
+}
+
+async function doImpersonate(targetEmail, btn) {
+  if (!targetEmail) return;
+  const rowMsg = document.getElementById("rowMsg");
+  rowMsg.innerHTML = "";
+  btn.disabled = true; btn.textContent = "Loading…";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error("Your admin session expired. Refresh and sign in again.");
+
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-impersonate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ target_email: targetEmail }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(txt || `Impersonation request failed (${resp.status})`);
+    }
+    const j = await resp.json();
+
+    // Save admin session backup so we can restore on Exit
+    const adminBackup = localStorage.getItem("pd_tracker_auth");
+    sessionStorage.setItem("pd_admin_backup_session", adminBackup || "");
+    sessionStorage.setItem("pd_admin_email", adminEmail);
+
+    // Verify the magic-link token to get target customer's session
+    const { data: verify, error: verifyErr } = await sb.auth.verifyOtp({
+      token_hash: j.hashed_token,
+      type: "magiclink",
+    });
+    if (verifyErr) throw verifyErr;
+    // verify automatically updates the pd_tracker_auth localStorage
+
+    // Set the impersonation flag (read by /admin-banner.js on every page)
+    const flag = {
+      admin_email: adminEmail,
+      target_email: j.target_email,
+      target_user_id: j.target_user_id,
+      started_at: Date.now(),
+      expires_at: Date.now() + 30 * 60 * 1000,
+    };
+    sessionStorage.setItem("pd_admin_impersonation", JSON.stringify(flag));
+
+    // Redirect to home/
+    window.location.href = "/home/";
+  } catch (e) {
+    rowMsg.className = "row-msg err"; rowMsg.textContent = "Error: " + (e.message || e);
+    btn.disabled = false; btn.textContent = "View Account →";
+  }
+}
+
+function esc(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+function fmtDate(d) {
+  try {
+    const dt = new Date(d);
+    return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  } catch { return "—"; }
+}
+
+function fmtRel(d) {
+  try {
+    const dt = new Date(d).getTime();
+    const diff = Date.now() - dt;
+    const mins = Math.floor(diff / 60000);
+    const hrs = Math.floor(mins / 60);
+    const days = Math.floor(hrs / 24);
+    if (days >= 7) return fmtDate(d);
+    if (days >= 1) return `${days}d ago`;
+    if (hrs >= 1) return `${hrs}h ago`;
+    if (mins >= 1) return `${mins}m ago`;
+    return "just now";
+  } catch { return "—"; }
+}
+
+// Check if returning from impersonation (e.g., after Exit was clicked elsewhere)
+(function checkReturn() {
+  const flag = sessionStorage.getItem("pd_admin_impersonation");
+  if (flag) {
+    // We're still impersonating but landed on /technical/. Restore admin and clear flag.
+    const backup = sessionStorage.getItem("pd_admin_backup_session");
+    if (backup) {
+      try { localStorage.setItem("pd_tracker_auth", backup); } catch {}
+    }
+    sessionStorage.removeItem("pd_admin_impersonation");
+    sessionStorage.removeItem("pd_admin_backup_session");
+    sessionStorage.removeItem("pd_admin_email");
+  }
+})();
+</script>
+
+</body>
+</html>
