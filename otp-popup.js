@@ -1,26 +1,15 @@
 /* Cursive — Universal OTP Popup (loaded on customer-facing pages)
  *
- * Automatically intercepts fetch() responses. When server returns:
- *   { otp_required: true, intent_hash, intent_description }  (HTTP 402)
- *
- * This script:
- *   1. Shows a modal asking for the 6-digit OTP
- *   2. Calls payment-otp-request to send the OTP email
- *   3. Waits for user to enter the code
- *   4. Calls payment-otp-verify to mint an action_token (60-sec validity)
- *   5. Retries the ORIGINAL request with action_token added to body
- *   6. Returns the retry response to the caller transparently
+ * Intercepts fetch() responses with HTTP 402 + otp_required:true.
+ * Shows a structured modal with action breakdown, sends OTP, verifies,
+ * and retries the original request with the action_token injected.
  *
  * Routes OTP to admin email if running inside an admin impersonation session.
- *
- * Safe to include on every page. Does NOT modify fetch behaviour unless server
- * sends an otp_required response.
  */
 (function () {
   "use strict";
 
   var SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
-  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
 
   function getAccessToken() {
     try {
@@ -49,9 +38,93 @@
     });
   }
 
-  function showOtpModal(intentDescription, maskedEmail, routedToAdmin) {
+  function rupees(paise) {
+    var v = (Number(paise) || 0) / 100;
+    return "₹" + v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Render the action breakdown based on what the server told us
+  function renderBreakdownHtml(otpInfo) {
+    var b = otpInfo.breakdown || {};
+    var kind = b.kind || "generic";
+
+    if (kind === "wallet_debit") {
+      var insuf = b.sufficient === false;
+      var afterStr = b.wallet_after_paise < 0 ? rupees(0) : rupees(b.wallet_after_paise);
+      var row = function (label, value, opts) {
+        opts = opts || {};
+        var style = "display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:#475467;";
+        if (opts.bold) style += "font-weight:700;color:#0f172a;font-size:14px;";
+        if (opts.danger) style += "color:#dc2626;";
+        if (opts.success) style += "color:#16a34a;";
+        if (opts.border) style += "border-top:1px solid #e2e8f0;margin-top:6px;padding-top:10px;";
+        return '<div style="' + style + '"><span>' + escapeHtml(label) + '</span><span>' + escapeHtml(value) + '</span></div>';
+      };
+      var insufNote = insuf
+        ? '<div style="margin-top:10px;padding:10px;background:#fee2e2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#7f1d1d;"><b>⚠️ Insufficient balance.</b> You need ' + rupees(b.shortfall_paise) + ' more in your wallet. Please recharge first.</div>'
+        : "";
+      return (
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
+          '<div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">💳 Wallet Deduction</div>' +
+          row("Service", escapeHtml(b.service_name || "")) +
+          row("Base", rupees(b.base_paise)) +
+          row("GST (18%)", rupees(b.gst_paise)) +
+          row("Total amount", rupees(b.total_paise), { bold: true, border: true }) +
+          '<div style="height:8px;"></div>' +
+          row("Current wallet balance", rupees(b.wallet_balance_paise)) +
+          row("After this deduction", afterStr, { success: !insuf, danger: insuf, bold: true }) +
+        '</div>' +
+        insufNote
+      );
+    }
+
+    if (kind === "buy_pack") {
+      return (
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
+          '<div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">📦 Buy Credit Pack</div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:13px;color:#475467;padding:4px 0;"><span>' + escapeHtml(b.plan_label || "") + '</span><span style="font-weight:700;color:#0f172a;">' + rupees(b.total_paise) + '</span></div>' +
+          '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">After OTP, Razorpay will open for payment.</div>' +
+        '</div>'
+      );
+    }
+
+    if (kind === "upload_confirm") {
+      return (
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
+          '<div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">📤 Upload Confirmation</div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:13px;color:#475467;padding:4px 0;"><span>' + (b.row_count || 0) + ' rows · ' + escapeHtml(b.plan || "paid") + '</span><span style="font-weight:700;color:#0f172a;">' + rupees(b.estimated_cost_paise) + '</span></div>' +
+        '</div>'
+      );
+    }
+
+    if (kind === "renew_now") {
+      return (
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
+          '<div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">🔄 Renew Subscriptions</div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:13px;color:#475467;padding:4px 0;"><span>' + (b.row_count || 0) + ' rows × ₹5.90</span><span style="font-weight:700;color:#0f172a;">up to ' + rupees(b.max_paise) + '</span></div>' +
+        '</div>'
+      );
+    }
+
+    if (kind === "toggle_auto_renew") {
+      return (
+        '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;margin:0 0 14px;">' +
+          '<div style="font-size:11px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">⚙️ Account Setting Change</div>' +
+          '<div style="font-size:14px;color:#0f172a;font-weight:600;">' + escapeHtml(otpInfo.intent_description || "Toggle auto-renew") + '</div>' +
+        '</div>'
+      );
+    }
+
+    // Generic fallback
+    return (
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 14px;font-size:14px;color:#0f172a;">' +
+        escapeHtml(otpInfo.intent_description || "Confirm this action") +
+      '</div>'
+    );
+  }
+
+  function showOtpModal(otpInfo, routedToAdmin) {
     return new Promise(function (resolve) {
-      // Remove existing modal if any
       var existing = document.getElementById("cursive-otp-modal");
       if (existing) existing.remove();
 
@@ -61,24 +134,27 @@
         "position:fixed", "top:0", "left:0", "right:0", "bottom:0",
         "background:rgba(15,23,42,0.75)", "z-index:2147483646",
         "display:flex", "align-items:center", "justify-content:center",
-        "font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        "font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "padding:20px"
       ].join(";");
 
       var adminNote = routedToAdmin
-        ? '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:12px;color:#7f1d1d;"><b>Admin Mode:</b> OTP sent to your admin email (not the customer\'s).</div>'
+        ? '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:12px;color:#7f1d1d;"><b>🟡 ADMIN MODE:</b> OTP sent to your admin email (not the customer\'s).</div>'
         : "";
 
+      var breakdownHtml = renderBreakdownHtml(otpInfo);
+      var headerLabel = (otpInfo.breakdown && otpInfo.breakdown.kind === "wallet_debit") ? "Confirm wallet deduction" : "Confirm action";
+
       overlay.innerHTML =
-        '<div style="background:#fff;border-radius:14px;max-width:420px;width:90%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+        '<div style="background:#fff;border-radius:14px;max-width:460px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto;">' +
           '<h2 style="margin:0 0 4px;font-size:18px;color:#0f172a;display:flex;align-items:center;gap:8px;">' +
-            '<span style="font-size:22px;">🔒</span> Confirm action' +
+            '<span style="font-size:22px;">🔒</span> ' + headerLabel +
           '</h2>' +
-          '<p style="margin:0 0 14px;font-size:13px;color:#64748b;line-height:1.45;">' +
-            escapeHtml(intentDescription) +
-          '</p>' +
+          '<p style="margin:0 0 14px;font-size:12px;color:#64748b;">Enter the one-time code we just sent to verify this transaction.</p>' +
           adminNote +
-          '<div style="background:#f1f5f9;border-radius:8px;padding:12px;margin:0 0 14px;font-size:13px;color:#475467;">' +
-            '<span id="otp-status">📧 Sending OTP to <b>' + escapeHtml(maskedEmail) + '</b>...</span>' +
+          breakdownHtml +
+          '<div style="background:#f1f5f9;border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:12px;color:#475467;">' +
+            '<span id="otp-status">📧 Sending OTP to <b>your email</b>...</span>' +
           '</div>' +
           '<label style="display:block;font-size:12px;color:#475467;margin:0 0 6px;font-weight:600;">Enter 6-digit code</label>' +
           '<input id="otp-input" type="text" inputmode="numeric" pattern="\\d{6}" maxlength="6" autocomplete="off" placeholder="000000" ' +
@@ -130,20 +206,20 @@
       resendBtn.addEventListener("click", function () {
         resendBtn.disabled = true;
         setStatus("📧 Resending OTP...", false);
-        // Send signal back via custom event for the caller to re-send OTP
         overlay.dispatchEvent(new CustomEvent("resend"));
       });
 
-      // Expose API for the caller to update the modal
-      overlay._enableInput = function () {
+      overlay._enableInput = function (maskedEmail, routedToAdminFlag) {
         input.disabled = false;
         resendBtn.disabled = false;
         input.focus();
-        setStatus("📧 Code sent to <b>" + escapeHtml(maskedEmail) + "</b>. Check inbox (or spam).", false);
+        if (routedToAdminFlag) {
+          setStatus("🔒 <b>ADMIN MODE</b> — OTP sent to your admin email: <b>" + escapeHtml(maskedEmail) + "</b>", false);
+        } else {
+          setStatus("📧 Code sent to <b>" + escapeHtml(maskedEmail) + "</b>. Check inbox (or spam).", false);
+        }
       };
-      overlay._showError = function (msg) {
-        setStatus(msg, true);
-      };
+      overlay._showError = function (msg) { setStatus(msg, true); };
     });
   }
 
@@ -151,84 +227,50 @@
     var token = getAccessToken();
     if (!token) throw new Error("Not signed in");
     var adminEmail = getAdminImpersonationEmail();
-
-    var headers = {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + token,
-    };
+    var headers = { "Content-Type": "application/json", "Authorization": "Bearer " + token };
     if (adminEmail) headers["x-admin-email"] = adminEmail;
-
     var resp = await fetch(SUPABASE_URL + "/functions/v1/payment-otp-request", {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify({
-        intent_hash: intentHash,
-        intent_description: intentDescription,
-      }),
+      method: "POST", headers: headers,
+      body: JSON.stringify({ intent_hash: intentHash, intent_description: intentDescription }),
     });
     var j = await resp.json();
     if (!resp.ok) throw new Error(j.error || "OTP request failed");
-    return j; // { otp_id, masked_email, routed_to_admin }
+    return j;
   }
 
   async function verifyOtp(intentHash, otpCode) {
     var token = getAccessToken();
     if (!token) throw new Error("Not signed in");
     var adminEmail = getAdminImpersonationEmail();
-
-    var headers = {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + token,
-    };
+    var headers = { "Content-Type": "application/json", "Authorization": "Bearer " + token };
     if (adminEmail) headers["x-admin-email"] = adminEmail;
-
     var resp = await fetch(SUPABASE_URL + "/functions/v1/payment-otp-verify", {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify({
-        intent_hash: intentHash,
-        otp_code: otpCode,
-      }),
+      method: "POST", headers: headers,
+      body: JSON.stringify({ intent_hash: intentHash, otp_code: otpCode }),
     });
     var j = await resp.json();
     if (!resp.ok) throw new Error(j.error || "OTP verify failed");
-    return j; // { action_token }
+    return j;
   }
 
   async function handleOtpRequired(originalInput, originalInit, otpInfo) {
-    var modalPromise = showOtpModal(
-      otpInfo.intent_description || "sensitive operation",
-      "your email",
-      false  // will update after OTP request returns
-    );
+    var modalPromise = showOtpModal(otpInfo, false);
     var modalEl = document.getElementById("cursive-otp-modal");
 
     var requestOtpAndUpdateUI = async function () {
       try {
         var info = await requestOtp(otpInfo.intent_hash, otpInfo.intent_description || "sensitive operation");
-        var maskedEl = modalEl.querySelector("b");
-        if (maskedEl) maskedEl.textContent = info.masked_email;
-        if (info.routed_to_admin) {
-          var statusEl = modalEl.querySelector("#otp-status");
-          if (statusEl) {
-            statusEl.innerHTML = '🔒 <b>ADMIN MODE</b> — OTP sent to your admin email: <b>' + escapeHtml(info.masked_email) + '</b>';
-          }
-        }
-        modalEl._enableInput();
+        modalEl._enableInput(info.masked_email, info.routed_to_admin);
       } catch (e) {
         modalEl._showError("Could not send OTP: " + e.message);
       }
     };
 
-    // Listen for resend
     modalEl.addEventListener("resend", requestOtpAndUpdateUI);
     requestOtpAndUpdateUI();
 
     var otp = await modalPromise;
-    if (!otp) {
-      // User cancelled — return original 402 response (caller will see otp_required)
-      return null;
-    }
+    if (!otp) return null;
 
     var verifyResult;
     try {
@@ -242,7 +284,6 @@
       return null;
     }
 
-    // Re-issue the original fetch with action_token added to body
     var newInit = Object.assign({}, originalInit || {});
     var bodyObj = {};
     if (newInit.body) {
@@ -255,7 +296,6 @@
     return await __originalFetch(originalInput, newInit);
   }
 
-  // Skip these endpoints from interception (avoid recursion)
   var SKIP_PATHS = [
     "/functions/v1/payment-otp-request",
     "/functions/v1/payment-otp-verify",
@@ -275,9 +315,7 @@
     if (ctype.indexOf("application/json") === -1) return response;
 
     var data;
-    try {
-      data = await response.clone().json();
-    } catch (e) { return response; }
+    try { data = await response.clone().json(); } catch (e) { return response; }
     if (!data || data.otp_required !== true || !data.intent_hash) return response;
 
     var retried = await handleOtpRequired(input, init, data);
@@ -285,5 +323,5 @@
     return response;
   };
 
-  console.log("[cursive otp-popup] active");
+  console.log("[cursive otp-popup] v2 active");
 })();
