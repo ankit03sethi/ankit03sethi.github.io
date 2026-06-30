@@ -401,7 +401,7 @@
           <span id="svcWalletAdj">−₹0</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding:8px 0 0;margin-top:6px;border-top:1px solid #e2e8f0;">
-          <span style="color:#0f172a;">Amount to pay</span>
+          <span style="color:#0f172a;">Amount to add in wallet</span>
           <span id="svcPayDue" style="color:#1f6feb;">₹1,179</span>
         </div>
       </div>
@@ -745,7 +745,7 @@ function renderCartModal() {
     `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span style="color:#64748b;">Cart subtotal</span><span style="color:#0f172a;font-weight:600;">${fmt(gross)}</span></div>` +
     (itemDiscount > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0;color:#16a34a;"><span>Coupon discount</span><span>−${fmt(itemDiscount)}</span></div>` : "") +
     (adj > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0;color:#16a34a;"><span>Adjustment from wallet</span><span>−${fmt(adj)}</span></div>` : "") +
-    `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:6px 0 0;margin-top:4px;border-top:1px solid #e2e8f0;"><span style="color:#0f172a;">Amount to pay</span><span style="color:#1f6feb;">${fmt(due)}</span></div>` +
+    `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:6px 0 0;margin-top:4px;border-top:1px solid #e2e8f0;"><span style="color:#0f172a;">Amount to add in wallet</span><span style="color:#1f6feb;">${fmt(due)}</span></div>` +
     `<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Wallet balance: ${fmt(_cartWalletPaise)}</div>`;
   $("#cartPayBtnAmt").textContent = fmt(due);
 }
