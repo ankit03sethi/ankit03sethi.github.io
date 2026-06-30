@@ -434,7 +434,7 @@ proceedBtn.addEventListener("click", async () => {
         contact: ((_cachedProfile?.mobile) || session.user.user_metadata?.mobile || session.user.phone || "").toString().replace(/^\+?91/, "").replace(/\D/g, "") || undefined,
       },
       theme: { color: "#1f6feb" },
-      timeout: 60,  // Razorpay-level 60-sec payment timeout (prevents premature "Confirming Payment" UI)
+      timeout: 30,  // Razorpay-level 30-sec payment timeout (prevents premature "Confirming Payment" UI)
       retry: { enabled: false },  // Disable the "Retry payment" loop on failure
       handler: async function (response) {
         rzpFinished = true; stopTimer();
@@ -503,9 +503,9 @@ proceedBtn.addEventListener("click", async () => {
       if (rzpFinished) return;
       rzpFinished = true;
       try { rzp.close(); } catch (e) {}
-      alert("⏱ Payment window closed (60-second timeout).\n\nIf you completed the UPI payment, your wallet will update in 1-2 minutes — no action needed.\n\nIf you didn't pay, just click 'Add money' to try again.");
+      alert("⏱ Payment window closed (30-second timeout).\n\nIf you completed the UPI payment, your wallet will update in 1-2 minutes — no action needed.\n\nIf you didn't pay, just click 'Add money' to try again.");
       proceedBtn.disabled = false; proceedBtn.textContent = "Proceed to pay";
-    }, 60 * 1000);
+    }, 30 * 1000);
 
     rzp.open();
   } catch (e) {
