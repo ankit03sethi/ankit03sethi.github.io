@@ -434,6 +434,8 @@ proceedBtn.addEventListener("click", async () => {
         contact: ((_cachedProfile?.mobile) || session.user.user_metadata?.mobile || session.user.phone || "").toString().replace(/^\+?91/, "").replace(/\D/g, "") || undefined,
       },
       theme: { color: "#1f6feb" },
+      timeout: 60,  // Razorpay-level 60-sec payment timeout (prevents premature "Confirming Payment" UI)
+      retry: { enabled: false },  // Disable the "Retry payment" loop on failure
       handler: async function (response) {
         rzpFinished = true; stopTimer();
         // Razorpay called handler with signed payment proof. Send it to our
