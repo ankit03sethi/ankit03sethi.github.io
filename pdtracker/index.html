@@ -1523,41 +1523,62 @@ async function loadAutoRenewState() {
     });
     const j = await r.json();
     if (j.ok) {
-      const chk = document.getElementById("autoRenewChk");
-      const lbl = document.getElementById("autoRenewLabel");
-      const slider = document.getElementById("autoRenewSlider");
-      const knob = document.getElementById("autoRenewKnob");
-      chk.checked = j.auto_renew_enabled;
-      lbl.textContent = j.auto_renew_enabled ? "ON" : "OFF";
-      lbl.style.color = j.auto_renew_enabled ? "#16a34a" : "#dc2626";
-      slider.style.background = j.auto_renew_enabled ? "#16a34a" : "#94a3b8";
-      knob.style.left = j.auto_renew_enabled ? "16px" : "2px";
+      applyAutoRenewVisualState(j.auto_renew_enabled);
       document.getElementById("autoRenewToggle").classList.remove("hidden");
     }
   } catch (e) { /* silent */ }
 }
+function applyAutoRenewVisualState(enabled) {
+  const chk = document.getElementById("autoRenewChk");
+  const lbl = document.getElementById("autoRenewLabel");
+  const slider = document.getElementById("autoRenewSlider");
+  const knob = document.getElementById("autoRenewKnob");
+  if (!chk || !lbl || !slider || !knob) return;
+  chk.checked = enabled;
+  lbl.textContent = enabled ? "ON" : "OFF";
+  lbl.style.color = enabled ? "#16a34a" : "#dc2626";
+  slider.style.background = enabled ? "#16a34a" : "#94a3b8";
+  knob.style.left = enabled ? "16px" : "2px";
+}
 async function saveAutoRenewState(enabled) {
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) return;
-    await fetch(SUPABASE_URL + "/functions/v1/pdtracker-toggle-auto-renew", {
+    if (!session) return { ok: false, error: "Not signed in" };
+    const r = await fetch(SUPABASE_URL + "/functions/v1/pdtracker-toggle-auto-renew", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
       body: JSON.stringify({ enabled }),
     });
-  } catch (e) { /* silent */ }
+    const j = await r.json();
+    return j || { ok: false };
+  } catch (e) { return { ok: false, error: e.message }; }
 }
-document.addEventListener("change", (e) => {
+let _autoRenewInFlight = false;
+document.addEventListener("change", async (e) => {
   if (e.target && e.target.id === "autoRenewChk") {
-    const enabled = e.target.checked;
-    const lbl = document.getElementById("autoRenewLabel");
-    const slider = document.getElementById("autoRenewSlider");
-    const knob = document.getElementById("autoRenewKnob");
-    lbl.textContent = enabled ? "ON" : "OFF";
-    lbl.style.color = enabled ? "#16a34a" : "#dc2626";
-    slider.style.background = enabled ? "#16a34a" : "#94a3b8";
-    knob.style.left = enabled ? "16px" : "2px";
-    saveAutoRenewState(enabled);
+    if (_autoRenewInFlight) return; // ignore double-fires
+    _autoRenewInFlight = true;
+
+    const newEnabled = e.target.checked;
+    const oldEnabled = !newEnabled;
+    const chk = e.target;
+    chk.disabled = true;
+
+    // Optimistic visual update
+    applyAutoRenewVisualState(newEnabled);
+
+    const result = await saveAutoRenewState(newEnabled);
+
+    chk.disabled = false;
+    _autoRenewInFlight = false;
+
+    // If API didn't confirm the change (OTP cancelled, rate-limited, or error), revert
+    if (!result || !result.ok || typeof result.auto_renew_enabled !== "boolean") {
+      applyAutoRenewVisualState(oldEnabled);
+      return;
+    }
+    // Sync to actual server state
+    applyAutoRenewVisualState(result.auto_renew_enabled);
   }
 });
 // Load auto-renew state on page load, then refresh every 5 min (reduced from 60s to save quota)
