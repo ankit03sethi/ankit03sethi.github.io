@@ -1182,6 +1182,44 @@ function buildPayBody(qty, ref) {
   return body;
 }
 
+// Shared helper: after a successful service purchase, put the modal in a clean
+// success state — hide Pay + Add to cart + hint, show a "Done" button that
+// closes the modal immediately (and restores CTAs for the next open).
+function applySvcPurchaseSuccessState(ok, btn, j, qty) {
+  const paid = paiseToRupees(j.total_paise);
+  const bal  = paiseToRupees(j.new_balance_paise);
+  const svc  = j.service_name || (_currentSvc && _currentSvc.name) || "service";
+  ok.innerHTML =
+    "<div style='background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:12px 14px;color:#166534;'>" +
+      "<div style='font-size:15px;font-weight:800;margin-bottom:6px;'>✓ Order confirmed</div>" +
+      "<div style='font-size:13px;line-height:1.55;'>Paid <b>" + paid + "</b> for " + esc(svc) + " (qty " + qty + ").<br>" +
+      "New wallet balance: <b>" + bal + "</b>.<br>" +
+      "<span style='color:#166534;'>Our team will contact you shortly.</span></div>" +
+    "</div>" +
+    "<button id='svcDoneBtn' type='button' style='width:100%;margin-top:12px;background:#16a34a;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;'>Done</button>";
+  ok.style.display = "block";
+  btn.style.display = "none";
+  const addBtn = document.querySelector("#svcAddToCartBtn");
+  if (addBtn) addBtn.style.display = "none";
+  const hint = document.querySelector("#svcPayHint");
+  if (hint) hint.style.display = "none";
+  const closeSvcModalAndReset = () => {
+    const modal = document.querySelector("#svcPayModal");
+    if (modal) modal.style.display = "none";
+    // Restore controls for the next time the modal opens
+    btn.style.display = "";
+    if (addBtn) addBtn.style.display = "";
+    if (hint) hint.style.display = "";
+    ok.style.display = "none";
+    ok.innerHTML = "";
+    if (typeof recalcSvcModal === "function") recalcSvcModal();
+  };
+  const doneBtn = document.querySelector("#svcDoneBtn");
+  if (doneBtn) doneBtn.addEventListener("click", closeSvcModalAndReset);
+  // Safety auto-close after 8s in case the user just walks away
+  setTimeout(closeSvcModalAndReset, 8000);
+}
+
 // Shared helper: try to debit from wallet. Returns { ok: true } on success.
 async function tryWalletDebit(session, qty, ref) {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-service`, {
@@ -1201,12 +1239,9 @@ async function autoDebitAfterRecharge(session, qty, ref, btn, err, ok) {
   btn.textContent = "Debiting service payment…";
   const j = await tryWalletDebit(session, qty, ref);
   if (j.ok) {
-    ok.innerHTML = "✓ <b>Paid " + paiseToRupees(j.total_paise) + "</b> for " + j.service_name + " (qty " + qty + ").<br>New wallet balance: <b>" + paiseToRupees(j.new_balance_paise) + "</b>.<br><span style='color:#64748b;font-size:12px;'>Our team will contact you shortly.</span>";
-    ok.style.display = "block";
-    btn.style.display = "none";
+    applySvcPurchaseSuccessState(ok, btn, j, qty);
     const { data: { session: s2 } } = await sb.auth.getSession();
     if (s2) await loadWallet(s2);
-    setTimeout(() => { $("#svcPayModal").style.display = "none"; btn.style.display = ""; recalcSvcModal(); }, 4000);
     return;
   }
   // Should rarely happen — wallet was just credited
@@ -1313,12 +1348,9 @@ $("#svcPayBtn").addEventListener("click", async () => {
 
     if (j.ok) {
       // Direct debit succeeded
-      ok.innerHTML = "✓ <b>Paid " + paiseToRupees(j.total_paise) + "</b> for " + j.service_name + " (qty " + qty + ").<br>New wallet balance: <b>" + paiseToRupees(j.new_balance_paise) + "</b>.<br><span style='color:#64748b;font-size:12px;'>Our team will contact you shortly.</span>";
-      ok.style.display = "block";
-      btn.style.display = "none";
+      applySvcPurchaseSuccessState(ok, btn, j, qty);
       const { data: { session: s2 } } = await sb.auth.getSession();
       if (s2) await loadWallet(s2);
-      setTimeout(() => { $("#svcPayModal").style.display = "none"; btn.style.display = ""; recalcSvcModal(); }, 4000);
       return;
     }
     if (j.code === "insufficient") {
