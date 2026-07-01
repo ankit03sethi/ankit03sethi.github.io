@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catalog · Admin · Cursive</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <style>
+    body { background: #f8fafc; margin: 0; color: #0f172a; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 1250px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+    h2 { margin: 0 0 10px; font-size: 15px; color: #0f172a; }
+    h3 { margin: 0 0 6px; font-size: 13.5px; color: #475467; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+    label { display:block; font-size: 11.5px; font-weight:700; color:#475467; margin: 10px 0 4px; text-transform:uppercase; letter-spacing:.3px; }
+    input[type="text"], input[type="url"], input[type="number"], textarea {
+      width: 100%; padding: 7px 10px; border: 1px solid #d0d7de; border-radius: 6px;
+      font-size: 13px; font-family: inherit; box-sizing: border-box;
+    }
+    input:focus, textarea:focus { outline: 2px solid #1f6feb; outline-offset: -1px; border-color: #1f6feb; }
+    textarea { resize: vertical; min-height: 60px; }
+    button { padding: 7px 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+    .b-primary { background: #1f6feb; color: #fff; }
+    .b-primary:hover { background: #0d4cb8; }
+    .b-outline { background: #fff; color: #1f6feb; border: 1px solid #1f6feb; }
+    .b-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .b-ghost { background: transparent; color: #475467; }
+    .row { display: flex; gap: 6px; align-items: center; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .cat-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
+      font-size: 13px; border: 1px solid #e2e8f0; background: #fff;
+    }
+    .cat-item:hover { background: #f0f6ff; border-color: #1f6feb; }
+    .cat-item.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+    .cat-item.active .count { background: rgba(255,255,255,0.2); color: #fff; }
+    .count { background: #f1f5f9; color: #475467; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
+    .prod-tab {
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
+      background: #fff; display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; cursor: pointer;
+    }
+    .prod-tab:hover { border-color: #1f6feb; }
+    .prod-tab.active { border-color: #1f6feb; background: #f0f6ff; }
+    .prod-tab .hero-badge { background: #fef3c7; color: #92400e; font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; letter-spacing: .3px; }
+    .subsection { border-top: 1px dashed #e2e8f0; padding-top: 12px; margin-top: 14px; }
+    .color-block { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .design-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 12.5px; }
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; background: #16a34a; color: #fff;
+      padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 200;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    .toast.err { background: #dc2626; }
+    .hidden { display: none !important; }
+    .kbd { background: #f1f5f9; color: #475467; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+    .empty-hint { color: #94a3b8; font-size: 12.5px; text-align: center; padding: 20px; }
+    .thumb { width: 40px; height: 40px; border-radius: 6px; background: #f1f5f9; background-size: cover; background-position: center; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Catalog Admin</div>
+    </div>
+  </a>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <a href="/technical/" style="text-decoration:none;padding:7px 12px;border-radius:6px;background:#fff;color:#1f6feb;border:1px solid #1f6feb;font-weight:600;font-size:13px;">← Admin Home</a>
+    <button id="signOutBtn" class="hidden" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;">Logout</button>
+  </div>
+</header>
+
+<div id="notAdmin" class="hidden" style="max-width:400px;margin:60px auto;padding:30px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;text-align:center;">
+  <h2>Admin access required</h2>
+  <p style="color:#64748b;font-size:13px;">You must be signed in as an admin user to manage the catalog.</p>
+  <a href="/home/" style="display:inline-block;background:#1f6feb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:12px;">Go to sign in →</a>
+</div>
+
+<main id="app" class="hidden">
+  <!-- Left column: categories -->
+  <aside class="panel">
+    <h2>📂 Categories</h2>
+    <div id="catList"></div>
+    <div class="subsection">
+      <h3>Add / edit category</h3>
+      <input id="catName" type="text" placeholder="e.g. T-Shirts" />
+      <input id="catSlug" type="text" placeholder="slug (auto)" style="margin-top:6px;" />
+      <div class="row" style="margin-top:8px;">
+        <input id="catPos" type="number" placeholder="pos" style="width:70px;" />
+        <button id="catSave" class="b-primary" style="flex:1;">Save category</button>
+      </div>
+      <div id="catEditId" class="hidden" style="font-size:11px;color:#94a3b8;margin-top:4px;">Editing #<span></span> · <a href="#" id="catCancelEdit">cancel</a></div>
+    </div>
+  </aside>
+
+  <!-- Right column: products under selected category + form -->
+  <section class="panel">
+    <div id="rightHead">
+      <h2 id="rightTitle">Select a category →</h2>
+      <p id="rightSub" style="color:#94a3b8;font-size:13px;margin:0;">Pick a category on the left to manage products.</p>
+    </div>
+
+    <div id="prodListWrap" class="hidden" style="margin-top:12px;">
+      <h3 style="display:flex;justify-content:space-between;align-items:center;"><span>Products in this category</span> <button id="prodNewBtn" class="b-outline">➕ New product</button></h3>
+      <div id="prodList"></div>
+    </div>
+
+    <div id="prodEdit" class="hidden" style="margin-top:14px;border-top:1px dashed #e2e8f0;padding-top:14px;">
+      <h3>Product details</h3>
+
+      <label>Title *</label>
+      <input id="pTitle" type="text" placeholder="e.g. Cotton Round Neck T-Shirt" />
+
+      <label>Bullet points (one per line)</label>
+      <textarea id="pBullets" placeholder="100% Combed cotton&#10;Bio-washed for softness&#10;Size S / M / L / XL&#10;Machine washable"></textarea>
+
+      <label>Description</label>
+      <textarea id="pDesc" placeholder="Full description..."></textarea>
+
+      <label>Video URL (YouTube / MP4)</label>
+      <input id="pVideo" type="url" placeholder="https://youtu.be/..." />
+
+      <label>Image URLs (one per line, first is main)</label>
+      <textarea id="pImages" placeholder="https://.../img1.jpg&#10;https://.../img2.jpg"></textarea>
+
+      <div class="row-2">
+        <div>
+          <label>Selling price ₹ *</label>
+          <input id="pPrice" type="number" min="1" placeholder="399" />
+        </div>
+        <div>
+          <label>MRP ₹ *</label>
+          <input id="pMrp" type="number" min="1" placeholder="799" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div>
+          <label>Qty available</label>
+          <input id="pQty" type="number" min="0" placeholder="0" />
+        </div>
+        <div>
+          <label>Position (sort)</label>
+          <input id="pPos" type="number" placeholder="100" />
+        </div>
+      </div>
+
+      <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;margin-top:14px;">
+        <input id="pHero" type="checkbox" />
+        <span>Mark as <b>Hero product</b> of this category (shown publicly)</span>
+      </label>
+
+      <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;">
+        <input id="pInStock" type="checkbox" checked />
+        <span>In stock</span>
+      </label>
+
+      <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;">
+        <input id="pActive" type="checkbox" checked />
+        <span>Active (uncheck to hide everywhere)</span>
+      </label>
+
+      <div class="row" style="margin-top:14px;gap:8px;">
+        <button id="pSave" class="b-primary">💾 Save product</button>
+        <button id="pDelete" class="b-danger hidden">🗑 Delete</button>
+        <button id="pCancel" class="b-ghost">Cancel</button>
+      </div>
+    </div>
+
+    <div id="colorsWrap" class="hidden" style="margin-top:20px;border-top:2px solid #f1f5f9;padding-top:14px;">
+      <h3 style="display:flex;justify-content:space-between;align-items:center;"><span>🎨 Colors of this product</span> <button id="colorNewBtn" class="b-outline">➕ Add color</button></h3>
+      <div id="colorList"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toastHost"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let _session = null;
+let _state = { categories: [], products: [], colors: [], designs: [] };
+let _selectedCatId = null;
+let _selectedProdId = null;
+
+function toast(m, err) {
+  const t = document.createElement("div");
+  t.className = "toast" + (err ? " err" : "");
+  t.textContent = m;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+async function call(op, body) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-catalog`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ op, ...body }),
+  });
+  return await res.json();
+}
+
+async function loadAll() {
+  const j = await call("list_all");
+  if (!j.ok) { toast(j.error || "Load failed", true); return; }
+  _state = { categories: j.categories, products: j.products, colors: j.colors, designs: j.designs };
+  renderCats();
+  renderRight();
+}
+
+function renderCats() {
+  const el = $("#catList");
+  if (_state.categories.length === 0) {
+    el.innerHTML = `<div class="empty-hint">No categories yet. Add one below ↓</div>`;
+    return;
+  }
+  el.innerHTML = _state.categories.map(c => {
+    const count = _state.products.filter(p => p.category_id === c.id).length;
+    return `<div class="cat-item ${_selectedCatId === c.id ? 'active' : ''}" data-id="${c.id}">
+      <span>${esc(c.name)}${!c.is_active ? " <small>(inactive)</small>" : ""}</span>
+      <span class="count">${count}</span>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".cat-item").forEach(el => {
+    el.addEventListener("click", () => selectCategory(Number(el.dataset.id)));
+  });
+}
+
+function selectCategory(id) {
+  _selectedCatId = id;
+  _selectedProdId = null;
+  const cat = _state.categories.find(c => c.id === id);
+  // Populate edit form on left panel with clicked cat
+  $("#catName").value = cat.name;
+  $("#catSlug").value = cat.slug;
+  $("#catPos").value = cat.position;
+  $("#catEditId").classList.remove("hidden");
+  $("#catEditId").querySelector("span").textContent = id;
+  renderCats();
+  renderRight();
+}
+
+function renderRight() {
+  if (!_selectedCatId) {
+    $("#rightTitle").textContent = "Select a category →";
+    $("#rightSub").textContent = "Pick a category on the left to manage products.";
+    $("#prodListWrap").classList.add("hidden");
+    $("#prodEdit").classList.add("hidden");
+    $("#colorsWrap").classList.add("hidden");
+    return;
+  }
+  const cat = _state.categories.find(c => c.id === _selectedCatId);
+  $("#rightTitle").innerHTML = `📂 ${esc(cat.name)}`;
+  $("#rightSub").textContent = `Manage products under this category.`;
+  $("#prodListWrap").classList.remove("hidden");
+  const prods = _state.products.filter(p => p.category_id === _selectedCatId).sort((a,b) => a.position - b.position);
+  if (prods.length === 0) {
+    $("#prodList").innerHTML = `<div class="empty-hint">No products yet. Click "New product" ↑</div>`;
+  } else {
+    $("#prodList").innerHTML = prods.map(p => `<div class="prod-tab ${_selectedProdId === p.id ? 'active' : ''}" data-id="${p.id}">
+      <span>${esc(p.title)}${p.is_hero ? ' <span class="hero-badge">HERO</span>' : ''}${!p.is_active ? ' <small>(inactive)</small>' : ''}</span>
+      <span style="color:#94a3b8;font-size:11px;">₹${p.price_inr}</span>
+    </div>`).join("");
+    $("#prodList").querySelectorAll(".prod-tab").forEach(el => {
+      el.addEventListener("click", () => selectProduct(Number(el.dataset.id)));
+    });
+  }
+  if (_selectedProdId) renderProdEdit(); else { $("#prodEdit").classList.add("hidden"); $("#colorsWrap").classList.add("hidden"); }
+}
+
+function selectProduct(id) {
+  _selectedProdId = id;
+  renderRight();
+}
+
+function renderProdEdit() {
+  const p = _state.products.find(x => x.id === _selectedProdId);
+  if (!p) return;
+  $("#prodEdit").classList.remove("hidden");
+  $("#pTitle").value = p.title;
+  $("#pBullets").value = (p.bullet_points || []).join("\n");
+  $("#pDesc").value = p.description || "";
+  $("#pVideo").value = p.video_url || "";
+  $("#pImages").value = (p.image_urls || []).join("\n");
+  $("#pPrice").value = p.price_inr;
+  $("#pMrp").value = p.mrp_inr;
+  $("#pQty").value = p.qty_available;
+  $("#pPos").value = p.position;
+  $("#pHero").checked = !!p.is_hero;
+  $("#pInStock").checked = p.in_stock !== false;
+  $("#pActive").checked = p.is_active !== false;
+  $("#pDelete").classList.remove("hidden");
+  renderColors();
+}
+
+function renderColors() {
+  $("#colorsWrap").classList.remove("hidden");
+  const colors = _state.colors.filter(c => c.product_id === _selectedProdId).sort((a,b) => a.position - b.position);
+  if (colors.length === 0) {
+    $("#colorList").innerHTML = `<div class="empty-hint">No colors yet. Click "Add color" ↑</div>`;
+    return;
+  }
+  $("#colorList").innerHTML = colors.map(c => {
+    const designs = _state.designs.filter(d => d.color_id === c.id).sort((a,b) => a.position - b.position);
+    const dHtml = designs.length === 0
+      ? `<div style="color:#94a3b8;font-size:11.5px;padding:4px 0;">No designs yet.</div>`
+      : designs.map(d => `<div class="design-block">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span>${esc(d.name)} <small style="color:#94a3b8;">${d.sku ? '· SKU ' + esc(d.sku) : ''} · qty ${d.qty_available}</small></span>
+            <span><button class="b-outline" data-edit-design="${d.id}">Edit</button> <button class="b-danger" data-del-design="${d.id}">🗑</button></span>
+          </div>
+        </div>`).join("");
+    return `<div class="color-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <b style="color:${c.hex_code||'#0f172a'};">● ${esc(c.name)}</b>
+          <small style="color:#94a3b8;">${c.hex_code || ''}</small>
+        </div>
+        <div>
+          <button class="b-outline" data-edit-color="${c.id}">Edit</button>
+          <button class="b-outline" data-add-design="${c.id}">➕ Design</button>
+          <button class="b-danger" data-del-color="${c.id}">🗑</button>
+        </div>
+      </div>
+      <div style="margin-top:8px;">${dHtml}</div>
+    </div>`;
+  }).join("");
+  // Wire up buttons
+  $$("[data-edit-color]").forEach(b => b.addEventListener("click", () => openColorDialog(Number(b.dataset.editColor))));
+  $$("[data-del-color]").forEach(b => b.addEventListener("click", () => deleteColor(Number(b.dataset.delColor))));
+  $$("[data-add-design]").forEach(b => b.addEventListener("click", () => openDesignDialog(Number(b.dataset.addDesign), 0)));
+  $$("[data-edit-design]").forEach(b => b.addEventListener("click", () => {
+    const d = _state.designs.find(x => x.id === Number(b.dataset.editDesign));
+    openDesignDialog(d.color_id, d.id);
+  }));
+  $$("[data-del-design]").forEach(b => b.addEventListener("click", () => deleteDesign(Number(b.dataset.delDesign))));
+}
+
+// ============ HANDLERS ============
+$("#catSave").addEventListener("click", async () => {
+  const name = $("#catName").value.trim();
+  if (!name) return toast("Name required", true);
+  const j = await call("save_category", {
+    id: $("#catEditId").querySelector("span").textContent ? Number($("#catEditId").querySelector("span").textContent) : 0,
+    name, slug: $("#catSlug").value.trim(), position: Number($("#catPos").value) || 100,
+  });
+  if (j.ok) { toast("✓ Saved"); $("#catName").value=""; $("#catSlug").value=""; $("#catPos").value=""; $("#catEditId").classList.add("hidden"); await loadAll(); }
+  else toast(j.error, true);
+});
+$("#catCancelEdit").addEventListener("click", (e) => { e.preventDefault(); $("#catName").value=""; $("#catSlug").value=""; $("#catPos").value=""; $("#catEditId").classList.add("hidden"); });
+
+$("#prodNewBtn").addEventListener("click", () => {
+  _selectedProdId = null;
+  $("#prodEdit").classList.remove("hidden");
+  ["#pTitle","#pBullets","#pDesc","#pVideo","#pImages","#pPrice","#pMrp","#pQty","#pPos"].forEach(s => $(s).value = "");
+  $("#pQty").value = "0"; $("#pPos").value = "100";
+  $("#pHero").checked = false; $("#pInStock").checked = true; $("#pActive").checked = true;
+  $("#pDelete").classList.add("hidden");
+  $("#colorsWrap").classList.add("hidden");
+});
+
+$("#pSave").addEventListener("click", async () => {
+  if (!_selectedCatId) return toast("Pick a category first", true);
+  const payload = {
+    id: _selectedProdId || 0,
+    category_id: _selectedCatId,
+    title: $("#pTitle").value.trim(),
+    bullet_points: $("#pBullets").value.split("\n").map(s => s.trim()).filter(Boolean),
+    description: $("#pDesc").value.trim(),
+    video_url: $("#pVideo").value.trim(),
+    image_urls: $("#pImages").value.split("\n").map(s => s.trim()).filter(Boolean),
+    price_inr: Number($("#pPrice").value),
+    mrp_inr: Number($("#pMrp").value),
+    qty_available: Number($("#pQty").value) || 0,
+    position: Number($("#pPos").value) || 100,
+    is_hero: $("#pHero").checked,
+    in_stock: $("#pInStock").checked,
+    is_active: $("#pActive").checked,
+  };
+  const j = await call("save_product", payload);
+  if (j.ok) { toast("✓ Saved product"); _selectedProdId = j.product.id; await loadAll(); }
+  else toast(j.error, true);
+});
+
+$("#pDelete").addEventListener("click", async () => {
+  if (!_selectedProdId || !confirm("Delete this product (and all its colors/designs)?")) return;
+  const j = await call("delete_product", { id: _selectedProdId });
+  if (j.ok) { toast("Deleted"); _selectedProdId = null; await loadAll(); }
+  else toast(j.error, true);
+});
+$("#pCancel").addEventListener("click", () => { _selectedProdId = null; renderRight(); });
+
+// Color dialog (simple prompt-based for speed)
+$("#colorNewBtn").addEventListener("click", () => openColorDialog(0));
+async function openColorDialog(id) {
+  const existing = id ? _state.colors.find(c => c.id === id) : null;
+  const name = prompt("Color name", existing?.name || "");
+  if (!name) return;
+  const hex = prompt("Hex code (optional, e.g. #ff0000)", existing?.hex_code || "");
+  const imgs = prompt("Color image URLs (comma-separated, optional)", (existing?.image_urls || []).join(","));
+  const j = await call("save_color", {
+    id, product_id: _selectedProdId,
+    name, hex_code: hex || "",
+    image_urls: (imgs || "").split(",").map(s => s.trim()).filter(Boolean),
+    position: existing?.position || 100,
+  });
+  if (j.ok) { toast("✓ Color saved"); await loadAll(); }
+  else toast(j.error, true);
+}
+async function deleteColor(id) {
+  if (!confirm("Delete this color (and its designs)?")) return;
+  const j = await call("delete_color", { id });
+  if (j.ok) { toast("Deleted"); await loadAll(); }
+  else toast(j.error, true);
+}
+
+// Design dialog
+async function openDesignDialog(colorId, id) {
+  const existing = id ? _state.designs.find(d => d.id === id) : null;
+  const name = prompt("Design name", existing?.name || "");
+  if (!name) return;
+  const sku = prompt("SKU (optional)", existing?.sku || "");
+  const img = prompt("Image URL (optional)", existing?.image_url || "");
+  const qty = prompt("Qty available", String(existing?.qty_available || 0));
+  const j = await call("save_design", {
+    id: id || 0, color_id: colorId,
+    name, sku, image_url: img,
+    qty_available: Number(qty) || 0,
+    position: existing?.position || 100,
+  });
+  if (j.ok) { toast("✓ Design saved"); await loadAll(); }
+  else toast(j.error, true);
+}
+async function deleteDesign(id) {
+  if (!confirm("Delete this design?")) return;
+  const j = await call("delete_design", { id });
+  if (j.ok) { toast("Deleted"); await loadAll(); }
+  else toast(j.error, true);
+}
+
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+// ============ INIT ============
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("#notAdmin").classList.remove("hidden"); return; }
+  _session = session;
+  $("#emailChip").textContent = session.user.email;
+  $("#emailChip").classList.remove("hidden");
+  $("#signOutBtn").classList.remove("hidden");
+  // Try loading — admin check happens on backend, 403 if not admin
+  const j = await call("list_all");
+  if (!j.ok) {
+    if (j.error === "Admin access required") {
+      $("#notAdmin").classList.remove("hidden");
+      $("#notAdmin").querySelector("p").textContent = `Signed in as ${session.user.email}, but this email is not in the admin_users table.`;
+    } else {
+      $("#notAdmin").classList.remove("hidden");
+    }
+    return;
+  }
+  $("#app").classList.remove("hidden");
+  _state = { categories: j.categories, products: j.products, colors: j.colors, designs: j.designs };
+  renderCats();
+  renderRight();
+})();
+</script>
+
+</body>
+</html>
