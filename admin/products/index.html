@@ -63,7 +63,7 @@
 <body>
 
 <header class="topbar">
-  <a href="/" class="brand">
+  <div class="brand" style="cursor:default;">
     <div class="brand-box" aria-label="cursive logo">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 17 9 11 13 15 21 6"/>
@@ -74,18 +74,30 @@
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
       <div class="nav-sub">Catalog Admin</div>
     </div>
-  </a>
+  </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
     <span id="emailChip" class="email-chip hidden"></span>
-    <a href="/technical/" style="text-decoration:none;padding:7px 12px;border-radius:6px;background:#fff;color:#1f6feb;border:1px solid #1f6feb;font-weight:600;font-size:13px;">← Admin Home</a>
     <button id="signOutBtn" class="hidden" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;">Logout</button>
   </div>
 </header>
 
-<div id="notAdmin" class="hidden" style="max-width:400px;margin:60px auto;padding:30px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;text-align:center;">
-  <h2>Admin access required</h2>
-  <p style="color:#64748b;font-size:13px;">You must be signed in as an admin user to manage the catalog.</p>
-  <a href="/home/" style="display:inline-block;background:#1f6feb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:12px;">Go to sign in →</a>
+<!-- LOGIN FORM (inline, no external navigation) -->
+<div id="loginBox" class="hidden" style="max-width:400px;margin:60px auto;padding:30px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;">
+  <h2 style="margin:0 0 6px;text-align:center;">Admin sign in</h2>
+  <p style="color:#64748b;font-size:13px;text-align:center;margin:0 0 18px;">Sign in with your admin email to manage the catalog.</p>
+  <label style="display:block;font-size:12px;font-weight:700;color:#475467;margin-bottom:4px;">Email</label>
+  <input id="lgEmail" type="email" style="width:100%;padding:9px 11px;border:1px solid #d0d7de;border-radius:6px;font-size:14px;box-sizing:border-box;" autocomplete="email" />
+  <label style="display:block;font-size:12px;font-weight:700;color:#475467;margin:12px 0 4px;">Password</label>
+  <input id="lgPassword" type="password" style="width:100%;padding:9px 11px;border:1px solid #d0d7de;border-radius:6px;font-size:14px;box-sizing:border-box;" autocomplete="current-password" />
+  <button id="lgBtn" style="width:100%;background:#1f6feb;color:#fff;border:none;padding:11px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;margin-top:16px;">Sign in →</button>
+  <p id="lgErr" style="color:#dc2626;font-size:13px;margin:10px 0 0;display:none;text-align:center;"></p>
+</div>
+
+<!-- NOT-ADMIN SCREEN -->
+<div id="notAdmin" class="hidden" style="max-width:420px;margin:60px auto;padding:30px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;text-align:center;">
+  <h2 style="margin:0 0 8px;">Admin access required</h2>
+  <p id="notAdminMsg" style="color:#64748b;font-size:13px;">This account isn't in the admin list.</p>
+  <button id="notAdminSignOut" style="display:inline-block;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:9px 18px;border-radius:6px;font-weight:600;margin-top:12px;cursor:pointer;">Sign in with a different account</button>
 </div>
 
 <main id="app" class="hidden">
@@ -458,23 +470,57 @@ async function deleteDesign(id) {
 }
 
 $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+$("#notAdminSignOut").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+// Inline login handler
+async function doLogin() {
+  const email = $("#lgEmail").value.trim();
+  const pwd = $("#lgPassword").value;
+  const err = $("#lgErr");
+  err.style.display = "none";
+  if (!email || !pwd) { err.textContent = "Email + password required"; err.style.display = "block"; return; }
+  $("#lgBtn").disabled = true;
+  $("#lgBtn").textContent = "Signing in…";
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+  $("#lgBtn").disabled = false;
+  $("#lgBtn").textContent = "Sign in →";
+  if (error) { err.textContent = error.message || "Sign-in failed"; err.style.display = "block"; return; }
+  await init();
+}
+$("#lgBtn").addEventListener("click", doLogin);
+$("#lgPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("#lgEmail").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#lgPassword").focus(); });
 
 // ============ INIT ============
-(async () => {
+async function init() {
+  // Hide all screens first
+  $("#loginBox").classList.add("hidden");
+  $("#notAdmin").classList.add("hidden");
+  $("#app").classList.add("hidden");
+  $("#emailChip").classList.add("hidden");
+  $("#signOutBtn").classList.add("hidden");
+
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { $("#notAdmin").classList.remove("hidden"); return; }
+  if (!session) {
+    // Not signed in — show inline login form
+    $("#loginBox").classList.remove("hidden");
+    setTimeout(() => $("#lgEmail").focus(), 50);
+    return;
+  }
   _session = session;
   $("#emailChip").textContent = session.user.email;
   $("#emailChip").classList.remove("hidden");
   $("#signOutBtn").classList.remove("hidden");
-  // Try loading — admin check happens on backend, 403 if not admin
+
+  // Try loading — admin check happens on backend
   const j = await call("list_all");
   if (!j.ok) {
     if (j.error === "Admin access required") {
       $("#notAdmin").classList.remove("hidden");
-      $("#notAdmin").querySelector("p").textContent = `Signed in as ${session.user.email}, but this email is not in the admin_users table.`;
+      $("#notAdminMsg").textContent = `Signed in as ${session.user.email}, but this email is not in the admin_users list.`;
     } else {
       $("#notAdmin").classList.remove("hidden");
+      $("#notAdminMsg").textContent = j.error || "Could not load catalog.";
     }
     return;
   }
@@ -482,7 +528,8 @@ $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut()
   _state = { categories: j.categories, products: j.products, colors: j.colors, designs: j.designs };
   renderCats();
   renderRight();
-})();
+}
+init();
 </script>
 
 </body>
