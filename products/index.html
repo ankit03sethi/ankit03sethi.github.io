@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Products · Cursive</title>
+  <title>Products · Cursive</title>
   <link rel="icon" href="/favicon.ico" />
+  <meta name="description" content="Browse in-stock products from Cursive sellers, listed on Amazon, Flipkart & Meesho." />
   <style>
     * { box-sizing: border-box; }
     body {
@@ -22,6 +23,9 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
     }
     .brand {
       display: flex;
@@ -30,258 +34,297 @@
       font-weight: 800;
       color: #1f6feb;
       text-decoration: none;
-      font-size: 18px;
+      font-size: 17px;
     }
-    .brand img { width: 32px; height: 32px; border-radius: 6px; }
-    .chip {
-      background: #f1f5f9;
-      color: #475467;
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-    }
-    .btn {
-      padding: 8px 14px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 13px;
-    }
+    .brand-logo { width: 32px; height: 32px; border-radius: 6px; background: #1f6feb; color: #fff; font-weight: 800; display:flex; align-items:center; justify-content:center; }
+    .chip { background: #f1f5f9; color: #475467; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+    .btn { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; text-decoration: none; display: inline-block; }
     .btn-primary { background: #1f6feb; color: #fff; }
     .btn-primary:hover { background: #0d4cb8; }
-    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
     .btn-ghost { background: transparent; color: #475467; border: 1px solid #d0d7de; }
-    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    /* Hero */
     .hero {
       background: linear-gradient(135deg, #1f6feb 0%, #0d4cb8 100%);
       color: #fff;
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 24px;
+      border-radius: 14px;
+      padding: 26px 28px;
+      margin-bottom: 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 20px;
       flex-wrap: wrap;
     }
-    .hero h1 { margin: 0 0 4px; font-size: 22px; }
-    .hero p { margin: 0; opacity: 0.9; font-size: 13px; }
+    .hero h1 { margin: 0 0 6px; font-size: 24px; }
+    .hero p { margin: 0; opacity: 0.9; font-size: 13.5px; max-width: 620px; line-height: 1.5; }
+    .hero-cta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .hero .balance {
       background: rgba(255,255,255,0.15);
-      padding: 12px 16px;
+      padding: 10px 14px;
       border-radius: 10px;
       text-align: right;
+      font-size: 12px;
     }
-    .hero .balance .label { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
-    .hero .balance .amt { font-size: 22px; font-weight: 800; }
+    .hero .balance b { font-size: 18px; display:block; font-weight:800; }
 
-    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
-    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
-    .card {
+    /* Filters */
+    .filters {
+      display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 20px;
+      align-items: center;
+    }
+    .filter-chip {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475467;
+      transition: all 0.15s;
+    }
+    .filter-chip:hover { border-color: #1f6feb; color: #1f6feb; }
+    .filter-chip.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+    .filter-count { color: #94a3b8; font-size: 13px; margin-left: auto; }
+
+    /* Public catalog grid */
+    .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .prod-card {
       background: #fff;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
-      padding: 20px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    .card h2 { margin: 0 0 12px; font-size: 16px; color: #0f172a; }
-    .card .sub { color: #64748b; font-size: 12px; margin: 0 0 16px; }
+    .prod-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #1f6feb; }
+    .prod-img {
+      width: 100%;
+      aspect-ratio: 1;
+      background: #f1f5f9;
+      background-size: cover;
+      background-position: center;
+      display: flex; align-items: center; justify-content: center;
+      color: #94a3b8; font-size: 36px;
+    }
+    .prod-body { padding: 12px 14px; }
+    .prod-title { font-size: 14px; font-weight: 700; margin: 0 0 6px; color: #0f172a; line-height: 1.35; height: 38px; overflow: hidden; }
+    .prod-price { display: flex; align-items: baseline; gap: 8px; }
+    .prod-price .now { color: #dc2626; font-weight: 800; font-size: 16px; }
+    .prod-price .mrp { color: #94a3b8; font-size: 12px; text-decoration: line-through; }
+    .prod-price .off { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 700; margin-left: auto; }
+    .prod-mps { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+    .mp-badge {
+      background: #f1f5f9; color: #475467; padding: 2px 6px; border-radius: 4px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .mp-badge.amazon { background: #fef3c7; color: #92400e; }
+    .mp-badge.flipkart { background: #dbeafe; color: #1e40af; }
+    .mp-badge.meesho { background: #f3e8ff; color: #7e22ce; }
 
-    /* Form */
+    .empty {
+      text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px;
+      background: #fff; border: 1px dashed #e2e8f0; border-radius: 12px;
+    }
+    .empty .icon { font-size: 40px; margin-bottom: 10px; }
+
+    /* Modal (add product + manage) */
+    .modal-back {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.55);
+      display: none; z-index: 100; padding: 20px; overflow-y: auto;
+    }
+    .modal-back.open { display: block; }
+    .modal {
+      max-width: 640px; margin: 40px auto; background: #fff;
+      border-radius: 14px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .modal-head h2 { margin: 0; font-size: 18px; }
+    .close-x { background: transparent; border: none; font-size: 22px; cursor: pointer; color: #94a3b8; }
+
     label { display: block; font-size: 12px; font-weight: 700; color: #475467; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.3px; }
     input[type="text"], input[type="number"], input[type="url"], textarea {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #d0d7de;
-      border-radius: 6px;
-      font-size: 13px;
-      font-family: inherit;
-      background: #fff;
+      width: 100%; padding: 8px 10px; border: 1px solid #d0d7de; border-radius: 6px;
+      font-size: 13px; font-family: inherit; background: #fff;
     }
     input:focus, textarea:focus { outline: 2px solid #1f6feb; outline-offset: -1px; border-color: #1f6feb; }
     textarea { resize: vertical; min-height: 60px; }
     .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .mp-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
     .mp-picker label {
-      background: #f8fafc;
-      border: 1.5px solid #d0d7de;
-      padding: 8px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 13px;
-      margin: 0;
-      color: #475467;
-      text-transform: none;
-      letter-spacing: 0;
-      transition: all 0.15s;
+      background: #f8fafc; border: 1.5px solid #d0d7de;
+      padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font-weight: 600; font-size: 13px; margin: 0; color: #475467;
+      text-transform: none; letter-spacing: 0;
     }
     .mp-picker input { display: none; }
     .mp-picker label.active { background: #dbeafe; border-color: #1f6feb; color: #1e40af; }
-    .image-rows { display: flex; flex-direction: column; gap: 6px; }
     .cost-box {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin: 16px 0 12px;
-      font-size: 13px;
+      background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;
+      padding: 12px 14px; margin: 16px 0 12px; font-size: 13px;
     }
     .cost-box .row-line { display: flex; justify-content: space-between; padding: 3px 0; color: #475467; }
     .cost-box .row-line.total { color: #0c4a6e; font-weight: 700; font-size: 14px; border-top: 1px solid #bae6fd; padding-top: 8px; margin-top: 4px; }
 
-    /* Products list */
-    .empty { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 13px; }
-    .prod {
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 14px;
-      margin-bottom: 10px;
-      display: grid;
-      grid-template-columns: 60px 1fr auto;
-      gap: 12px;
-      align-items: center;
+    /* My products list */
+    .my-prods { display: flex; flex-direction: column; gap: 8px; }
+    .my-prod {
+      border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px;
+      display: grid; grid-template-columns: 44px 1fr auto auto; gap: 10px; align-items: center;
     }
-    .prod-thumb {
-      width: 60px; height: 60px;
-      background: #f1f5f9;
-      border-radius: 8px;
-      background-size: cover;
-      background-position: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #94a3b8;
-      font-size: 20px;
-    }
-    .prod-name { font-weight: 700; font-size: 14px; margin-bottom: 3px; }
-    .prod-meta { font-size: 11.5px; color: #64748b; display: flex; gap: 8px; flex-wrap: wrap; }
-    .prod-status {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 6px;
-      font-size: 10.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
+    .my-thumb { width: 44px; height: 44px; background: #f1f5f9; border-radius: 6px; background-size: cover; background-position: center; display:flex; align-items:center; justify-content:center; color:#94a3b8; }
+    .my-name { font-weight: 700; font-size: 13px; }
+    .my-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .status-pill { padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
     .st-pending { background: #fef3c7; color: #92400e; }
     .st-in_progress { background: #dbeafe; color: #1e40af; }
     .st-listed { background: #dcfce7; color: #166534; }
     .st-rejected { background: #fef2f2; color: #b91c1c; }
 
+    /* Stock switch */
+    .switch { position: relative; width: 40px; height: 22px; display: inline-block; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; border-radius: 22px; transition: 0.2s; }
+    .slider::before {
+      content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: 0.2s;
+    }
+    .switch input:checked + .slider { background: #16a34a; }
+    .switch input:checked + .slider::before { transform: translateX(18px); }
+
     .toast {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      background: #16a34a;
-      color: #fff;
-      padding: 12px 18px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-      z-index: 200;
+      position: fixed; right: 20px; bottom: 20px; background: #16a34a;
+      color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 13px;
+      font-weight: 600; box-shadow: 0 8px 20px rgba(0,0,0,0.15); z-index: 200;
     }
     .toast.err { background: #dc2626; }
-
-    .login-wrap { max-width: 380px; margin: 60px auto; padding: 30px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
-    .login-wrap h2 { margin: 0 0 8px; font-size: 20px; }
-    .login-wrap p { margin: 0 0 16px; color: #64748b; font-size: 13px; }
     .hidden { display: none !important; }
+
+    /* Product detail modal */
+    .detail-img { width: 100%; aspect-ratio: 1; background: #f1f5f9; border-radius: 10px; background-size: cover; background-position: center; margin-bottom: 12px; }
+    .detail-thumbs { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
+    .detail-thumb { width: 60px; height: 60px; background: #f1f5f9; border-radius: 6px; background-size: cover; background-position: center; flex-shrink: 0; cursor: pointer; border: 2px solid transparent; }
+    .detail-thumb.active { border-color: #1f6feb; }
   </style>
 </head>
 <body>
 
 <div class="topbar">
-  <a href="/home/" class="brand">
-    <div style="width:32px;height:32px;border-radius:6px;background:#1f6feb;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;">C</div>
-    <span>Cursive · My Products</span>
+  <a href="/" class="brand">
+    <div class="brand-logo">C</div>
+    <span>Cursive · Products</span>
   </a>
-  <div style="display:flex;align-items:center;gap:10px;">
+  <div style="display:flex;align-items:center;gap:8px;">
     <span id="emailChip" class="chip hidden"></span>
-    <a href="/home/" class="btn btn-ghost">← Back to home</a>
+    <a href="/home/" class="btn btn-ghost">← My Dashboard</a>
+    <button id="openManageBtn" class="btn btn-primary hidden">📦 Manage my products</button>
+    <a id="signInLink" href="/home/" class="btn btn-primary">Sign in to sell</a>
     <button id="signOutBtn" class="btn btn-danger hidden">Sign out</button>
   </div>
 </div>
 
 <main>
-  <!-- Login prompt -->
-  <div id="loginPrompt" class="login-wrap hidden">
-    <h2>Sign in required</h2>
-    <p>Please sign in on the home page to manage your products.</p>
-    <a href="/home/" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Go to sign in →</a>
-  </div>
-
-  <!-- Main content -->
-  <div id="mainContent" class="hidden">
-    <div class="hero">
-      <div>
-        <h1>📦 My Products</h1>
-        <p>Add products you want us to list on Amazon, Flipkart, or Meesho. Each submission: ₹50 + 18% GST = ₹59.</p>
-      </div>
+  <div class="hero">
+    <div>
+      <h1>🛍️ Cursive Seller Products</h1>
+      <p>Browse in-stock products from Indian sellers. Currently listed on Amazon, Flipkart, and Meesho. Click any item to view details.</p>
+    </div>
+    <div id="heroCta" class="hero-cta">
       <div class="balance">
-        <div class="label">Wallet balance</div>
-        <div class="amt" id="walletAmt">₹0.00</div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <!-- Add product form -->
-      <div class="card">
-        <h2>➕ Add a product</h2>
-        <p class="sub">Fill the details for one product you want us to list.</p>
-
-        <label for="pName">Product name *</label>
-        <input id="pName" type="text" maxlength="200" placeholder="e.g. Cotton Round Neck T-Shirt" />
-
-        <label for="pDesc">Description</label>
-        <textarea id="pDesc" maxlength="2000" placeholder="Fabric, size, features, USP..."></textarea>
-
-        <div class="row-2">
-          <div>
-            <label for="pPrice">Selling price (₹) *</label>
-            <input id="pPrice" type="number" min="1" step="1" placeholder="399" />
-          </div>
-          <div>
-            <label for="pMrp">MRP (₹) *</label>
-            <input id="pMrp" type="number" min="1" step="1" placeholder="799" />
-          </div>
-        </div>
-
-        <label>Target marketplaces *</label>
-        <div class="mp-picker" id="mpPicker">
-          <label data-mp="amazon"><input type="checkbox" value="amazon"> 🛒 Amazon</label>
-          <label data-mp="flipkart"><input type="checkbox" value="flipkart"> 🛍️ Flipkart</label>
-          <label data-mp="meesho"><input type="checkbox" value="meesho"> 🎯 Meesho</label>
-        </div>
-
-        <label>Product image URLs (paste up to 5)</label>
-        <div class="image-rows">
-          <input type="url" class="img-url" placeholder="https://... (image 1)" />
-          <input type="url" class="img-url" placeholder="https://... (image 2, optional)" />
-          <input type="url" class="img-url" placeholder="https://... (image 3, optional)" />
-        </div>
-
-        <div class="cost-box">
-          <div class="row-line"><span>Base price</span><span>₹50.00</span></div>
-          <div class="row-line"><span>GST (18%)</span><span>₹9.00</span></div>
-          <div class="row-line total"><span>Total to debit</span><span>₹59.00</span></div>
-        </div>
-
-        <button id="addBtn" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">Add product · Pay ₹59 from wallet</button>
-      </div>
-
-      <!-- Product list -->
-      <div class="card">
-        <h2>📋 Your submitted products <span id="prodCount" style="color:#94a3b8;font-weight:500;font-size:13px;"></span></h2>
-        <p class="sub">Products you've added. Once we start work, status changes to "In progress", then "Listed".</p>
-        <div id="prodList"></div>
+        <div>Wallet</div>
+        <b id="walletAmt">—</b>
       </div>
     </div>
   </div>
 
+  <div class="filters">
+    <button class="filter-chip active" data-mp="">All</button>
+    <button class="filter-chip" data-mp="amazon">🛒 Amazon</button>
+    <button class="filter-chip" data-mp="flipkart">🛍️ Flipkart</button>
+    <button class="filter-chip" data-mp="meesho">🎯 Meesho</button>
+    <span class="filter-count" id="catCount"></span>
+  </div>
+
+  <div id="catalogWrap"></div>
 </main>
+
+<!-- Manage Products Modal (only for logged in customers) -->
+<div id="manageModal" class="modal-back">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>📦 My Products</h2>
+      <button class="close-x" data-close>×</button>
+    </div>
+    <p style="color:#64748b;font-size:13px;margin:0 0 14px;">Add products for us to list on marketplaces. Once listed, toggle in-stock to control public visibility.</p>
+
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px;">➕ Add a new product</div>
+      <div style="color:#94a3b8;font-size:12px;margin-bottom:6px;">₹50 + 18% GST = ₹59 per product</div>
+
+      <label for="pName">Product name *</label>
+      <input id="pName" type="text" maxlength="200" placeholder="e.g. Cotton Round Neck T-Shirt" />
+
+      <label for="pDesc">Description</label>
+      <textarea id="pDesc" maxlength="2000" placeholder="Fabric, size, features, USP..."></textarea>
+
+      <div class="row-2">
+        <div>
+          <label for="pPrice">Selling price (₹) *</label>
+          <input id="pPrice" type="number" min="1" step="1" placeholder="399" />
+        </div>
+        <div>
+          <label for="pMrp">MRP (₹) *</label>
+          <input id="pMrp" type="number" min="1" step="1" placeholder="799" />
+        </div>
+      </div>
+
+      <label>Target marketplaces *</label>
+      <div class="mp-picker" id="mpPicker">
+        <label data-mp="amazon"><input type="checkbox" value="amazon"> 🛒 Amazon</label>
+        <label data-mp="flipkart"><input type="checkbox" value="flipkart"> 🛍️ Flipkart</label>
+        <label data-mp="meesho"><input type="checkbox" value="meesho"> 🎯 Meesho</label>
+      </div>
+
+      <label>Product image URLs (up to 5)</label>
+      <input type="url" class="img-url" placeholder="https://... (image 1)" style="margin-bottom:6px;" />
+      <input type="url" class="img-url" placeholder="https://... (image 2, optional)" style="margin-bottom:6px;" />
+      <input type="url" class="img-url" placeholder="https://... (image 3, optional)" />
+
+      <div class="cost-box">
+        <div class="row-line"><span>Base price</span><span>₹50.00</span></div>
+        <div class="row-line"><span>GST (18%)</span><span>₹9.00</span></div>
+        <div class="row-line total"><span>Total to debit</span><span>₹59.00</span></div>
+      </div>
+
+      <button id="addBtn" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">Add product · Pay ₹59 from wallet</button>
+    </div>
+
+    <div style="border-top:1px solid #e2e8f0;padding-top:14px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px;">📋 Your submissions <span id="myCount" style="color:#94a3b8;font-weight:500;font-size:13px;"></span></div>
+      <div style="color:#94a3b8;font-size:12px;margin-bottom:10px;">Toggle switch = in stock. Off = hidden from public catalog.</div>
+      <div id="myProdList" class="my-prods"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Product detail modal -->
+<div id="detailModal" class="modal-back">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h2 id="dTitle">Product</h2>
+      <button class="close-x" data-close>×</button>
+    </div>
+    <div id="dMainImg" class="detail-img"></div>
+    <div id="dThumbs" class="detail-thumbs"></div>
+    <div id="dPrice" style="margin-bottom:8px;"></div>
+    <div id="dMps" style="margin-bottom:12px;"></div>
+    <div id="dDesc" style="color:#475467;font-size:13.5px;line-height:1.55;white-space:pre-wrap;"></div>
+    <p style="margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Available on the marketplaces listed above. Search the product name there to buy.</p>
+  </div>
+</div>
 
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
@@ -292,7 +335,6 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSessio
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fmt = (paise) => "₹" + (Math.abs(paise) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 function toast(msg, isErr) {
@@ -303,88 +345,187 @@ function toast(msg, isErr) {
   setTimeout(() => t.remove(), 3500);
 }
 
-// Marketplace checkbox toggle style
-document.querySelectorAll("#mpPicker label").forEach(l => {
-  l.addEventListener("click", () => {
-    setTimeout(() => {
-      const cb = l.querySelector("input");
-      l.classList.toggle("active", cb.checked);
-    }, 0);
+let _session = null;
+let _currentMp = "";
+
+// ============ PUBLIC CATALOG (no login needed) ============
+async function loadCatalog() {
+  const wrap = $("#catalogWrap");
+  wrap.innerHTML = `<div class="empty"><div class="icon">⏳</div>Loading products...</div>`;
+  try {
+    const url = new URL(`${SUPABASE_URL}/functions/v1/customer-listings-public`);
+    if (_currentMp) url.searchParams.set("marketplace", _currentMp);
+    const res = await fetch(url.toString(), { headers: { "apikey": SUPABASE_ANON_KEY } });
+    const j = await res.json();
+    if (!j.ok) {
+      wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Could not load: ${esc(j.error || "")}</div>`;
+      return;
+    }
+    $("#catCount").textContent = j.count === 1 ? "1 product" : (j.count + " products");
+    renderCatalog(j.products);
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Network error</div>`;
+  }
+}
+
+function renderCatalog(products) {
+  const wrap = $("#catalogWrap");
+  if (products.length === 0) {
+    wrap.innerHTML = `<div class="empty"><div class="icon">📭</div>No listed products yet${_currentMp ? " for this marketplace" : ""}. Check back soon!</div>`;
+    return;
+  }
+  const mpLabels = { amazon: "AMAZON", flipkart: "FLIPKART", meesho: "MEESHO" };
+  let html = `<div class="catalog">`;
+  for (const p of products) {
+    const img = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : "";
+    const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
+    const mps = (p.marketplaces || []).map(m => `<span class="mp-badge ${m}">${mpLabels[m] || m}</span>`).join("");
+    html += `<div class="prod-card" data-id="${p.id}">
+      <div class="prod-img"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
+      <div class="prod-body">
+        <div class="prod-title">${esc(p.product_name)}</div>
+        <div class="prod-price">
+          <span class="now">₹${p.price_inr}</span>
+          ${p.mrp_inr > p.price_inr ? `<span class="mrp">₹${p.mrp_inr}</span>` : ""}
+          ${off > 0 ? `<span class="off">${off}% OFF</span>` : ""}
+        </div>
+        <div class="prod-mps">${mps}</div>
+      </div>
+    </div>`;
+  }
+  html += `</div>`;
+  wrap.innerHTML = html;
+
+  // Wire up clicks → detail modal
+  wrap.querySelectorAll(".prod-card").forEach(el => {
+    el.addEventListener("click", () => showDetail(products.find(p => p.id === Number(el.dataset.id))));
+  });
+}
+
+function showDetail(p) {
+  if (!p) return;
+  $("#dTitle").textContent = p.product_name;
+  const imgs = (p.image_urls && p.image_urls.length) ? p.image_urls : [""];
+  $("#dMainImg").style.backgroundImage = imgs[0] ? `url('${imgs[0]}')` : "";
+  $("#dMainImg").innerHTML = imgs[0] ? "" : `<div style="color:#94a3b8;font-size:40px;">📷</div>`;
+  if (imgs.length > 1) {
+    $("#dThumbs").innerHTML = imgs.map((u, i) => `<div class="detail-thumb ${i===0?"active":""}"${u?` style="background-image:url('${esc(u)}')"`:""} data-src="${esc(u)}"></div>`).join("");
+    $("#dThumbs").querySelectorAll(".detail-thumb").forEach(t => {
+      t.addEventListener("click", () => {
+        $("#dMainImg").style.backgroundImage = t.dataset.src ? `url('${t.dataset.src}')` : "";
+        $$("#dThumbs .detail-thumb").forEach(x => x.classList.remove("active"));
+        t.classList.add("active");
+      });
+    });
+  } else {
+    $("#dThumbs").innerHTML = "";
+  }
+  const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
+  $("#dPrice").innerHTML = `<span style="font-size:22px;font-weight:800;color:#dc2626;">₹${p.price_inr}</span>${p.mrp_inr > p.price_inr ? ` <span style="color:#94a3b8;text-decoration:line-through;margin-left:6px;">₹${p.mrp_inr}</span>` : ""}${off > 0 ? ` <span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ""}`;
+  const mpLabels = { amazon: "Amazon", flipkart: "Flipkart", meesho: "Meesho" };
+  $("#dMps").innerHTML = `<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Available on:</div>` + (p.marketplaces || []).map(m => `<span class="mp-badge ${m}" style="margin-right:6px;padding:4px 10px;font-size:11.5px;">${(mpLabels[m] || m).toUpperCase()}</span>`).join("");
+  $("#dDesc").textContent = p.description || "";
+  $("#detailModal").classList.add("open");
+}
+
+// ============ FILTERS ============
+$$(".filter-chip").forEach(c => {
+  c.addEventListener("click", () => {
+    $$(".filter-chip").forEach(x => x.classList.remove("active"));
+    c.classList.add("active");
+    _currentMp = c.dataset.mp;
+    loadCatalog();
   });
 });
 
-async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    $("#loginPrompt").classList.remove("hidden");
-    return;
-  }
-  $("#mainContent").classList.remove("hidden");
-  $("#emailChip").textContent = session.user.email;
-  $("#emailChip").classList.remove("hidden");
-  $("#signOutBtn").classList.remove("hidden");
-  await Promise.all([loadWallet(session), loadProducts(session)]);
-}
+// ============ MANAGE MODAL (login required) ============
+$("#openManageBtn").addEventListener("click", async () => {
+  if (!_session) { toast("Please sign in first", true); return; }
+  $("#manageModal").classList.add("open");
+  await loadMyProducts();
+});
+$$("[data-close]").forEach(b => b.addEventListener("click", () => {
+  b.closest(".modal-back").classList.remove("open");
+}));
+document.querySelectorAll(".modal-back").forEach(m => {
+  m.addEventListener("click", (e) => { if (e.target === m) m.classList.remove("open"); });
+});
 
-async function loadWallet(session) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=1`, {
-      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
-    });
-    const j = await res.json();
-    if (j.ok) $("#walletAmt").textContent = "₹" + j.balance_rupees;
-  } catch (e) { console.error(e); }
-}
-
-async function loadProducts(session) {
+async function loadMyProducts() {
+  if (!_session) return;
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listings-list`, {
-      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+      headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY },
     });
     const j = await res.json();
-    if (!j.ok) {
-      $("#prodList").innerHTML = `<div class="empty">Could not load: ${esc(j.error || "")}</div>`;
-      return;
-    }
-    renderProducts(j.products);
-  } catch (e) {
-    $("#prodList").innerHTML = `<div class="empty">Network error: ${esc(e.message)}</div>`;
-  }
+    if (!j.ok) { $("#myProdList").innerHTML = `<div style="color:#94a3b8;font-size:12px;">Could not load.</div>`; return; }
+    renderMyProducts(j.products);
+  } catch (e) {}
 }
 
-function renderProducts(products) {
-  $("#prodCount").textContent = products.length ? `(${products.length})` : "";
+function renderMyProducts(products) {
+  $("#myCount").textContent = products.length ? `(${products.length})` : "";
   if (products.length === 0) {
-    $("#prodList").innerHTML = `<div class="empty">No products yet. Add your first one from the form on the left! →</div>`;
+    $("#myProdList").innerHTML = `<div style="color:#94a3b8;font-size:12.5px;padding:14px;text-align:center;background:#f8fafc;border-radius:8px;">No submissions yet. Add your first product above.</div>`;
     return;
   }
   const mpLabels = { amazon: "Amazon", flipkart: "Flipkart", meesho: "Meesho" };
   let html = "";
   for (const p of products) {
-    const thumb = (p.image_urls && p.image_urls[0])
-      ? `<div class="prod-thumb" style="background-image:url('${esc(p.image_urls[0])}')"></div>`
-      : `<div class="prod-thumb">📷</div>`;
+    const img = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : "";
     const mps = (p.marketplaces || []).map(m => mpLabels[m] || m).join(" · ");
-    html += `<div class="prod">
-      ${thumb}
+    const isListed = p.status === "listed";
+    html += `<div class="my-prod">
+      <div class="my-thumb"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
       <div>
-        <div class="prod-name">${esc(p.product_name)}</div>
-        <div class="prod-meta">
-          <span>₹${p.price_inr} <s style="color:#94a3b8;">₹${p.mrp_inr}</s></span>
-          <span>· ${esc(mps)}</span>
-          <span>· ${fmtDate(p.created_at)}</span>
-        </div>
+        <div class="my-name">${esc(p.product_name)}</div>
+        <div class="my-meta">₹${p.price_inr} · ${esc(mps)} · ${fmtDate(p.created_at)}</div>
       </div>
-      <div><span class="prod-status st-${esc(p.status)}">${p.status.replace("_", " ")}</span></div>
+      <span class="status-pill st-${esc(p.status)}">${p.status.replace("_", " ")}</span>
+      <div title="${isListed ? "Toggle stock" : "Only listed products can be in-stock"}">
+        <label class="switch">
+          <input type="checkbox" ${p.in_stock ? "checked" : ""} data-id="${p.id}" ${isListed ? "" : "disabled"} />
+          <span class="slider"></span>
+        </label>
+      </div>
     </div>`;
   }
-  $("#prodList").innerHTML = html;
+  $("#myProdList").innerHTML = html;
+  $("#myProdList").querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const id = Number(cb.dataset.id);
+      const in_stock = cb.checked;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listings-toggle-stock`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ id, in_stock }),
+        });
+        const j = await res.json();
+        if (j.ok) {
+          toast(in_stock ? "✓ Marked in stock" : "Marked out of stock");
+          loadCatalog();
+        } else {
+          cb.checked = !in_stock;
+          toast(j.error || "Toggle failed", true);
+        }
+      } catch (e) {
+        cb.checked = !in_stock;
+        toast("Network error", true);
+      }
+    });
+  });
 }
 
-$("#addBtn").addEventListener("click", async () => {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { toast("Please sign in again", true); return; }
+// ============ ADD PRODUCT ============
+document.querySelectorAll("#mpPicker label").forEach(l => {
+  l.addEventListener("click", () => {
+    setTimeout(() => l.classList.toggle("active", l.querySelector("input").checked), 0);
+  });
+});
 
+$("#addBtn").addEventListener("click", async () => {
+  if (!_session) { toast("Please sign in first", true); return; }
   const product_name = $("#pName").value.trim();
   const description = $("#pDesc").value.trim();
   const price_inr = parseInt($("#pPrice").value, 10) || 0;
@@ -392,40 +533,29 @@ $("#addBtn").addEventListener("click", async () => {
   const marketplaces = Array.from($$('#mpPicker input:checked')).map(i => i.value);
   const image_urls = Array.from($$('.img-url')).map(i => i.value.trim()).filter(Boolean);
 
-  // Client-side validation
-  if (!product_name || product_name.length < 2) { toast("Product name required", true); return; }
-  if (marketplaces.length === 0) { toast("Pick at least one marketplace", true); return; }
-  if (price_inr < 1) { toast("Enter a selling price", true); return; }
-  if (mrp_inr < price_inr) { toast("MRP should be ≥ selling price", true); return; }
+  if (!product_name || product_name.length < 2) return toast("Product name required", true);
+  if (marketplaces.length === 0) return toast("Pick at least one marketplace", true);
+  if (price_inr < 1) return toast("Enter a selling price", true);
+  if (mrp_inr < price_inr) return toast("MRP should be ≥ selling price", true);
 
   $("#addBtn").disabled = true;
   $("#addBtn").textContent = "Saving…";
-
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listings-add`, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${session.access_token}`,
-        "apikey": SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-      },
+      headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ product_name, description, price_inr, mrp_inr, marketplaces, image_urls }),
     });
     const j = await res.json();
-
     if (j.ok) {
-      toast("✓ Product added — ₹59 debited from wallet");
-      // Clear form
-      $("#pName").value = "";
-      $("#pDesc").value = "";
-      $("#pPrice").value = "";
-      $("#pMrp").value = "";
+      toast("✓ Product added — ₹59 debited");
+      $("#pName").value = ""; $("#pDesc").value = "";
+      $("#pPrice").value = ""; $("#pMrp").value = "";
       $$('#mpPicker input').forEach(i => { i.checked = false; i.closest("label").classList.remove("active"); });
       $$('.img-url').forEach(i => { i.value = ""; });
-      // Refresh
-      await Promise.all([loadWallet(session), loadProducts(session)]);
+      await Promise.all([loadWallet(), loadMyProducts()]);
     } else if (j.code === "insufficient") {
-      toast(`Wallet short by ${((j.shortfall_paise||0)/100).toFixed(2)} — recharge on home page`, true);
+      toast(`Wallet short by ₹${((j.shortfall_paise||0)/100).toFixed(2)} — recharge on /home/`, true);
     } else {
       toast(j.error || "Could not save", true);
     }
@@ -437,11 +567,39 @@ $("#addBtn").addEventListener("click", async () => {
   }
 });
 
+async function loadWallet() {
+  if (!_session) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=1`, {
+      headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await res.json();
+    if (j.ok) $("#walletAmt").textContent = "₹" + j.balance_rupees;
+  } catch (e) {}
+}
+
 $("#signOutBtn").addEventListener("click", async () => {
   await sb.auth.signOut();
-  location.href = "/home/";
+  location.reload();
 });
 
+// ============ INIT ============
+async function init() {
+  loadCatalog(); // public — always
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    _session = session;
+    $("#emailChip").textContent = session.user.email;
+    $("#emailChip").classList.remove("hidden");
+    $("#openManageBtn").classList.remove("hidden");
+    $("#signOutBtn").classList.remove("hidden");
+    $("#signInLink").classList.add("hidden");
+    await loadWallet();
+  } else {
+    $("#walletAmt").textContent = "—";
+    $("#heroCta").querySelector(".balance").style.display = "none";
+  }
+}
 init();
 </script>
 
