@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Products · Cursive</title>
+  <link rel="icon" href="/favicon.ico" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f8fafc;
+      margin: 0;
+      color: #0f172a;
+      min-height: 100vh;
+    }
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      color: #1f6feb;
+      text-decoration: none;
+      font-size: 18px;
+    }
+    .brand img { width: 32px; height: 32px; border-radius: 6px; }
+    .chip {
+      background: #f1f5f9;
+      color: #475467;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .btn-primary { background: #1f6feb; color: #fff; }
+    .btn-primary:hover { background: #0d4cb8; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-ghost { background: transparent; color: #475467; border: 1px solid #d0d7de; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+    .hero {
+      background: linear-gradient(135deg, #1f6feb 0%, #0d4cb8 100%);
+      color: #fff;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .hero h1 { margin: 0 0 4px; font-size: 22px; }
+    .hero p { margin: 0; opacity: 0.9; font-size: 13px; }
+    .hero .balance {
+      background: rgba(255,255,255,0.15);
+      padding: 12px 16px;
+      border-radius: 10px;
+      text-align: right;
+    }
+    .hero .balance .label { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .hero .balance .amt { font-size: 22px; font-weight: 800; }
+
+    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 16px; color: #0f172a; }
+    .card .sub { color: #64748b; font-size: 12px; margin: 0 0 16px; }
+
+    /* Form */
+    label { display: block; font-size: 12px; font-weight: 700; color: #475467; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+    input[type="text"], input[type="number"], input[type="url"], textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+    }
+    input:focus, textarea:focus { outline: 2px solid #1f6feb; outline-offset: -1px; border-color: #1f6feb; }
+    textarea { resize: vertical; min-height: 60px; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mp-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .mp-picker label {
+      background: #f8fafc;
+      border: 1.5px solid #d0d7de;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      margin: 0;
+      color: #475467;
+      text-transform: none;
+      letter-spacing: 0;
+      transition: all 0.15s;
+    }
+    .mp-picker input { display: none; }
+    .mp-picker label.active { background: #dbeafe; border-color: #1f6feb; color: #1e40af; }
+    .image-rows { display: flex; flex-direction: column; gap: 6px; }
+    .cost-box {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 16px 0 12px;
+      font-size: 13px;
+    }
+    .cost-box .row-line { display: flex; justify-content: space-between; padding: 3px 0; color: #475467; }
+    .cost-box .row-line.total { color: #0c4a6e; font-weight: 700; font-size: 14px; border-top: 1px solid #bae6fd; padding-top: 8px; margin-top: 4px; }
+
+    /* Products list */
+    .empty { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 13px; }
+    .prod {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 60px 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .prod-thumb {
+      width: 60px; height: 60px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 20px;
+    }
+    .prod-name { font-weight: 700; font-size: 14px; margin-bottom: 3px; }
+    .prod-meta { font-size: 11.5px; color: #64748b; display: flex; gap: 8px; flex-wrap: wrap; }
+    .prod-status {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .st-pending { background: #fef3c7; color: #92400e; }
+    .st-in_progress { background: #dbeafe; color: #1e40af; }
+    .st-listed { background: #dcfce7; color: #166534; }
+    .st-rejected { background: #fef2f2; color: #b91c1c; }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #16a34a;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      z-index: 200;
+    }
+    .toast.err { background: #dc2626; }
+
+    .login-wrap { max-width: 380px; margin: 60px auto; padding: 30px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .login-wrap h2 { margin: 0 0 8px; font-size: 20px; }
+    .login-wrap p { margin: 0 0 16px; color: #64748b; font-size: 13px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/home/" class="brand">
+    <div style="width:32px;height:32px;border-radius:6px;background:#1f6feb;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;">C</div>
+    <span>Cursive · My Products</span>
+  </a>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span id="emailChip" class="chip hidden"></span>
+    <a href="/home/" class="btn btn-ghost">← Back to home</a>
+    <button id="signOutBtn" class="btn btn-danger hidden">Sign out</button>
+  </div>
+</div>
+
+<main>
+  <!-- Login prompt -->
+  <div id="loginPrompt" class="login-wrap hidden">
+    <h2>Sign in required</h2>
+    <p>Please sign in on the home page to manage your products.</p>
+    <a href="/home/" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Go to sign in →</a>
+  </div>
+
+  <!-- Main content -->
+  <div id="mainContent" class="hidden">
+    <div class="hero">
+      <div>
+        <h1>📦 My Products</h1>
+        <p>Add products you want us to list on Amazon, Flipkart, or Meesho. Each submission: ₹50 + 18% GST = ₹59.</p>
+      </div>
+      <div class="balance">
+        <div class="label">Wallet balance</div>
+        <div class="amt" id="walletAmt">₹0.00</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Add product form -->
+      <div class="card">
+        <h2>➕ Add a product</h2>
+        <p class="sub">Fill the details for one product you want us to list.</p>
+
+        <label for="pName">Product name *</label>
+        <input id="pName" type="text" maxlength="200" placeholder="e.g. Cotton Round Neck T-Shirt" />
+
+        <label for="pDesc">Description</label>
+        <textarea id="pDesc" maxlength="2000" placeholder="Fabric, size, features, USP..."></textarea>
+
+        <div class="row-2">
+          <div>
+            <label for="pPrice">Selling price (₹) *</label>
+            <input id="pPrice" type="number" min="1" step="1" placeholder="399" />
+          </div>
+          <div>
+            <label for="pMrp">MRP (₹) *</label>
+            <input id="pMrp" type="number" min="1" step="1" placeholder="799" />
+          </div>
+        </div>
+
+        <label>Target marketplaces *</label>
+        <div class="mp-picker" id="mpPicker">
+          <label data-mp="amazon"><input type="checkbox" value="amazon"> 🛒 Amazon</label>
+          <label data-mp="flipkart"><input type="checkbox" value="flipkart"> 🛍️ Flipkart</label>
+          <label data-mp="meesho"><input type="checkbox" value="meesho"> 🎯 Meesho</label>
+        </div>
+
+        <label>Product image URLs (paste up to 5)</label>
+        <div class="image-rows">
+          <input type="url" class="img-url" placeholder="https://... (image 1)" />
+          <input type="url" class="img-url" placeholder="https://... (image 2, optional)" />
+          <input type="url" class="img-url" placeholder="https://... (image 3, optional)" />
+        </div>
+
+        <div class="cost-box">
+          <div class="row-line"><span>Base price</span><span>₹50.00</span></div>
+          <div class="row-line"><span>GST (18%)</span><span>₹9.00</span></div>
+          <div class="row-line total"><span>Total to debit</span><span>₹59.00</span></div>
+        </div>
+
+        <button id="addBtn" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">Add product · Pay ₹59 from wallet</button>
+      </div>
+
+      <!-- Product list -->
+      <div class="card">
+        <h2>📋 Your submitted products <span id="prodCount" style="color:#94a3b8;font-weight:500;font-size:13px;"></span></h2>
+        <p class="sub">Products you've added. Once we start work, status changes to "In progress", then "Listed".</p>
+        <div id="prodList"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (paise) => "₹" + (Math.abs(paise) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function toast(msg, isErr) {
+  const t = document.createElement("div");
+  t.className = "toast" + (isErr ? " err" : "");
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// Marketplace checkbox toggle style
+document.querySelectorAll("#mpPicker label").forEach(l => {
+  l.addEventListener("click", () => {
+    setTimeout(() => {
+      const cb = l.querySelector("input");
+      l.classList.toggle("active", cb.checked);
+    }, 0);
+  });
+});
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    $("#loginPrompt").classList.remove("hidden");
+    return;
+  }
+  $("#mainContent").classList.remove("hidden");
+  $("#emailChip").textContent = session.user.email;
+  $("#emailChip").classList.remove("hidden");
+  $("#signOutBtn").classList.remove("hidden");
+  await Promise.all([loadWallet(session), loadProducts(session)]);
+}
+
+async function loadWallet(session) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary?limit=1`, {
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await res.json();
+    if (j.ok) $("#walletAmt").textContent = "₹" + j.balance_rupees;
+  } catch (e) { console.error(e); }
+}
+
+async function loadProducts(session) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listings-list`, {
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      $("#prodList").innerHTML = `<div class="empty">Could not load: ${esc(j.error || "")}</div>`;
+      return;
+    }
+    renderProducts(j.products);
+  } catch (e) {
+    $("#prodList").innerHTML = `<div class="empty">Network error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderProducts(products) {
+  $("#prodCount").textContent = products.length ? `(${products.length})` : "";
+  if (products.length === 0) {
+    $("#prodList").innerHTML = `<div class="empty">No products yet. Add your first one from the form on the left! →</div>`;
+    return;
+  }
+  const mpLabels = { amazon: "Amazon", flipkart: "Flipkart", meesho: "Meesho" };
+  let html = "";
+  for (const p of products) {
+    const thumb = (p.image_urls && p.image_urls[0])
+      ? `<div class="prod-thumb" style="background-image:url('${esc(p.image_urls[0])}')"></div>`
+      : `<div class="prod-thumb">📷</div>`;
+    const mps = (p.marketplaces || []).map(m => mpLabels[m] || m).join(" · ");
+    html += `<div class="prod">
+      ${thumb}
+      <div>
+        <div class="prod-name">${esc(p.product_name)}</div>
+        <div class="prod-meta">
+          <span>₹${p.price_inr} <s style="color:#94a3b8;">₹${p.mrp_inr}</s></span>
+          <span>· ${esc(mps)}</span>
+          <span>· ${fmtDate(p.created_at)}</span>
+        </div>
+      </div>
+      <div><span class="prod-status st-${esc(p.status)}">${p.status.replace("_", " ")}</span></div>
+    </div>`;
+  }
+  $("#prodList").innerHTML = html;
+}
+
+$("#addBtn").addEventListener("click", async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { toast("Please sign in again", true); return; }
+
+  const product_name = $("#pName").value.trim();
+  const description = $("#pDesc").value.trim();
+  const price_inr = parseInt($("#pPrice").value, 10) || 0;
+  const mrp_inr = parseInt($("#pMrp").value, 10) || 0;
+  const marketplaces = Array.from($$('#mpPicker input:checked')).map(i => i.value);
+  const image_urls = Array.from($$('.img-url')).map(i => i.value.trim()).filter(Boolean);
+
+  // Client-side validation
+  if (!product_name || product_name.length < 2) { toast("Product name required", true); return; }
+  if (marketplaces.length === 0) { toast("Pick at least one marketplace", true); return; }
+  if (price_inr < 1) { toast("Enter a selling price", true); return; }
+  if (mrp_inr < price_inr) { toast("MRP should be ≥ selling price", true); return; }
+
+  $("#addBtn").disabled = true;
+  $("#addBtn").textContent = "Saving…";
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listings-add`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ product_name, description, price_inr, mrp_inr, marketplaces, image_urls }),
+    });
+    const j = await res.json();
+
+    if (j.ok) {
+      toast("✓ Product added — ₹59 debited from wallet");
+      // Clear form
+      $("#pName").value = "";
+      $("#pDesc").value = "";
+      $("#pPrice").value = "";
+      $("#pMrp").value = "";
+      $$('#mpPicker input').forEach(i => { i.checked = false; i.closest("label").classList.remove("active"); });
+      $$('.img-url').forEach(i => { i.value = ""; });
+      // Refresh
+      await Promise.all([loadWallet(session), loadProducts(session)]);
+    } else if (j.code === "insufficient") {
+      toast(`Wallet short by ${((j.shortfall_paise||0)/100).toFixed(2)} — recharge on home page`, true);
+    } else {
+      toast(j.error || "Could not save", true);
+    }
+  } catch (e) {
+    toast("Network error: " + e.message, true);
+  } finally {
+    $("#addBtn").disabled = false;
+    $("#addBtn").textContent = "Add product · Pay ₹59 from wallet";
+  }
+});
+
+$("#signOutBtn").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  location.href = "/home/";
+});
+
+init();
+</script>
+
+</body>
+</html>
