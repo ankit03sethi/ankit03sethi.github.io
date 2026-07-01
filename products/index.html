@@ -241,11 +241,7 @@
   </div>
 
   <div class="filters">
-    <button class="filter-chip active" data-mp="">All</button>
-    <button class="filter-chip" data-mp="amazon">🛒 Amazon</button>
-    <button class="filter-chip" data-mp="flipkart">🛍️ Flipkart</button>
-    <button class="filter-chip" data-mp="meesho">🎯 Meesho</button>
-    <span class="filter-count" id="catCount"></span>
+    <span class="filter-count" id="catCount" style="margin-left:0;"></span>
   </div>
 
   <div id="catalogWrap"></div>
@@ -374,12 +370,10 @@ function renderCatalog(products) {
     wrap.innerHTML = `<div class="empty"><div class="icon">📭</div>No listed products yet${_currentMp ? " for this marketplace" : ""}. Check back soon!</div>`;
     return;
   }
-  const mpLabels = { amazon: "AMAZON", flipkart: "FLIPKART", meesho: "MEESHO" };
   let html = `<div class="catalog">`;
   for (const p of products) {
     const img = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : "";
     const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
-    const mps = (p.marketplaces || []).map(m => `<span class="mp-badge ${m}">${mpLabels[m] || m}</span>`).join("");
     html += `<div class="prod-card" data-id="${p.id}">
       <div class="prod-img"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
       <div class="prod-body">
@@ -389,7 +383,6 @@ function renderCatalog(products) {
           ${p.mrp_inr > p.price_inr ? `<span class="mrp">₹${p.mrp_inr}</span>` : ""}
           ${off > 0 ? `<span class="off">${off}% OFF</span>` : ""}
         </div>
-        <div class="prod-mps">${mps}</div>
       </div>
     </div>`;
   }
@@ -422,8 +415,7 @@ function showDetail(p) {
   }
   const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
   $("#dPrice").innerHTML = `<span style="font-size:22px;font-weight:800;color:#dc2626;">₹${p.price_inr}</span>${p.mrp_inr > p.price_inr ? ` <span style="color:#94a3b8;text-decoration:line-through;margin-left:6px;">₹${p.mrp_inr}</span>` : ""}${off > 0 ? ` <span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ""}`;
-  const mpLabels = { amazon: "Amazon", flipkart: "Flipkart", meesho: "Meesho" };
-  $("#dMps").innerHTML = `<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Available on:</div>` + (p.marketplaces || []).map(m => `<span class="mp-badge ${m}" style="margin-right:6px;padding:4px 10px;font-size:11.5px;">${(mpLabels[m] || m).toUpperCase()}</span>`).join("");
+  $("#dMps").innerHTML = "";
   $("#dDesc").textContent = p.description || "";
   $("#detailModal").classList.add("open");
 }
