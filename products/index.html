@@ -271,13 +271,10 @@
         <label data-mp="meesho"><input type="checkbox" value="meesho"> 🎯 Meesho</label>
       </div>
 
-      <label>Product images (up to 5)</label>
-      <div id="uploadArea" style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;">
-        <div id="thumbGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:10px;"></div>
-        <label for="imgFileInput" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:8px 14px;border-radius:6px;font-weight:600;font-size:13px;">📷 Upload photo</label>
-        <input id="imgFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;" />
-        <span id="uploadStatus" style="margin-left:10px;color:#64748b;font-size:12px;"></span>
-      </div>
+      <label>Product image URLs (up to 5)</label>
+      <input type="url" class="img-url" placeholder="https://... (image 1)" style="margin-bottom:6px;" />
+      <input type="url" class="img-url" placeholder="https://... (image 2, optional)" style="margin-bottom:6px;" />
+      <input type="url" class="img-url" placeholder="https://... (image 3, optional)" />
 
       <div class="cost-box">
         <div class="row-line"><span>Base price</span><span>₹50.00</span></div>
@@ -334,40 +331,49 @@ function toast(msg, isErr) {
 let _session = null;
 let _currentMp = "";
 
-// ============ PUBLIC CATALOG (no login needed) ============
+// ============ CATALOG (categories → hero product → variations) ============
+let _catalogGrid = [];
+let _viewState = "grid"; // grid | detail
+let _selectedColorId = null;
+
 async function loadCatalog() {
   const wrap = $("#catalogWrap");
-  wrap.innerHTML = `<div class="empty"><div class="icon">⏳</div>Loading products...</div>`;
+  wrap.innerHTML = `<div class="empty"><div class="icon">⏳</div>Loading categories...</div>`;
   try {
-    const url = new URL(`${SUPABASE_URL}/functions/v1/customer-listings-public`);
-    if (_currentMp) url.searchParams.set("marketplace", _currentMp);
-    const res = await fetch(url.toString(), { headers: { "apikey": SUPABASE_ANON_KEY } });
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/catalog-public?op=grid`, {
+      headers: { "apikey": SUPABASE_ANON_KEY },
+    });
     const j = await res.json();
     if (!j.ok) {
       wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Could not load: ${esc(j.error || "")}</div>`;
       return;
     }
-    $("#catCount").textContent = j.count === 1 ? "1 product" : (j.count + " products");
-    renderCatalog(j.products);
+    _catalogGrid = j.grid || [];
+    $("#catCount").textContent = _catalogGrid.length === 1 ? "1 category" : (_catalogGrid.length + " categories");
+    renderGrid();
   } catch (e) {
     wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Network error</div>`;
   }
 }
 
-function renderCatalog(products) {
+function renderGrid() {
   const wrap = $("#catalogWrap");
-  if (products.length === 0) {
-    wrap.innerHTML = `<div class="empty"><div class="icon">📭</div>No listed products yet${_currentMp ? " for this marketplace" : ""}. Check back soon!</div>`;
+  _viewState = "grid";
+  if (_catalogGrid.length === 0) {
+    wrap.innerHTML = `<div class="empty"><div class="icon">📭</div>No categories yet. Check back soon!</div>`;
     return;
   }
   let html = `<div class="catalog">`;
-  for (const p of products) {
+  for (const item of _catalogGrid) {
+    const p = item.hero;
+    const c = item.category;
     const img = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : "";
     const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
-    html += `<div class="prod-card" data-id="${p.id}">
+    html += `<div class="prod-card" data-pid="${p.id}">
       <div class="prod-img"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
       <div class="prod-body">
-        <div class="prod-title">${esc(p.product_name)}</div>
+        <div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:3px;">${esc(c.name)}</div>
+        <div class="prod-title">${esc(p.title)}</div>
         <div class="prod-price">
           <span class="now">₹${p.price_inr}</span>
           ${p.mrp_inr > p.price_inr ? `<span class="mrp">₹${p.mrp_inr}</span>` : ""}
@@ -378,47 +384,146 @@ function renderCatalog(products) {
   }
   html += `</div>`;
   wrap.innerHTML = html;
-
-  // Wire up clicks → detail modal
   wrap.querySelectorAll(".prod-card").forEach(el => {
-    el.addEventListener("click", () => showDetail(products.find(p => p.id === Number(el.dataset.id))));
+    el.addEventListener("click", () => showProductDetail(Number(el.dataset.pid)));
   });
 }
 
-function showDetail(p) {
-  if (!p) return;
-  $("#dTitle").textContent = p.product_name;
-  const imgs = (p.image_urls && p.image_urls.length) ? p.image_urls : [""];
-  $("#dMainImg").style.backgroundImage = imgs[0] ? `url('${imgs[0]}')` : "";
-  $("#dMainImg").innerHTML = imgs[0] ? "" : `<div style="color:#94a3b8;font-size:40px;">📷</div>`;
-  if (imgs.length > 1) {
-    $("#dThumbs").innerHTML = imgs.map((u, i) => `<div class="detail-thumb ${i===0?"active":""}"${u?` style="background-image:url('${esc(u)}')"`:""} data-src="${esc(u)}"></div>`).join("");
-    $("#dThumbs").querySelectorAll(".detail-thumb").forEach(t => {
-      t.addEventListener("click", () => {
-        $("#dMainImg").style.backgroundImage = t.dataset.src ? `url('${t.dataset.src}')` : "";
-        $$("#dThumbs .detail-thumb").forEach(x => x.classList.remove("active"));
-        t.classList.add("active");
-      });
+async function showProductDetail(productId) {
+  const wrap = $("#catalogWrap");
+  _viewState = "detail";
+  wrap.innerHTML = `<div class="empty"><div class="icon">⏳</div>Loading product...</div>`;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/catalog-public?op=detail&product_id=${productId}`, {
+      headers: { "apikey": SUPABASE_ANON_KEY },
     });
-  } else {
-    $("#dThumbs").innerHTML = "";
+    const j = await res.json();
+    if (!j.ok) {
+      wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>${esc(j.error || "Failed")}</div>`;
+      return;
+    }
+    renderProductDetail(j);
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Network error</div>`;
   }
-  const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
-  $("#dPrice").innerHTML = `<span style="font-size:22px;font-weight:800;color:#dc2626;">₹${p.price_inr}</span>${p.mrp_inr > p.price_inr ? ` <span style="color:#94a3b8;text-decoration:line-through;margin-left:6px;">₹${p.mrp_inr}</span>` : ""}${off > 0 ? ` <span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ""}`;
-  $("#dMps").innerHTML = "";
-  $("#dDesc").textContent = p.description || "";
-  $("#detailModal").classList.add("open");
 }
 
-// ============ FILTERS ============
-$$(".filter-chip").forEach(c => {
-  c.addEventListener("click", () => {
-    $$(".filter-chip").forEach(x => x.classList.remove("active"));
-    c.classList.add("active");
-    _currentMp = c.dataset.mp;
-    loadCatalog();
+function renderProductDetail(data) {
+  const p = data.product;
+  const cat = data.category;
+  const colors = data.colors || [];
+  _selectedColorId = colors.length ? colors[0].id : null;
+  const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
+  const imgs = (p.image_urls || []).length ? p.image_urls : [""];
+
+  const wrap = $("#catalogWrap");
+  wrap.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <button id="backToGrid" class="p-btn p-btn-outline" type="button">← Back to categories</button>
+      <span style="color:#94a3b8;font-size:13px;margin-left:12px;">${esc(cat?.name || '')} / ${esc(p.title)}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr);gap:24px;background:#fff;padding:20px;border-radius:14px;border:1px solid #e2e8f0;">
+      <div>
+        <div id="detailMainImg" class="detail-img" style="${imgs[0]?`background-image:url('${esc(imgs[0])}');`:''}"></div>
+        <div id="detailThumbs" class="detail-thumbs">
+          ${imgs.map((u, i) => u ? `<div class="detail-thumb ${i===0?'active':''}" style="background-image:url('${esc(u)}')" data-src="${esc(u)}"></div>` : "").join("")}
+        </div>
+      </div>
+      <div>
+        <h1 style="margin:0 0 6px;font-size:22px;">${esc(p.title)}</h1>
+        <div style="margin-bottom:14px;">
+          <span style="font-size:26px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
+          ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:8px;font-size:15px;">₹${p.mrp_inr}</span>` : ''}
+          ${off > 0 ? `<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ''}
+        </div>
+        ${(p.bullet_points || []).length ? `<ul style="padding-left:18px;margin:0 0 14px;color:#374151;font-size:13px;line-height:1.7;">${(p.bullet_points||[]).map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ''}
+        ${p.description ? `<div style="color:#475467;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:14px;">${esc(p.description)}</div>` : ''}
+        ${colors.length ? `
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available colors (${colors.length})</div>
+            <div id="colorChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+              ${colors.map(c => `
+                <button type="button" class="color-chip" data-cid="${c.id}" style="border:2px solid ${_selectedColorId===c.id?'#1f6feb':'#e2e8f0'};padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;">
+                  ${c.hex_code ? `<span style="width:14px;height:14px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;"></span>` : ''}
+                  ${esc(c.name)}
+                </button>
+              `).join("")}
+            </div>
+            <div id="designsWrap"></div>
+          </div>
+        ` : ''}
+        <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
+          <a href="https://wa.me/919625737475?text=${encodeURIComponent('Hi, I want to know more about ' + p.title)}" class="p-btn p-btn-primary" style="text-decoration:none;">💬 Enquire on WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Store colors globally for design switching
+  _catalogGrid._colors = colors;
+
+  // Wire up main image thumbnails
+  wrap.querySelectorAll("#detailThumbs .detail-thumb").forEach(t => {
+    t.addEventListener("click", () => {
+      $("#detailMainImg").style.backgroundImage = `url('${t.dataset.src}')`;
+      wrap.querySelectorAll("#detailThumbs .detail-thumb").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+    });
   });
-});
+
+  // Wire up color chip clicks
+  wrap.querySelectorAll(".color-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _selectedColorId = Number(btn.dataset.cid);
+      wrap.querySelectorAll(".color-chip").forEach(b => b.style.borderColor = "#e2e8f0");
+      btn.style.borderColor = "#1f6feb";
+      renderDesignsForColor();
+      // Also update main image to first color image if available
+      const clr = colors.find(c => c.id === _selectedColorId);
+      if (clr && clr.image_urls && clr.image_urls[0]) {
+        $("#detailMainImg").style.backgroundImage = `url('${clr.image_urls[0]}')`;
+      }
+    });
+  });
+
+  // Back button
+  $("#backToGrid").addEventListener("click", () => renderGrid());
+
+  renderDesignsForColor();
+}
+
+function renderDesignsForColor() {
+  const wrap = $("#designsWrap");
+  if (!wrap) return;
+  const colors = _catalogGrid._colors || [];
+  const clr = colors.find(c => c.id === _selectedColorId);
+  if (!clr) { wrap.innerHTML = ""; return; }
+  const designs = clr.designs || [];
+  if (designs.length === 0) {
+    wrap.innerHTML = `<div style="color:#94a3b8;font-size:12px;">No specific designs — order this color as-is.</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Designs available in ${esc(clr.name)} (${designs.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;">
+      ${designs.map(d => `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;cursor:pointer;" data-did="${d.id}">
+          <div style="aspect-ratio:1;background:#f1f5f9;${d.image_url?`background-image:url('${esc(d.image_url)}');`:''}background-size:cover;background-position:center;"></div>
+          <div style="padding:6px;font-size:11px;font-weight:600;text-align:center;color:#374151;">${esc(d.name)}</div>
+          ${d.qty_available > 0 ? `<div style="padding:0 6px 6px;font-size:10px;color:#16a34a;text-align:center;">In stock</div>` : `<div style="padding:0 6px 6px;font-size:10px;color:#dc2626;text-align:center;">Out of stock</div>`}
+        </div>
+      `).join("")}
+    </div>
+  `;
+  wrap.querySelectorAll("[data-did]").forEach(el => {
+    el.addEventListener("click", () => {
+      const design = designs.find(d => d.id === Number(el.dataset.did));
+      if (design && design.image_url) {
+        $("#detailMainImg").style.backgroundImage = `url('${design.image_url}')`;
+      }
+    });
+  });
+}
 
 // ============ MANAGE MODAL (login required) ============
 $("#openManageBtn").addEventListener("click", async () => {
@@ -506,65 +611,6 @@ document.querySelectorAll("#mpPicker label").forEach(l => {
   });
 });
 
-// ============ IMAGE UPLOAD ============
-let _uploadedUrls = [];
-const MAX_IMAGES = 5;
-
-function renderThumbs() {
-  const g = $("#thumbGrid");
-  if (!_uploadedUrls.length) { g.innerHTML = ""; return; }
-  g.innerHTML = _uploadedUrls.map((u, i) => `
-    <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
-      <img src="${u}" style="width:100%;height:100%;object-fit:cover;" />
-      <button type="button" data-idx="${i}" class="thumb-remove" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">×</button>
-    </div>
-  `).join("");
-  g.querySelectorAll(".thumb-remove").forEach(b => b.addEventListener("click", () => {
-    _uploadedUrls.splice(parseInt(b.dataset.idx, 10), 1);
-    renderThumbs();
-  }));
-}
-
-$("#imgFileInput").addEventListener("change", async (e) => {
-  if (!_session) { toast("Please sign in first", true); return; }
-  const files = Array.from(e.target.files || []);
-  if (!files.length) return;
-  const room = MAX_IMAGES - _uploadedUrls.length;
-  if (room <= 0) { toast(`Max ${MAX_IMAGES} images`, true); e.target.value = ""; return; }
-  const toUpload = files.slice(0, room);
-  const status = $("#uploadStatus");
-  let done = 0;
-  status.textContent = `Uploading 0/${toUpload.length}…`;
-  for (const f of toUpload) {
-    try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listing-upload-image`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY },
-        body: fd,
-      });
-      const j = await res.json();
-      if (j.ok && j.url) {
-        _uploadedUrls.push(j.url);
-        done++;
-        status.textContent = `Uploading ${done}/${toUpload.length}…`;
-        renderThumbs();
-      } else if (j.code === "demo_account") {
-        toast(j.message || "Demo account can't upload", true);
-        break;
-      } else {
-        toast(j.error || "Upload failed", true);
-      }
-    } catch (err) {
-      toast("Upload error: " + err.message, true);
-    }
-  }
-  status.textContent = done > 0 ? `✓ ${done} uploaded` : "";
-  e.target.value = "";
-  setTimeout(() => { status.textContent = ""; }, 3000);
-});
-
 $("#addBtn").addEventListener("click", async () => {
   if (!_session) { toast("Please sign in first", true); return; }
   const product_name = $("#pName").value.trim();
@@ -572,7 +618,7 @@ $("#addBtn").addEventListener("click", async () => {
   const price_inr = parseInt($("#pPrice").value, 10) || 0;
   const mrp_inr = parseInt($("#pMrp").value, 10) || 0;
   const marketplaces = Array.from($$('#mpPicker input:checked')).map(i => i.value);
-  const image_urls = _uploadedUrls.slice();
+  const image_urls = Array.from($$('.img-url')).map(i => i.value.trim()).filter(Boolean);
 
   if (!product_name || product_name.length < 2) return toast("Product name required", true);
   if (marketplaces.length === 0) return toast("Pick at least one marketplace", true);
@@ -593,8 +639,7 @@ $("#addBtn").addEventListener("click", async () => {
       $("#pName").value = ""; $("#pDesc").value = "";
       $("#pPrice").value = ""; $("#pMrp").value = "";
       $$('#mpPicker input').forEach(i => { i.checked = false; i.closest("label").classList.remove("active"); });
-      _uploadedUrls = [];
-      renderThumbs();
+      $$('.img-url').forEach(i => { i.value = ""; });
       await Promise.all([loadWallet(), loadMyProducts()]);
     } else if (j.code === "insufficient") {
       toast(`Wallet short by ₹${((j.shortfall_paise||0)/100).toFixed(2)} — recharge on /home/`, true);
