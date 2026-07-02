@@ -437,6 +437,7 @@ function renderProductDetail(data) {
       </div>
       <div>
         <h1 style="margin:0 0 6px;font-size:22px;">${esc(p.title)}</h1>
+        ${p.product_code ? `<div style="color:#64748b;font-size:12px;margin-bottom:8px;">Code: <b style="color:#1f6feb;">${esc(p.product_code)}</b></div>` : ''}
         <div style="margin-bottom:14px;">
           <span style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
           ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;">₹${p.mrp_inr}</span>` : ''}
@@ -451,7 +452,7 @@ function renderProductDetail(data) {
               ${colors.map(c => `
                 <button type="button" class="color-chip" data-cid="${c.id}" style="border:2px solid ${_selectedColorId===c.id?'#1f6feb':'#e2e8f0'};padding:6px 12px;border-radius:20px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;">
                   ${c.hex_code ? `<span style="width:14px;height:14px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;"></span>` : ''}
-                  ${esc(c.name)}
+                  ${esc(c.name)}${c.product_code ? ` <small style="color:#64748b;font-weight:500;">(${esc(c.product_code)})</small>` : ''}
                 </button>
               `).join("")}
             </div>
@@ -516,6 +517,7 @@ function renderDesignsForColor() {
         <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;cursor:pointer;" data-did="${d.id}">
           <div style="aspect-ratio:1;background:#f1f5f9;${d.image_url?`background-image:url('${esc(d.image_url)}');`:''}background-size:cover;background-position:center;"></div>
           <div style="padding:6px;font-size:11px;font-weight:600;text-align:center;color:#374151;">${esc(d.name)}</div>
+          ${d.product_code ? `<div style="padding:0 6px 2px;font-size:10px;color:#1f6feb;font-weight:600;text-align:center;">${esc(d.product_code)}</div>` : ''}
           ${d.qty_available > 0 ? `<div style="padding:0 6px 6px;font-size:10px;color:#16a34a;text-align:center;">In stock</div>` : `<div style="padding:0 6px 6px;font-size:10px;color:#dc2626;text-align:center;">Out of stock</div>`}
         </div>
       `).join("")}
