@@ -1,11 +1,11 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.93
+// Cursive PD Tracker — offscreen background scraper v1.0.94
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
 // No tabs, no windows, no visible activity at all.
-// v1.0.93: Amazon price fix — v1.0.92 JSON-LD returned Amazon's list price (599)
-//          not the actual "Price to Pay" (399). Now targets .priceToPay class
-//          (Amazon's marker for the current selling price). JSON-LD is fallback.
+// v1.0.94: Amazon price fix v4 — DOM selectors may miss React-rendered content
+//          when Amazon serves minimal HTML to fetch(). Now uses raw-HTML regex
+//          to match "priceToPay" pattern that appears in Amazon's initial SSR.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.93');
+console.log('[PD-OFFSCREEN] loaded v1.0.94');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -65,11 +65,12 @@ async function scrapeUrl(product) {
 function extract(doc, html, platform, productId) {
   let rating = null, reviewCount = null, price = null, seller = null;
 
-  // ===== v1.0.93: Amazon "Price to Pay" DOM selectors (most reliable) =====
-  // Amazon marks the actual selling price with class="priceToPay". This is
-  // separate from list price, MRP, coupon promo, etc. The .a-offscreen span
-  // inside contains the formatted ₹value for screen-readers — perfect target.
+  // ===== v1.0.94: Amazon "Price to Pay" — multiple strategies =====
+  // Amazon marks the actual selling price with class="priceToPay". The
+  // .a-offscreen span inside contains the formatted ₹value for accessibility.
+  // We try DOM selectors first, then raw-HTML regex, then a-price-whole pattern.
   if (platform === 'Amazon') {
+    // Strategy 1: DOM selectors
     const priceToPaySelectors = [
       '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
       '#apex_desktop .priceToPay .a-offscreen',
@@ -86,6 +87,36 @@ function extract(doc, html, platform, productId) {
           price = String(Math.round(v));
           break;
         }
+      }
+    }
+    // Strategy 2: Raw-HTML regex for the priceToPay pattern
+    // Handles cases where DOMParser missed React-rendered content but the
+    // initial HTML contains the pattern.
+    if (!price) {
+      const patterns = [
+        /class="[^"]*priceToPay[^"]*"[^>]*>\s*<span[^>]*class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
+        /priceToPay[^>]{0,300}a-offscreen[^>]*>[^\d]*([\d,.]+)/,
+        /"priceAmount"\s*:\s*"?([\d.]+)"?/,
+        /"apex_desktop"[\s\S]{0,3000}?"amount"\s*:\s*"?([\d.]+)"?/,
+      ];
+      for (const re of patterns) {
+        const m = html.match(re);
+        if (m) {
+          const v = parseFloat(String(m[1]).replace(/,/g, ''));
+          if (v >= 10 && v < 1000000) {
+            price = String(Math.round(v));
+            break;
+          }
+        }
+      }
+    }
+    // Strategy 3: a-price-whole (Amazon shows the integer part in a-price-whole)
+    if (!price) {
+      const wholeEl = doc.querySelector('#corePriceDisplay_desktop_feature_div .a-price-whole') ||
+                      doc.querySelector('.priceToPay .a-price-whole');
+      if (wholeEl) {
+        const v = parseFloat(String(wholeEl.textContent || '').replace(/[^\d.]/g, ''));
+        if (v >= 10 && v < 1000000) price = String(Math.round(v));
       }
     }
   }
@@ -174,29 +205,4 @@ function extract(doc, html, platform, productId) {
         const j = JSON.parse(nd.textContent);
         const single = j?.props?.pageProps?.initialState?.productDetails?.singleProductDetails;
         if (single) {
-          if (single.transient_price && !price) price = String(Math.round(single.transient_price));
-          if (single.price && !price) price = String(Math.round(single.price));
-          if (single.product_rating?.avg_rating && !rating) rating = parseFloat(single.product_rating.avg_rating);
-          if (single.product_rating?.rating_count && !reviewCount) reviewCount = single.product_rating.rating_count;
-          if (single.supplier_name && !seller) seller = single.supplier_name;
-          if (single.shop_name && !seller) seller = single.shop_name;
-        }
-      }
-    } catch {}
-  }
-
-  // ===== Myntra: window.__myx =====
-  if (platform === 'Myntra' && (!price || !rating)) {
-    try {
-      const m = html.match(/window\.__myx\s*=\s*({[\s\S]*?});\s*<\/script>/);
-      if (m) {
-        const j = JSON.parse(m[1]);
-        const pd = j?.pdpData;
-        if (pd) {
-          if (pd.price?.discounted && !price) price = String(Math.round(pd.price.discounted));
-          if (pd.price?.mrp && !price) price = String(Math.round(pd.price.mrp));
-          if (pd.ratings?.averageRating && !rating) rating = parseFloat(pd.ratings.averageRating);
-          if (pd.ratings?.totalCount && !reviewCount) reviewCount = pd.ratings.totalCount;
-          if (pd.brand?.name && !seller) seller = pd.brand.name;
-        }
-     
+          if (single.transient_price && !price)
