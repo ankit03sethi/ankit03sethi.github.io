@@ -80,7 +80,7 @@
     .filter-count { color: #94a3b8; font-size: 13px; margin-left: auto; }
 
     /* Public catalog grid */
-    .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
     .prod-card {
       background: #fff;
       border: 1px solid #e2e8f0;
@@ -90,11 +90,22 @@
       transition: all 0.15s;
     }
     .prod-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #1f6feb; }
+    .cat-tag {
+      background: #f0f6ff;
+      color: #1f6feb;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #e0e9ff;
+    }
     .prod-img {
       width: 100%;
       aspect-ratio: 1;
-      background: #f1f5f9;
-      background-size: cover;
+      background: #fff;
+      background-size: contain;
+      background-repeat: no-repeat;
       background-position: center;
       display: flex; align-items: center; justify-content: center;
       color: #94a3b8; font-size: 36px;
@@ -102,7 +113,7 @@
     .prod-body { padding: 12px 14px; }
     .prod-title { font-size: 14px; font-weight: 700; margin: 0 0 6px; color: #0f172a; line-height: 1.35; height: 38px; overflow: hidden; }
     .prod-price { display: flex; align-items: baseline; gap: 8px; }
-    .prod-price .now { color: #dc2626; font-weight: 800; font-size: 16px; }
+    .prod-price .now { color: #0f172a; font-weight: 800; font-size: 16px; }
     .prod-price .mrp { color: #94a3b8; font-size: 12px; text-decoration: line-through; }
     .prod-price .off { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 700; margin-left: auto; }
     .prod-mps { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
@@ -193,9 +204,9 @@
     .hidden { display: none !important; }
 
     /* Product detail modal */
-    .detail-img { width: 100%; aspect-ratio: 1; background: #f1f5f9; border-radius: 10px; background-size: cover; background-position: center; margin-bottom: 12px; }
+    .detail-img { width: 100%; aspect-ratio: 1; background: #fff; border: 1px solid #f1f5f9; border-radius: 10px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-bottom: 12px; }
     .detail-thumbs { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
-    .detail-thumb { width: 60px; height: 60px; background: #f1f5f9; border-radius: 6px; background-size: cover; background-position: center; flex-shrink: 0; cursor: pointer; border: 2px solid transparent; }
+    .detail-thumb { width: 60px; height: 60px; background: #fff; border-radius: 6px; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; cursor: pointer; border: 2px solid #e2e8f0; }
     .detail-thumb.active { border-color: #1f6feb; }
   </style>
 </head>
@@ -225,10 +236,6 @@
 <main>
   <div id="heroCta" style="display:none;" aria-hidden="true">
     <div class="balance"><div>Wallet</div><b id="walletAmt">—</b></div>
-  </div>
-
-  <div class="filters" style="margin-top:8px;">
-    <span class="filter-count" id="catCount" style="margin-left:0;"></span>
   </div>
 
   <div id="catalogWrap"></div>
@@ -370,9 +377,9 @@ function renderGrid() {
     const img = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : "";
     const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
     html += `<div class="prod-card" data-pid="${p.id}">
+      <div class="cat-tag">${esc(c.name)}</div>
       <div class="prod-img"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
       <div class="prod-body">
-        <div style="font-size:11px;color:#1f6feb;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:3px;">${esc(c.name)}</div>
         <div class="prod-title">${esc(p.title)}</div>
         <div class="prod-price">
           <span class="now">₹${p.price_inr}</span>
@@ -432,8 +439,8 @@ function renderProductDetail(data) {
       <div>
         <h1 style="margin:0 0 6px;font-size:22px;">${esc(p.title)}</h1>
         <div style="margin-bottom:14px;">
-          <span style="font-size:26px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
-          ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:8px;font-size:15px;">₹${p.mrp_inr}</span>` : ''}
+          <span style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
+          ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;">₹${p.mrp_inr}</span>` : ''}
           ${off > 0 ? `<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ''}
         </div>
         ${(p.bullet_points || []).length ? `<ul style="padding-left:18px;margin:0 0 14px;color:#374151;font-size:13px;line-height:1.7;">${(p.bullet_points||[]).map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ''}
