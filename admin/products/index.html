@@ -658,7 +658,7 @@ function openColorDialog(id, type) {
   $("#colorModal").classList.remove("hidden");
 }
 
-$("#colorNewBtn").addEventListener("click", () => openColorDialog(0));
+// colorNewBtn removed - variations now added via per-type "Add X" buttons in renderVariations()
 $("#mColorCancel").addEventListener("click", () => $("#colorModal").classList.add("hidden"));
 $("#mColorImgFile").addEventListener("change", async (e) => {
   const files = Array.from(e.target.files || []);
