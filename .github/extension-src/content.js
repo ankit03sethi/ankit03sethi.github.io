@@ -1,0 +1,1575 @@
+// UNIVERSAL E-commerce Rating Extractor
+// Works on: Amazon.in, Flipkart, Meesho, Myntra, Nykaa, FirstCry, and more!
+
+(function() {
+  'use strict';
+
+  console.log('Cursive PD Tracker content.js v1.0.60: Loaded');
+
+  // ===== v1.0.37/54 PRICE VALIDATION =====
+  // Reject prices that appear next to promo keywords (EMI, cashback, save, etc.)
+  // Returns true if the context around the price is a real product price.
+  function isRealPriceContext(text) {
+    if (!text) return true;
+    const t = text.toLowerCase();
+    // Within 60 chars of the match, none of these promo words should appear
+    const promoWords = ['emi', 'cashback', 'save ', 'save\u00a0', 'discount', '% off', 'off ',
+      'coupon', 'bank offer', 'partner offer', 'free shipping', 'delivery charge',
+      'protection plan', 'warranty', 'exchange offer', 'supercoin', 'earn ', 'reward'];
+    for (const w of promoWords) {
+      if (t.includes(w)) return false;
+    }
+    return true;
+  }
+  function isAcceptablePrice(value, platform) {
+    if (value == null || isNaN(value)) return false;
+    const v = parseInt(value);
+    if (v < 10) return false;
+    if (v >= 1000000) return false;
+    // v1.0.54: Myntra prices below ₹30 are almost always SuperCoin / promo noise
+    if (platform === 'Myntra' && v < 30) return false;
+    return true;
+  }
+  // ===== v1.0.35 SELLER VALIDATION =====
+  // Reject "Brand: X" / "Brand X" / "Visit the X store" type values that
+  // pretend to be sellers but are really the brand byline.
+  function isRealSeller(s) {
+    if (!s) return false;
+    const v = String(s).trim();
+    if (v.length < 2 || v.length > 80) return false;
+    const lower = v.toLowerCase();
+    if (lower.startsWith('brand:') || lower.startsWith('brand ') || lower === 'brand') return false;
+    if (lower.startsWith('visit the ')) return false;
+    if (lower.startsWith('see other ')) return false;
+    if (lower.startsWith('explore ')) return false;
+    return true;
+  }
+
+  const platform = detectPlatform();
+  console.log('Platform detected:', platform);
+
+  if (platform !== 'unknown') {
+    // Try extraction at different intervals as page loads
+    setTimeout(() => extractAndSendRating(), 2000);
+    setTimeout(() => extractAndSendRating(), 4000);
+    setTimeout(() => extractAndSendRating(), 6000);
+  }
+
+  // Listen for manual extraction
+  function sendDiag(source, data) {
+    try {
+      chrome.runtime.sendMessage({
+        action: 'pd_diag', source, platform,
+        url: window.location.href,
+        price: data && data.price, rating: data && data.rating,
+        reviewCount: data && data.reviewCount, seller: data && data.seller,
+        success: !!(data && data.success),
+      }, () => { if (chrome.runtime.lastError) {} });
+    } catch (e) {}
+  }
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'extractRating') {
+      const data = extractRatingData();
+      sendDiag('MANUAL', data);
+      sendResponse(data);
+    }
+    return true;
+  });
+
+  function detectPlatform() {
+    const url = window.location.href.toLowerCase();
+    const hostname = window.location.hostname.toLowerCase();
+
+    if (hostname.includes('flipkart.com')) return 'Flipkart';
+    if (hostname.includes('amazon.in') || hostname.includes('amazon.com')) return 'Amazon';
+    if (hostname.includes('meesho.com')) return 'Meesho';
+    if (hostname.includes('myntra.com')) return 'Myntra';
+    if (hostname.includes('nykaa.com')) return 'Nykaa';
+    if (hostname.includes('firstcry.com')) return 'FirstCry';
+    if (hostname.includes('ajio.com')) return 'Ajio';
+    if (hostname.includes('snapdeal.com')) return 'Snapdeal';
+    if (hostname.includes('shopclues.com')) return 'ShopClues';
+    if (hostname.includes('pepperfry.com')) return 'Pepperfry';
+    if (hostname.includes('urbancompany.com')) return 'UrbanCompany';
+
+    return 'unknown';
+  }
+
+  function isSearchOrListingPage() {
+    const url = window.location.href.toLowerCase();
+    const bodyText = document.body.innerText.toLowerCase();
+
+    // Meesho /search URLs: detect multi-product pages using multiple methods.
+    // If more than 1 product is visible → it's a listing → write dashes.
+    if (url.includes('meesho.com') && (url.includes('/search') || url.includes('?q='))) {
+      let productCount = 0;
+
+      // Method 1: Count product card links (various Meesho URL patterns)
+      const allLinks = document.querySelectorAll('a[href]');
+      const uniqueProductLinks = new Set();
+      for (const link of allLinks) {
+        const href = (link.getAttribute('href') || '').toLowerCase();
+        // Meesho product pages: /p/, /product/, or direct product slugs with numeric IDs
+        if (href.match(/\/(p|product)\//) || href.match(/\/[a-z0-9-]+\/p\//)) {
+          uniqueProductLinks.add(href.split('?')[0]);
+        }
+      }
+      productCount = uniqueProductLinks.size;
+
+      // Method 2: If no product links found, count distinct ₹ price elements
+      // (product cards each show a price — more than 3 distinct prices = multi-product)
+      if (productCount <= 1) {
+        const allEls = document.querySelectorAll('span, div, h4, p');
+        const prices = new Set();
+        for (const el of allEls) {
+          const t = el.textContent.trim();
+          if (t.length > 20) continue;
+          const m = t.match(/^₹\s*([\d,]+)$/);
+          if (m) prices.add(m[1]);
+          if (prices.size > 3) break;
+        }
+        if (prices.size > 3) productCount = prices.size;
+      }
+
+      // Method 3: Count product card images (Meesho shows grid of product images)
+      if (productCount <= 1) {
+        const productImages = document.querySelectorAll('img[src*="meeshocdn"], img[src*="images/products"]');
+        if (productImages.length > 3) productCount = productImages.length;
+      }
+
+      console.log('[Meesho] Search page: detected ' + productCount + ' products');
+      return productCount > 1;
+    }
+
+    // Standard URL patterns for all other platforms
+    if (url.includes('/search') || url.includes('/results') || url.includes('?q=') || url.includes('&q=')) {
+      return true;
+    }
+
+    // Listing page indicators
+    if (bodyText.includes('results for') || bodyText.includes('search results')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function extractRatingData() {
+    const platform = detectPlatform();
+
+    if (platform === 'unknown') {
+      return {
+        success: false,
+        platform: 'Unknown',
+        error: 'Not an e-commerce site'
+      };
+    }
+
+    // Skip extraction on search/listing pages
+    if (isSearchOrListingPage()) {
+      return {
+        success: false,
+        platform: platform,
+        error: 'Search or listing page detected. Please visit a product page.'
+      };
+    }
+
+    // ===== MAINTENANCE / ERROR / REDIRECT PAGE DETECTION =====
+    // If platform served us a generic error/maintenance page, bail out so we
+    // do not pick up random numbers like "3" from boilerplate UI.
+    const _pageTitle = (document.title || '').toLowerCase();
+    const _h1Text = (document.querySelector('h1')?.textContent || '').toLowerCase();
+    const _bodyLen = (document.body && document.body.innerText) ? document.body.innerText.trim().length : 0;
+    const _isErrorPage =
+      _pageTitle.includes('site maintenance') ||
+      _pageTitle.includes('page not found') ||
+      _pageTitle.includes('something went wrong') ||
+      _pageTitle.includes('access denied') ||
+      _h1Text.includes('oops') ||
+      _h1Text.includes('something went wrong') ||
+      _h1Text.includes('page not found') ||
+      _bodyLen < 400;
+    if (_isErrorPage) {
+      console.log('✗ Error/maintenance/empty page detected (title="' + _pageTitle + '", h1="' + _h1Text + '", bodyLen=' + _bodyLen + '); skipping');
+      return {
+        success: false,
+        platform: platform,
+        error: 'Error or maintenance page detected.'
+      };
+    }
+
+    console.log(`Extracting rating for ${platform}...`);
+
+    let rating = null;
+    let reviewCount = null;
+    let productName = null;
+    let seller = null;
+
+    // UNIVERSAL METHOD 1: Search entire page text
+    const bodyText = document.body.innerText;
+    const htmlContent = document.documentElement.innerHTML;
+
+    // Common rating patterns across all sites
+    const textPatterns = [
+      /(\d\.\d)\s*★/,                          // "4.2 ★"
+      /(\d\.\d)\s*out of 5/i,                  // "4.2 out of 5"
+      /Rating[:\s]*(\d\.\d)/i,                 // "Rating: 4.2"
+      /(\d\.\d)\s*\/\s*5/,                     // "4.2 / 5"
+      /★\s*(\d\.\d)/,                          // "★ 4.2"
+      /(\d\.\d)\s*stars?/i,                    // "4.2 stars"
+    ];
+
+    for (const pattern of textPatterns) {
+      const match = bodyText.match(pattern);
+      if (match && match[1] && platform !== 'Amazon' && platform !== 'Myntra') {
+        const val = parseFloat(match[1]);
+        if (val >= 0 && val <= 5) {
+          rating = val;
+          console.log(`✓ Found rating via text pattern: ${rating}`);
+          break;
+        }
+      }
+    }
+
+    // UNIVERSAL METHOD 2: Search HTML/JSON data
+    if (!rating) {
+      const htmlPatterns = [
+        /"ratingValue":"?(\d+\.?\d*)"?/,
+        /"rating":"?(\d+\.?\d*)"?/,
+        /aggregateRating[^}]*ratingValue[^}]*?(\d+\.?\d*)/,
+        /"averageRating":"?(\d+\.?\d*)"?/,
+        /"productRating":"?(\d+\.?\d*)"?/,
+      ];
+
+      for (const pattern of htmlPatterns) {
+        const match = htmlContent.match(pattern);
+        if (match && match[1] && platform !== 'Amazon' && platform !== 'Myntra') {
+          const val = parseFloat(match[1]);
+          if (val >= 0 && val <= 5) {
+            rating = val;
+            console.log(`✓ Found rating in HTML: ${rating}`);
+            break;
+          }
+        }
+      }
+    }
+
+    // UNIVERSAL METHOD 3: Find elements with rating-like content
+    if (!rating) {
+      const allElements = document.querySelectorAll('div, span, p');
+
+      for (const el of allElements) {
+        const text = el.textContent.trim();
+
+        // Look for standalone numbers between 0-5 with 1 decimal
+        if (/^\d\.\d$/.test(text) && text.length <= 3) {
+          const val = parseFloat(text);
+          if (val >= 1 && val <= 5) {
+            // Check if parent/nearby text has rating keywords
+            const parent = el.parentElement;
+            const parentText = parent ? parent.textContent.toLowerCase() : '';
+
+            if ((parentText.includes('rating') ||
+                parentText.includes('star') ||
+                parentText.includes('★') ||
+                parentText.includes('review')) && platform !== 'Amazon' && platform !== 'Myntra') {
+              rating = val;
+              console.log(`✓ Found rating via element scan: ${rating}`);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Flipkart-specific: Try JSON-LD first, then DOM
+    if (platform === 'Flipkart' && !rating) {
+      // Check JSON-LD
+      const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const ldScript of ldScripts) {
+        try {
+          const ld = JSON.parse(ldScript.textContent);
+          const items = Array.isArray(ld) ? ld : [ld];
+          for (const item of items) {
+            if (item.aggregateRating && item.aggregateRating.ratingValue) {
+              const v = parseFloat(item.aggregateRating.ratingValue);
+              if (v > 0 && v <= 5) {
+                rating = v;
+                console.log(`✓ Flipkart: Rating from JSON-LD: ${rating}`);
+              }
+            }
+          }
+        } catch (e) {}
+        if (rating) break;
+      }
+
+      // Then try DOM
+      if (!rating) {
+        rating = platformSpecificExtraction(platform);
+      }
+    }
+
+    // Amazon-specific: Platform extraction with container checks
+    if (platform === 'Amazon' && !rating) {
+      rating = platformSpecificExtraction(platform);
+    }
+
+    // PLATFORM-SPECIFIC SELECTORS (fallback for other platforms)
+    if (!rating && platform !== 'Flipkart' && platform !== 'Amazon') {
+      rating = platformSpecificExtraction(platform);
+    }
+
+    // Extract review count — JSON-LD first (most reliable), then platform-specific DOM
+    // JSON-LD has standardized aggregateRating.ratingCount / reviewCount
+    if (platform !== 'Amazon') {
+      const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const ldScript of ldScripts) {
+        try {
+          const ld = JSON.parse(ldScript.textContent);
+          const items = Array.isArray(ld) ? ld : [ld];
+          for (const item of items) {
+            if (item.aggregateRating) {
+              const ar = item.aggregateRating;
+              const rc = (ar.ratingCount || ar.reviewCount || '').toString();
+              if (rc && rc !== '0' && rc !== '') {
+                reviewCount = rc;
+                console.log(`✓ Review count from JSON-LD: ${reviewCount}`);
+              }
+              // Also grab rating from JSON-LD if not found yet
+              if (!rating && ar.ratingValue) {
+                const v = parseFloat(ar.ratingValue);
+                if (v > 0 && v <= 5) { rating = v; console.log(`✓ Rating from JSON-LD: ${rating}`); }
+              }
+            }
+          }
+        } catch (e) {}
+        if (reviewCount) break;
+      }
+    }
+
+    // Fallback: platform-specific DOM extraction
+    if (!reviewCount) {
+      reviewCount = platformSpecificCountExtraction(platform, bodyText, htmlContent);
+    }
+    console.log(`Review count after extraction: ${reviewCount}`);
+
+    // Extract price (digits only, no ₹ symbol)
+    let price = extractPrice(platform, bodyText, htmlContent);
+    console.log(`Price after extraction: ${price}`);
+
+    // Extract product name (universal)
+    const nameSelectors = ['h1', '[class*="title"]', '[class*="name"]', '[class*="product"]'];
+    for (const selector of nameSelectors) {
+      const elements = document.querySelectorAll(selector);
+      for (const el of elements) {
+        const text = el.textContent.trim();
+        if (text.length > 10 && text.length < 200) {
+          productName = text.substring(0, 100);
+          console.log(`✓ Found product name: ${productName}`);
+          break;
+        }
+      }
+      if (productName) break;
+    }
+
+    // No rating → no count (count without rating is meaningless)
+    if (rating === null) {
+      reviewCount = null;
+    }
+
+    // Myntra sanity check: if count equals price (exact string match), the count
+    // extractor almost certainly fell through and picked up the price. Reject it.
+    if (platform === 'Myntra' && reviewCount && price) {
+      const countNum = String(reviewCount).replace(/[^\d]/g, '');
+      const priceNum = String(price).replace(/[^\d]/g, '');
+      if (countNum === priceNum && countNum.length > 0) {
+        console.log(`✗ Myntra: count=${reviewCount} equals price=${price}, rejecting count`);
+        reviewCount = null;
+        // Also drop the rating since it was likely the "Rate this product" false positive
+        rating = null;
+      }
+    }
+
+    // UNIVERSAL RULE: no count (or count=0) → clear rating. A product cannot have
+    // a valid average rating without at least 1 review contributing to it.
+    const countNumCheck = parseInt((reviewCount || '0').toString().replace(/,/g, ''));
+    if (!reviewCount || countNumCheck < 1) {
+      if (rating !== null) {
+        console.log(`✗ Rating=${rating} rejected: count is empty/0 (no valid rating without ≥1 review). Price kept: ${price}`);
+      }
+      rating = null;
+      reviewCount = null;
+    }
+
+    // Round rating to 1 decimal place
+    if (rating !== null) {
+      rating = Math.round(rating * 10) / 10;
+    }
+
+    // Extract seller name (skip Meesho for now — causes issues)
+    if (platform !== 'Meesho') {
+      seller = extractSeller(platform);
+    }
+
+    console.log('Final extraction result:', { rating, reviewCount, price, seller, productName, platform });
+
+    return {
+      success: rating !== null || price !== null,
+      platform: platform,
+      rating: rating,
+      reviewCount: reviewCount,
+      price: price,
+      seller: seller,
+      productName: productName,
+      url: window.location.href,
+      error: (rating === null && price === null) ? 'Rating and price not found. Try scrolling the page first.' : null
+    };
+  }
+
+  function platformSpecificExtraction(platform) {
+    let rating = null;
+
+    try {
+      switch(platform) {
+        case 'Amazon':
+          // Amazon-specific selectors with container checks
+          // First look for rating INSIDE specific containers
+          let ratingContainer = document.querySelector('#averageCustomerReviews');
+          if (!ratingContainer) ratingContainer = document.querySelector('#acrPopover');
+          if (!ratingContainer) ratingContainer = document.querySelector('[data-hook="rating-out-of-text"]');
+
+          if (ratingContainer) {
+            const match = ratingContainer.textContent.match(/(\d\.\d)/);
+            if (match) {
+              rating = parseFloat(match[1]);
+              console.log(`✓ Amazon-specific extraction from container: ${rating}`);
+              break;
+            }
+          }
+
+          // Fallback: span[data-hook="rating-out-of-text"] directly (only exists for actual product rating)
+          if (!rating) {
+            const ratingSpan = document.querySelector('span[data-hook="rating-out-of-text"]');
+            if (ratingSpan) {
+              const match = ratingSpan.textContent.match(/(\d\.\d)/);
+              if (match) {
+                rating = parseFloat(match[1]);
+                console.log(`✓ Amazon-specific extraction from span: ${rating}`);
+              }
+            }
+          }
+          break;
+
+        case 'Flipkart':
+          // Flipkart-specific selectors
+          const flipkartSelectors = [
+            'div.XQDdHH',
+            'div._1lRcqv',
+            'div.hGSR34',
+            'span.Wphh3N'
+          ];
+          for (const sel of flipkartSelectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+              const val = parseFloat(el.textContent.trim());
+              if (val >= 0 && val <= 5) {
+                rating = val;
+                console.log(`✓ Flipkart-specific extraction: ${rating}`);
+                break;
+              }
+            }
+          }
+          break;
+
+        case 'Myntra':
+          // Myntra v1.0.5: REQUIRE the rating to appear together with a Ratings count
+          // (e.g. "4.2 | 1,234 Ratings" or "4.2★ 1,234 ratings"). This rejects stray
+          // 3.0/4.0/5.0 figures from "Rate this product" widgets, similar-product cards,
+          // or generic landing pages.
+          const myntraCandidates = document.querySelectorAll('[class*="rating"], [class*="Rating"]');
+          for (const el of myntraCandidates) {
+            const text = el.textContent.trim();
+            if (text.length > 150 || text.length < 5) continue;
+            // Strict: must contain a rating number + a ratings count nearby
+            const strict = text.match(/(\d\.\d)[\s★⭐\|]*([\d,]+)\s*[Rr]atings?/);
+            if (strict) {
+              const r = parseFloat(strict[1]);
+              const count = parseInt(strict[2].replace(/,/g, ''));
+              if (r >= 1.0 && r <= 5.0 && count > 0) {
+                rating = r;
+                console.log('✓ Myntra-strict extraction: ' + rating + ' (' + count + ' ratings)');
+                break;
+              }
+            }
+          }
+          // Check for explicit "no ratings" indicator — if found, skip rating
+          // entirely to prevent downstream false positives.
+          if (!rating) {
+            const bodyLower = (document.body.innerText || '').toLowerCase();
+            if (bodyLower.includes('be the first to rate') ||
+                bodyLower.includes('no ratings yet') ||
+                bodyLower.includes('0 ratings')) {
+              console.log('✓ Myntra: product has no ratings, skipping rating extraction');
+            }
+          }
+          break;
+
+        case 'Nykaa':
+          // Nykaa rating selectors
+          const nykaaEl = document.querySelector('[class*="rating"], [class*="stars"]');
+          if (nykaaEl) {
+            const match = nykaaEl.textContent.match(/(\d\.\d)/);
+            if (match) {
+              rating = parseFloat(match[1]);
+              console.log(`✓ Nykaa-specific extraction: ${rating}`);
+            }
+          }
+          break;
+
+        case 'Meesho':
+          // Meesho format: "4.3 ★ 1096 Reviews" — rating is typically in a short badge
+          // element near the product title. The star "★" is usually rendered as an
+          // SVG icon, not text, so element textContent may just be "4.3" or "4.31096 Reviews".
+
+          // Method 1: Look in short badge-like elements whose text starts with "X.Y"
+          // and whose parent/self mentions "review"/"★"/"rating" — this avoids picking
+          // up price decimals like "4.99" by mistake.
+          const meeshoCandidates = document.querySelectorAll('span, div, p');
+          for (const el of meeshoCandidates) {
+            const text = el.textContent.trim();
+            if (text.length < 3 || text.length > 60) continue;
+
+            const m = text.match(/^(\d\.\d)(?:\D|$)/);
+            if (!m) continue;
+            const val = parseFloat(m[1]);
+            if (!(val > 0 && val <= 5)) continue;
+
+            const selfLower = text.toLowerCase();
+            const parent = el.parentElement;
+            const parentLower = parent ? parent.textContent.toLowerCase() : '';
+            if (
+              selfLower.includes('review') ||
+              selfLower.includes('★') ||
+              parentLower.includes('review') ||
+              parentLower.includes('★') ||
+              parentLower.includes('rating')
+            ) {
+              rating = val;
+              console.log(`✓ Meesho-specific extraction from badge: ${rating}`);
+              break;
+            }
+          }
+
+          // Method 2: Regex over bodyText — "X.Y ★" or "X.Y ... N Reviews"
+          if (!rating) {
+            const bodyText = document.body.innerText || '';
+            let m = bodyText.match(/(\d\.\d)\s*★/);
+            if (!m) m = bodyText.match(/(\d\.\d)[^\d]{0,6}\d+\s*Reviews?/i);
+            if (m) {
+              const v = parseFloat(m[1]);
+              if (v > 0 && v <= 5) {
+                rating = v;
+                console.log(`✓ Meesho-specific extraction from bodyText: ${rating}`);
+              }
+            }
+          }
+
+          // Method 3: Last resort — scan the hydrated __NEXT_DATA__ script tag
+          if (!rating) {
+            const next = document.getElementById('__NEXT_DATA__');
+            if (next && next.textContent) {
+              const patterns = [
+                /"averageRating"\s*:\s*(\d+\.?\d*)/,
+                /"average_rating"\s*:\s*(\d+\.?\d*)/,
+                /"catalog_rating"\s*:\s*(\d+\.?\d*)/,
+                /"ratingValue"\s*:\s*"?(\d+\.?\d*)"?/
+              ];
+              for (const p of patterns) {
+                const m = next.textContent.match(p);
+                if (m) {
+                  const v = parseFloat(m[1]);
+                  if (v > 0 && v <= 5) {
+                    rating = v;
+                    console.log(`✓ Meesho-specific extraction from __NEXT_DATA__: ${rating}`);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          break;
+      }
+    } catch (e) {
+      console.log('Platform-specific extraction failed:', e);
+    }
+
+    return rating;
+  }
+
+  function platformSpecificCountExtraction(platform, bodyText, htmlContent) {
+    let count = null;
+
+    try {
+      // ===== FLIPKART =====
+      // Format: "4.2 ★ | 538" — count is after the pipe symbol
+      if (platform === 'Flipkart') {
+        // Method 1: Scan small elements for "rating | count" pattern
+        const allEls = document.querySelectorAll('span, div');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 100) continue;
+
+          // "4.2 ★ | 538" or "4.2★|538"
+          const pipeMatch = text.match(/★\s*\|?\s*(\d[\d,\.]*\s*[KkLl]?)\s*$/);
+          if (pipeMatch) {
+            count = pipeMatch[1].trim();
+            console.log(`✓ Flipkart: count from ★|N pattern: ${count}`);
+            break;
+          }
+
+          // "538 Ratings" or "54,232 Ratings & 6,543 Reviews"
+          const ratingsMatch = text.match(/^(\d[\d,\.]*\s*[KkLl]?)\s+Ratings?/i);
+          if (ratingsMatch && text.length < 80) {
+            count = ratingsMatch[1].trim();
+            console.log(`✓ Flipkart: count from N Ratings pattern: ${count}`);
+            break;
+          }
+        }
+
+        // Method 2: Look for the number right next to rating value in DOM
+        if (!count) {
+          const ratingEls = document.querySelectorAll('div.XQDdHH, div._1lRcqv, div.hGSR34, span.Wphh3N');
+          for (const el of ratingEls) {
+            const parent = el.parentElement;
+            if (parent) {
+              const parentText = parent.textContent.trim();
+              // Extract number after the rating: "4.2 538" or "4.2 | 538"
+              const m = parentText.match(/\d\.\d\s*[★\|]?\s*(\d[\d,\.]+)/);
+              if (m && m[1] && parseFloat(m[1]) > 5) {
+                count = m[1].trim();
+                console.log(`✓ Flipkart: count from parent element: ${count}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // ===== AMAZON =====
+      // Format: "4.1 ★★★★☆ (117)" — count in parentheses
+      if (platform === 'Amazon' && !count) {
+        // Method 1: Amazon's dedicated review count element
+        const amazonCountEl = document.querySelector('#acrCustomerReviewText');
+        if (amazonCountEl) {
+          const m = amazonCountEl.textContent.match(/(\d[\d,]*)/);
+          if (m) {
+            count = m[1];
+            console.log(`✓ Amazon: count from #acrCustomerReviewText: ${count}`);
+          }
+        }
+
+        // Method 2: "(117)" link near the rating
+        if (!count) {
+          const ratingLinks = document.querySelectorAll('#acrCustomerReviewLink, a[href*="#customerReviews"]');
+          for (const el of ratingLinks) {
+            const m = el.textContent.match(/(\d[\d,]*)/);
+            if (m) {
+              count = m[1];
+              console.log(`✓ Amazon: count from review link: ${count}`);
+              break;
+            }
+          }
+        }
+
+        // Method 3: Look for "(number)" pattern in body text near a rating
+        if (!count) {
+          const m = bodyText.match(/\d\.\d[^(]{0,30}\((\d[\d,]+)\)/);
+          if (m) {
+            count = m[1];
+            console.log(`✓ Amazon: count from (N) pattern: ${count}`);
+          }
+        }
+      }
+
+      // ===== MEESHO =====
+      // Format: "4.3 ★ 1096 Reviews"
+      // BUG FIX: DOM elements often concatenate rating + count (e.g. "4.31100 Reviews")
+      // so we strip the leading rating pattern before matching to avoid "31100" instead of "1100"
+      if (platform === 'Meesho' && !count) {
+        // Method 1: Scan elements for "N Reviews" pattern
+        const allEls = document.querySelectorAll('span, div, p');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 100) continue;
+
+          // Strip leading rating pattern (e.g. "4.3★", "4.3 ★ ") to prevent
+          // the last digit of the rating from merging with the review count
+          const cleanedText = text.replace(/\d\.\d\s*★?\s*/g, ' ').trim();
+
+          // "1096 Reviews" — match FULL number before "Reviews"
+          const m = cleanedText.match(/(\d+)\s*Reviews?/i);
+          if (m && parseInt(m[1]) > 0) {
+            count = m[1];
+            console.log(`✓ Meesho: count from element: ${count}`);
+            break;
+          }
+        }
+
+        // Method 2: bodyText fallback — strip rating patterns first
+        if (!count) {
+          const cleanedBody = bodyText.replace(/\d\.\d\s*★?\s*/g, ' ');
+          const m = cleanedBody.match(/(?<!\d)(\d{2,})\s*Reviews?/i);
+          if (m) {
+            count = m[1];
+            console.log(`✓ Meesho: count from bodyText: ${count}`);
+          }
+        }
+      }
+
+      // ===== FIRSTCRY =====
+      // Format: "4.3 ★ 89" — the ★ is rendered as an icon/image, NOT as text
+      // So textContent may be "4.3 149", "4.3149", or "4.3 ★ 149"
+      if (platform === 'FirstCry' && !count) {
+        // Method 1: Scan SHORT badge elements for "rating + count" pattern
+        const allEls = document.querySelectorAll('span, div, a');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length < 3 || text.length > 20) continue;
+
+          // Flexible match: "4.3 ★ 149", "4.3 149", "4.3149"
+          // \D*? handles any non-digit chars between rating and count (star, spaces, etc.)
+          const m = text.match(/(\d\.\d)\D*?(\d+)\s*$/);
+          if (m) {
+            const ratingDecimal = m[1].charAt(2); // "3" from "4.3"
+            const countStr = m[2];
+            // Make sure count isn't just the decimal digit of the rating (e.g. "3" from "4.3")
+            if (countStr !== ratingDecimal && parseInt(countStr) > 0) {
+              count = countStr;
+              console.log(`✓ FirstCry: count from badge pattern: ${count}`);
+              break;
+            }
+          }
+        }
+
+        // Method 2: Broader search — any element with "X.X number" pattern
+        if (!count) {
+          const allEls2 = document.querySelectorAll('span, div, a');
+          for (const el of allEls2) {
+            const text = el.textContent.trim();
+            if (text.length > 50) continue;
+            // "4.3  89" — number after the rating with at least one space
+            const m = text.match(/\d\.\d\s+(\d+)/);
+            if (m && parseInt(m[1]) > 0) {
+              count = m[1];
+              console.log(`✓ FirstCry: count from spaced pattern: ${count}`);
+              break;
+            }
+          }
+        }
+      }
+
+      // ===== MYNTRA / NYKAA =====
+      if ((platform === 'Myntra' || platform === 'Nykaa') && !count) {
+        const allEls = document.querySelectorAll('span, div');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 100) continue;
+          const m = text.match(/(\d[\d,\.]*\s*[KkLl]?)\s*(?:ratings?|reviews?)/i);
+          if (m && m[1].trim().length > 1) {
+            count = m[1].trim();
+            console.log(`✓ ${platform}: count from element: ${count}`);
+            break;
+          }
+        }
+      }
+
+    } catch(e) {
+      console.log('Platform-specific count extraction error:', e);
+    }
+
+    // ===== UNIVERSAL FALLBACKS =====
+    if (!count) {
+      // Fallback 1: HTML/JSON structured data
+      const htmlCountPatterns = [
+        /"ratingCount":\s*"?(\d[\d,]*)"?/,
+        /"reviewCount":\s*"?(\d[\d,]*)"?/,
+        /aggregateRating[^}]*?"ratingCount":\s*"?(\d[\d,]*)"?/,
+      ];
+      for (const pattern of htmlCountPatterns) {
+        const match = htmlContent.match(pattern);
+        if (match && match[1]) {
+          count = match[1];
+          console.log(`✓ Count from HTML/JSON: ${count}`);
+          break;
+        }
+      }
+    }
+
+    if (!count) {
+      // Fallback 2: Universal text patterns with word boundaries
+      const reviewPatterns = [
+        // "54.2K Ratings" or "1.2L Reviews" (abbreviated)
+        /(?<!\d)(\d+\.?\d*\s*[KkLlMm])\s*(?:ratings?|reviews?)/i,
+        // "54232 Ratings" (plain number, 2+ digits, word boundary to get full number)
+        /(?<!\d)(\d{2,})\s*(?:ratings?|reviews?)/i,
+        // "(117)" right after a rating number
+        /\d\.\d[^(]{0,30}\((\d[\d,]+)\)/,
+        // "based on 1234"
+        /based on\s*(\d[\d,]+)/i,
+      ];
+
+      for (const pattern of reviewPatterns) {
+        const match = bodyText.match(pattern);
+        if (match && match[1]) {
+          const val = match[1].trim();
+          if (/^\d$/.test(val)) continue;
+          count = val;
+          console.log(`✓ Count from universal text pattern: ${count}`);
+          break;
+        }
+      }
+    }
+
+    // Clean up count: remove trailing commas, dots, spaces that may have
+    // been captured by greedy regex patterns (e.g. "544," → "544")
+    if (count) {
+      count = count.replace(/[,.\s]+$/, '').trim();
+    }
+
+    return count;
+  }
+
+  function extractPrice(platform, bodyText, htmlContent) {
+    let price = null;
+
+    try {
+      // ===== AMAZON =====
+      if (platform === 'Amazon') {
+        // GUARD: Skip price extraction entirely if the product is unavailable.
+        // Amazon's "Currently unavailable" pages still contain price elements
+        // (last-known price, similar-product prices in carousels, etc.) which
+        // get falsely picked up by the selectors below.
+        const availabilityEl = document.querySelector('#availability, #outOfStock, #buybox');
+        const availabilityText = availabilityEl ? availabilityEl.textContent.toLowerCase() : '';
+        const hasUnavailableText = /currently unavailable|out of stock|we don'?t know when or if this item will be back/i.test(availabilityText);
+        const hasAddToCart = !!document.querySelector('#add-to-cart-button, #buy-now-button, input[name="submit.add-to-cart"], input[name="submit.buy-now"]');
+
+        if (hasUnavailableText || !hasAddToCart) {
+          console.log(`✗ Amazon: product appears unavailable (unavailable text=${hasUnavailableText}, add-to-cart present=${hasAddToCart}) — skipping price extraction`);
+          return null;
+        }
+
+        // v1.0.100 Method 0 (PRIMARY): Amazon ATC hidden input — the ONE TRUE
+        // price used by the Buy button. Exists ONCE per page, never in carousel.
+        //   <input name="items[0.base][customerVisiblePrice][amount]" value="399.0">
+        const atcInput = document.querySelector('input[name="items[0.base][customerVisiblePrice][amount]"]');
+        if (atcInput && atcInput.value) {
+          const v = parseFloat(String(atcInput.value).replace(/,/g, ''));
+          if (v >= 10 && v < 1000000) {
+            price = String(Math.round(v));
+            console.log(`✓ Amazon: price from ATC hidden input: ${price}`);
+          }
+        }
+
+        // Method 1: SCOPED main price (was picking carousel 599 before)
+        // Now uses .apex-pricetopay-value (Amazon's real class for main sale price)
+        if (!price) {
+          const mainPrice = document.querySelector('.apex-pricetopay-value .a-offscreen') ||
+                            document.querySelector('#corePriceDisplay_desktop_feature_div .a-offscreen') ||
+                            document.querySelector('#apex_desktop .a-offscreen');
+          if (mainPrice) {
+            const m = mainPrice.textContent.match(/[\₹Rs\.]*\s*([\d,]+)/);
+            if (m) {
+              price = m[1].replace(/,/g, '');
+              console.log(`✓ Amazon: price from scoped main price: ${price}`);
+            }
+          }
+        }
+
+        // Method 2: Offscreen price (fallback — may pick carousel on some pages)
+        if (!price) {
+          const offscreen = document.querySelector('.a-price .a-offscreen');
+          if (offscreen) {
+            const m = offscreen.textContent.match(/[\₹Rs\.]*\s*([\d,]+)/);
+            if (m) {
+              price = m[1].replace(/,/g, '');
+              console.log(`✓ Amazon: price from a-offscreen (fallback): ${price}`);
+            }
+          }
+        }
+
+        // Method 2b: a-price-whole (last resort — picks first match, may be carousel)
+        if (!price) {
+          const priceWhole = document.querySelector('span.a-price-whole');
+          if (priceWhole) {
+            const digits = priceWhole.textContent.replace(/[^0-9]/g, '');
+            if (digits) {
+              price = digits;
+              console.log(`✓ Amazon: price from a-price-whole (last resort): ${price}`);
+            }
+          }
+        }
+
+        // Method 3: Deal price or our price
+        if (!price) {
+          const priceEls = document.querySelectorAll('#priceblock_dealprice, #priceblock_ourprice, #price_inside_buybox, .a-price .a-offscreen');
+          for (const el of priceEls) {
+            const m = el.textContent.match(/[\₹Rs\.]*\s*([\d,]+)/);
+            if (m) {
+              price = m[1].replace(/,/g, '');
+              console.log(`✓ Amazon: price from price block: ${price}`);
+              break;
+            }
+          }
+        }
+      }
+
+      // ===== FLIPKART =====
+      if (platform === 'Flipkart' && !price) {
+        // Method 1: Flipkart selling price selectors
+        const flipkartPriceSelectors = [
+          'div.Nx9bqj._4b5DiR',   // current selling price (product page)
+          'div.Nx9bqj',            // selling price
+          'div._30jeq3',           // older class for selling price
+          'div._25b18c div._30jeq3'
+        ];
+        for (const sel of flipkartPriceSelectors) {
+          const el = document.querySelector(sel);
+          if (el) {
+            const m = el.textContent.match(/[\₹Rs\.]*\s*([\d,]+)/);
+            if (m) {
+              price = m[1].replace(/,/g, '');
+              console.log(`✓ Flipkart: price from ${sel}: ${price}`);
+              break;
+            }
+          }
+        }
+      }
+
+      // ===== MEESHO =====
+      // BUG FIX: ₹ symbol MUST be present to avoid picking up search query numbers
+      // BUG FIX: Skip crossed-out MRP prices (strikethrough) — only pick selling price
+      if (platform === 'Meesho' && !price) {
+        // Helper: check if an element or its ancestors have strikethrough (= MRP, not selling price)
+        function isStrikethrough(el) {
+          let node = el;
+          while (node && node !== document.body) {
+            const tag = node.tagName ? node.tagName.toLowerCase() : '';
+            if (tag === 's' || tag === 'strike' || tag === 'del') return true;
+            try {
+              const style = window.getComputedStyle(node);
+              if (style.textDecorationLine.includes('line-through') ||
+                  style.textDecoration.includes('line-through')) return true;
+            } catch(e) {}
+            node = node.parentElement;
+          }
+          return false;
+        }
+
+        // Method 1: Look for elements that are exactly "₹234" or "₹1,234"
+        const allEls = document.querySelectorAll('h4, h3, h2, span, div, p');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 20) continue;
+
+          // MUST start with ₹ — prevents matching bare numbers like search queries
+          const m = text.match(/^₹\s*([\d,]+)$/);
+          if (m) {
+            const val = parseInt(m[1].replace(/,/g, ''));
+            if (val > 0 && val < 100000 && !isStrikethrough(el)) {
+              price = m[1].replace(/,/g, '');
+              console.log(`✓ Meesho: price from element: ${price}`);
+              break;
+            }
+          }
+        }
+
+        // Method 2: Look for ₹ followed by number in any element (skip delivery & crossed-out prices)
+        if (!price) {
+          const allEls2 = document.querySelectorAll('span, div, h1, h2, h3, h4, h5, p');
+          for (const el of allEls2) {
+            const text = el.textContent.trim();
+            if (text.length > 50) continue;
+            const m = text.match(/₹\s*([\d,]+)/);
+            if (m) {
+              const val = parseInt(m[1].replace(/,/g, ''));
+              // Must have ₹ symbol, reasonable price, not delivery, not crossed-out MRP
+              if (val > 0 && val < 100000 && !text.includes('Delivery') && !isStrikethrough(el)) {
+                price = m[1].replace(/,/g, '');
+                console.log(`✓ Meesho: price from ₹ pattern: ${price}`);
+                break;
+              }
+            }
+          }
+        }
+
+        // Method 3: Pull price directly from hydrated __NEXT_DATA__ script tag.
+        // Meesho's SPA embeds product data here and it's reliable even if the
+        // price DOM elements haven't rendered yet.
+        if (!price) {
+          const next = document.getElementById('__NEXT_DATA__');
+          if (next && next.textContent) {
+            const pricePatterns = [
+              /"discounted_price"\s*:\s*"?(\d+)"?/,
+              /"selling_price"\s*:\s*"?(\d+)"?/,
+              /"offerPrice"\s*:\s*"?(\d+)"?/,
+              /"min_product_price"\s*:\s*"?(\d+)"?/,
+              /"transient_price"\s*:\s*"?(\d+)"?/,
+              /"final_price"\s*:\s*"?(\d+)"?/
+            ];
+            for (const p of pricePatterns) {
+              const m = next.textContent.match(p);
+              if (m) {
+                const v = parseInt(m[1]);
+                if (v > 0 && v < 100000) {
+                  price = m[1];
+                  console.log(`✓ Meesho: price from __NEXT_DATA__: ${price}`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        // Method 4: Standard product-price meta tags (OpenGraph / schema.org)
+        if (!price) {
+          const metaSelectors = [
+            'meta[property="product:price:amount"]',
+            'meta[property="og:price:amount"]',
+            'meta[itemprop="price"]',
+            'meta[name="price"]'
+          ];
+          for (const sel of metaSelectors) {
+            const el = document.querySelector(sel);
+            if (el && el.content) {
+              const v = parseInt(el.content.replace(/[^\d]/g, ''));
+              if (v > 0 && v < 100000) {
+                price = String(v);
+                console.log(`✓ Meesho: price from ${sel}: ${price}`);
+                break;
+              }
+            }
+          }
+        }
+
+        // Method 5: JSON-LD offers (standardized structured data)
+        if (!price) {
+          const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (const s of ldScripts) {
+            try {
+              const ld = JSON.parse(s.textContent);
+              const items = Array.isArray(ld) ? ld : [ld];
+              for (const item of items) {
+                if (item.offers) {
+                  const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+                  const raw = offer.price || offer.lowPrice || offer.highPrice;
+                  if (raw != null) {
+                    const v = parseInt(String(raw).replace(/[^\d]/g, ''));
+                    if (v > 0 && v < 100000) {
+                      price = String(v);
+                      console.log(`✓ Meesho: price from JSON-LD offers: ${price}`);
+                      break;
+                    }
+                  }
+                }
+              }
+            } catch (e) {}
+            if (price) break;
+          }
+        }
+      }
+
+      // ===== MEESHO: Add delivery charge to price =====
+      // Delivery shown as "Delivery ₹63 ₹70" — ₹70 is strikethrough (old price).
+      // We want the NON-strikethrough ₹63 added to product price.
+      if (platform === 'Meesho' && price) {
+        let deliveryCharge = 0;
+
+        // Method 1 (most reliable): Check __NEXT_DATA__ for delivery/shipping charge
+        const nextData = document.getElementById('__NEXT_DATA__');
+        if (nextData && nextData.textContent) {
+          const deliveryPatterns = [
+            /"delivery_charge"\s*:\s*"?(\d+)"?/,
+            /"shipping_charge"\s*:\s*"?(\d+)"?/,
+            /"deliveryCharge"\s*:\s*"?(\d+)"?/,
+            /"shippingCost"\s*:\s*"?(\d+)"?/,
+            /"delivery_fee"\s*:\s*"?(\d+)"?/
+          ];
+          for (const p of deliveryPatterns) {
+            const m = nextData.textContent.match(p);
+            if (m) {
+              const v = parseInt(m[1]);
+              if (v > 0 && v < 5000) {
+                deliveryCharge = v;
+                console.log(`✓ Meesho: delivery from __NEXT_DATA__: ${deliveryCharge}`);
+                break;
+              }
+            }
+          }
+        }
+
+        // Method 2: Find the SMALLEST element whose text starts with "Delivery ₹"
+        // Smallest = most specific = won't accidentally include product price
+        if (deliveryCharge === 0) {
+          let bestEl = null;
+          let bestLen = 99999;
+          const candidates = document.querySelectorAll('span, div, p');
+          for (const el of candidates) {
+            const text = el.textContent.trim();
+            // Must contain "Delivery" and a ₹ amount, and be SHORT (specific)
+            if (text.length > 50) continue;
+            if (!/delivery/i.test(text)) continue;
+            if (!/₹/.test(text)) continue;
+            if (text.length < bestLen) {
+              bestLen = text.length;
+              bestEl = el;
+            }
+          }
+
+          if (bestEl) {
+            // Look at child elements for non-strikethrough ₹ amount
+            const children = bestEl.querySelectorAll('span, s, del, strike, b, strong');
+            for (const child of children) {
+              const ct = child.textContent.trim();
+              const m = ct.match(/₹\s*([\d,]+)/);
+              if (!m) continue;
+              const val = parseInt(m[1].replace(/,/g, ''));
+              if (val <= 0 || val > 5000) continue;
+
+              // Check strikethrough
+              let isStruck = false;
+              let node = child;
+              while (node && node !== bestEl.parentElement) {
+                const tag = node.tagName ? node.tagName.toLowerCase() : '';
+                if (tag === 's' || tag === 'strike' || tag === 'del') { isStruck = true; break; }
+                try {
+                  const st = window.getComputedStyle(node);
+                  if (st.textDecorationLine.includes('line-through') ||
+                      st.textDecoration.includes('line-through')) { isStruck = true; break; }
+                } catch(e) {}
+                node = node.parentElement;
+              }
+
+              if (!isStruck) {
+                deliveryCharge = val;
+                console.log(`✓ Meesho: delivery from DOM (non-strike child): ${deliveryCharge}`);
+                break;
+              }
+            }
+
+            // Fallback: if no children had ₹, parse the element text directly
+            // Take the FIRST ₹ amount after "Delivery" keyword
+            if (deliveryCharge === 0) {
+              const afterDelivery = bestEl.textContent.split(/delivery/i).pop();
+              const amounts = [...afterDelivery.matchAll(/₹\s*([\d,]+)/g)];
+              if (amounts.length >= 1) {
+                // First amount after "Delivery" is the actual charge (non-crossed)
+                const val = parseInt(amounts[0][1].replace(/,/g, ''));
+                if (val > 0 && val < 5000) {
+                  deliveryCharge = val;
+                  console.log(`✓ Meesho: delivery from text parse: ${deliveryCharge}`);
+                }
+              }
+            }
+          }
+        }
+
+        if (deliveryCharge > 0) {
+          const originalPrice = parseInt(price.replace(/,/g, ''));
+          const totalPrice = originalPrice + deliveryCharge;
+          console.log(`✓ Meesho: price ${originalPrice} + delivery ${deliveryCharge} = ${totalPrice}`);
+          price = String(totalPrice);
+        } else {
+          console.log(`✓ Meesho: no delivery charge found, keeping price as ${price}`);
+        }
+      }
+
+      // ===== FIRSTCRY =====
+      if (platform === 'FirstCry' && !price) {
+        const priceEls = document.querySelectorAll('[class*="price"], [class*="Price"], [id*="price"], [id*="Price"]');
+        for (const el of priceEls) {
+          const text = el.textContent.trim();
+          const m = text.match(/₹\s*([\d,]+)/);
+          if (m && parseInt(m[1].replace(/,/g, '')) > 0) {
+            price = m[1].replace(/,/g, '');
+            console.log(`✓ FirstCry: price from element: ${price}`);
+            break;
+          }
+        }
+      }
+
+      // ===== MYNTRA (specific selectors first, v1.0.5) =====
+      if (!price && platform === 'Myntra') {
+        const myntraPriceSelectors = [
+          '.pdp-price strong',
+          'span.pdp-price strong',
+          '.pdp-price',
+          'span.pdp-price',
+          'span[class*="pdpPrice"]',
+          'span[class*="price-final"]',
+          'span[class*="finalPrice"]'
+        ];
+        for (const sel of myntraPriceSelectors) {
+          const el = document.querySelector(sel);
+          if (!el) continue;
+          const text = el.textContent.trim();
+          const m = text.match(/₹?\s*([\d,]+(?:\.\d+)?)/);
+          if (m) {
+            const val = parseInt(m[1].replace(/,/g, ''));
+            if (val >= 10 && val < 1000000) {
+              price = String(val);
+              console.log('✓ Myntra-specific selector ' + sel + ' price: ' + price);
+              break;
+            }
+          }
+        }
+      }
+
+      // ===== MYNTRA / NYKAA / OTHERS (loose fallback, v1.0.5 with floor + ₹ requirement) =====
+      if (!price && (platform === 'Myntra' || platform === 'Nykaa' || platform === 'Ajio' || platform === 'Snapdeal')) {
+        const priceEls = document.querySelectorAll('[class*="price"], [class*="Price"], [class*="amount"], [class*="Amount"]');
+        for (const el of priceEls) {
+          const text = el.textContent.trim();
+          // Must look like a real price element (contains ₹ or Rs)
+          if (!/₹|Rs\.?/i.test(text)) continue;
+          const m = text.match(/(?:₹|Rs\.?)\s*([\d,]+)/i);
+          if (m) {
+            const val = parseInt(m[1].replace(/,/g, ''));
+            // Price floor: real marketplace products are virtually never under ₹10
+            if (val >= 10 && val < 1000000) {
+              price = String(val);
+              console.log(`✓ ${platform}: price from element: ${price}`);
+              break;
+            }
+          }
+        }
+      }
+
+    } catch (e) {
+      console.log('Price extraction error:', e);
+    }
+
+    // ===== UNIVERSAL FALLBACK =====
+    if (!price) {
+      // Fallback 1: JSON structured data
+      const jsonPricePatterns = [
+        /"price":\s*"?([\d,]+\.?\d*)"?/,
+        /"offerPrice":\s*"?([\d,]+\.?\d*)"?/,
+        /"sellingPrice":\s*"?([\d,]+\.?\d*)"?/,
+      ];
+      for (const pattern of jsonPricePatterns) {
+        const match = htmlContent.match(pattern);
+        if (match && match[1]) {
+          const val = parseFloat(match[1].replace(/,/g, ''));
+          // Price floor (v1.0.5): real marketplace products are virtually never under ₹10
+          if (val >= 10 && val < 1000000) {
+            price = Math.round(val).toString();
+            console.log(`✓ Price from JSON: ${price}`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!price) {
+      // Fallback 2: First ₹ price on the page (selling price is usually first)
+      // Use a reasonable price range to avoid picking up IDs, phone numbers, etc.
+      const priceMatches = bodyText.matchAll(/₹\s*([\d,]+)/g);
+      for (const m of priceMatches) {
+        const val = parseInt(m[1].replace(/,/g, ''));
+        // Price floor (v1.0.5): real marketplace products are virtually never under ₹10
+        if (val >= 10 && val < 100000) {
+          price = m[1].replace(/,/g, '');
+          console.log(`✓ Price from universal ₹ pattern: ${price}`);
+          break;
+        }
+      }
+    }
+
+    return price;
+  }
+
+  // ========================================================================
+  // SELLER NAME EXTRACTION
+  // ========================================================================
+  function extractSeller(platform) {
+    try {
+      // ===== AMAZON =====
+      if (platform === 'Amazon') {
+        // "Sold by X" in the buy box
+        const soldByEl = document.querySelector('#sellerProfileTriggerId');
+        if (soldByEl) return soldByEl.textContent.trim();
+
+        // Fallback: "Sold by" text pattern
+        const buyBox = document.querySelector('#buyBoxAccordion, #desktop_buybox, #newBuyBoxPrice')?.closest('[class*="buybox"], [id*="buybox"], [class*="BuyBox"]')?.parentElement || document.body;
+        const allEls = buyBox.querySelectorAll('a, span, div');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length < 80 && /sold\s*by/i.test(text)) {
+            // Extract name after "Sold by"
+            const m = text.match(/sold\s*by\s*[:\s]*(.*)/i);
+            if (m && m[1].trim()) return m[1].trim();
+          }
+        }
+
+        // Fallback: merchant name from page
+        const merchantEl = document.querySelector('#merchant-info a, #tabular-buybox .tabular-buybox-text a');
+        if (merchantEl) return merchantEl.textContent.trim();
+      }
+
+      // ===== FLIPKART =====
+      if (platform === 'Flipkart') {
+        // Strategy: find the SMALLEST element containing "Sold by" or "Fulfilled by"
+        // Smallest = most specific = cleanest text without rating/years noise
+        let bestEl = null;
+        let bestLen = 99999;
+        const allEls = document.querySelectorAll('span, div, a, p');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 120 || text.length < 10) continue;
+          if (/(?:sold|fulfilled)\s*by/i.test(text)) {
+            if (text.length < bestLen) {
+              bestLen = text.length;
+              bestEl = el;
+            }
+          }
+        }
+        if (bestEl) {
+          const text = bestEl.textContent.trim();
+          const m = text.match(/(?:sold|fulfilled)\s*by\s*[:\s]*([\w\s&.\-]+)/i);
+          if (m && m[1].trim().length > 1 && m[1].trim().length < 50) {
+            // Clean up: remove trailing rating text like "4.1★" or "4.1•" or just "4.1"
+            let name = m[1].trim()
+              .replace(/\d+\.\d+\s*[★•].*$/, '')   // "4.1★..." or "4.1•..."
+              .replace(/\d+\.\d+\s*$/, '')           // trailing "4.1"
+              .trim();
+            if (name) return name;
+          }
+        }
+      }
+
+      // ===== MEESHO =====
+      if (platform === 'Meesho') {
+        // Meesho shows "Sold By" on product pages (/p/...) only.
+        // The DOM text is like: Sold By"365available"View Shop4.1...
+        // We need to find the "Sold By" heading and extract the name after it.
+
+        // Method 1: Find h6/h5 with "Sold By", then parse container text
+        const headings = document.querySelectorAll('h6, h5, h4, h3, span, div');
+        for (const h of headings) {
+          const ht = h.textContent.trim();
+          if (ht.length > 10 || !/^sold\s*by$/i.test(ht)) continue;
+          // Found exact "Sold By" heading — get parent container text
+          const container = h.closest('div') || h.parentElement;
+          if (container) {
+            const fullText = container.textContent.trim();
+            // Pattern: Sold By"NAME"View Shop  or  Sold By NAME View Shop
+            const m = fullText.match(/sold\s*by\s*[""]?\s*([^""]+?)\s*[""]?\s*(?:view\s*shop|$)/i);
+            if (m && m[1].trim().length > 1) {
+              const name = m[1].trim().replace(/^["'""]+|["'""]+$/g, '');
+              if (name.length > 0 && name.length < 50) {
+                console.log('✓ Meesho seller from heading container: ' + name);
+                return name;
+              }
+            }
+          }
+        }
+
+        // Method 2: Search all elements for "Sold By" + name pattern
+        const allEls = document.querySelectorAll('span, div, p, a');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 200 || text.length < 8) continue;
+          if (!/sold\s*by/i.test(text)) continue;
+          // Try to extract name between "Sold By" and "View Shop"
+          const m = text.match(/sold\s*by\s*[""]?\s*([^""]+?)\s*[""]?\s*(?:view\s*shop|\d+\.\d+|$)/i);
+          if (m && m[1].trim().length > 1 && m[1].trim().length < 50) {
+            const name = m[1].trim().replace(/^["'""]+|["'""]+$/g, '');
+            if (name) {
+              console.log('✓ Meesho seller from text pattern: ' + name);
+              return name;
+            }
+          }
+        }
+
+        // Method 3: __NEXT_DATA__
+        const next = document.getElementById('__NEXT_DATA__');
+        if (next && next.textContent) {
+          const m = next.textContent.match(/"supplier_name"\s*:\s*"([^"\\]+)"/);
+          if (m && m[1].trim()) return m[1].trim();
+          const m2 = next.textContent.match(/"shop_name"\s*:\s*"([^"\\]+)"/);
+          if (m2 && m2[1].trim()) return m2[1].trim();
+        }
+      }
+
+      // ===== MYNTRA =====
+      if (platform === 'Myntra') {
+        // Strategy: find smallest element with "Seller:" text
+        let bestEl = null;
+        let bestLen = 99999;
+        const allEls = document.querySelectorAll('span, div, a, p');
+        for (const el of allEls) {
+          const text = el.textContent.trim();
+          if (text.length > 80 || text.length < 8) continue;
+          if (/seller\s*:/i.test(text)) {
+            if (text.length < bestLen) {
+              bestLen = text.length;
+              bestEl = el;
+            }
+          }
+        }
+        if (bestEl) {
+          const text = bestEl.textContent.trim();
+          const m = text.match(/seller\s*[:\s]+([\w\s&.\-]+)/i);
+          if (m && m[1].trim().length > 1 && m[1].trim().length < 50) {
+            let name = m[1].trim()
+              .replace(/\s*View\s*Supplier\s*Information.*/i, '')
+              .replace(/\s*View\s*Shop.*/i, '')
+              .trim();
+            if (name) return name;
+          }
+        }
+      }
+
+      // ===== UNIVERSAL FALLBACK =====
+      // Try "Sold by" or "Seller:" pattern on any platform
+      const allEls = document.querySelectorAll('span, div, a, p');
+      for (const el of allEls) {
+        const text = el.textContent.trim();
+        if (text.length > 80) continue;
+        const m = text.match(/(?:sold|fulfilled|shipped)\s*by\s*[:\s]*([\w\s&.\-"]+)/i);
+        if (m && m[1].trim().length > 1 && m[1].trim().length < 50) {
+          return m[1].trim().replace(/^["']|["']$/g, '');
+        }
+      }
+
+    } catch (e) {
+      console.log('Seller extraction error:', e);
+    }
+    return null;
+  }
+
+  function extractAndSendRating() {
+    chrome.storage.sync.get(['autoMode'], (result) => {
+      if (result.autoMode) {
+        const data = extractRatingData();
+
+        if (data.success) {
+          console.log('✓ Auto-sync: Sending rating');
+
+          chrome.runtime.sendMessage({
+            action: 'ratingExtracted',
+            data: data
+          });
+
+          showNotification(data);
+        } else {
+          console.log('✗ Rating extraction failed');
+        }
+      }
+    });
+  }
+
+  function showNotification(data) {
+    // Remove existing notification
+    const existing = document.getElementById('universal-rating-toast');
+    if (existing) existing.remove();
+
+    const notification = document.createElement('div');
+    notification.id = 'universal-rating-toast';
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 2147483647;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      min-width: 300px;
+      animation: slideInRight 0.4s ease-out;
+      cursor: pointer;
+    `;
+
+    notification.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div style="font-weight: bold; font-size: 18px;">⭐ Rating Found!</div>
+        <div style="background: rgba(255,255,255,0.3); border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: bold;">
+          ${data.platform}
+        </div>
+      </div>
+
+      <div style="background: rgba(255,255,255,0.25); padding: 16px; border-radius: 10px; margin-bottom: 12px; text-align: center;">
+        <div style="font-size: 42px; font-weight: bold; line-height: 1;">${data.rating}</div>
+        <div style="font-size: 28px; opacity: 0.9;">★★★★★</div>
+        ${data.reviewCount ? `<div style="font-size: 13px; margin-top: 6px; opacity: 0.95;">${data.reviewCount} reviews</div>` : ''}
+        ${data.price ? `<div style="font-size: 15px; margin-top: 8px; font-weight: bold; opacity: 0.95;">Price: ₹${data.price}</div>` : ''}
+      </div>
+
+      ${data.productName ? `<div style="font-size: 12px; opacity: 0.9; margin-bottom: 12px; line-height: 1.4; max-height: 40px; overflow: hidden;">${data.productName}</div>` : ''}
+
+      <div style="background: #4ade80; color: #065f46; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 13px;">
+        ✓ RATING${data.reviewCount ? ' + COUNT' : ''}${data.price ? ' + PRICE' : ''} COPIED TO CLIPBOARD!
+      </div>
+
+      <div style="font-size: 11px; text-align: center; margin-top: 10px; opacity: 0.85;">
+        Go to your Google Sheet and press Ctrl+V to paste${(data.reviewCount || data.price) ? ' (in separate columns)' : ''}
+      </div>
+    `;
+
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideInRight {
+        from {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(notification);
+
+    // Auto-copy to clipboard (rating + count + price, tab-separated for sheet columns)
+    try {
+      let clipboardText = data.rating.toString();
+      if (data.reviewCount) clipboardText += `\t${data.reviewCount}`;
+      if (data.price) clipboardText += `\t${data.price}`;
+      navigator.clipboard.writeText(clipboardText);
+      console.log('✓ Rating + count + price copied to clipboard');
+    } catch (err) {
+      console.log('Could not copy to clipboard:', err);
+    }
+
+    // Click to dismiss
+    notification.addEventListener('click', () => {
+      notification.style.animation = 'slideOutRight 0.3s ease-out';
+      setTimeout(() => notification.remove(), 300);
+    });
+
+    // Auto-dismiss after 8 seconds
+    setTimeout(() => {
+      if (document.getElementById('universal-rating-toast')) {
+        notification.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+      }
+    }, 8000);
+  }
+})();
