@@ -4,46 +4,7 @@
 (function() {
   'use strict';
 
-  console.log('Cursive PD Tracker content.js v1.0.60: Loaded');
-
-  // ===== v1.0.37/54 PRICE VALIDATION =====
-  // Reject prices that appear next to promo keywords (EMI, cashback, save, etc.)
-  // Returns true if the context around the price is a real product price.
-  function isRealPriceContext(text) {
-    if (!text) return true;
-    const t = text.toLowerCase();
-    // Within 60 chars of the match, none of these promo words should appear
-    const promoWords = ['emi', 'cashback', 'save ', 'save\u00a0', 'discount', '% off', 'off ',
-      'coupon', 'bank offer', 'partner offer', 'free shipping', 'delivery charge',
-      'protection plan', 'warranty', 'exchange offer', 'supercoin', 'earn ', 'reward'];
-    for (const w of promoWords) {
-      if (t.includes(w)) return false;
-    }
-    return true;
-  }
-  function isAcceptablePrice(value, platform) {
-    if (value == null || isNaN(value)) return false;
-    const v = parseInt(value);
-    if (v < 10) return false;
-    if (v >= 1000000) return false;
-    // v1.0.54: Myntra prices below ₹30 are almost always SuperCoin / promo noise
-    if (platform === 'Myntra' && v < 30) return false;
-    return true;
-  }
-  // ===== v1.0.35 SELLER VALIDATION =====
-  // Reject "Brand: X" / "Brand X" / "Visit the X store" type values that
-  // pretend to be sellers but are really the brand byline.
-  function isRealSeller(s) {
-    if (!s) return false;
-    const v = String(s).trim();
-    if (v.length < 2 || v.length > 80) return false;
-    const lower = v.toLowerCase();
-    if (lower.startsWith('brand:') || lower.startsWith('brand ') || lower === 'brand') return false;
-    if (lower.startsWith('visit the ')) return false;
-    if (lower.startsWith('see other ')) return false;
-    if (lower.startsWith('explore ')) return false;
-    return true;
-  }
+  console.log('🌟 Cursive PD Tracker scraper v1.0.79 (force-inject + tab logs): Loaded');
 
   const platform = detectPlatform();
   console.log('Platform detected:', platform);
@@ -53,28 +14,118 @@
     setTimeout(() => extractAndSendRating(), 2000);
     setTimeout(() => extractAndSendRating(), 4000);
     setTimeout(() => extractAndSendRating(), 6000);
+    setTimeout(() => extractAndSendRating(), 9000);
+    setTimeout(() => extractAndSendRating(), 12000);
+    setTimeout(() => extractAndSendRating(), 15000);
+  }
+
+  // v1.0.83: DevTools defense. Extraction refuses to run when DevTools is open.
+  // Multiple heuristics; if ANY trip, we assume a developer is inspecting.
+  function pdDevToolsOpen() {
+    try {
+      // Heuristic 1: window dimension delta (DevTools docked side/bottom)
+      const wd = (window.outerWidth - window.innerWidth) > 160;
+      const hd = (window.outerHeight - window.innerHeight) > 160;
+      if (wd || hd) return true;
+      // Heuristic 2: console.log({}-formatter side effect. DevTools serializes objects
+      // via .toString() of the prototype chain when grouped. We override toString
+      // on a probe object and see if console.log triggers it (DevTools opens "preview").
+      let tripped = false;
+      const probe = {};
+      Object.defineProperty(probe, "id", { get() { tripped = true; return "x"; } });
+      // The console.log itself is a no-op visually but DevTools reads .id eagerly.
+      console.log("%c", "", probe);
+      if (tripped) return true;
+      // Heuristic 3: debugger timing. `debugger;` is a no-op unless DevTools is paused;
+      // we measure execution time. Skipped here to avoid pause-on-exception loops.
+      return false;
+    } catch { return false; }
   }
 
   // Listen for manual extraction
-  function sendDiag(source, data) {
-    try {
-      chrome.runtime.sendMessage({
-        action: 'pd_diag', source, platform,
-        url: window.location.href,
-        price: data && data.price, rating: data && data.rating,
-        reviewCount: data && data.reviewCount, seller: data && data.seller,
-        success: !!(data && data.success),
-      }, () => { if (chrome.runtime.lastError) {} });
-    } catch (e) {}
-  }
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'extractRating') {
+      if (pdDevToolsOpen()) {
+        // Pretend extraction failed temporarily. Looks like a network/DOM issue
+        // to the customer; they'll see no useful data while DevTools is open.
+        sendResponse({ success: false, error: "fail_temporary", platform: null });
+        return true;
+      }
       const data = extractRatingData();
-      sendDiag('MANUAL', data);
+      // v1.0.49: Diagnostic for MANUAL extraction (what background actually uses)
+      try {
+        chrome.runtime.sendMessage({
+          action: "pd_diag",
+          ts: Date.now(),
+          source: "MANUAL",
+          url: window.location.href,
+          platform: data.platform,
+          success: data.success,
+          rating: data.rating,
+          reviewCount: data.reviewCount,
+          price: data.price,
+          seller: data.seller,
+          error: data.error,
+        }).catch(() => {});
+      } catch (e) {}
+      console.log('Manual extraction:', data);
       sendResponse(data);
     }
     return true;
   });
+
+  // v1.0.87: WASM-first count parser. Falls back to JS if .wasm fails to load.
+  // Source for WASM is hidden in cursive_core.wasm binary (Phase 2C Stage B).
+  let _pdWasm = null;
+  let _pdWasmReady = (async () => {
+    try {
+      const r = await fetch(chrome.runtime.getURL('cursive_core.wasm'));
+      const buf = await r.arrayBuffer();
+      const mod = await WebAssembly.instantiate(buf, { env: { abort: () => {} } });
+      _pdWasm = mod.instance.exports;
+    } catch (e) { _pdWasm = null; }
+  })();
+
+  function pdParseCount(s) {
+    if (s == null) return 0;
+    // Try WASM path first (sensitive logic compiled to binary)
+    if (_pdWasm) {
+      try {
+        const str = String(s);
+        const buf = new TextEncoder().encode(str);
+        const ptr = 1024;  // free zone above runtime allocations
+        new Uint8Array(_pdWasm.memory.buffer, ptr, buf.length).set(buf);
+        return Number(_pdWasm.pdParseCount(ptr, buf.length));
+      } catch (e) { /* fall through to JS */ }
+    }
+    // JS fallback (only triggers if WASM failed to load or threw)
+    const m = s.toString().match(/([\d,.]+)\s*([KkMmLl]?)/);
+    if (!m) return 0;
+    const num = parseFloat(m[1].replace(/,/g, ''));
+    if (isNaN(num)) return 0;
+    const suffix = (m[2] || '').toLowerCase();
+    if (suffix === 'k') return Math.round(num * 1000);
+    if (suffix === 'm') return Math.round(num * 1000000);
+    if (suffix === 'l') return Math.round(num * 100000);
+    return Math.round(num);
+  }
+
+  // v1.0.87: WASM-first price validator (rejects EMI/Save/Cashback/Coupon/% off)
+  function pdValidatePrice(s) {
+    if (!s || typeof s !== 'string') return false;
+    if (_pdWasm) {
+      try {
+        const buf = new TextEncoder().encode(s);
+        const ptr = 2048;
+        new Uint8Array(_pdWasm.memory.buffer, ptr, buf.length).set(buf);
+        return _pdWasm.validatePrice(ptr, buf.length) === 1;
+      } catch (e) {}
+    }
+    // JS fallback
+    const lower = s.toLowerCase();
+    if (lower.indexOf('emi') >= 0 || lower.indexOf('cashback') >= 0 || lower.indexOf('save') >= 0 || lower.indexOf('coupon') >= 0 || lower.indexOf('off') >= 0) return false;
+    return /\d/.test(s);
+  }
 
   function detectPlatform() {
     const url = window.location.href.toLowerCase();
@@ -174,30 +225,6 @@
       };
     }
 
-    // ===== MAINTENANCE / ERROR / REDIRECT PAGE DETECTION =====
-    // If platform served us a generic error/maintenance page, bail out so we
-    // do not pick up random numbers like "3" from boilerplate UI.
-    const _pageTitle = (document.title || '').toLowerCase();
-    const _h1Text = (document.querySelector('h1')?.textContent || '').toLowerCase();
-    const _bodyLen = (document.body && document.body.innerText) ? document.body.innerText.trim().length : 0;
-    const _isErrorPage =
-      _pageTitle.includes('site maintenance') ||
-      _pageTitle.includes('page not found') ||
-      _pageTitle.includes('something went wrong') ||
-      _pageTitle.includes('access denied') ||
-      _h1Text.includes('oops') ||
-      _h1Text.includes('something went wrong') ||
-      _h1Text.includes('page not found') ||
-      _bodyLen < 400;
-    if (_isErrorPage) {
-      console.log('✗ Error/maintenance/empty page detected (title="' + _pageTitle + '", h1="' + _h1Text + '", bodyLen=' + _bodyLen + '); skipping');
-      return {
-        success: false,
-        platform: platform,
-        error: 'Error or maintenance page detected.'
-      };
-    }
-
     console.log(`Extracting rating for ${platform}...`);
 
     let rating = null;
@@ -221,7 +248,7 @@
 
     for (const pattern of textPatterns) {
       const match = bodyText.match(pattern);
-      if (match && match[1] && platform !== 'Amazon' && platform !== 'Myntra') {
+      if (match && match[1] && platform !== 'Amazon') {
         const val = parseFloat(match[1]);
         if (val >= 0 && val <= 5) {
           rating = val;
@@ -232,7 +259,9 @@
     }
 
     // UNIVERSAL METHOD 2: Search HTML/JSON data
-    if (!rating) {
+    // v1.0.78: skip for Myntra/Amazon — Myntra page has "rating":N per-star bars in
+    // its state JSON that this regex catches, masking the correct platform extraction.
+    if (!rating && platform !== 'Myntra' && platform !== 'Amazon') {
       const htmlPatterns = [
         /"ratingValue":"?(\d+\.?\d*)"?/,
         /"rating":"?(\d+\.?\d*)"?/,
@@ -243,7 +272,7 @@
 
       for (const pattern of htmlPatterns) {
         const match = htmlContent.match(pattern);
-        if (match && match[1] && platform !== 'Amazon' && platform !== 'Myntra') {
+        if (match && match[1] && platform !== 'Amazon') {
           const val = parseFloat(match[1]);
           if (val >= 0 && val <= 5) {
             rating = val;
@@ -272,7 +301,7 @@
             if ((parentText.includes('rating') ||
                 parentText.includes('star') ||
                 parentText.includes('★') ||
-                parentText.includes('review')) && platform !== 'Amazon' && platform !== 'Myntra') {
+                parentText.includes('review')) && platform !== 'Amazon') {
               rating = val;
               console.log(`✓ Found rating via element scan: ${rating}`);
               break;
@@ -347,6 +376,34 @@
       }
     }
 
+    // v1.0.79: FirstCry-specific count - read directly from .ratingcount element.
+    // Universal extractors mis-pick "7" from "0 to 7 Kg" weight labels.
+    if (platform === 'FirstCry') {
+      try {
+        const fcCount = document.querySelector('.ratingNreview .ratingcount, .ratingcount');
+        if (fcCount) {
+          const c = parseInt(fcCount.textContent.replace(/[^0-9]/g, ''));
+          if (c > 0 && c < 1000000) {
+            reviewCount = String(c);
+            console.log('✓ FirstCry count from .ratingcount selector: ' + reviewCount);
+          }
+        }
+      } catch (e) {}
+      // Also force-set rating from .rate if available
+      try {
+        const fcRate = document.querySelector('.ratingNreview .rate, .rate');
+        if (fcRate) {
+          const m = fcRate.textContent.trim().match(/(\d\.\d)/);
+          if (m) {
+            const v = parseFloat(m[1]);
+            if (v >= 1 && v <= 5 && v !== 5.0) {
+              rating = v;  // overwrite — canonical source
+              console.log('✓ FirstCry rating from .rate selector: ' + rating);
+            }
+          }
+        }
+      } catch (e) {}
+    }
     // Fallback: platform-specific DOM extraction
     if (!reviewCount) {
       reviewCount = platformSpecificCountExtraction(platform, bodyText, htmlContent);
@@ -407,8 +464,8 @@
     }
 
     // Extract seller name (skip Meesho for now — causes issues)
-    if (platform !== 'Meesho') {
-      seller = extractSeller(platform);
+    if (platform !== 'Meesho' && platform !== 'Myntra') {
+      seller = extractSeller(platform);  // v1.0.77: also skip Myntra (like Meesho)
     }
 
     console.log('Final extraction result:', { rating, reviewCount, price, seller, productName, platform });
@@ -482,37 +539,127 @@
           break;
 
         case 'Myntra':
-          // Myntra v1.0.5: REQUIRE the rating to appear together with a Ratings count
-          // (e.g. "4.2 | 1,234 Ratings" or "4.2★ 1,234 ratings"). This rejects stray
-          // 3.0/4.0/5.0 figures from "Rate this product" widgets, similar-product cards,
-          // or generic landing pages.
-          const myntraCandidates = document.querySelectorAll('[class*="rating"], [class*="Rating"]');
-          for (const el of myntraCandidates) {
-            const text = el.textContent.trim();
-            if (text.length > 150 || text.length < 5) continue;
-            // Strict: must contain a rating number + a ratings count nearby
-            const strict = text.match(/(\d\.\d)[\s★⭐\|]*([\d,]+)\s*[Rr]atings?/);
-            if (strict) {
-              const r = parseFloat(strict[1]);
-              const count = parseInt(strict[2].replace(/,/g, ''));
-              if (r >= 1.0 && r <= 5.0 && count > 0) {
-                rating = r;
-                console.log('✓ Myntra-strict extraction: ' + rating + ' (' + count + ' ratings)');
-                break;
+          // v1.0.64: try canonical JSON sources first (Myntra-only):
+          //   1. window.__myx.pdpData.ratings.averageRating
+          //   2. window.__NEXT_DATA__.props.pageProps...averageRating
+          //   3. JSON-LD aggregateRating in any <script type="application/ld+json">
+          // If none yield a value, fall back to DOM selectors with SCORING:
+          //   - prefer elements matching "X.Y | N Ratings" (canonical summary)
+          //   - reject "Rate this product" widgets
+          //   - pick the candidate with the HIGHEST adjacent review count
+          //     (per-star bars in the distribution have lower counts)
+          try {
+            const scripts = document.querySelectorAll('script');
+            for (const sc of scripts) {
+              const txt = sc.textContent || '';
+              // 1. __myx
+              if (txt.includes('__myx')) {
+                const m = txt.match(/window\.__myx\s*=\s*(\{[\s\S]*?\});/);
+                if (m) {
+                  try {
+                    const j = JSON.parse(m[1]);
+                    const avg = j && j.pdpData && j.pdpData.ratings && j.pdpData.ratings.averageRating;
+                    if (avg) {
+                      const v = parseFloat(avg);
+                      if (v >= 1 && v <= 5 && v !== 5.0) {
+                        rating = v;
+                        console.log('✓ Myntra rating (__myx): ' + rating);
+                        break;
+                      }
+                    }
+                  } catch (e) {}
+                }
+              }
+              // 2. __NEXT_DATA__
+              if (sc.id === '__NEXT_DATA__' || txt.startsWith('{') && txt.includes('"averageRating"')) {
+                try {
+                  const j = JSON.parse(txt);
+                  const walk = (o, depth) => {
+                    if (!o || typeof o !== 'object' || depth > 8) return null;
+                    if (o.averageRating != null) {
+                      const v = parseFloat(o.averageRating);
+                      if (v >= 1 && v <= 5 && v !== 5.0) return v;
+                    }
+                    for (const k of Object.keys(o)) {
+                      const r = walk(o[k], depth + 1);
+                      if (r != null) return r;
+                    }
+                    return null;
+                  };
+                  const v = walk(j, 0);
+                  if (v != null) {
+                    rating = v;
+                    console.log('✓ Myntra rating (__NEXT_DATA__): ' + rating);
+                    break;
+                  }
+                } catch (e) {}
+              }
+              // 3. JSON-LD aggregateRating
+              if (sc.type === 'application/ld+json' || txt.includes('aggregateRating')) {
+                try {
+                  const j = JSON.parse(txt);
+                  const items = Array.isArray(j) ? j : [j];
+                  for (const it of items) {
+                    const candidates = it['@graph'] ? it['@graph'] : [it];
+                    for (const c of candidates) {
+                      if (c.aggregateRating && c.aggregateRating.ratingValue) {
+                        const v = parseFloat(c.aggregateRating.ratingValue);
+                        if (v >= 1 && v <= 5 && v !== 5.0) {
+                          rating = v;
+                          console.log('✓ Myntra rating (JSON-LD): ' + rating);
+                          break;
+                        }
+                      }
+                    }
+                    if (rating) break;
+                  }
+                } catch (e) {}
+                if (rating) break;
               }
             }
-          }
-          // Check for explicit "no ratings" indicator — if found, skip rating
-          // entirely to prevent downstream false positives.
-          if (!rating) {
-            const bodyLower = (document.body.innerText || '').toLowerCase();
-            if (bodyLower.includes('be the first to rate') ||
-                bodyLower.includes('no ratings yet') ||
-                bodyLower.includes('0 ratings')) {
-              console.log('✓ Myntra: product has no ratings, skipping rating extraction');
+          } catch (e) {}
+          if (rating) break;
+
+          // Fallback: DOM selector with scoring. Collect all candidates,
+          // score them, pick the best one.
+          {
+            // v1.0.76: case-insensitive — Myntra uses camelCase like "overallRating"
+            const myntraCandidates = document.querySelectorAll('[class*="rating" i]');
+            let best = null;
+            for (const el of myntraCandidates) {
+              const text = el.textContent.trim();
+              if (text.length > 500 || text.length < 3) continue;  // v1.0.85: was 200
+              const lower = text.toLowerCase();
+              // Skip "Rate this product" widgets
+              if (lower.includes('rate this') || lower.includes('be the first')) continue;
+              const hasStar = /[★⭐]/.test(text);
+              const hasOutOf = /out of\s*5/i.test(text);
+              // v1.0.65: handle "4.2 ★ | 19 Ratings" format (star AND pipe, any order, optional)
+              const summaryMatch = text.match(/(\d\.\d)\s*[★⭐]?\s*\|?\s*([\d,.]+\s*[KkMmLl]?)\s*(?:Ratings?|Reviews?)/i);
+              const plainMatch = text.match(/(\d\.\d)/);
+              let val = null;
+              let count = 0;
+              let score = 0;
+              if (summaryMatch) {
+                val = parseFloat(summaryMatch[1]);
+                count = pdParseCount(summaryMatch[2]);  // v1.0.85: handles K/M/L
+                score = 100 + Math.min(count, 100000);  // strongly prefer summary format
+              } else if (plainMatch && (hasStar || hasOutOf)) {
+                val = parseFloat(plainMatch[1]);
+                // try to find a review count nearby
+                const nearCount = text.match(/([\d,.]+\s*[KkMmLl]?)\s*(?:Ratings?|Reviews?)/i);
+                if (nearCount) count = pdParseCount(nearCount[1]);  // v1.0.85: handles K/M/L
+                score = 10 + Math.min(count, 100000);
+              }
+              if (val == null || val < 1 || val > 5 || val === 5.0) continue;
+              if (!best || score > best.score) best = { val, score, text };
+            }
+            if (best) {
+              rating = best.val;
+              console.log('✓ Myntra rating (DOM scored): ' + rating + ' (score=' + best.score + ')');
             }
           }
-          break;
+          break;  // v1.0.75: CRITICAL fix — was falling through to Nykaa which overwrote rating
 
         case 'Nykaa':
           // Nykaa rating selectors
@@ -853,26 +1000,31 @@
         const availabilityText = availabilityEl ? availabilityEl.textContent.toLowerCase() : '';
         const hasUnavailableText = /currently unavailable|out of stock|we don'?t know when or if this item will be back/i.test(availabilityText);
         const hasAddToCart = !!document.querySelector('#add-to-cart-button, #buy-now-button, input[name="submit.add-to-cart"], input[name="submit.buy-now"]');
+        // v1.0.79: variant pages (price range) hide add-to-cart until a variant is selected.
+        // Accept the page as valid if a price element is present, even without add-to-cart.
+        const hasPriceElement = !!document.querySelector('span.a-price-whole, .a-price .a-offscreen, .a-price-range');
 
-        if (hasUnavailableText || !hasAddToCart) {
-          console.log(`✗ Amazon: product appears unavailable (unavailable text=${hasUnavailableText}, add-to-cart present=${hasAddToCart}) — skipping price extraction`);
+        if (hasUnavailableText) {
+          console.log(`✗ Amazon: product unavailable (text match) — skipping price extraction`);
+          return null;
+        }
+        if (!hasAddToCart && !hasPriceElement) {
+          console.log(`✗ Amazon: no add-to-cart AND no price element — skipping`);
           return null;
         }
 
-        // v1.0.100 Method 0 (PRIMARY): Amazon ATC hidden input — the ONE TRUE
-        // price used by the Buy button. Exists ONCE per page, never in carousel.
-        //   <input name="items[0.base][customerVisiblePrice][amount]" value="399.0">
+        // v1.0.100 Method 0 (PRIMARY): ATC hidden input — bulletproof.
+        // Exists ONCE per page (main product), never in carousel.
         const atcInput = document.querySelector('input[name="items[0.base][customerVisiblePrice][amount]"]');
         if (atcInput && atcInput.value) {
           const v = parseFloat(String(atcInput.value).replace(/,/g, ''));
           if (v >= 10 && v < 1000000) {
             price = String(Math.round(v));
-            console.log(`✓ Amazon: price from ATC hidden input: ${price}`);
+            console.log(`✓ Amazon v1.0.100: price from ATC input: ${price}`);
           }
         }
 
-        // Method 1: SCOPED main price (was picking carousel 599 before)
-        // Now uses .apex-pricetopay-value (Amazon's real class for main sale price)
+        // Method 1: SCOPED main price (apex-pricetopay-value or corePriceDisplay)
         if (!price) {
           const mainPrice = document.querySelector('.apex-pricetopay-value .a-offscreen') ||
                             document.querySelector('#corePriceDisplay_desktop_feature_div .a-offscreen') ||
@@ -886,26 +1038,26 @@
           }
         }
 
-        // Method 2: Offscreen price (fallback — may pick carousel on some pages)
-        if (!price) {
-          const offscreen = document.querySelector('.a-price .a-offscreen');
-          if (offscreen) {
-            const m = offscreen.textContent.match(/[\₹Rs\.]*\s*([\d,]+)/);
-            if (m) {
-              price = m[1].replace(/,/g, '');
-              console.log(`✓ Amazon: price from a-offscreen (fallback): ${price}`);
-            }
-          }
-        }
-
-        // Method 2b: a-price-whole (last resort — picks first match, may be carousel)
+        // Method 2 (fallback): a-price-whole — may pick carousel on some pages
         if (!price) {
           const priceWhole = document.querySelector('span.a-price-whole');
           if (priceWhole) {
             const digits = priceWhole.textContent.replace(/[^0-9]/g, '');
             if (digits) {
               price = digits;
-              console.log(`✓ Amazon: price from a-price-whole (last resort): ${price}`);
+              console.log(`✓ Amazon: price from a-price-whole (fallback): ${price}`);
+            }
+          }
+        }
+
+        // Method 3: Offscreen price (contains full price like "₹299.00")
+        if (!price) {
+          const offscreen = document.querySelector('.a-price .a-offscreen');
+          if (offscreen) {
+            const m = offscreen.textContent.match(/[\₹Rs\.]*\s*([\d,]+)/);
+            if (m) {
+              price = m[1].replace(/,/g, '');
+              console.log(`✓ Amazon: price from a-offscreen: ${price}`);
             }
           }
         }
@@ -1198,45 +1350,16 @@
         }
       }
 
-      // ===== MYNTRA (specific selectors first, v1.0.5) =====
-      if (!price && platform === 'Myntra') {
-        const myntraPriceSelectors = [
-          '.pdp-price strong',
-          'span.pdp-price strong',
-          '.pdp-price',
-          'span.pdp-price',
-          'span[class*="pdpPrice"]',
-          'span[class*="price-final"]',
-          'span[class*="finalPrice"]'
-        ];
-        for (const sel of myntraPriceSelectors) {
-          const el = document.querySelector(sel);
-          if (!el) continue;
-          const text = el.textContent.trim();
-          const m = text.match(/₹?\s*([\d,]+(?:\.\d+)?)/);
-          if (m) {
-            const val = parseInt(m[1].replace(/,/g, ''));
-            if (val >= 10 && val < 1000000) {
-              price = String(val);
-              console.log('✓ Myntra-specific selector ' + sel + ' price: ' + price);
-              break;
-            }
-          }
-        }
-      }
-
-      // ===== MYNTRA / NYKAA / OTHERS (loose fallback, v1.0.5 with floor + ₹ requirement) =====
+      // ===== MYNTRA / NYKAA / OTHERS =====
       if (!price && (platform === 'Myntra' || platform === 'Nykaa' || platform === 'Ajio' || platform === 'Snapdeal')) {
         const priceEls = document.querySelectorAll('[class*="price"], [class*="Price"], [class*="amount"], [class*="Amount"]');
         for (const el of priceEls) {
           const text = el.textContent.trim();
-          // Must look like a real price element (contains ₹ or Rs)
-          if (!/₹|Rs\.?/i.test(text)) continue;
+          if (!/₹|Rs\.?/i.test(text)) continue;  // v1.0.54: require ₹/Rs symbol
           const m = text.match(/(?:₹|Rs\.?)\s*([\d,]+)/i);
           if (m) {
             const val = parseInt(m[1].replace(/,/g, ''));
-            // Price floor: real marketplace products are virtually never under ₹10
-            if (val >= 10 && val < 1000000) {
+            if (val >= 30 && val < 1000000) {  // v1.0.54: floor ₹30 (real products never below)
               price = String(val);
               console.log(`✓ ${platform}: price from element: ${price}`);
               break;
@@ -1261,8 +1384,7 @@
         const match = htmlContent.match(pattern);
         if (match && match[1]) {
           const val = parseFloat(match[1].replace(/,/g, ''));
-          // Price floor (v1.0.5): real marketplace products are virtually never under ₹10
-          if (val >= 10 && val < 1000000) {
+          if (val > 0 && val < 1000000) {
             price = Math.round(val).toString();
             console.log(`✓ Price from JSON: ${price}`);
             break;
@@ -1272,17 +1394,23 @@
     }
 
     if (!price) {
-      // Fallback 2: First ₹ price on the page (selling price is usually first)
-      // Use a reasonable price range to avoid picking up IDs, phone numbers, etc.
-      const priceMatches = bodyText.matchAll(/₹\s*([\d,]+)/g);
-      for (const m of priceMatches) {
+      // v1.0.54: First ₹ price on the page, with promo-context filter + floor ₹30
+      const regex = /₹\s*([\d,]+)/g;
+      let m;
+      while ((m = regex.exec(bodyText)) !== null) {
         const val = parseInt(m[1].replace(/,/g, ''));
-        // Price floor (v1.0.5): real marketplace products are virtually never under ₹10
-        if (val >= 10 && val < 100000) {
-          price = m[1].replace(/,/g, '');
-          console.log(`✓ Price from universal ₹ pattern: ${price}`);
-          break;
+        if (val < 30 || val >= 100000) continue;  // skip too-small or too-large
+        const start = Math.max(0, m.index - 60);
+        const end = Math.min(bodyText.length, m.index + 30);
+        const ctx = bodyText.slice(start, end).toLowerCase();
+        // Skip promotional contexts
+        if (/emi|save|cashback|discount|off |off$|coupon|bank offer|partner|free shipping|delivery charge|protection plan|warranty|exchange|supercoin|earn|reward/.test(ctx)) {
+          console.log('✗ Skip ₹' + val + ' (promo context)');
+          continue;
         }
+        price = m[1].replace(/,/g, '');
+        console.log('✓ Price from universal ₹ pattern: ' + price);
+        break;
       }
     }
 
@@ -1450,6 +1578,23 @@
   }
 
   function extractAndSendRating() {
+    // v1.0.48 diagnostic: log every extraction attempt to background console
+    try {
+      const data = extractRatingData();
+      chrome.runtime.sendMessage({
+        action: "pd_diag",
+        ts: Date.now(),
+        url: window.location.href,
+        platform: data.platform,
+        success: data.success,
+        rating: data.rating,
+        reviewCount: data.reviewCount,
+        price: data.price,
+        seller: data.seller,
+        error: data.error,
+      }).catch(() => {});
+    } catch (e) { console.warn('diag err:', e); }
+
     chrome.storage.sync.get(['autoMode'], (result) => {
       if (result.autoMode) {
         const data = extractRatingData();
