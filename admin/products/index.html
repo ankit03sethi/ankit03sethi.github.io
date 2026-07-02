@@ -141,6 +141,9 @@
       <label>Description</label>
       <textarea id="pDesc" placeholder="Full description..."></textarea>
 
+      <label>Product code (SKU, shown to customer)</label>
+      <input id="pCode" type="text" placeholder="e.g. WE-45" />
+
       <label>Video URL (YouTube / MP4)</label>
       <input id="pVideo" type="url" placeholder="https://youtu.be/..." />
 
@@ -235,6 +238,8 @@
     <input id="mColorName" placeholder="e.g. Deep Brown" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Hex code (optional)</label>
     <input id="mColorHex" placeholder="#8B4513" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product code (SKU, shown to customer)</label>
+    <input id="mColorCode" type="text" placeholder="e.g. WE-45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
     <input id="mColorPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Color images (up to 5)</label>
@@ -272,8 +277,10 @@
     </div>
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Name *</label>
     <input id="mDesignName" placeholder="e.g. Butterfly WE 45 / Red / Large" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">SKU (optional)</label>
-    <input id="mDesignSku" placeholder="MZ-DP-BR-045" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product code (SKU, shown to customer)</label>
+    <input id="mDesignCode" placeholder="e.g. MZ-DP-BR-045" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Internal SKU (optional)</label>
+    <input id="mDesignSku" placeholder="Internal SKU" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Qty available</label>
     <input id="mDesignQty" type="number" min="0" placeholder="0" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
@@ -470,6 +477,7 @@ function renderProdEdit() {
   $("#pBullets").value = (p.bullet_points || []).join("\n");
   $("#pDesc").value = p.description || "";
   $("#pVideo").value = p.video_url || "";
+  $("#pCode").value = p.product_code || "";
   _prodUploaded = (p.image_urls || []).slice();
   syncProdImagesField();
   renderProdThumbs();
@@ -586,7 +594,7 @@ $("#catCancelEdit").addEventListener("click", (e) => { e.preventDefault(); $("#c
 $("#prodNewBtn").addEventListener("click", () => {
   _selectedProdId = null;
   $("#prodEdit").classList.remove("hidden");
-  ["#pTitle","#pBullets","#pDesc","#pVideo","#pImages","#pPrice","#pMrp","#pQty","#pPos"].forEach(s => $(s).value = "");
+  ["#pTitle","#pBullets","#pDesc","#pVideo","#pCode","#pImages","#pPrice","#pMrp","#pQty","#pPos"].forEach(s => $(s).value = "");
   _prodUploaded = [];
   syncProdImagesField();
   renderProdThumbs();
@@ -607,6 +615,7 @@ $("#pSave").addEventListener("click", async () => {
     bullet_points: $("#pBullets").value.split("\n").map(s => s.trim()).filter(Boolean),
     description: $("#pDesc").value.trim(),
     video_url: $("#pVideo").value.trim(),
+    product_code: $("#pCode").value.trim(),
     image_urls: $("#pImages").value.split("\n").map(s => s.trim()).filter(Boolean),
     price_inr: Number($("#pPrice").value),
     mrp_inr: Number($("#pMrp").value),
@@ -658,6 +667,7 @@ function openColorDialog(id, type) {
   $("#colorModalTitle").textContent = (existing ? "Edit " : "Add ") + meta.label.toLowerCase();
   $("#mColorName").value = existing?.name || "";
   $("#mColorHex").value = existing?.hex_code || "";
+  $("#mColorCode").value = existing?.product_code || "";
   $("#mColorPos").value = existing?.position || 100;
   // Show hex input only for color type
   const hexRow = $("#mColorHex").parentElement.querySelector("label");
@@ -704,6 +714,7 @@ $("#mColorSave").addEventListener("click", async () => {
   const j = await call("save_color", {
     id: _colorEditId, product_id: _selectedProdId,
     name, hex_code: _colorEditType === "color" ? $("#mColorHex").value.trim() : "",
+    product_code: $("#mColorCode").value.trim(),
     image_urls: _colorUploaded.slice(),
     position: Number($("#mColorPos").value) || 100,
     variation_type: _colorEditType,
@@ -746,6 +757,7 @@ function openDesignDialog(colorId, id) {
   $("#designModalTitle").textContent = existing ? "Edit sub-variation" : "Add sub-variation";
   $("#mDesignName").value = existing?.name || "";
   $("#mDesignSku").value = existing?.sku || "";
+  $("#mDesignCode").value = existing?.product_code || "";
   $("#mDesignQty").value = existing?.qty_available || 0;
   $("#mDesignPos").value = existing?.position || 100;
   _designUploaded = existing?.image_url || "";
@@ -781,6 +793,7 @@ $("#mDesignSave").addEventListener("click", async () => {
   const j = await call("save_design", {
     id: _designEditId, color_id: _designColorId,
     name, sku: $("#mDesignSku").value.trim(),
+    product_code: $("#mDesignCode").value.trim(),
     image_url: _designUploaded,
     qty_available: Number($("#mDesignQty").value) || 0,
     position: Number($("#mDesignPos").value) || 100,
