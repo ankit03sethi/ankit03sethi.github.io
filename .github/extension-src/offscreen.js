@@ -5,7 +5,7 @@
 //           This exists ONCE per page (main product ATC button), never in
 //           carousel. Bulletproof fix for MUAAZON-like products.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.100');
+console.log('[PD-OFFSCREEN] loaded v1.0.103');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -220,15 +220,15 @@ function extract(doc, html, platform, productId) {
   } catch {}
 
   // ===== Amazon rating + review count from DOM/HTML =====
+  // STRICT — only from main product elements. NEVER greedy regex on whole HTML
+  // because carousel/related products would leak.
   if (platform === 'Amazon') {
-    // Rating — try DOM first, then regex
+    // Rating — ONLY from #acrPopover which is main product's rating popover
+    // (does NOT exist for carousel entries — those are simple stars only)
     if (!rating) {
       try {
         const el = doc.querySelector('#acrPopover .a-icon-alt') ||
-                   doc.querySelector('#averageCustomerReviews .a-icon-alt') ||
-                   doc.querySelector('[data-hook="rating-out-of-text"]') ||
-                   doc.querySelector('.a-icon-star .a-icon-alt') ||
-                   doc.querySelector('.a-icon-star-medium .a-icon-alt');
+                   doc.querySelector('#averageCustomerReviews .a-icon-alt');
         if (el) {
           const m = (el.textContent || '').match(/([\d.]+)\s*out\s*of\s*5/i);
           if (m) {
@@ -238,14 +238,15 @@ function extract(doc, html, platform, productId) {
         }
       } catch {}
     }
+    // Regex fallback — ONLY anchored to #acrPopover context (never plain "out of 5")
     if (!rating) {
-      const rm = html.match(/([\d.]+)\s*out\s*of\s*5\s*stars/i);
+      const rm = html.match(/id="acrPopover"[\s\S]{0,500}?([\d.]+)\s*out\s*of\s*5/i);
       if (rm) {
         const v = parseFloat(rm[1]);
         if (v >= 1 && v <= 5) rating = v;
       }
     }
-    // Review count — try DOM first, then regex
+    // Review count — ONLY from #acrCustomerReviewText (main product)
     if (!reviewCount) {
       try {
         const el = doc.querySelector('#acrCustomerReviewText') ||
@@ -257,9 +258,18 @@ function extract(doc, html, platform, productId) {
       } catch {}
     }
     if (!reviewCount) {
-      const cm = html.match(/id="acrCustomerReviewText"[^>]*>\s*([\d,]+)\s*ratings?/i) ||
-                 html.match(/([\d,]+)\s*(?:global\s*)?ratings?\s*<\/span>/i);
+      const cm = html.match(/id="acrCustomerReviewText"[^>]*>\s*([\d,]+)/i);
       if (cm) reviewCount = parseInt(cm[1].replace(/,/g, ''));
+    }
+
+    // BUSINESS RULE: rating requires at least 1 review. If count is null or 0,
+    // rating must also be null (matches content.js logic). This prevents leaking
+    // a stray "X out of 5" match when the product has no actual reviews.
+    if (!reviewCount || reviewCount === 0) {
+      if (rating) {
+        console.log('[PD-OFF v1.0.103] rejecting rating=' + rating + ' because reviewCount is empty');
+        rating = null;
+      }
     }
   }
 
