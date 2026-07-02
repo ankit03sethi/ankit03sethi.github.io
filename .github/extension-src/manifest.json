@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Cursive PD Tracker",
-  "version": "1.0.98",
-  "description": "Cursive PD Tracker - track public product data on Indian marketplaces (v1.0.98)",
+  "version": "1.0.99",
+  "description": "Cursive PD Tracker - track public product data on Indian marketplaces (v1.0.99)",
   "permissions": [
     "activeTab",
     "storage",
