@@ -356,7 +356,6 @@ async function loadCatalog() {
       return;
     }
     _catalogGrid = j.grid || [];
-    $("#catCount").textContent = _catalogGrid.length === 1 ? "1 category" : (_catalogGrid.length + " categories");
     renderGrid();
   } catch (e) {
     wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Network error</div>`;
