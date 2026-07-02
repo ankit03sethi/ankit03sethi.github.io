@@ -1,11 +1,12 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.95
+// Cursive PD Tracker — offscreen background scraper v1.0.96
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
-// v1.0.95: Amazon price fix v5 — anchor price extraction to MAIN PRODUCT AREA
-//          only, skipping the "Customers who viewed" carousel at top.
-//          Uses "-80%" discount indicator + "M.R.P." text as anchors that
-//          only appear in the main product section.
+// v1.0.96: Fetch as ANONYMOUS customer (no cookies) instead of authenticated.
+//          Root cause: if customer has an Amazon Business account signed in,
+//          sending those cookies via credentials:include makes Amazon serve
+//          the business layout (different prices). credentials:omit gets the
+//          standard consumer view with correct sale prices.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.95');
+console.log('[PD-OFFSCREEN] loaded v1.0.96');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -18,8 +19,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function scrapeUrl(product) {
   try {
+    // v1.0.96: credentials:'omit' → don't send Amazon Business cookies.
+    // This gives us the ANONYMOUS "normal customer" view with correct sale prices.
     const res = await fetch(product.product_url, {
-      credentials: 'include',
+      credentials: 'omit',
       redirect: 'follow',
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -179,11 +182,4 @@ function extract(doc, html, platform, productId) {
                 // v1.0.92: seller from offers.seller.name (real Marketplace seller)
                 if (!seller && offers.seller) {
                   const s2 = typeof offers.seller === 'string' ? offers.seller : offers.seller.name;
-                  if (s2 && typeof s2 === 'string' && s2.trim().length > 0) {
-                    seller = s2.trim().substring(0, 100);
-                  }
-                }
-              }
-              // v1.0.27: brand is NOT seller. Skip this mapping — only use real seller fields.
-            }
-  
+                  if (s2 && typeof s2 === 'string' && s
