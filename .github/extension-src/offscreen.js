@@ -1,11 +1,11 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.94
+// Cursive PD Tracker — offscreen background scraper v1.0.95
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
-// No tabs, no windows, no visible activity at all.
-// v1.0.94: Amazon price fix v4 — DOM selectors may miss React-rendered content
-//          when Amazon serves minimal HTML to fetch(). Now uses raw-HTML regex
-//          to match "priceToPay" pattern that appears in Amazon's initial SSR.
+// v1.0.95: Amazon price fix v5 — anchor price extraction to MAIN PRODUCT AREA
+//          only, skipping the "Customers who viewed" carousel at top.
+//          Uses "-80%" discount indicator + "M.R.P." text as anchors that
+//          only appear in the main product section.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.94');
+console.log('[PD-OFFSCREEN] loaded v1.0.95');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -89,17 +89,31 @@ function extract(doc, html, platform, productId) {
         }
       }
     }
-    // Strategy 2: Raw-HTML regex for the priceToPay pattern
-    // Handles cases where DOMParser missed React-rendered content but the
-    // initial HTML contains the pattern.
+    // Strategy 2: MAIN-PRODUCT-ONLY anchored regex.
+    // The "Customers who viewed" carousel at the TOP shows related products
+    // with their own prices. We skip that by anchoring to markers that ONLY
+    // appear in the main product section:
+    //    - "-80%" savings percentage indicator
+    //    - "M.R.P.:" text (only on main product)
+    //    - #corePriceDisplay_desktop_feature_div (main Buy Box only)
     if (!price) {
-      const patterns = [
-        /class="[^"]*priceToPay[^"]*"[^>]*>\s*<span[^>]*class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
+      const anchoredPatterns = [
+        // Discount % IMMEDIATELY followed by ₹price (main product's savings + price)
+        /-\d+%[\s\S]{0,80}?₹\s*([\d,.]+)/,
+        // Discount % badge followed by a-offscreen span (main product structure)
+        /-\d+%[\s\S]{0,500}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
+        // Inside #corePriceDisplay_desktop_feature_div — main Buy Box only
+        /id="corePriceDisplay_desktop_feature_div"[\s\S]{0,2000}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
+        // Inside #corePriceDisplay_desktop_feature_div — a-price-whole (integer part)
+        /id="corePriceDisplay_desktop_feature_div"[\s\S]{0,2000}?class="a-price-whole"[^>]*>[^\d]*([\d,.]+)/,
+        // Price before "M.R.P.:" text (main product always has this label)
+        /class="a-offscreen"[^>]*>[^\d]*([\d,.]+)[^<]*<\/span>[\s\S]{0,300}?M\.?R\.?P/,
+        // priceToPay class (Amazon's marker for actual selling price)
         /priceToPay[^>]{0,300}a-offscreen[^>]*>[^\d]*([\d,.]+)/,
-        /"priceAmount"\s*:\s*"?([\d.]+)"?/,
-        /"apex_desktop"[\s\S]{0,3000}?"amount"\s*:\s*"?([\d.]+)"?/,
+        // apex_desktop feature block
+        /id="apex_desktop"[\s\S]{0,3000}?"amount"\s*:\s*"?([\d.]+)"?/,
       ];
-      for (const re of patterns) {
+      for (const re of anchoredPatterns) {
         const m = html.match(re);
         if (m) {
           const v = parseFloat(String(m[1]).replace(/,/g, ''));
@@ -172,37 +186,4 @@ function extract(doc, html, platform, productId) {
               }
               // v1.0.27: brand is NOT seller. Skip this mapping — only use real seller fields.
             }
-          }
-        } catch {}
-      }
-    }
-  } catch {}
-
-  // ===== Meta tags (works for many e-commerce sites) =====
-  try {
-    if (!price) {
-      const metaSelectors = [
-        'meta[property="product:price:amount"]',
-        'meta[property="og:price:amount"]',
-        'meta[itemprop="price"]',
-        'meta[name="twitter:data1"]',
-      ];
-      for (const sel of metaSelectors) {
-        const m = doc.querySelector(sel);
-        if (m) {
-          const v = parseFloat(String(m.getAttribute('content') || '').replace(/[^\d.]/g, ''));
-          if (v >= 10 && v < 1000000) { price = String(Math.round(v)); break; }
-        }
-      }
-    }
-  } catch {}
-
-  // ===== Meesho: __NEXT_DATA__ =====
-  if (platform === 'Meesho' && (!price || !rating)) {
-    try {
-      const nd = doc.querySelector('#__NEXT_DATA__');
-      if (nd) {
-        const j = JSON.parse(nd.textContent);
-        const single = j?.props?.pageProps?.initialState?.productDetails?.singleProductDetails;
-        if (single) {
-          if (single.transient_price && !price)
+  
