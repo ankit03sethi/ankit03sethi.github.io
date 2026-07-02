@@ -1,12 +1,12 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.98
+// Cursive PD Tracker — offscreen background scraper v1.0.99
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
-// v1.0.98: FIX Amazon selectors — real class is "apex-pricetopay-value"
-//          (hyphenated), NOT "priceToPay" (camelCase). Previous selectors
-//          never matched, so Strategy 1 always fell through and JSON-LD
-//          picked up 599 (list price / carousel).
-//          Now uses .apex-pricetopay-value .a-offscreen as PRIMARY selector.
+// v1.0.99: BULLETPROOF — read Amazon's hidden ATC input which contains the
+//          EXACT price used by the Buy button:
+//            name="items[0.base][customerVisiblePrice][amount]" value="399.0"
+//          This element only exists ONCE per page (for the main product's ATC
+//          button). Carousels don't have this input. Best possible signal.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.98');
+console.log('[PD-OFFSCREEN] loaded v1.0.99');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -68,52 +68,73 @@ async function scrapeUrl(product) {
 function extract(doc, html, platform, productId) {
   let rating = null, reviewCount = null, price = null, seller = null;
 
-  // ===== v1.0.98: Amazon MAIN PRODUCT price — using REAL class names =====
-  // Amazon uses class="apex-pricetopay-value" (hyphenated lowercase) for the
-  // main sale price. Previous versions searched for ".priceToPay" (camelCase)
-  // which never matched, so extraction fell through to JSON-LD which grabbed
-  // 599 (list price / carousel).
+  // ===== v1.0.99: Amazon MAIN PRODUCT price — BULLETPROOF =====
+  // FIX: For products where "Customers who viewed" carousel appears at the
+  // TOP of the page (above main product), previous strategies matched the
+  // FIRST price in HTML = carousel price (wrong).
+  //
+  // Solution: Use Amazon's ATC (Add To Cart) hidden input. This input only
+  // exists ONCE per page, is bound to the main product Buy button, and
+  // contains the EXACT price used to book the order. Cannot appear in
+  // carousel or any other product section.
+  //
+  //   <input type="hidden"
+  //          name="items[0.base][customerVisiblePrice][amount]"
+  //          value="399.0">
   if (platform === 'Amazon') {
-    // Strategy 1: DOM selectors using Amazon's REAL class names.
-    // apex-pricetopay-value is the main sale-price element on every Amazon.in
-    // product page. It only exists ONCE (the main product), never in carousels.
-    const priceSelectors = [
-      // Real Amazon class — matches "₹399.00" for the main product
-      '.apex-pricetopay-value .a-offscreen',
-      '.apexPriceToPay .a-offscreen',
-      '.priceToPay .a-offscreen',
-      // Scoped fallbacks — first a-offscreen inside main-product containers
-      '#corePriceDisplay_desktop_feature_div .a-offscreen',
-      '#apex_desktop .a-offscreen',
-      '#corePrice_feature_div .a-offscreen',
-      // a-price-whole variants (scoped to main product only)
-      '#corePriceDisplay_desktop_feature_div .a-price-whole',
-      '#apex_desktop .a-price-whole',
-      '#corePrice_feature_div .a-price-whole',
-    ];
-    for (const sel of priceSelectors) {
-      const el = doc.querySelector(sel);
-      if (el) {
-        const text = (el.textContent || '').trim();
-        const cleaned = text.replace(/[^\d.]/g, '');
-        const v = parseFloat(cleaned);
+    // Strategy 1 (PRIMARY): Amazon ATC hidden input — the ONE TRUE price
+    const atcMatch = html.match(/name="items\[0\.base\]\[customerVisiblePrice\]\[amount\]"[^>]*value="([\d,.]+)"/);
+    if (atcMatch) {
+      const v = parseFloat(String(atcMatch[1]).replace(/,/g, ''));
+      if (v >= 10 && v < 1000000) {
+        price = String(Math.round(v));
+        console.log('[PD-OFF v1.0.99] price from ATC hidden input = ' + price);
+      }
+    }
+    // Also try alternate value order (value first, name later)
+    if (!price) {
+      const atc2 = html.match(/value="([\d,.]+)"[^>]*name="items\[0\.base\]\[customerVisiblePrice\]\[amount\]"/);
+      if (atc2) {
+        const v = parseFloat(String(atc2[1]).replace(/,/g, ''));
         if (v >= 10 && v < 1000000) {
           price = String(Math.round(v));
-          console.log('[PD-OFF v1.0.98] price from selector "' + sel + '" = ' + price);
-          break;
+          console.log('[PD-OFF v1.0.99] price from ATC (reversed) = ' + price);
         }
       }
     }
-    // Strategy 2: HTML regex fallback — search for the actual class name in HTML.
+    // Strategy 2: DOM selectors using Amazon's REAL class names.
+    if (!price) {
+      const priceSelectors = [
+        '.apex-pricetopay-value .a-offscreen',
+        '.apexPriceToPay .a-offscreen',
+        '.priceToPay .a-offscreen',
+        '#corePriceDisplay_desktop_feature_div .a-offscreen',
+        '#apex_desktop .a-offscreen',
+        '#corePrice_feature_div .a-offscreen',
+        '#corePriceDisplay_desktop_feature_div .a-price-whole',
+        '#apex_desktop .a-price-whole',
+        '#corePrice_feature_div .a-price-whole',
+      ];
+      for (const sel of priceSelectors) {
+        const el = doc.querySelector(sel);
+        if (el) {
+          const text = (el.textContent || '').trim();
+          const cleaned = text.replace(/[^\d.]/g, '');
+          const v = parseFloat(cleaned);
+          if (v >= 10 && v < 1000000) {
+            price = String(Math.round(v));
+            console.log('[PD-OFF v1.0.99] price from selector "' + sel + '" = ' + price);
+            break;
+          }
+        }
+      }
+    }
+    // Strategy 3: HTML regex fallback
     if (!price) {
       const anchoredPatterns = [
-        // The main sale price element (real Amazon class)
         /class="[^"]*apex-pricetopay-value[^"]*"[\s\S]{0,500}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
-        // Scoped to main product containers only
         /id="corePriceDisplay_desktop_feature_div"[\s\S]{0,3000}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
         /id="apex_desktop"[\s\S]{0,3000}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
-        /id="corePriceDisplay_desktop_feature_div"[\s\S]{0,3000}?class="a-price-whole"[^>]*>[^\d]*([\d,.]+)/,
-        /id="apex_desktop"[\s\S]{0,3000}?class="a-price-whole"[^>]*>[^\d]*([\d,.]+)/,
       ];
       for (let i = 0; i < anchoredPatterns.length; i++) {
         const m = html.match(anchoredPatterns[i]);
@@ -121,7 +142,7 @@ function extract(doc, html, platform, productId) {
           const v = parseFloat(String(m[1]).replace(/,/g, ''));
           if (v >= 10 && v < 1000000) {
             price = String(Math.round(v));
-            console.log('[PD-OFF v1.0.98] price from regex #' + i + ' = ' + price);
+            console.log('[PD-OFF v1.0.99] price from regex #' + i + ' = ' + price);
             break;
           }
         }
