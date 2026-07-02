@@ -271,10 +271,13 @@
         <label data-mp="meesho"><input type="checkbox" value="meesho"> 🎯 Meesho</label>
       </div>
 
-      <label>Product image URLs (up to 5)</label>
-      <input type="url" class="img-url" placeholder="https://... (image 1)" style="margin-bottom:6px;" />
-      <input type="url" class="img-url" placeholder="https://... (image 2, optional)" style="margin-bottom:6px;" />
-      <input type="url" class="img-url" placeholder="https://... (image 3, optional)" />
+      <label>Product images (up to 5)</label>
+      <div id="uploadArea" style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;">
+        <div id="thumbGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:10px;"></div>
+        <label for="imgFileInput" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:8px 14px;border-radius:6px;font-weight:600;font-size:13px;">📷 Upload photo</label>
+        <input id="imgFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;" />
+        <span id="uploadStatus" style="margin-left:10px;color:#64748b;font-size:12px;"></span>
+      </div>
 
       <div class="cost-box">
         <div class="row-line"><span>Base price</span><span>₹50.00</span></div>
@@ -503,6 +506,65 @@ document.querySelectorAll("#mpPicker label").forEach(l => {
   });
 });
 
+// ============ IMAGE UPLOAD ============
+let _uploadedUrls = [];
+const MAX_IMAGES = 5;
+
+function renderThumbs() {
+  const g = $("#thumbGrid");
+  if (!_uploadedUrls.length) { g.innerHTML = ""; return; }
+  g.innerHTML = _uploadedUrls.map((u, i) => `
+    <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover;" />
+      <button type="button" data-idx="${i}" class="thumb-remove" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">×</button>
+    </div>
+  `).join("");
+  g.querySelectorAll(".thumb-remove").forEach(b => b.addEventListener("click", () => {
+    _uploadedUrls.splice(parseInt(b.dataset.idx, 10), 1);
+    renderThumbs();
+  }));
+}
+
+$("#imgFileInput").addEventListener("change", async (e) => {
+  if (!_session) { toast("Please sign in first", true); return; }
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  const room = MAX_IMAGES - _uploadedUrls.length;
+  if (room <= 0) { toast(`Max ${MAX_IMAGES} images`, true); e.target.value = ""; return; }
+  const toUpload = files.slice(0, room);
+  const status = $("#uploadStatus");
+  let done = 0;
+  status.textContent = `Uploading 0/${toUpload.length}…`;
+  for (const f of toUpload) {
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-listing-upload-image`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+        body: fd,
+      });
+      const j = await res.json();
+      if (j.ok && j.url) {
+        _uploadedUrls.push(j.url);
+        done++;
+        status.textContent = `Uploading ${done}/${toUpload.length}…`;
+        renderThumbs();
+      } else if (j.code === "demo_account") {
+        toast(j.message || "Demo account can't upload", true);
+        break;
+      } else {
+        toast(j.error || "Upload failed", true);
+      }
+    } catch (err) {
+      toast("Upload error: " + err.message, true);
+    }
+  }
+  status.textContent = done > 0 ? `✓ ${done} uploaded` : "";
+  e.target.value = "";
+  setTimeout(() => { status.textContent = ""; }, 3000);
+});
+
 $("#addBtn").addEventListener("click", async () => {
   if (!_session) { toast("Please sign in first", true); return; }
   const product_name = $("#pName").value.trim();
@@ -510,7 +572,7 @@ $("#addBtn").addEventListener("click", async () => {
   const price_inr = parseInt($("#pPrice").value, 10) || 0;
   const mrp_inr = parseInt($("#pMrp").value, 10) || 0;
   const marketplaces = Array.from($$('#mpPicker input:checked')).map(i => i.value);
-  const image_urls = Array.from($$('.img-url')).map(i => i.value.trim()).filter(Boolean);
+  const image_urls = _uploadedUrls.slice();
 
   if (!product_name || product_name.length < 2) return toast("Product name required", true);
   if (marketplaces.length === 0) return toast("Pick at least one marketplace", true);
@@ -531,7 +593,8 @@ $("#addBtn").addEventListener("click", async () => {
       $("#pName").value = ""; $("#pDesc").value = "";
       $("#pPrice").value = ""; $("#pMrp").value = "";
       $$('#mpPicker input').forEach(i => { i.checked = false; i.closest("label").classList.remove("active"); });
-      $$('.img-url').forEach(i => { i.value = ""; });
+      _uploadedUrls = [];
+      renderThumbs();
       await Promise.all([loadWallet(), loadMyProducts()]);
     } else if (j.code === "insufficient") {
       toast(`Wallet short by ₹${((j.shortfall_paise||0)/100).toFixed(2)} — recharge on /home/`, true);
