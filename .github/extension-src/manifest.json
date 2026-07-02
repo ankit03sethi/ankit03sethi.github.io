@@ -1,0 +1,93 @@
+{
+  "manifest_version": 3,
+  "name": "Cursive PD Tracker",
+  "version": "1.0.91",
+  "description": "Cursive PD Tracker - track public product data on Indian marketplaces (v1.0.60)",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs",
+    "alarms",
+    "offscreen",
+    "declarativeNetRequest",
+    "history"
+  ],
+  "host_permissions": [
+    "https://www.flipkart.com/*",
+    "https://www.amazon.in/*",
+    "https://www.meesho.com/*",
+    "https://www.myntra.com/*",
+    "https://www.firstcry.com/*",
+    "https://bttppihskbfmxwujyztj.supabase.co/*",
+    "https://cursive.world/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "Cursive PD Tracker"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.flipkart.com/*",
+        "https://www.amazon.in/*",
+        "https://www.meesho.com/*",
+        "https://www.myntra.com/*",
+        "https://www.firstcry.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://cursive.world/pdtracker/*"
+      ],
+      "js": [
+        "pd-bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "mask.html",
+        "mask.js",
+        "offscreen.html",
+        "icon128.png",
+        "icon48.png"
+      ],
+      "matches": [
+        "https://www.flipkart.com/*",
+        "https://www.amazon.in/*",
+        "https://www.meesho.com/*",
+        "https://www.myntra.com/*",
+        "https://www.firstcry.com/*"
+      ]
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "cursive_headers",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  }
+}
