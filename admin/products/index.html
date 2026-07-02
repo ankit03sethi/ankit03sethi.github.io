@@ -144,8 +144,15 @@
       <label>Video URL (YouTube / MP4)</label>
       <input id="pVideo" type="url" placeholder="https://youtu.be/..." />
 
-      <label>Image URLs (one per line, first is main)</label>
-      <textarea id="pImages" placeholder="https://.../img1.jpg&#10;https://.../img2.jpg"></textarea>
+      <label>Product images (first = main, drag to reorder later)</label>
+      <div id="prodUploadArea" style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;margin-bottom:10px;">
+        <div id="prodThumbGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:10px;"></div>
+        <label for="prodImgFile" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:8px 14px;border-radius:6px;font-weight:600;font-size:13px;">📷 Upload image</label>
+        <input id="prodImgFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;" />
+        <span id="prodUploadStatus" style="margin-left:10px;color:#64748b;font-size:12px;"></span>
+      </div>
+      <!-- keep hidden textarea for compatibility with existing save code -->
+      <textarea id="pImages" style="display:none;"></textarea>
 
       <div class="row-2">
         <div>
@@ -213,6 +220,71 @@ let _session = null;
 let _state = { categories: [], products: [], colors: [], designs: [] };
 let _selectedCatId = null;
 let _selectedProdId = null;
+
+// ============ IMAGE UPLOAD (Admin) ============
+let _prodUploaded = [];
+const MAX_PROD_IMAGES = 10;
+
+function syncProdImagesField() {
+  $("#pImages").value = _prodUploaded.join("\n");
+}
+
+function renderProdThumbs() {
+  const g = $("#prodThumbGrid");
+  if (!_prodUploaded.length) { g.innerHTML = ""; return; }
+  g.innerHTML = _prodUploaded.map((u, i) => `
+    <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover;" />
+      <button type="button" data-idx="${i}" class="prod-thumb-rm" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">×</button>
+      ${i === 0 ? '<div style="position:absolute;bottom:2px;left:2px;background:#1F6FEB;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;">MAIN</div>' : ''}
+    </div>
+  `).join("");
+  g.querySelectorAll(".prod-thumb-rm").forEach(b => b.addEventListener("click", () => {
+    _prodUploaded.splice(parseInt(b.dataset.idx, 10), 1);
+    syncProdImagesField();
+    renderProdThumbs();
+  }));
+}
+
+async function uploadFile(file, scope) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("scope", scope);
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-catalog-upload-image`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+    body: fd,
+  });
+  return await res.json();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const fi = document.getElementById("prodImgFile");
+  if (fi) fi.addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !_session) return;
+    const room = MAX_PROD_IMAGES - _prodUploaded.length;
+    if (room <= 0) { toast(`Max ${MAX_PROD_IMAGES} images`, true); e.target.value = ""; return; }
+    const status = $("#prodUploadStatus");
+    let done = 0;
+    status.textContent = `Uploading 0/${files.length}…`;
+    for (const f of files.slice(0, room)) {
+      const j = await uploadFile(f, "product");
+      if (j.ok && j.url) {
+        _prodUploaded.push(j.url);
+        done++;
+        status.textContent = `Uploading ${done}/${files.length}…`;
+        syncProdImagesField();
+        renderProdThumbs();
+      } else {
+        toast(j.error || "Upload failed", true);
+      }
+    }
+    status.textContent = done > 0 ? `✓ ${done} uploaded` : "";
+    e.target.value = "";
+    setTimeout(() => { status.textContent = ""; }, 3000);
+  });
+});
 
 function toast(m, err) {
   const t = document.createElement("div");
@@ -312,7 +384,9 @@ function renderProdEdit() {
   $("#pBullets").value = (p.bullet_points || []).join("\n");
   $("#pDesc").value = p.description || "";
   $("#pVideo").value = p.video_url || "";
-  $("#pImages").value = (p.image_urls || []).join("\n");
+  _prodUploaded = (p.image_urls || []).slice();
+  syncProdImagesField();
+  renderProdThumbs();
   $("#pPrice").value = p.price_inr;
   $("#pMrp").value = p.mrp_inr;
   $("#pQty").value = p.qty_available;
@@ -384,6 +458,9 @@ $("#prodNewBtn").addEventListener("click", () => {
   _selectedProdId = null;
   $("#prodEdit").classList.remove("hidden");
   ["#pTitle","#pBullets","#pDesc","#pVideo","#pImages","#pPrice","#pMrp","#pQty","#pPos"].forEach(s => $(s).value = "");
+  _prodUploaded = [];
+  syncProdImagesField();
+  renderProdThumbs();
   $("#pQty").value = "0"; $("#pPos").value = "100";
   $("#pHero").checked = false; $("#pInStock").checked = true; $("#pActive").checked = true;
   $("#pDelete").classList.add("hidden");
