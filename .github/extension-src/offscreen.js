@@ -1,12 +1,11 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.92
+// Cursive PD Tracker — offscreen background scraper v1.0.93
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
 // No tabs, no windows, no visible activity at all.
-// v1.0.92: Amazon fix v2 — DOM selectors matched wrong price zones (coupon/MRP).
-//          Now uses ONLY JSON-LD but with ASIN-matching preference to avoid
-//          picking up the "Customers who viewed" carousel items' data.
-//          Everything else identical to v1.0.90.
+// v1.0.93: Amazon price fix — v1.0.92 JSON-LD returned Amazon's list price (599)
+//          not the actual "Price to Pay" (399). Now targets .priceToPay class
+//          (Amazon's marker for the current selling price). JSON-LD is fallback.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.92');
+console.log('[PD-OFFSCREEN] loaded v1.0.93');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -65,6 +64,31 @@ async function scrapeUrl(product) {
 
 function extract(doc, html, platform, productId) {
   let rating = null, reviewCount = null, price = null, seller = null;
+
+  // ===== v1.0.93: Amazon "Price to Pay" DOM selectors (most reliable) =====
+  // Amazon marks the actual selling price with class="priceToPay". This is
+  // separate from list price, MRP, coupon promo, etc. The .a-offscreen span
+  // inside contains the formatted ₹value for screen-readers — perfect target.
+  if (platform === 'Amazon') {
+    const priceToPaySelectors = [
+      '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+      '#apex_desktop .priceToPay .a-offscreen',
+      '#corePrice_feature_div .priceToPay .a-offscreen',
+      '.priceToPay .a-offscreen',
+    ];
+    for (const sel of priceToPaySelectors) {
+      const el = doc.querySelector(sel);
+      if (el) {
+        const text = (el.textContent || '').trim();
+        const cleaned = text.replace(/[^\d.]/g, '');
+        const v = parseFloat(cleaned);
+        if (v >= 10 && v < 1000000) {
+          price = String(Math.round(v));
+          break;
+        }
+      }
+    }
+  }
 
   // ===== JSON-LD (works for Amazon, Flipkart, FirstCry) =====
   // v1.0.92: Two-pass strategy specifically for Amazon.
@@ -175,27 +199,4 @@ function extract(doc, html, platform, productId) {
           if (pd.ratings?.totalCount && !reviewCount) reviewCount = pd.ratings.totalCount;
           if (pd.brand?.name && !seller) seller = pd.brand.name;
         }
-      }
-    } catch {}
-  }
-
-  // ===== Flipkart: __INITIAL_STATE__ =====
-  if (platform === 'Flipkart' && (!price || !rating)) {
-    try {
-      const m = html.match(/window\.__INITIAL_STATE__\s*=\s*({[\s\S]*?});\s*<\/script>/);
-      if (m) {
-        const j = JSON.parse(m[1]);
-        // Flipkart structure varies; try common paths
-        const pageData = j?.pageDataV4?.page?.data || j?.data?.product;
-        if (pageData) {
-          const priceObj = pageData?.PRODUCT_DETAILS_WIDGET?.priceObj;
-          if (priceObj?.finalPrice?.value && !price) price = String(Math.round(priceObj.finalPrice.value));
-          if (pageData?.PRODUCT_DETAILS_WIDGET?.rating?.average && !rating) rating = parseFloat(pageData.PRODUCT_DETAILS_WIDGET.rating.average);
-        }
-      }
-    } catch {}
-  }
-
-  // ===== Generic JSON regex (last-ditch) =====
-  // v1.0.16: Only well-scoped price patterns that target product-specific JSON.
-  // Removed
+     
