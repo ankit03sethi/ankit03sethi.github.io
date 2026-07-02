@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Cursive PD Tracker",
-  "version": "1.0.91",
-  "description": "Cursive PD Tracker - track public product data on Indian marketplaces (v1.0.60)",
+  "version": "1.0.92",
+  "description": "Cursive PD Tracker - track public product data on Indian marketplaces (v1.0.92)",
   "permissions": [
     "activeTab",
     "storage",
@@ -11,7 +11,8 @@
     "alarms",
     "offscreen",
     "declarativeNetRequest",
-    "history"
+    "history",
+    "webNavigation"
   ],
   "host_permissions": [
     "https://www.flipkart.com/*",
@@ -43,7 +44,8 @@
       "js": [
         "content.js"
       ],
-      "run_at": "document_end"
+      "run_at": "document_end",
+      "all_frames": false
     },
     {
       "matches": [
@@ -63,24 +65,6 @@
     "48": "icon48.png",
     "128": "icon128.png"
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "mask.html",
-        "mask.js",
-        "offscreen.html",
-        "icon128.png",
-        "icon48.png"
-      ],
-      "matches": [
-        "https://www.flipkart.com/*",
-        "https://www.amazon.in/*",
-        "https://www.meesho.com/*",
-        "https://www.myntra.com/*",
-        "https://www.firstcry.com/*"
-      ]
-    }
-  ],
   "declarative_net_request": {
     "rule_resources": [
       {
@@ -89,5 +73,22 @@
         "path": "rules.json"
       }
     ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "mask.html",
+        "mask.js",
+        "offscreen.html",
+        "icon128.png",
+        "cursive_core.wasm"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   }
 }
