@@ -1,11 +1,12 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.91
+// Cursive PD Tracker — offscreen background scraper v1.0.92
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
 // No tabs, no windows, no visible activity at all.
-// v1.0.91: Fix Amazon picking wrong price from "Customers who viewed" carousel.
-//          Now targets main product price zone (#corePriceDisplay_desktop_feature_div)
-//          AND prefers JSON-LD entries whose productID matches the tracked ASIN.
+// v1.0.92: Amazon fix v2 — DOM selectors matched wrong price zones (coupon/MRP).
+//          Now uses ONLY JSON-LD but with ASIN-matching preference to avoid
+//          picking up the "Customers who viewed" carousel items' data.
+//          Everything else identical to v1.0.90.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.91');
+console.log('[PD-OFFSCREEN] loaded v1.0.92');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
@@ -65,69 +66,60 @@ async function scrapeUrl(product) {
 function extract(doc, html, platform, productId) {
   let rating = null, reviewCount = null, price = null, seller = null;
 
-  // ===== v1.0.91: AMAZON PRICE ONLY — target MAIN Buy Box (NOT the carousel) =====
-  // Fixes issue where "Customers who viewed" carousel prices were being picked up.
-  // Nothing else changed — seller / rating / reviews continue to use JSON-LD below.
-  if (platform === 'Amazon') {
-    const amazonPriceSelectors = [
-      '#corePriceDisplay_desktop_feature_div .a-price .a-offscreen',
-      '#corePriceDisplay_desktop_feature_div .a-price-whole',
-      '#corePrice_desktop .a-offscreen',
-      '#corePrice_feature_div .a-offscreen',
-      '#apex_desktop .a-price .a-offscreen',
-      '.priceToPay .a-offscreen',
-      '#priceblock_ourprice',
-      '#priceblock_dealprice',
-      '#priceblock_saleprice',
-    ];
-    for (const sel of amazonPriceSelectors) {
-      const el = doc.querySelector(sel);
-      if (el) {
-        const text = (el.textContent || el.getAttribute('content') || '').trim();
-        const cleaned = text.replace(/[^\d.]/g, '');
-        const v = parseFloat(cleaned);
-        if (v >= 10 && v < 1000000) {
-          price = String(Math.round(v));
-          break;
-        }
-      }
-    }
-  }
-
   // ===== JSON-LD (works for Amazon, Flipkart, FirstCry) =====
-  // UNCHANGED from prior version. Only difference: for Amazon, price will
-  // usually already be set from the Buy Box selectors above, so the JSON-LD
-  // offers loop skips assignment (guarded by `!price`).
+  // v1.0.92: Two-pass strategy specifically for Amazon.
+  //   Pass 0: Only accept JSON-LD entries whose productID/sku matches the
+  //           tracked ASIN. This skips "Customers who viewed" carousel items.
+  //   Pass 1: Fallback — accept any JSON-LD (behaviour identical to v1.0.90).
+  // For non-Amazon platforms, only Pass 1 runs (behaviour unchanged).
   try {
     const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-    for (const s of scripts) {
-      try {
-        const j = JSON.parse(s.textContent);
-        const items = Array.isArray(j) ? j : [j];
-        for (const item of items) {
-          // Also dig into @graph if present
-          const candidates = item['@graph'] ? item['@graph'] : [item];
-          for (const it of candidates) {
-            if (it.aggregateRating) {
-              if (it.aggregateRating.ratingValue && !rating) {
-                const v = parseFloat(it.aggregateRating.ratingValue);
-                if (v >= 1 && v <= 5) rating = v;
+    const passes = (platform === 'Amazon' && productId) ? [true, false] : [false];
+    for (const mustMatchAsin of passes) {
+      if (price && rating && reviewCount) break;
+      for (const s of scripts) {
+        try {
+          const j = JSON.parse(s.textContent);
+          const items = Array.isArray(j) ? j : [j];
+          for (const item of items) {
+            // Also dig into @graph if present
+            const candidates = item['@graph'] ? item['@graph'] : [item];
+            for (const it of candidates) {
+              // Skip carousel entries on the strict pass
+              if (mustMatchAsin) {
+                const pid = String(it.productID || it.sku || it.mpn || it['@id'] || '').toUpperCase();
+                if (pid.indexOf(String(productId).toUpperCase()) < 0) continue;
               }
-              const rc = it.aggregateRating.ratingCount || it.aggregateRating.reviewCount;
-              if (rc && !reviewCount) reviewCount = parseInt(String(rc).replace(/,/g, ''));
-            }
-            if (it.offers && !price) {
-              const offers = Array.isArray(it.offers) ? it.offers[0] : it.offers;
-              const p = offers.price || offers.lowPrice || offers.highPrice;
-              if (p) {
-                const v = parseFloat(String(p).replace(/,/g, ''));
-                if (v >= 10) price = String(Math.round(v));
+              if (it.aggregateRating) {
+                if (it.aggregateRating.ratingValue && !rating) {
+                  const v = parseFloat(it.aggregateRating.ratingValue);
+                  if (v >= 1 && v <= 5) rating = v;
+                }
+                const rc = it.aggregateRating.ratingCount || it.aggregateRating.reviewCount;
+                if (rc && !reviewCount) reviewCount = parseInt(String(rc).replace(/,/g, ''));
               }
+              if (it.offers) {
+                const offers = Array.isArray(it.offers) ? it.offers[0] : it.offers;
+                if (!price) {
+                  const p = offers.price || offers.lowPrice || offers.highPrice;
+                  if (p) {
+                    const v = parseFloat(String(p).replace(/,/g, ''));
+                    if (v >= 10) price = String(Math.round(v));
+                  }
+                }
+                // v1.0.92: seller from offers.seller.name (real Marketplace seller)
+                if (!seller && offers.seller) {
+                  const s2 = typeof offers.seller === 'string' ? offers.seller : offers.seller.name;
+                  if (s2 && typeof s2 === 'string' && s2.trim().length > 0) {
+                    seller = s2.trim().substring(0, 100);
+                  }
+                }
+              }
+              // v1.0.27: brand is NOT seller. Skip this mapping — only use real seller fields.
             }
-            // v1.0.27: brand is NOT seller. Skip this mapping — only use real seller fields.
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
   } catch {}
 
@@ -206,4 +198,4 @@ function extract(doc, html, platform, productId) {
 
   // ===== Generic JSON regex (last-ditch) =====
   // v1.0.16: Only well-scoped price patterns that target product-specific JSON.
-  // Removed loose "price" / "mrp" patterns that matched unrela
+  // Removed
