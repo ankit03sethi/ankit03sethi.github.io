@@ -175,6 +175,25 @@
         </div>
       </div>
 
+      <div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">🧩 Variation types (multi-select)</div>
+        <div style="color:#64748b;font-size:12px;margin-bottom:8px;">Pick which types of variations this product has. Sections will appear below to add each type.</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;">
+          <label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;margin:0;font-weight:600;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="var-type-check" value="color" />
+            <span>🎨 Color</span>
+          </label>
+          <label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;margin:0;font-weight:600;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="var-type-check" value="style" />
+            <span>✨ Style</span>
+          </label>
+          <label style="display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;margin:0;font-weight:600;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="var-type-check" value="size" />
+            <span>📏 Size</span>
+          </label>
+        </div>
+      </div>
+
       <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;margin-top:14px;">
         <input id="pHero" type="checkbox" />
         <span>Mark as <b>Hero product</b> of this category (shown publicly)</span>
@@ -198,13 +217,65 @@
     </div>
 
     <div id="colorsWrap" class="hidden" style="margin-top:20px;border-top:2px solid #f1f5f9;padding-top:14px;">
-      <h3 style="display:flex;justify-content:space-between;align-items:center;"><span>🎨 Colors of this product</span> <button id="colorNewBtn" class="b-outline">➕ Add color</button></h3>
-      <div id="colorList"></div>
+      <div id="varSections"></div>
+      <div id="varEmpty" style="text-align:center;color:#94a3b8;padding:24px;font-size:13px;">
+        Select at least one <b>variation type</b> above (Color / Style / Size) to add variations.
+      </div>
     </div>
   </section>
 </main>
 
 <div id="toastHost"></div>
+
+<!-- COLOR MODAL -->
+<div id="colorModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <h3 id="colorModalTitle" style="margin:0 0 16px;">Add color</h3>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Color name *</label>
+    <input id="mColorName" placeholder="e.g. Deep Brown" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Hex code (optional)</label>
+    <input id="mColorHex" placeholder="#8B4513" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
+    <input id="mColorPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Color images (up to 5)</label>
+    <div style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;margin-bottom:16px;">
+      <div id="mColorThumbGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-bottom:10px;"></div>
+      <label for="mColorImgFile" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:7px 12px;border-radius:6px;font-weight:600;font-size:13px;">📷 Upload</label>
+      <input id="mColorImgFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;" />
+      <span id="mColorUploadStatus" style="margin-left:10px;color:#64748b;font-size:12px;"></span>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="mColorCancel" class="b-outline">Cancel</button>
+      <button id="mColorSave" class="btn btn-primary">Save color</button>
+    </div>
+  </div>
+</div>
+
+<!-- DESIGN MODAL -->
+<div id="designModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <h3 id="designModalTitle" style="margin:0 0 16px;">Add design</h3>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Design name *</label>
+    <input id="mDesignName" placeholder="e.g. Butterfly WE 45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">SKU (optional)</label>
+    <input id="mDesignSku" placeholder="MZ-DP-BR-045" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Qty available</label>
+    <input id="mDesignQty" type="number" min="0" placeholder="0" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
+    <input id="mDesignPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Design image</label>
+    <div style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;margin-bottom:16px;">
+      <div id="mDesignThumb" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;margin-bottom:10px;"></div>
+      <label for="mDesignImgFile" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:7px 12px;border-radius:6px;font-weight:600;font-size:13px;">📷 Upload</label>
+      <input id="mDesignImgFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" />
+      <span id="mDesignUploadStatus" style="margin-left:10px;color:#64748b;font-size:12px;"></span>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="mDesignCancel" class="b-outline">Cancel</button>
+      <button id="mDesignSave" class="btn btn-primary">Save design</button>
+    </div>
+  </div>
+</div>
 
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
@@ -394,52 +465,95 @@ function renderProdEdit() {
   $("#pHero").checked = !!p.is_hero;
   $("#pInStock").checked = p.in_stock !== false;
   $("#pActive").checked = p.is_active !== false;
+  // Load variation type checkboxes from product.variation_types array
+  const vt = new Set(p.variation_types || []);
+  $$(".var-type-check").forEach(c => { c.checked = vt.has(c.value); });
   $("#pDelete").classList.remove("hidden");
-  renderColors();
+  renderVariations();
 }
 
-function renderColors() {
+const VAR_TYPE_META = {
+  color: { icon: "🎨", label: "Color", plural: "Colors" },
+  style: { icon: "✨", label: "Style", plural: "Styles" },
+  size:  { icon: "📏", label: "Size",  plural: "Sizes" },
+};
+
+function selectedVariationTypes() {
+  return Array.from($$(".var-type-check")).filter(c => c.checked).map(c => c.value);
+}
+
+function renderVariations() {
   $("#colorsWrap").classList.remove("hidden");
-  const colors = _state.colors.filter(c => c.product_id === _selectedProdId).sort((a,b) => a.position - b.position);
-  if (colors.length === 0) {
-    $("#colorList").innerHTML = `<div class="empty-hint">No colors yet. Click "Add color" ↑</div>`;
+  const types = selectedVariationTypes();
+  const wrap = $("#varSections");
+  const emptyMsg = $("#varEmpty");
+  if (types.length === 0) {
+    wrap.innerHTML = "";
+    emptyMsg.style.display = "block";
     return;
   }
-  $("#colorList").innerHTML = colors.map(c => {
-    const designs = _state.designs.filter(d => d.color_id === c.id).sort((a,b) => a.position - b.position);
-    const dHtml = designs.length === 0
-      ? `<div style="color:#94a3b8;font-size:11.5px;padding:4px 0;">No designs yet.</div>`
-      : designs.map(d => `<div class="design-block">
+  emptyMsg.style.display = "none";
+  const allVars = _state.colors.filter(c => c.product_id === _selectedProdId);
+  let html = "";
+  for (const t of types) {
+    const meta = VAR_TYPE_META[t];
+    const rows = allVars.filter(v => (v.variation_type || "color") === t).sort((a,b) => a.position - b.position);
+    html += `<div style="margin-bottom:20px;">
+      <h3 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${meta.icon} ${meta.plural} of this product</span>
+        <button class="b-outline" data-add-var="${t}">➕ Add ${meta.label.toLowerCase()}</button>
+      </h3>
+      <div>`;
+    if (rows.length === 0) {
+      html += `<div class="empty-hint">No ${meta.plural.toLowerCase()} yet. Click "Add ${meta.label.toLowerCase()}" ↑</div>`;
+    } else {
+      html += rows.map(c => {
+        const designs = _state.designs.filter(d => d.color_id === c.id).sort((a,b) => a.position - b.position);
+        const dHtml = designs.length === 0
+          ? `<div style="color:#94a3b8;font-size:11.5px;padding:4px 0;">No specific designs yet.</div>`
+          : designs.map(d => `<div class="design-block">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>${esc(d.name)} <small style="color:#94a3b8;">${d.sku ? '· SKU ' + esc(d.sku) : ''} · qty ${d.qty_available}</small></span>
+                <span><button class="b-outline" data-edit-design="${d.id}">Edit</button> <button class="b-danger" data-del-design="${d.id}">🗑</button></span>
+              </div>
+            </div>`).join("");
+        return `<div class="color-block">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span>${esc(d.name)} <small style="color:#94a3b8;">${d.sku ? '· SKU ' + esc(d.sku) : ''} · qty ${d.qty_available}</small></span>
-            <span><button class="b-outline" data-edit-design="${d.id}">Edit</button> <button class="b-danger" data-del-design="${d.id}">🗑</button></span>
+            <div>
+              <b style="color:${c.hex_code||'#0f172a'};">● ${esc(c.name)}</b>
+              <small style="color:#94a3b8;">${c.hex_code || ''}</small>
+            </div>
+            <div>
+              <button class="b-outline" data-edit-color="${c.id}">Edit</button>
+              <button class="b-outline" data-add-design="${c.id}">➕ Design</button>
+              <button class="b-danger" data-del-color="${c.id}">🗑</button>
+            </div>
           </div>
-        </div>`).join("");
-    return `<div class="color-block">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <b style="color:${c.hex_code||'#0f172a'};">● ${esc(c.name)}</b>
-          <small style="color:#94a3b8;">${c.hex_code || ''}</small>
-        </div>
-        <div>
-          <button class="b-outline" data-edit-color="${c.id}">Edit</button>
-          <button class="b-outline" data-add-design="${c.id}">➕ Design</button>
-          <button class="b-danger" data-del-color="${c.id}">🗑</button>
-        </div>
-      </div>
-      <div style="margin-top:8px;">${dHtml}</div>
-    </div>`;
-  }).join("");
+          <div style="margin-top:8px;">${dHtml}</div>
+        </div>`;
+      }).join("");
+    }
+    html += `</div></div>`;
+  }
+  wrap.innerHTML = html;
   // Wire up buttons
-  $$("[data-edit-color]").forEach(b => b.addEventListener("click", () => openColorDialog(Number(b.dataset.editColor))));
-  $$("[data-del-color]").forEach(b => b.addEventListener("click", () => deleteColor(Number(b.dataset.delColor))));
-  $$("[data-add-design]").forEach(b => b.addEventListener("click", () => openDesignDialog(Number(b.dataset.addDesign), 0)));
-  $$("[data-edit-design]").forEach(b => b.addEventListener("click", () => {
+  wrap.querySelectorAll("[data-add-var]").forEach(b => b.addEventListener("click", () => openColorDialog(0, b.dataset.addVar)));
+  wrap.querySelectorAll("[data-edit-color]").forEach(b => b.addEventListener("click", () => openColorDialog(Number(b.dataset.editColor))));
+  wrap.querySelectorAll("[data-del-color]").forEach(b => b.addEventListener("click", () => deleteColor(Number(b.dataset.delColor))));
+  wrap.querySelectorAll("[data-add-design]").forEach(b => b.addEventListener("click", () => openDesignDialog(Number(b.dataset.addDesign), 0)));
+  wrap.querySelectorAll("[data-edit-design]").forEach(b => b.addEventListener("click", () => {
     const d = _state.designs.find(x => x.id === Number(b.dataset.editDesign));
     openDesignDialog(d.color_id, d.id);
   }));
-  $$("[data-del-design]").forEach(b => b.addEventListener("click", () => deleteDesign(Number(b.dataset.delDesign))));
+  wrap.querySelectorAll("[data-del-design]").forEach(b => b.addEventListener("click", () => deleteDesign(Number(b.dataset.delDesign))));
 }
+
+// Re-render when variation type checkboxes change
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains("var-type-check")) {
+    renderVariations();
+  }
+});
 
 // ============ HANDLERS ============
 $("#catSave").addEventListener("click", async () => {
@@ -461,6 +575,8 @@ $("#prodNewBtn").addEventListener("click", () => {
   _prodUploaded = [];
   syncProdImagesField();
   renderProdThumbs();
+  $$(".var-type-check").forEach(c => { c.checked = false; });
+  renderVariations();
   $("#pQty").value = "0"; $("#pPos").value = "100";
   $("#pHero").checked = false; $("#pInStock").checked = true; $("#pActive").checked = true;
   $("#pDelete").classList.add("hidden");
@@ -484,6 +600,7 @@ $("#pSave").addEventListener("click", async () => {
     is_hero: $("#pHero").checked,
     in_stock: $("#pInStock").checked,
     is_active: $("#pActive").checked,
+    variation_types: selectedVariationTypes(),
   };
   const j = await call("save_product", payload);
   if (j.ok) { toast("✓ Saved product"); _selectedProdId = j.product.id; await loadAll(); }
@@ -498,23 +615,88 @@ $("#pDelete").addEventListener("click", async () => {
 });
 $("#pCancel").addEventListener("click", () => { _selectedProdId = null; renderRight(); });
 
-// Color dialog (simple prompt-based for speed)
-$("#colorNewBtn").addEventListener("click", () => openColorDialog(0));
-async function openColorDialog(id) {
-  const existing = id ? _state.colors.find(c => c.id === id) : null;
-  const name = prompt("Color name", existing?.name || "");
-  if (!name) return;
-  const hex = prompt("Hex code (optional, e.g. #ff0000)", existing?.hex_code || "");
-  const imgs = prompt("Color image URLs (comma-separated, optional)", (existing?.image_urls || []).join(","));
-  const j = await call("save_color", {
-    id, product_id: _selectedProdId,
-    name, hex_code: hex || "",
-    image_urls: (imgs || "").split(",").map(s => s.trim()).filter(Boolean),
-    position: existing?.position || 100,
-  });
-  if (j.ok) { toast("✓ Color saved"); await loadAll(); }
-  else toast(j.error, true);
+// ============ COLOR MODAL ============
+let _colorEditId = 0;
+let _colorUploaded = [];
+
+function renderColorModalThumbs() {
+  const g = $("#mColorThumbGrid");
+  if (!_colorUploaded.length) { g.innerHTML = ""; return; }
+  g.innerHTML = _colorUploaded.map((u, i) => `
+    <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover;" />
+      <button type="button" data-idx="${i}" class="mcol-rm" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;padding:0;line-height:1;">×</button>
+    </div>
+  `).join("");
+  g.querySelectorAll(".mcol-rm").forEach(b => b.addEventListener("click", () => {
+    _colorUploaded.splice(parseInt(b.dataset.idx, 10), 1);
+    renderColorModalThumbs();
+  }));
 }
+
+let _colorEditType = "color";
+function openColorDialog(id, type) {
+  _colorEditId = id;
+  const existing = id ? _state.colors.find(c => c.id === id) : null;
+  _colorEditType = existing?.variation_type || type || "color";
+  const meta = VAR_TYPE_META[_colorEditType] || VAR_TYPE_META.color;
+  $("#colorModalTitle").textContent = (existing ? "Edit " : "Add ") + meta.label.toLowerCase();
+  $("#mColorName").value = existing?.name || "";
+  $("#mColorHex").value = existing?.hex_code || "";
+  $("#mColorPos").value = existing?.position || 100;
+  // Show hex input only for color type
+  const hexRow = $("#mColorHex").parentElement.querySelector("label");
+  if (_colorEditType === "color") {
+    $("#mColorHex").style.display = "";
+    if (hexRow) hexRow.style.display = "";
+  } else {
+    $("#mColorHex").style.display = "none";
+    if (hexRow) hexRow.style.display = "none";
+  }
+  _colorUploaded = (existing?.image_urls || []).slice();
+  renderColorModalThumbs();
+  $("#colorModal").classList.remove("hidden");
+}
+
+$("#colorNewBtn").addEventListener("click", () => openColorDialog(0));
+$("#mColorCancel").addEventListener("click", () => $("#colorModal").classList.add("hidden"));
+$("#mColorImgFile").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  const room = 5 - _colorUploaded.length;
+  if (room <= 0) { toast("Max 5 images", true); e.target.value = ""; return; }
+  const status = $("#mColorUploadStatus");
+  let done = 0;
+  status.textContent = `Uploading 0/${files.length}…`;
+  for (const f of files.slice(0, room)) {
+    const j = await uploadFile(f, "color");
+    if (j.ok && j.url) {
+      _colorUploaded.push(j.url);
+      done++;
+      status.textContent = `Uploading ${done}/${files.length}…`;
+      renderColorModalThumbs();
+    } else {
+      toast(j.error || "Upload failed", true);
+    }
+  }
+  status.textContent = done > 0 ? `✓ ${done} uploaded` : "";
+  e.target.value = "";
+  setTimeout(() => { status.textContent = ""; }, 2500);
+});
+$("#mColorSave").addEventListener("click", async () => {
+  const name = $("#mColorName").value.trim();
+  if (!name) return toast("Name required", true);
+  const j = await call("save_color", {
+    id: _colorEditId, product_id: _selectedProdId,
+    name, hex_code: _colorEditType === "color" ? $("#mColorHex").value.trim() : "",
+    image_urls: _colorUploaded.slice(),
+    position: Number($("#mColorPos").value) || 100,
+    variation_type: _colorEditType,
+  });
+  if (j.ok) { toast("✓ Saved"); $("#colorModal").classList.add("hidden"); await loadAll(); }
+  else toast(j.error, true);
+});
+
 async function deleteColor(id) {
   if (!confirm("Delete this color (and its designs)?")) return;
   const j = await call("delete_color", { id });
@@ -522,23 +704,72 @@ async function deleteColor(id) {
   else toast(j.error, true);
 }
 
-// Design dialog
-async function openDesignDialog(colorId, id) {
-  const existing = id ? _state.designs.find(d => d.id === id) : null;
-  const name = prompt("Design name", existing?.name || "");
-  if (!name) return;
-  const sku = prompt("SKU (optional)", existing?.sku || "");
-  const img = prompt("Image URL (optional)", existing?.image_url || "");
-  const qty = prompt("Qty available", String(existing?.qty_available || 0));
-  const j = await call("save_design", {
-    id: id || 0, color_id: colorId,
-    name, sku, image_url: img,
-    qty_available: Number(qty) || 0,
-    position: existing?.position || 100,
+// ============ DESIGN MODAL ============
+let _designEditId = 0;
+let _designColorId = 0;
+let _designUploaded = "";
+
+function renderDesignModalThumb() {
+  const g = $("#mDesignThumb");
+  if (!_designUploaded) { g.innerHTML = ""; return; }
+  g.innerHTML = `
+    <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
+      <img src="${_designUploaded}" style="width:100%;height:100%;object-fit:cover;" />
+      <button type="button" id="mdes-rm" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;padding:0;line-height:1;">×</button>
+    </div>
+  `;
+  document.getElementById("mdes-rm").addEventListener("click", () => {
+    _designUploaded = "";
+    renderDesignModalThumb();
   });
-  if (j.ok) { toast("✓ Design saved"); await loadAll(); }
-  else toast(j.error, true);
 }
+
+function openDesignDialog(colorId, id) {
+  _designEditId = id || 0;
+  _designColorId = colorId;
+  const existing = id ? _state.designs.find(d => d.id === id) : null;
+  $("#designModalTitle").textContent = existing ? "Edit design" : "Add design";
+  $("#mDesignName").value = existing?.name || "";
+  $("#mDesignSku").value = existing?.sku || "";
+  $("#mDesignQty").value = existing?.qty_available || 0;
+  $("#mDesignPos").value = existing?.position || 100;
+  _designUploaded = existing?.image_url || "";
+  renderDesignModalThumb();
+  $("#designModal").classList.remove("hidden");
+}
+
+$("#mDesignCancel").addEventListener("click", () => $("#designModal").classList.add("hidden"));
+$("#mDesignImgFile").addEventListener("change", async (e) => {
+  const f = e.target.files?.[0];
+  if (!f) return;
+  const status = $("#mDesignUploadStatus");
+  status.textContent = "Uploading…";
+  const j = await uploadFile(f, "design");
+  if (j.ok && j.url) {
+    _designUploaded = j.url;
+    renderDesignModalThumb();
+    status.textContent = "✓ Uploaded";
+  } else {
+    toast(j.error || "Upload failed", true);
+    status.textContent = "";
+  }
+  e.target.value = "";
+  setTimeout(() => { status.textContent = ""; }, 2500);
+});
+$("#mDesignSave").addEventListener("click", async () => {
+  const name = $("#mDesignName").value.trim();
+  if (!name) return toast("Design name required", true);
+  const j = await call("save_design", {
+    id: _designEditId, color_id: _designColorId,
+    name, sku: $("#mDesignSku").value.trim(),
+    image_url: _designUploaded,
+    qty_available: Number($("#mDesignQty").value) || 0,
+    position: Number($("#mDesignPos").value) || 100,
+  });
+  if (j.ok) { toast("✓ Design saved"); $("#designModal").classList.add("hidden"); await loadAll(); }
+  else toast(j.error, true);
+});
+
 async function deleteDesign(id) {
   if (!confirm("Delete this design?")) return;
   const j = await call("delete_design", { id });
