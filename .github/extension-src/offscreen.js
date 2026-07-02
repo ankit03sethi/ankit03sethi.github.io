@@ -1,8 +1,9 @@
 // Cursive PD Tracker — offscreen background scraper v1.0.100
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
-// v1.0.100: Same ATC hidden input strategy as v1.0.99, plus fixed heartbeat
-//           to report actual manifest version. Also removes JSON-LD fallback
-//           since it was picking up 599 for carousel-heavy pages.
+// v1.0.100: ATC hidden input as PRIMARY strategy for Amazon.
+//           Reads name="items[0.base][customerVisiblePrice][amount]" value.
+//           This exists ONCE per page (main product ATC button), never in
+//           carousel. Bulletproof fix for MUAAZON-like products.
 
 console.log('[PD-OFFSCREEN] loaded v1.0.100');
 
@@ -17,8 +18,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function scrapeUrl(product) {
   try {
-    // v1.0.96: credentials:'omit' → don't send Amazon Business cookies.
-    // This gives us the ANONYMOUS "normal customer" view with correct sale prices.
     const res = await fetch(product.product_url, {
       credentials: 'omit',
       redirect: 'follow',
@@ -66,52 +65,39 @@ async function scrapeUrl(product) {
 function extract(doc, html, platform, productId) {
   let rating = null, reviewCount = null, price = null, seller = null;
 
-  // ===== v1.0.99: Amazon MAIN PRODUCT price — BULLETPROOF =====
-  // FIX: For products where "Customers who viewed" carousel appears at the
-  // TOP of the page (above main product), previous strategies matched the
-  // FIRST price in HTML = carousel price (wrong).
-  //
-  // Solution: Use Amazon's ATC (Add To Cart) hidden input. This input only
-  // exists ONCE per page, is bound to the main product Buy button, and
-  // contains the EXACT price used to book the order. Cannot appear in
-  // carousel or any other product section.
-  //
-  //   <input type="hidden"
-  //          name="items[0.base][customerVisiblePrice][amount]"
-  //          value="399.0">
+  // ===== v1.0.100: Amazon MAIN PRODUCT price — BULLETPROOF =====
   if (platform === 'Amazon') {
-    // Strategy 1 (PRIMARY): Amazon ATC hidden input — the ONE TRUE price
-    const atcMatch = html.match(/name="items\[0\.base\]\[customerVisiblePrice\]\[amount\]"[^>]*value="([\d,.]+)"/);
-    if (atcMatch) {
-      const v = parseFloat(String(atcMatch[1]).replace(/,/g, ''));
+    // Strategy 1 (PRIMARY): ATC hidden input — ONE TRUE price.
+    // Exists ONCE per page, cannot be in carousel.
+    //   <input name="items[0.base][customerVisiblePrice][amount]" value="399.0">
+    const atc1 = html.match(/name="items\[0\.base\]\[customerVisiblePrice\]\[amount\]"[^>]*value="([\d,.]+)"/);
+    if (atc1) {
+      const v = parseFloat(String(atc1[1]).replace(/,/g, ''));
       if (v >= 10 && v < 1000000) {
         price = String(Math.round(v));
-        console.log('[PD-OFF v1.0.99] price from ATC hidden input = ' + price);
+        console.log('[PD-OFF v1.0.100] price from ATC input = ' + price);
       }
     }
-    // Also try alternate value order (value first, name later)
     if (!price) {
       const atc2 = html.match(/value="([\d,.]+)"[^>]*name="items\[0\.base\]\[customerVisiblePrice\]\[amount\]"/);
       if (atc2) {
         const v = parseFloat(String(atc2[1]).replace(/,/g, ''));
         if (v >= 10 && v < 1000000) {
           price = String(Math.round(v));
-          console.log('[PD-OFF v1.0.99] price from ATC (reversed) = ' + price);
+          console.log('[PD-OFF v1.0.100] price from ATC (reversed) = ' + price);
         }
       }
     }
-    // Strategy 2: DOM selectors using Amazon's REAL class names.
+
+    // Strategy 2: DOM selectors using Amazon's REAL class names
     if (!price) {
       const priceSelectors = [
         '.apex-pricetopay-value .a-offscreen',
-        '.apexPriceToPay .a-offscreen',
-        '.priceToPay .a-offscreen',
         '#corePriceDisplay_desktop_feature_div .a-offscreen',
         '#apex_desktop .a-offscreen',
         '#corePrice_feature_div .a-offscreen',
         '#corePriceDisplay_desktop_feature_div .a-price-whole',
         '#apex_desktop .a-price-whole',
-        '#corePrice_feature_div .a-price-whole',
       ];
       for (const sel of priceSelectors) {
         const el = doc.querySelector(sel);
@@ -121,26 +107,28 @@ function extract(doc, html, platform, productId) {
           const v = parseFloat(cleaned);
           if (v >= 10 && v < 1000000) {
             price = String(Math.round(v));
-            console.log('[PD-OFF v1.0.99] price from selector "' + sel + '" = ' + price);
+            console.log('[PD-OFF v1.0.100] price from ' + sel + ' = ' + price);
             break;
           }
         }
       }
     }
-    // Strategy 3: HTML regex fallback
+
+    // Strategy 3: HTML regex anchored to main product containers
     if (!price) {
       const anchoredPatterns = [
         /class="[^"]*apex-pricetopay-value[^"]*"[\s\S]{0,500}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
         /id="corePriceDisplay_desktop_feature_div"[\s\S]{0,3000}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
         /id="apex_desktop"[\s\S]{0,3000}?class="a-offscreen"[^>]*>[^\d]*([\d,.]+)/,
+        /id="corePriceDisplay_desktop_feature_div"[\s\S]{0,3000}?class="a-price-whole"[^>]*>[^\d]*([\d,.]+)/,
       ];
-      for (let i = 0; i < anchoredPatterns.length; i++) {
-        const m = html.match(anchoredPatterns[i]);
+      for (const re of anchoredPatterns) {
+        const m = html.match(re);
         if (m) {
           const v = parseFloat(String(m[1]).replace(/,/g, ''));
           if (v >= 10 && v < 1000000) {
             price = String(Math.round(v));
-            console.log('[PD-OFF v1.0.99] price from regex #' + i + ' = ' + price);
+            console.log('[PD-OFF v1.0.100] price from regex anchor');
             break;
           }
         }
@@ -148,12 +136,7 @@ function extract(doc, html, platform, productId) {
     }
   }
 
-  // ===== JSON-LD (works for Amazon, Flipkart, FirstCry) =====
-  // v1.0.92: Two-pass strategy specifically for Amazon.
-  //   Pass 0: Only accept JSON-LD entries whose productID/sku matches the
-  //           tracked ASIN. This skips "Customers who viewed" carousel items.
-  //   Pass 1: Fallback — accept any JSON-LD (behaviour identical to v1.0.90).
-  // For non-Amazon platforms, only Pass 1 runs (behaviour unchanged).
+  // ===== JSON-LD (Amazon rating/count/seller + other platforms) =====
   try {
     const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
     const passes = (platform === 'Amazon' && productId) ? [true, false] : [false];
@@ -164,19 +147,17 @@ function extract(doc, html, platform, productId) {
           const j = JSON.parse(s.textContent);
           const items = Array.isArray(j) ? j : [j];
           for (const item of items) {
-            // Also dig into @graph if present
             const candidates = item['@graph'] ? item['@graph'] : [item];
             for (const it of candidates) {
-              // Skip carousel entries on the strict pass — check multiple fields.
               if (mustMatchAsin) {
                 const asin = String(productId).toUpperCase();
                 const meoi = it.mainEntityOfPage && (it.mainEntityOfPage['@id'] || it.mainEntityOfPage.id) || '';
                 const offersRaw = Array.isArray(it.offers) ? it.offers[0] : it.offers;
                 const offersUrl = (offersRaw && offersRaw.url) || '';
-                const candidates = [
+                const fields = [
                   it.productID, it.sku, it.mpn, it['@id'], meoi, offersUrl,
                 ].map(v => String(v || '').toUpperCase());
-                if (!candidates.some(c => c.indexOf(asin) >= 0)) continue;
+                if (!fields.some(c => c.indexOf(asin) >= 0)) continue;
               }
               if (it.aggregateRating) {
                 if (it.aggregateRating.ratingValue && !rating) {
@@ -188,14 +169,14 @@ function extract(doc, html, platform, productId) {
               }
               if (it.offers) {
                 const offers = Array.isArray(it.offers) ? it.offers[0] : it.offers;
-                if (!price) {
+                // For Amazon, price is already set from ATC input — don't overwrite from JSON-LD
+                if (!price && platform !== 'Amazon') {
                   const p = offers.price || offers.lowPrice || offers.highPrice;
                   if (p) {
                     const v = parseFloat(String(p).replace(/,/g, ''));
                     if (v >= 10) price = String(Math.round(v));
                   }
                 }
-                // v1.0.92: seller from offers.seller.name (real Marketplace seller)
                 if (!seller && offers.seller) {
                   const s2 = typeof offers.seller === 'string' ? offers.seller : offers.seller.name;
                   if (s2 && typeof s2 === 'string' && s2.trim().length > 0) {
@@ -203,7 +184,6 @@ function extract(doc, html, platform, productId) {
                   }
                 }
               }
-              // v1.0.27: brand is NOT seller. Skip this mapping — only use real seller fields.
             }
           }
         } catch {}
@@ -211,7 +191,44 @@ function extract(doc, html, platform, productId) {
     }
   } catch {}
 
-  // ===== Meta tags (works for many e-commerce sites) =====
+  // ===== Meta tags (fallback for price on non-Amazon) =====
   try {
     if (!price) {
-      const metaSelectors
+      const metaSelectors = [
+        'meta[itemprop="price"]',
+        'meta[property="product:price:amount"]',
+        'meta[property="og:price:amount"]',
+        'meta[name="twitter:data1"]',
+      ];
+      for (const sel of metaSelectors) {
+        const el = doc.querySelector(sel);
+        if (el) {
+          const c = el.getAttribute('content');
+          if (c) {
+            const m = c.match(/[\d,.]+/);
+            if (m) {
+              const v = parseFloat(m[0].replace(/,/g, ''));
+              if (v >= 10 && v < 1000000) {
+                price = String(Math.round(v));
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // ===== Amazon seller — from Sold By text on the page =====
+  if (platform === 'Amazon' && !seller) {
+    try {
+      const soldBy = doc.querySelector('#sellerProfileTriggerId, [data-csa-c-content-id="offerDisplayFeature_desktop_soldByText"]');
+      if (soldBy) {
+        const t = (soldBy.textContent || '').trim();
+        if (t && t.length > 0 && t.length < 100) seller = t;
+      }
+    } catch {}
+  }
+
+  return { rating, reviewCount, price, seller };
+}
