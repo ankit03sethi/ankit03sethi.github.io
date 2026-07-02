@@ -254,9 +254,24 @@
 <!-- DESIGN MODAL -->
 <div id="designModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:12px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-    <h3 id="designModalTitle" style="margin:0 0 16px;">Add design</h3>
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Design name *</label>
-    <input id="mDesignName" placeholder="e.g. Butterfly WE 45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <h3 id="designModalTitle" style="margin:0 0 16px;">Add sub-variation</h3>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Sub-variation type *</label>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <label style="display:flex;gap:5px;align-items:center;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">
+        <input type="radio" name="mDesignType" value="design" checked /> ✏️ Design
+      </label>
+      <label style="display:flex;gap:5px;align-items:center;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">
+        <input type="radio" name="mDesignType" value="color" /> 🎨 Color
+      </label>
+      <label style="display:flex;gap:5px;align-items:center;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">
+        <input type="radio" name="mDesignType" value="style" /> ✨ Style
+      </label>
+      <label style="display:flex;gap:5px;align-items:center;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">
+        <input type="radio" name="mDesignType" value="size" /> 📏 Size
+      </label>
+    </div>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Name *</label>
+    <input id="mDesignName" placeholder="e.g. Butterfly WE 45 / Red / Large" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">SKU (optional)</label>
     <input id="mDesignSku" placeholder="MZ-DP-BR-045" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Qty available</label>
@@ -525,7 +540,7 @@ function renderVariations() {
             </div>
             <div>
               <button class="b-outline" data-edit-color="${c.id}">Edit</button>
-              <button class="b-outline" data-add-design="${c.id}">➕ Design</button>
+              <button class="b-outline" data-add-design="${c.id}">➕ Add sub</button>
               <button class="b-danger" data-del-color="${c.id}">🗑</button>
             </div>
           </div>
@@ -658,7 +673,7 @@ function openColorDialog(id, type) {
   $("#colorModal").classList.remove("hidden");
 }
 
-// colorNewBtn removed - variations now added via per-type "Add X" buttons in renderVariations()
+// v2-force-cdn-refresh - colorNewBtn removed, variations added via per-type buttons
 $("#mColorCancel").addEventListener("click", () => $("#colorModal").classList.add("hidden"));
 $("#mColorImgFile").addEventListener("change", async (e) => {
   const files = Array.from(e.target.files || []);
@@ -728,12 +743,15 @@ function openDesignDialog(colorId, id) {
   _designEditId = id || 0;
   _designColorId = colorId;
   const existing = id ? _state.designs.find(d => d.id === id) : null;
-  $("#designModalTitle").textContent = existing ? "Edit design" : "Add design";
+  $("#designModalTitle").textContent = existing ? "Edit sub-variation" : "Add sub-variation";
   $("#mDesignName").value = existing?.name || "";
   $("#mDesignSku").value = existing?.sku || "";
   $("#mDesignQty").value = existing?.qty_available || 0;
   $("#mDesignPos").value = existing?.position || 100;
   _designUploaded = existing?.image_url || "";
+  // Set variation type radio (default 'design')
+  const existingType = existing?.variation_type || "design";
+  document.querySelectorAll("input[name='mDesignType']").forEach(r => { r.checked = (r.value === existingType); });
   renderDesignModalThumb();
   $("#designModal").classList.remove("hidden");
 }
@@ -758,13 +776,15 @@ $("#mDesignImgFile").addEventListener("change", async (e) => {
 });
 $("#mDesignSave").addEventListener("click", async () => {
   const name = $("#mDesignName").value.trim();
-  if (!name) return toast("Design name required", true);
+  if (!name) return toast("Name required", true);
+  const chosenType = document.querySelector("input[name='mDesignType']:checked")?.value || "design";
   const j = await call("save_design", {
     id: _designEditId, color_id: _designColorId,
     name, sku: $("#mDesignSku").value.trim(),
     image_url: _designUploaded,
     qty_available: Number($("#mDesignQty").value) || 0,
     position: Number($("#mDesignPos").value) || 100,
+    variation_type: chosenType,
   });
   if (j.ok) { toast("✓ Design saved"); $("#designModal").classList.add("hidden"); await loadAll(); }
   else toast(j.error, true);
