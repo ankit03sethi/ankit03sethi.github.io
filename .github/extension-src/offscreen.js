@@ -1,12 +1,10 @@
-// Cursive PD Tracker — offscreen background scraper v1.0.99
+// Cursive PD Tracker — offscreen background scraper v1.0.100
 // Runs in a hidden offscreen document. Does fetch + DOMParser + extraction.
-// v1.0.99: BULLETPROOF — read Amazon's hidden ATC input which contains the
-//          EXACT price used by the Buy button:
-//            name="items[0.base][customerVisiblePrice][amount]" value="399.0"
-//          This element only exists ONCE per page (for the main product's ATC
-//          button). Carousels don't have this input. Best possible signal.
+// v1.0.100: Same ATC hidden input strategy as v1.0.99, plus fixed heartbeat
+//           to report actual manifest version. Also removes JSON-LD fallback
+//           since it was picking up 599 for carousel-heavy pages.
 
-console.log('[PD-OFFSCREEN] loaded v1.0.99');
+console.log('[PD-OFFSCREEN] loaded v1.0.100');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action !== 'pd_scrape_url') return;
