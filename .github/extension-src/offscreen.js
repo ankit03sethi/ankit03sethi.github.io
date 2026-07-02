@@ -219,6 +219,50 @@ function extract(doc, html, platform, productId) {
     }
   } catch {}
 
+  // ===== Amazon rating + review count from DOM/HTML =====
+  if (platform === 'Amazon') {
+    // Rating — try DOM first, then regex
+    if (!rating) {
+      try {
+        const el = doc.querySelector('#acrPopover .a-icon-alt') ||
+                   doc.querySelector('#averageCustomerReviews .a-icon-alt') ||
+                   doc.querySelector('[data-hook="rating-out-of-text"]') ||
+                   doc.querySelector('.a-icon-star .a-icon-alt') ||
+                   doc.querySelector('.a-icon-star-medium .a-icon-alt');
+        if (el) {
+          const m = (el.textContent || '').match(/([\d.]+)\s*out\s*of\s*5/i);
+          if (m) {
+            const v = parseFloat(m[1]);
+            if (v >= 1 && v <= 5) rating = v;
+          }
+        }
+      } catch {}
+    }
+    if (!rating) {
+      const rm = html.match(/([\d.]+)\s*out\s*of\s*5\s*stars/i);
+      if (rm) {
+        const v = parseFloat(rm[1]);
+        if (v >= 1 && v <= 5) rating = v;
+      }
+    }
+    // Review count — try DOM first, then regex
+    if (!reviewCount) {
+      try {
+        const el = doc.querySelector('#acrCustomerReviewText') ||
+                   doc.querySelector('[data-hook="total-review-count"]');
+        if (el) {
+          const m = (el.textContent || '').match(/([\d,]+)/);
+          if (m) reviewCount = parseInt(m[1].replace(/,/g, ''));
+        }
+      } catch {}
+    }
+    if (!reviewCount) {
+      const cm = html.match(/id="acrCustomerReviewText"[^>]*>\s*([\d,]+)\s*ratings?/i) ||
+                 html.match(/([\d,]+)\s*(?:global\s*)?ratings?\s*<\/span>/i);
+      if (cm) reviewCount = parseInt(cm[1].replace(/,/g, ''));
+    }
+  }
+
   // ===== Amazon seller — from Sold By text on the page =====
   if (platform === 'Amazon' && !seller) {
     try {
