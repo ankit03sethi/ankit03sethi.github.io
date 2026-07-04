@@ -551,8 +551,15 @@ function renderProductDetail(data) {
   _lastDetailProduct = p;
   _lastDetailProductId = p.id;
   _lastDetailColors = colors;
-  // Persist product context in URL hash so refresh returns to the same detail page
-  try { if (location.hash !== "#p=" + p.id) history.replaceState(null, "", "#p=" + p.id); } catch (_) {}
+  // Persist product context in URL hash — but preserve any modal state params already present
+  try {
+    const cur = parseHash();
+    if (!cur.p) {
+      // No hash yet — set to just p=id
+      history.replaceState(null, "", "#p=" + p.id);
+    }
+    // else: keep whatever modal params are already in URL so refresh restores them
+  } catch (_) {}
   const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
   const imgs = (p.image_urls || []).length ? p.image_urls : [""];
 
@@ -1117,6 +1124,8 @@ function restoreModalFromHash(state) {
     updateDsTotal();
     document.getElementById("dropshipModal")?.classList.remove("hidden");
     if (typeof loadDsWallet === "function") loadDsWallet();
+    // Rewrite hash to lock in restored state (idempotent — refresh again works)
+    writeModalHash();
   } catch (e) { console.warn("restoreModalFromHash failed:", e); }
 }
 
