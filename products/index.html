@@ -206,29 +206,47 @@
     .hidden { display: none !important; }
 
     /* 3D mode tabs */
+    .mt-badge {
+      display: inline-block;
+      background: #1f6feb;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      align-self: flex-start;
+      box-shadow: 0 2px 4px rgba(31,111,235,0.25);
+      text-transform: uppercase;
+    }
     .mode-tab-3d {
-      flex: 1; min-width: 0;
+      width: 100%;
       display: flex; align-items: center; gap: 8px;
-      padding: 10px 10px;
+      padding: 12px 10px;
       background: #fff;
       border: 1.5px solid #e2e8f0;
       border-radius: 12px;
       cursor: pointer;
       text-align: left;
+      color: #0f172a;
       box-shadow:
         0 4px 10px rgba(15,23,42,0.06),
         0 1px 2px rgba(15,23,42,0.04),
         inset 0 1px 0 rgba(255,255,255,0.9);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
     }
     .mode-tab-3d:hover {
-      border-color: #1f6feb;
+      background: linear-gradient(180deg, #1f6feb 0%, #1858d6 100%);
+      border-color: #1858d6;
+      color: #fff;
       box-shadow:
-        0 10px 24px rgba(31,111,235,0.18),
-        0 4px 8px rgba(15,23,42,0.08),
-        inset 0 1px 0 rgba(255,255,255,1);
+        0 10px 24px rgba(31,111,235,0.28),
+        0 4px 8px rgba(15,23,42,0.10),
+        inset 0 1px 0 rgba(255,255,255,0.4);
       transform: translateY(-3px);
     }
+    .mode-tab-3d:hover .mt-icon { background: rgba(255,255,255,0.2); }
     .mode-tab-3d:active { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(31,111,235,0.12); }
     .mode-tab-3d.active {
       background: linear-gradient(180deg, #1f6feb 0%, #1858d6 100%);
@@ -240,21 +258,26 @@
         inset 0 1px 0 rgba(255,255,255,0.4);
       transform: translateY(-2px);
     }
-    .mode-tab-3d.active .mt-sub { color: rgba(255,255,255,0.85); }
+    .mode-tab-3d.active .mt-icon { background: rgba(255,255,255,0.2); }
     .mode-tab-3d .mt-icon {
       width: 34px; height: 34px; border-radius: 9px;
       display: grid; place-items: center; font-size: 17px;
       background: #eff6ff;
       flex-shrink: 0;
       box-shadow: 0 2px 4px rgba(31,111,235,0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+      transition: background .18s ease;
     }
-    .mode-tab-3d.active .mt-icon { background: rgba(255,255,255,0.2); }
-    .mode-tab-3d .mt-txt { flex: 1; min-width: 0; line-height: 1.2; }
-    .mode-tab-3d .mt-title { font-weight: 800; font-size: 13px; margin-bottom: 1px; }
-    .mode-tab-3d .mt-sub { font-size: 10.5px; font-weight: 600; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mode-tab-3d .mt-txt {
+      flex: 1; min-width: 0;
+      font-weight: 700;
+      font-size: 12.5px;
+      line-height: 1.25;
+      word-wrap: break-word;
+    }
     @media (max-width: 640px) {
-      .mode-tab-3d { flex-direction: column; text-align: center; padding: 10px 6px; gap: 4px; }
-      .mode-tab-3d .mt-sub { font-size: 9.5px; white-space: normal; }
+      .mode-tab-3d { flex-direction: column; text-align: center; padding: 10px 6px; gap: 6px; }
+      .mode-tab-3d .mt-txt { font-size: 11.5px; }
+      .mt-badge { font-size: 9px; padding: 2px 6px; }
     }
 
     /* Product detail modal */
@@ -562,18 +585,27 @@ function renderProductDetail(data) {
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
             <div id="modeTabs" style="display:flex;gap:10px;margin-bottom:14px;">
-              <button type="button" data-mode="purchase" class="mode-tab-3d active" data-icon="🛒" data-sublabel="Purchase">
-                <div class="mt-icon">🛒</div>
-                <div class="mt-txt"><div class="mt-title">Option 1</div><div class="mt-sub">Purchase</div></div>
-              </button>
-              <button type="button" data-mode="cat_purchase" class="mode-tab-3d" data-icon="🎨" data-sublabel="Cataloging + Purchase">
-                <div class="mt-icon">🎨</div>
-                <div class="mt-txt"><div class="mt-title">Option 2</div><div class="mt-sub">Cataloging + Purchase</div></div>
-              </button>
-              <button type="button" data-mode="dropship" class="mode-tab-3d" data-icon="📦" data-sublabel="Cataloging + Dropshipping">
-                <div class="mt-icon">📦</div>
-                <div class="mt-txt"><div class="mt-title">Option 3</div><div class="mt-sub">Cataloging + Dropshipping</div></div>
-              </button>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+                <div class="mt-badge">Option 1</div>
+                <button type="button" data-mode="purchase" class="mode-tab-3d active">
+                  <div class="mt-icon">🛒</div>
+                  <div class="mt-txt">Purchase</div>
+                </button>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+                <div class="mt-badge">Option 2</div>
+                <button type="button" data-mode="cat_purchase" class="mode-tab-3d">
+                  <div class="mt-icon">🎨</div>
+                  <div class="mt-txt">Cataloging + Purchase</div>
+                </button>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+                <div class="mt-badge">Option 3</div>
+                <button type="button" data-mode="dropship" class="mode-tab-3d">
+                  <div class="mt-icon">📦</div>
+                  <div class="mt-txt">Cataloging + Dropshipping</div>
+                </button>
+              </div>
             </div>
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more <span style="color:#64748b;font-weight:500;font-size:11.5px;">· min qty 10 per product · +5 steps</span></div>
             <div id="varList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
