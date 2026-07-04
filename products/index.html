@@ -312,14 +312,14 @@
     </div>
 
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:16px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Base charge</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Base charge per product</div>
       <div style="display:flex;justify-content:space-between;font-size:13px;color:#374151;">
         <span>Product imaging + listing</span>
         <b>₹300</b>
       </div>
     </div>
 
-    <label style="display:block;font-weight:700;font-size:13px;margin-bottom:8px;">Select marketplaces to list on (₹50 each)</label>
+    <label style="display:block;font-weight:700;font-size:13px;margin-bottom:8px;">Select marketplaces to list on (₹50 each, per product)</label>
     <div id="dsMps" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <label class="ds-mp"><input type="checkbox" value="Amazon" /> <span>🛒 Amazon</span></label>
       <label class="ds-mp"><input type="checkbox" value="Flipkart" /> <span>🛍️ Flipkart</span></label>
@@ -331,13 +331,16 @@
 
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
-        <span>Base</span><span>₹300</span>
+        <span>Products selected</span><b><span id="dsProdCount">0</span></b>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
+        <span>Base (₹300 × <span id="dsProdCount2">0</span>)</span><span>₹<span id="dsBaseAmt">0</span></span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#374151;">
-        <span>Marketplaces (<span id="dsMpCount">0</span> × ₹50)</span><span>₹<span id="dsMpTotal">0</span></span>
+        <span>Marketplaces (<span id="dsMpCount">0</span> × ₹50 × <span id="dsProdCount3">0</span> prod)</span><span>₹<span id="dsMpTotal">0</span></span>
       </div>
       <div style="display:flex;justify-content:space-between;border-top:1px solid #bfdbfe;padding-top:8px;font-weight:800;font-size:16px;">
-        <span>Total</span><span style="color:#1f6feb;">₹<span id="dsTotal">300</span></span>
+        <span>Total</span><span style="color:#1f6feb;">₹<span id="dsTotal">0</span></span>
       </div>
     </div>
 
@@ -506,19 +509,18 @@ function renderProductDetail(data) {
               <button type="button" data-mode="dropship" class="mode-tab" style="flex:1;padding:9px 12px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">📦 Dropshipping</button>
             </div>
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more</div>
-            <div id="varList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+            <div id="varList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
               ${colors.map(c => `
-                <label class="var-row" data-cid="${c.id}" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#fff;display:flex;align-items:center;gap:10px;cursor:pointer;">
-                  <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;" />
-                  ${c.hex_code ? `<span style="width:22px;height:22px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-weight:700;font-size:13px;color:#0f172a;">${esc(c.name)}</div>
-                    ${c.product_code ? `<div style="font-size:11px;color:#1f6feb;font-weight:600;">${esc(c.product_code)}</div>` : ''}
+                <label class="var-row" data-cid="${c.id}" style="border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
+                  ${c.hex_code ? `<span style="width:16px;height:16px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
+                  <div style="flex:1;min-width:0;line-height:1.2;">
+                    <div style="font-weight:600;font-size:12.5px;color:#0f172a;">${esc(c.name)}${c.product_code ? ` <span style="font-size:10.5px;color:#1f6feb;font-weight:600;">· ${esc(c.product_code)}</span>` : ''}</div>
                   </div>
                   <div class="var-qty-wrap" data-cid="${c.id}" style="display:flex;align-items:center;gap:0;">
-                    <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:28px;height:28px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px 0 0 6px;font-size:16px;font-weight:700;cursor:pointer;padding:0;">−</button>
-                    <input class="var-qty" data-cid="${c.id}" type="number" min="1" value="1" style="width:44px;height:28px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:13px;font-weight:700;padding:0;" />
-                    <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:28px;height:28px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 6px 6px 0;font-size:16px;font-weight:700;cursor:pointer;padding:0;">+</button>
+                    <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
+                    <input class="var-qty" data-cid="${c.id}" type="number" min="1" value="1" style="width:32px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
+                    <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
                   </div>
                 </label>
               `).join("")}
@@ -704,12 +706,19 @@ let _lastDropshipItems = [];
 function updateDsTotal() {
   const checked = document.querySelectorAll("#dsMps input:checked");
   const count = checked.length;
-  const mpTotal = count * 50;
-  const total = 300 + mpTotal;
+  // Number of products selected on the main page (from _lastDropshipItems)
+  const prodCount = Math.max(1, (_lastDropshipItems || []).length);
+  const baseAmt = 300 * prodCount;
+  const mpTotal = count * 50 * prodCount;
+  const total = baseAmt + mpTotal;
   const cEl = document.getElementById("dsMpCount"); if (cEl) cEl.textContent = count;
   const mtEl = document.getElementById("dsMpTotal"); if (mtEl) mtEl.textContent = mpTotal;
   const tEl = document.getElementById("dsTotal"); if (tEl) tEl.textContent = total;
-  return { count, total, selected: Array.from(checked).map(c => c.value) };
+  const pcEl = document.getElementById("dsProdCount"); if (pcEl) pcEl.textContent = prodCount;
+  const pcEl2 = document.getElementById("dsProdCount2"); if (pcEl2) pcEl2.textContent = prodCount;
+  const pcEl3 = document.getElementById("dsProdCount3"); if (pcEl3) pcEl3.textContent = prodCount;
+  const baEl = document.getElementById("dsBaseAmt"); if (baEl) baEl.textContent = baseAmt;
+  return { count, total, selected: Array.from(checked).map(c => c.value), prodCount, baseAmt, mpTotal };
 }
 
 // Wire up dropship modal (once, global)
@@ -745,7 +754,11 @@ function sendDropshipMessage(payNow) {
     });
   }
   lines.push(``, `Marketplaces: ${selected.join(", ")}`);
-  lines.push(`Charges: ₹300 (base) + ₹50 × ${count} = ₹${total}`);
+  const dsInfo = updateDsTotal();
+  lines.push(`Products: ${dsInfo.prodCount}`);
+  lines.push(`Base: ₹300 × ${dsInfo.prodCount} = ₹${dsInfo.baseAmt}`);
+  lines.push(`Marketplaces: ${count} × ₹50 × ${dsInfo.prodCount} = ₹${dsInfo.mpTotal}`);
+  lines.push(`Total: ₹${total}`);
   lines.push(``, payNow ? `Please share payment link.` : `Please add to my cart.`);
   const parts = lines.join("\n");
   window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
