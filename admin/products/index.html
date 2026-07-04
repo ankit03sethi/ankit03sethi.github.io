@@ -141,7 +141,7 @@
       <label>Description</label>
       <textarea id="pDesc" placeholder="Full description..."></textarea>
 
-      <label>Product code (SKU, shown to customer)</label>
+      <label>Product ID (shown to customer)</label>
       <input id="pCode" type="text" placeholder="e.g. WE-45" />
 
       <label>Video URL (YouTube / MP4)</label>
@@ -238,10 +238,17 @@
     <input id="mColorName" placeholder="e.g. Deep Brown" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Hex code (optional)</label>
     <input id="mColorHex" placeholder="#8B4513" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product code (SKU, shown to customer)</label>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product ID (shown to customer)</label>
     <input id="mColorCode" type="text" placeholder="e.g. WE-45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
     <input id="mColorPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Video URL or upload (optional)</label>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <input id="mColorVideo" type="url" placeholder="https://youtu.be/..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
+      <label for="mColorVideoFile" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;white-space:nowrap;">🎬 Upload MP4</label>
+      <input id="mColorVideoFile" type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" />
+    </div>
+    <span id="mColorVideoStatus" style="color:#64748b;font-size:12px;display:block;margin-top:-8px;margin-bottom:12px;"></span>
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Color images (up to 5)</label>
     <div style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;margin-bottom:16px;">
       <div id="mColorThumbGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-bottom:10px;"></div>
@@ -277,7 +284,7 @@
     </div>
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Name *</label>
     <input id="mDesignName" placeholder="e.g. Butterfly WE 45 / Red / Large" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product code (SKU, shown to customer)</label>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product ID (shown to customer)</label>
     <input id="mDesignCode" placeholder="e.g. MZ-DP-BR-045" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Internal SKU (optional)</label>
     <input id="mDesignSku" placeholder="Internal SKU" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
@@ -285,6 +292,13 @@
     <input id="mDesignQty" type="number" min="0" placeholder="0" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
     <input id="mDesignPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Video URL or upload (optional)</label>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <input id="mDesignVideo" type="url" placeholder="https://youtu.be/..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
+      <label for="mDesignVideoFile" style="display:inline-block;cursor:pointer;background:#1F6FEB;color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;white-space:nowrap;">🎬 Upload MP4</label>
+      <input id="mDesignVideoFile" type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" />
+    </div>
+    <span id="mDesignVideoStatus" style="color:#64748b;font-size:12px;display:block;margin-top:-8px;margin-bottom:12px;"></span>
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Design image</label>
     <div style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;margin-bottom:16px;">
       <div id="mDesignThumb" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;margin-bottom:10px;"></div>
@@ -325,17 +339,43 @@ function syncProdImagesField() {
 function renderProdThumbs() {
   const g = $("#prodThumbGrid");
   if (!_prodUploaded.length) { g.innerHTML = ""; return; }
+  const total = _prodUploaded.length;
   g.innerHTML = _prodUploaded.map((u, i) => `
     <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
       <img src="${u}" style="width:100%;height:100%;object-fit:cover;" />
-      <button type="button" data-idx="${i}" class="prod-thumb-rm" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">×</button>
-      ${i === 0 ? '<div style="position:absolute;bottom:2px;left:2px;background:#1F6FEB;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;">MAIN</div>' : ''}
+      <div style="position:absolute;top:2px;left:2px;background:${i === 0 ? '#1F6FEB' : 'rgba(0,0,0,0.6)'};color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:3px;">${i + 1}${i === 0 ? ' · MAIN' : ''}</div>
+      <button type="button" data-idx="${i}" class="prod-thumb-rm" title="Delete" style="position:absolute;top:2px;right:2px;background:rgba(220,38,38,0.85);color:#fff;border:0;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">×</button>
+      <div style="position:absolute;bottom:2px;left:2px;right:2px;display:flex;gap:2px;justify-content:space-between;">
+        <button type="button" data-idx="${i}" class="prod-thumb-left" ${i === 0 ? 'disabled' : ''} title="Move left" style="background:rgba(0,0,0,${i === 0 ? '0.3' : '0.7'});color:#fff;border:0;width:22px;height:20px;border-radius:3px;cursor:${i === 0 ? 'not-allowed' : 'pointer'};font-size:12px;padding:0;line-height:1;">‹</button>
+        <button type="button" data-idx="${i}" class="prod-thumb-replace" title="Replace" style="background:rgba(31,111,235,0.85);color:#fff;border:0;flex:1;margin:0 2px;height:20px;border-radius:3px;cursor:pointer;font-size:11px;padding:0;line-height:1;font-weight:600;">↻</button>
+        <button type="button" data-idx="${i}" class="prod-thumb-right" ${i === total - 1 ? 'disabled' : ''} title="Move right" style="background:rgba(0,0,0,${i === total - 1 ? '0.3' : '0.7'});color:#fff;border:0;width:22px;height:20px;border-radius:3px;cursor:${i === total - 1 ? 'not-allowed' : 'pointer'};font-size:12px;padding:0;line-height:1;">›</button>
+      </div>
     </div>
   `).join("");
   g.querySelectorAll(".prod-thumb-rm").forEach(b => b.addEventListener("click", () => {
     _prodUploaded.splice(parseInt(b.dataset.idx, 10), 1);
-    syncProdImagesField();
-    renderProdThumbs();
+    syncProdImagesField(); renderProdThumbs();
+  }));
+  g.querySelectorAll(".prod-thumb-left").forEach(b => b.addEventListener("click", () => {
+    const i = parseInt(b.dataset.idx, 10);
+    if (i > 0) { [_prodUploaded[i-1], _prodUploaded[i]] = [_prodUploaded[i], _prodUploaded[i-1]]; syncProdImagesField(); renderProdThumbs(); }
+  }));
+  g.querySelectorAll(".prod-thumb-right").forEach(b => b.addEventListener("click", () => {
+    const i = parseInt(b.dataset.idx, 10);
+    if (i < _prodUploaded.length - 1) { [_prodUploaded[i], _prodUploaded[i+1]] = [_prodUploaded[i+1], _prodUploaded[i]]; syncProdImagesField(); renderProdThumbs(); }
+  }));
+  g.querySelectorAll(".prod-thumb-replace").forEach(b => b.addEventListener("click", () => {
+    const i = parseInt(b.dataset.idx, 10);
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/jpeg,image/png,image/webp,image/gif";
+    input.addEventListener("change", async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const j = await uploadFile(f, "product");
+      if (j.ok && j.url) { _prodUploaded[i] = j.url; syncProdImagesField(); renderProdThumbs(); toast("✓ Replaced"); }
+      else toast(j.error || "Upload failed", true);
+    });
+    input.click();
   }));
 }
 
@@ -454,7 +494,10 @@ function renderRight() {
     $("#prodList").innerHTML = `<div class="empty-hint">No products yet. Click "New product" ↑</div>`;
   } else {
     $("#prodList").innerHTML = prods.map(p => `<div class="prod-tab ${_selectedProdId === p.id ? 'active' : ''}" data-id="${p.id}">
-      <span>${esc(p.title)}${p.is_hero ? ' <span class="hero-badge">HERO</span>' : ''}${!p.is_active ? ' <small>(inactive)</small>' : ''}</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;transition:transform 0.15s;display:inline-block;${_selectedProdId === p.id ? 'transform:rotate(90deg);color:#1f6feb;' : 'color:#94a3b8;'}">▶</span>
+        <span>${esc(p.title)}${p.is_hero ? ' <span class="hero-badge">HERO</span>' : ''}${!p.is_active ? ' <small>(inactive)</small>' : ''}</span>
+      </span>
       <span style="color:#94a3b8;font-size:11px;">₹${p.price_inr}</span>
     </div>`).join("");
     $("#prodList").querySelectorAll(".prod-tab").forEach(el => {
@@ -465,7 +508,12 @@ function renderRight() {
 }
 
 function selectProduct(id) {
-  _selectedProdId = id;
+  // Toggle: if already selected, close it
+  if (_selectedProdId === id) {
+    _selectedProdId = null;
+  } else {
+    _selectedProdId = id;
+  }
   renderRight();
 }
 
@@ -646,15 +694,42 @@ let _colorUploaded = [];
 function renderColorModalThumbs() {
   const g = $("#mColorThumbGrid");
   if (!_colorUploaded.length) { g.innerHTML = ""; return; }
+  const total = _colorUploaded.length;
   g.innerHTML = _colorUploaded.map((u, i) => `
     <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
       <img src="${u}" style="width:100%;height:100%;object-fit:cover;" />
-      <button type="button" data-idx="${i}" class="mcol-rm" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;padding:0;line-height:1;">×</button>
+      <div style="position:absolute;top:2px;left:2px;background:${i === 0 ? '#1F6FEB' : 'rgba(0,0,0,0.6)'};color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;">${i + 1}${i === 0 ? ' · MAIN' : ''}</div>
+      <button type="button" data-idx="${i}" class="mcol-rm" title="Delete" style="position:absolute;top:2px;right:2px;background:rgba(220,38,38,0.85);color:#fff;border:0;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;padding:0;line-height:1;">×</button>
+      <div style="position:absolute;bottom:2px;left:2px;right:2px;display:flex;gap:2px;">
+        <button type="button" data-idx="${i}" class="mcol-left" ${i === 0 ? 'disabled' : ''} title="Move left" style="background:rgba(0,0,0,${i === 0 ? '0.3' : '0.7'});color:#fff;border:0;width:18px;height:18px;border-radius:3px;cursor:${i === 0 ? 'not-allowed' : 'pointer'};font-size:11px;padding:0;line-height:1;">‹</button>
+        <button type="button" data-idx="${i}" class="mcol-replace" title="Replace" style="background:rgba(31,111,235,0.85);color:#fff;border:0;flex:1;height:18px;border-radius:3px;cursor:pointer;font-size:10px;padding:0;line-height:1;font-weight:600;">↻</button>
+        <button type="button" data-idx="${i}" class="mcol-right" ${i === total - 1 ? 'disabled' : ''} title="Move right" style="background:rgba(0,0,0,${i === total - 1 ? '0.3' : '0.7'});color:#fff;border:0;width:18px;height:18px;border-radius:3px;cursor:${i === total - 1 ? 'not-allowed' : 'pointer'};font-size:11px;padding:0;line-height:1;">›</button>
+      </div>
     </div>
   `).join("");
   g.querySelectorAll(".mcol-rm").forEach(b => b.addEventListener("click", () => {
-    _colorUploaded.splice(parseInt(b.dataset.idx, 10), 1);
-    renderColorModalThumbs();
+    _colorUploaded.splice(parseInt(b.dataset.idx, 10), 1); renderColorModalThumbs();
+  }));
+  g.querySelectorAll(".mcol-left").forEach(b => b.addEventListener("click", () => {
+    const i = parseInt(b.dataset.idx, 10);
+    if (i > 0) { [_colorUploaded[i-1], _colorUploaded[i]] = [_colorUploaded[i], _colorUploaded[i-1]]; renderColorModalThumbs(); }
+  }));
+  g.querySelectorAll(".mcol-right").forEach(b => b.addEventListener("click", () => {
+    const i = parseInt(b.dataset.idx, 10);
+    if (i < _colorUploaded.length - 1) { [_colorUploaded[i], _colorUploaded[i+1]] = [_colorUploaded[i+1], _colorUploaded[i]]; renderColorModalThumbs(); }
+  }));
+  g.querySelectorAll(".mcol-replace").forEach(b => b.addEventListener("click", () => {
+    const i = parseInt(b.dataset.idx, 10);
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/jpeg,image/png,image/webp,image/gif";
+    input.addEventListener("change", async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const j = await uploadFile(f, "color");
+      if (j.ok && j.url) { _colorUploaded[i] = j.url; renderColorModalThumbs(); toast("✓ Replaced"); }
+      else toast(j.error || "Upload failed", true);
+    });
+    input.click();
   }));
 }
 
@@ -668,6 +743,7 @@ function openColorDialog(id, type) {
   $("#mColorName").value = existing?.name || "";
   $("#mColorHex").value = existing?.hex_code || "";
   $("#mColorCode").value = existing?.product_code || "";
+  $("#mColorVideo").value = existing?.video_url || "";
   $("#mColorPos").value = existing?.position || 100;
   // Show hex input only for color type
   const hexRow = $("#mColorHex").parentElement.querySelector("label");
@@ -685,6 +761,22 @@ function openColorDialog(id, type) {
 
 // v2-force-cdn-refresh - colorNewBtn removed, variations added via per-type buttons
 $("#mColorCancel").addEventListener("click", () => $("#colorModal").classList.add("hidden"));
+$("#mColorVideoFile").addEventListener("change", async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const status = $("#mColorVideoStatus"); status.textContent = "Uploading video...";
+  const j = await uploadFile(f, "color");
+  if (j.ok && j.url) { $("#mColorVideo").value = j.url; status.textContent = "✓ Uploaded"; toast("✓ Video uploaded"); }
+  else { toast(j.error || "Upload failed", true); status.textContent = ""; }
+  e.target.value = ""; setTimeout(() => { status.textContent = ""; }, 3000);
+});
+$("#mDesignVideoFile").addEventListener("change", async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const status = $("#mDesignVideoStatus"); status.textContent = "Uploading video...";
+  const j = await uploadFile(f, "design");
+  if (j.ok && j.url) { $("#mDesignVideo").value = j.url; status.textContent = "✓ Uploaded"; toast("✓ Video uploaded"); }
+  else { toast(j.error || "Upload failed", true); status.textContent = ""; }
+  e.target.value = ""; setTimeout(() => { status.textContent = ""; }, 3000);
+});
 $("#mColorImgFile").addEventListener("change", async (e) => {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
@@ -715,6 +807,7 @@ $("#mColorSave").addEventListener("click", async () => {
     id: _colorEditId, product_id: _selectedProdId,
     name, hex_code: _colorEditType === "color" ? $("#mColorHex").value.trim() : "",
     product_code: $("#mColorCode").value.trim(),
+    video_url: $("#mColorVideo").value.trim(),
     image_urls: _colorUploaded.slice(),
     position: Number($("#mColorPos").value) || 100,
     variation_type: _colorEditType,
@@ -741,12 +834,25 @@ function renderDesignModalThumb() {
   g.innerHTML = `
     <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
       <img src="${_designUploaded}" style="width:100%;height:100%;object-fit:cover;" />
-      <button type="button" id="mdes-rm" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:0;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;padding:0;line-height:1;">×</button>
+      <div style="position:absolute;top:2px;left:2px;background:#1F6FEB;color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;">1 · MAIN</div>
+      <button type="button" id="mdes-rm" title="Delete" style="position:absolute;top:2px;right:2px;background:rgba(220,38,38,0.85);color:#fff;border:0;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;cursor:pointer;padding:0;line-height:1;">×</button>
+      <button type="button" id="mdes-replace" title="Replace" style="position:absolute;bottom:2px;left:2px;right:2px;background:rgba(31,111,235,0.85);color:#fff;border:0;height:20px;border-radius:3px;cursor:pointer;font-size:11px;padding:0;line-height:1;font-weight:600;">↻ Replace</button>
     </div>
   `;
   document.getElementById("mdes-rm").addEventListener("click", () => {
-    _designUploaded = "";
-    renderDesignModalThumb();
+    _designUploaded = ""; renderDesignModalThumb();
+  });
+  document.getElementById("mdes-replace").addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/jpeg,image/png,image/webp,image/gif";
+    input.addEventListener("change", async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const j = await uploadFile(f, "design");
+      if (j.ok && j.url) { _designUploaded = j.url; renderDesignModalThumb(); toast("✓ Replaced"); }
+      else toast(j.error || "Upload failed", true);
+    });
+    input.click();
   });
 }
 
@@ -758,6 +864,7 @@ function openDesignDialog(colorId, id) {
   $("#mDesignName").value = existing?.name || "";
   $("#mDesignSku").value = existing?.sku || "";
   $("#mDesignCode").value = existing?.product_code || "";
+  $("#mDesignVideo").value = existing?.video_url || "";
   $("#mDesignQty").value = existing?.qty_available || 0;
   $("#mDesignPos").value = existing?.position || 100;
   _designUploaded = existing?.image_url || "";
@@ -794,6 +901,7 @@ $("#mDesignSave").addEventListener("click", async () => {
     id: _designEditId, color_id: _designColorId,
     name, sku: $("#mDesignSku").value.trim(),
     product_code: $("#mDesignCode").value.trim(),
+    video_url: $("#mDesignVideo").value.trim(),
     image_url: _designUploaded,
     qty_available: Number($("#mDesignQty").value) || 0,
     position: Number($("#mDesignPos").value) || 100,
