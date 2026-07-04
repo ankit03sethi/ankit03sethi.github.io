@@ -205,6 +205,21 @@
     }
     .toast.err { background: #dc2626; }
     .hidden { display: none !important; }
+    /* Anonymous-visitor gate — hide all purchase controls when not signed in */
+    body.anon .mode-tabs,
+    body.anon #cartSummary,
+    body.anon #purchaseButtons,
+    body.anon #catPurchaseNextBtn,
+    body.anon #dropshipBtn,
+    body.anon #quickQtyBar,
+    body.anon .var-check,
+    body.anon .var-qty,
+    body.anon .qty-btn,
+    body.anon #cartChip,
+    body.anon #openManageBtn { display: none !important; }
+    body.anon .var-row { pointer-events: none; opacity: 0.95; }
+    body.anon .anon-cta { display: block !important; }
+    .anon-cta { display: none; }
 
     /* Variation list — unified list style, tight rows */
     #varList .var-row:last-child { border-bottom: 0; }
@@ -667,6 +682,8 @@ function renderProductDetail(data) {
           </div>
           <button type="button" id="catPurchaseNextBtn" class="p-btn p-btn-primary" style="width:100%;background:#7c3aed;border:0;color:#fff;font-size:14px;padding:11px 16px;display:none;">Next → Choose marketplaces</button>
           <button type="button" id="dropshipBtn" class="p-btn p-btn-primary" style="width:100%;background:#7c3aed;border:0;color:#fff;font-size:14px;padding:11px 16px;display:none;">Next → Choose marketplaces</button>
+          <!-- Anonymous CTA — shown only when body.anon -->
+          <a href="/home/?next=${encodeURIComponent('/products/#p=' + p.id)}" class="anon-cta p-btn p-btn-primary" style="width:100%;background:#1f6feb;border:0;color:#fff;font-size:15px;padding:12px 16px;text-align:center;text-decoration:none;font-weight:700;">🔒 Sign in to purchase</a>
         </div>
         ${(p.bullet_points || []).length || p.description ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -1449,6 +1466,8 @@ $("#signOutBtn").addEventListener("click", async () => {
 
 // ============ INIT ============
 async function init() {
+  // Default to anonymous view until we know the session (avoid flashing purchase controls)
+  document.body.classList.add("anon");
   // Restore product detail + modal state from URL hash
   const hashState = parseHash();
   if (hashState.p && /^\d+$/.test(hashState.p)) {
@@ -1463,11 +1482,13 @@ async function init() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     _session = session;
+    document.body.classList.remove("anon");
     $("#openManageBtn").classList.remove("hidden");
     $("#signOutBtn").classList.remove("hidden");
     $("#signInLink").classList.add("hidden");
     await loadWallet();
   } else {
+    document.body.classList.add("anon");
     const walletEl = $("#walletAmt");
     if (walletEl) walletEl.textContent = "—";
     const balance = $("#heroCta") && $("#heroCta").querySelector(".balance");
