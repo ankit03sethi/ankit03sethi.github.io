@@ -1142,8 +1142,10 @@ document.addEventListener("click", (e) => {
 // Cart Pay button — process items sequentially after wallet is funded
 $("#cartPayBtn").addEventListener("click", async () => {
   const cart = getCart();
-  if (cart.length === 0) return;
-  const total = cartTotalPaise();
+  const hasCatalog = _catalogCartItems && _catalogCartItems.length > 0;
+  if (cart.length === 0 && !hasCatalog) return;
+  const { gross: totalNetPaise } = cartTotalsBreakdown();
+  const total = totalNetPaise;
   const due = Math.max(0, total - _cartWalletPaise);
   const btn = $("#cartPayBtn");
   const err = $("#cartError");
@@ -1155,9 +1157,13 @@ $("#cartPayBtn").addEventListener("click", async () => {
   if (!session) { err.textContent = "Please sign in."; err.style.display = "block"; btn.disabled = false; return; }
 
   async function processCartItems() {
+    const totalSteps = cart.length + (hasCatalog ? Object.keys(_catalogCartItems.reduce((m, it) => (m[it.mode]=1,m), {})).length : 0);
+    let step = 0;
+    // 1) Services items (require OTP via wallet-pay-service — currently the service takes OTP inline)
     for (let i = 0; i < cart.length; i++) {
+      step++;
       const it = cart[i];
-      btn.textContent = "Processing " + (i+1) + "/" + cart.length + "…";
+      btn.textContent = "Processing " + step + "/" + totalSteps + "…";
       const body = { service_tag: it.service_tag };
       if (it.variant) body.variant = it.variant;
       if (it.platforms) body.platforms = it.platforms;
@@ -1170,12 +1176,64 @@ $("#cartPayBtn").addEventListener("click", async () => {
       const j = await r.json();
       if (!j.ok) throw new Error(`Item "${it.label}" failed: ${j.error || j.message}`);
     }
-    // Clear cart
+    // 2) Catalog items — batch per mode, run OTP per batch
+    if (hasCatalog) {
+      // Reload catalog items fresh
+      await loadCatalogCartCount();
+      const byMode = {};
+      for (const ci of _catalogCartItems) { (byMode[ci.mode] = byMode[ci.mode] || []).push(ci); }
+      for (const mode of Object.keys(byMode)) {
+        step++;
+        btn.textContent = "Processing catalog " + step + "/" + totalSteps + "…";
+        const rows = byMode[mode];
+        const items = rows.map(r => ({ product_id: r.product_id, color_id: r.color_id, qty: r.qty, unit_price_inr: r.unit_price_inr }));
+        // Use first row's marketplaces (typically same for a mode-group)
+        const marketplaces = rows[0].marketplaces || [];
+        // Request debit → get otp_required
+        const doPay = async (action_token) => {
+          const body = { mode, items, marketplaces };
+          if (action_token) body.action_token = action_token;
+          const r = await fetch(`${SUPABASE_URL}/functions/v1/wallet-pay-catalog`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+            body: JSON.stringify(body),
+          });
+          return await r.json();
+        };
+        let jc = await doPay(null);
+        if (jc.otp_required) {
+          btn.textContent = "Sending OTP for " + mode + "…";
+          const otpRes = await fetch(`${SUPABASE_URL}/functions/v1/payment-otp-request`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+            body: JSON.stringify({ intent_hash: jc.intent_hash, intent_description: jc.intent_description }),
+          });
+          const or = await otpRes.json();
+          if (!or.ok) throw new Error("OTP send failed: " + (or.error || "unknown"));
+          const code = prompt("6-digit code sent to " + or.masked_email + " for " + jc.intent_description + " — enter to confirm:");
+          if (!code || !/^\d{6}$/.test(code)) throw new Error("OTP cancelled for catalog " + mode);
+          const vr = await fetch(`${SUPABASE_URL}/functions/v1/payment-otp-verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+            body: JSON.stringify({ intent_hash: jc.intent_hash, otp_code: code }),
+          });
+          const vj = await vr.json();
+          if (!vj.ok) throw new Error("OTP verify failed: " + (vj.error || "unknown"));
+          jc = await doPay(vj.action_token);
+        }
+        if (!jc.ok) throw new Error("Catalog " + mode + " failed: " + (jc.error || jc.message || "unknown"));
+        // Delete catalog_cart rows for this mode
+        await sb.from("catalog_cart").delete().in("id", rows.map(r => r.id));
+      }
+      await loadCatalogCartCount();
+    }
+    // Clear services cart
     saveCart([]);
     $("#cartModal").style.display = "none";
     try { history.replaceState(null, "", location.pathname); } catch (_) {}
-    alert("✓ All " + cart.length + " item(s) purchased successfully. Our team will reach out shortly.");
+    alert("✓ All items purchased successfully. Our team will reach out shortly.");
     if (session) await loadWallet(session);
+    refreshCartChip();
   }
 
   try {
