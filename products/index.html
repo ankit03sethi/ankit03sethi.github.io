@@ -395,6 +395,9 @@
       <div id="dsPurchaseLine" style="display:none;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
         <span>Product value</span><span>₹<span id="dsPurchaseAmt">0</span></span>
       </div>
+      <div id="dsDiscountLine" style="display:none;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#16a34a;font-weight:700;">
+        <span>🎁 Volume discount (<span id="dsDiscountPct">0</span>%)</span><span>−₹<span id="dsDiscountAmt">0</span></span>
+      </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
         <span>Imaging <span style="color:#94a3b8;">(₹300 × <span id="dsProdCount2">0</span>)</span></span><span>₹<span id="dsBaseAmt">0</span></span>
       </div>
@@ -645,7 +648,10 @@ function renderProductDetail(data) {
               <span>Selected items: <b id="cartCount">0</b></span>
               <span>Total qty: <b id="cartQty">0</b></span>
             </div>
-            <div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;color:#1f6feb;">
+            <div id="purDiscountRow" style="display:none;justify-content:space-between;margin-top:2px;color:#16a34a;font-size:12.5px;font-weight:700;">
+              <span>🎁 Volume discount (<span id="purDiscountPct">0</span>%)</span><span>−₹<span id="purDiscountAmt">0</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;color:#1f6feb;margin-top:4px;">
               <span>Total</span><span>₹<span id="cartTotal">0</span></span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #bfdbfe;color:#475467;font-size:12.5px;">
@@ -730,24 +736,35 @@ function renderProductDetail(data) {
     const { items, totalQty, totalAmt } = getSelectedCart();
     const cc = $("#cartCount"); if (cc) cc.textContent = items.length;
     const cq = $("#cartQty"); if (cq) cq.textContent = totalQty;
-    const ct = $("#cartTotal"); if (ct) ct.textContent = totalAmt.toLocaleString("en-IN");
+    // Volume discount on product value only
+    const discountPct = totalAmt >= 100000 ? 15 : totalAmt >= 50000 ? 10 : totalAmt >= 25000 ? 5 : 0;
+    const discountInr = Math.round(totalAmt * discountPct / 100);
+    const finalTotal = totalAmt - discountInr;
+    const dr = document.getElementById("purDiscountRow");
+    const dp = document.getElementById("purDiscountPct");
+    const da = document.getElementById("purDiscountAmt");
+    if (dr && dp && da) {
+      if (discountPct > 0) { dr.style.display = "flex"; dp.textContent = discountPct; da.textContent = discountInr.toLocaleString("en-IN"); }
+      else dr.style.display = "none";
+    }
+    const ct = $("#cartTotal"); if (ct) ct.textContent = finalTotal.toLocaleString("en-IN");
     // Wallet + shortfall (Option 1 Purchase tab)
     const walletPaise = Number(_dsWalletPaise || 0);
     const wb = document.getElementById("purWalletBal");
     if (wb) wb.textContent = "₹" + (walletPaise/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const shortfall = Math.max(0, totalAmt * 100 - walletPaise);
+    const shortfall = Math.max(0, finalTotal * 100 - walletPaise);
     const sr = document.getElementById("purShortfallRow");
     const sa = document.getElementById("purShortfallAmt");
     if (sr && sa) {
-      if (shortfall > 0 && totalAmt > 0) {
+      if (shortfall > 0 && finalTotal > 0) {
         sr.style.display = "flex";
         sa.textContent = "₹" + (shortfall/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       } else sr.style.display = "none";
     }
     const buyBtn = document.getElementById("buyNowBtn");
-    if (buyBtn && totalAmt > 0) {
+    if (buyBtn && finalTotal > 0) {
       if (shortfall > 0) buyBtn.textContent = "💳 Add ₹" + Math.round(shortfall/100) + " & Pay";
-      else buyBtn.textContent = "🔒 Pay ₹" + totalAmt + " from wallet";
+      else buyBtn.textContent = "🔒 Pay ₹" + finalTotal + " from wallet";
     } else if (buyBtn) buyBtn.textContent = "⚡ Buy Now";
   }
   // Load wallet balance on detail render so numbers are right on first show
@@ -1022,8 +1039,20 @@ function updateDsTotal() {
   const prodCount = Math.max(1, (_lastDropshipItems || []).length);
   const baseAmt = 300 * prodCount;
   const mpTotal = count * 50 * prodCount;
-  const purchaseAmt = _lastDropshipMode === "cat_purchase" ? (_lastDropshipPurchaseAmt || 0) : 0;
+  const rawPurchase = _lastDropshipMode === "cat_purchase" ? (_lastDropshipPurchaseAmt || 0) : 0;
+  // Volume discount on product value only (25k/50k/1L → 5/10/15%)
+  const dsDiscountPct = rawPurchase >= 100000 ? 15 : rawPurchase >= 50000 ? 10 : rawPurchase >= 25000 ? 5 : 0;
+  const dsDiscountInr = Math.round(rawPurchase * dsDiscountPct / 100);
+  const purchaseAmt = rawPurchase - dsDiscountInr;
   const total = purchaseAmt + baseAmt + mpTotal;
+  const dLine = document.getElementById("dsDiscountLine");
+  const dPct = document.getElementById("dsDiscountPct");
+  const dAmt = document.getElementById("dsDiscountAmt");
+  if (dLine && dPct && dAmt) {
+    if (dsDiscountPct > 0 && _lastDropshipMode === "cat_purchase") {
+      dLine.style.display = "flex"; dPct.textContent = dsDiscountPct; dAmt.textContent = dsDiscountInr.toLocaleString("en-IN");
+    } else dLine.style.display = "none";
+  }
   const cEl = document.getElementById("dsMpCount"); if (cEl) cEl.textContent = count;
   const mtEl = document.getElementById("dsMpTotal"); if (mtEl) mtEl.textContent = mpTotal;
   const tEl = document.getElementById("dsTotal"); if (tEl) tEl.textContent = total;
@@ -1036,7 +1065,7 @@ function updateDsTotal() {
   const pa = document.getElementById("dsPurchaseAmt");
   if (_lastDropshipMode === "cat_purchase") {
     if (pl) pl.style.display = "flex";
-    if (pa) pa.textContent = purchaseAmt;
+    if (pa) pa.textContent = rawPurchase;  // show original (pre-discount) product value line
   } else {
     if (pl) pl.style.display = "none";
   }
