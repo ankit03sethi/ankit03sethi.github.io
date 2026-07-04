@@ -406,8 +406,8 @@
     </div>
 
     <div style="display:flex;gap:8px;">
-      <button type="button" id="dsAddCart" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
-      <button type="button" id="dsPayNow" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
+      <button type="button" id="dsAddCart" onclick="window.__handleDsCheckout && window.__handleDsCheckout(false)" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+      <button type="button" id="dsPayNow" onclick="window.__handleDsCheckout && window.__handleDsCheckout(true)" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
     </div>
   </div>
 </div>
@@ -1004,6 +1004,7 @@ document.addEventListener("click", (e) => {
   if (isBtn("dsPayNow")) { handleDsCheckout(true); return; }
 });
 
+window.__handleDsCheckout = async function (payNow) { return handleDsCheckout(payNow); };
 async function handleDsCheckout(payNow) {
   const dsInfo = updateDsTotal();
   if (dsInfo.count === 0) { alert("Please select at least one marketplace"); return; }
