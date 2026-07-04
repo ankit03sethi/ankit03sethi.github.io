@@ -786,7 +786,15 @@ function renderCatalogCartHtml() {
     const items = groups[mode]; if (!items || items.length === 0) continue;
     const label = modeLabel[mode] || mode;
     const color = modeColor[mode] || "#334155";
-    const groupSum = items.reduce((s, it) => s + ((it.unit_price_inr || 0) * (it.qty || 0)), 0);
+    const productValue = items.reduce((s, it) => s + ((it.unit_price_inr || 0) * (it.qty || 0)), 0);
+    // For cat_purchase & dropship, add imaging + listing per row (all marketplaces on that row)
+    let imagingAmt = 0, listingAmt = 0;
+    if (mode === "cat_purchase" || mode === "dropship") {
+      imagingAmt = 300 * items.length;
+      for (const it of items) listingAmt += 50 * ((it.marketplaces || []).length);
+    }
+    const includePurchase = (mode === "purchase" || mode === "cat_purchase");
+    const groupSum = (includePurchase ? productValue : 0) + imagingAmt + listingAmt;
     const gid = "cat-" + mode;
     const isOpen = _cartOpenGroups.has(gid);
     const chevron = isOpen ? "▼" : "▶";
@@ -795,6 +803,14 @@ function renderCatalogCartHtml() {
       <span>₹${groupSum.toLocaleString("en-IN")}</span>
     </div>`;
     if (!isOpen) continue;
+    // Breakdown box under header (for cat_purchase/dropship)
+    if (mode === "cat_purchase" || mode === "dropship") {
+      html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
+        ${includePurchase ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Product value</span><span>₹${productValue.toLocaleString("en-IN")}</span></div>` : ""}
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Imaging (₹300 × ${items.length})</span><span>₹${imagingAmt.toLocaleString("en-IN")}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Listing (₹50 × marketplaces × products)</span><span>₹${listingAmt.toLocaleString("en-IN")}</span></div>
+      </div>`;
+    }
     for (const it of items) {
       const code = (it.catalog_colors && it.catalog_colors.product_code) || (it.catalog_products && it.catalog_products.product_code) || ("P" + it.product_id + (it.color_id ? "-" + it.color_id : ""));
       const mps = (it.marketplaces || []).join(", ");
