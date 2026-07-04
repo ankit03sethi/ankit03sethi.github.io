@@ -838,15 +838,23 @@ function renderCatalogCartHtml() {
       const mps = (it.marketplaces || []).join(", ");
       const unitInr = it.unit_price_inr || 0;
       const sub = unitInr * (it.qty || 0);
+      // Option 3 (Dropshipping): customer doesn't buy the product — hide Price · Qty · subtotal
+      const isDropship = mode === "dropship";
+      const metaLine = isDropship
+        ? (mps ? escapeHtml(mps) : "")
+        : (`Price ₹${unitInr.toLocaleString("en-IN")} · Qty ${it.qty}` + (mps ? " · " + escapeHtml(mps) : ""));
+      const rightCol = isDropship
+        ? `<button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;font-weight:600;">Remove</button>`
+        : `<div style="font-size:13.5px;font-weight:700;color:#0f172a;">₹${sub.toLocaleString("en-IN")}</div>
+           <button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:1px;font-weight:600;">Remove</button>`;
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
         <input type="checkbox" class="unifiedCartChk" data-kind="cat" data-id="${it.id}" style="width:14px;height:14px;cursor:pointer;" onchange="updateUnifiedSelectAllState()">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;color:#0f172a;">ID: ${escapeHtml(code)}</div>
-          <div style="font-size:11.5px;color:#64748b;margin-top:1px;">Price ₹${unitInr.toLocaleString("en-IN")} · Qty ${it.qty}${mps ? " · " + escapeHtml(mps) : ""}</div>
+          ${metaLine ? `<div style="font-size:11.5px;color:#64748b;margin-top:1px;">${metaLine}</div>` : ""}
         </div>
         <div style="text-align:right;margin-left:10px;flex-shrink:0;">
-          <div style="font-size:13.5px;font-weight:700;color:#0f172a;">₹${sub.toLocaleString("en-IN")}</div>
-          <button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:1px;font-weight:600;">Remove</button>
+          ${rightCol}
         </div>
       </div>`;
     }
