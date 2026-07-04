@@ -1229,7 +1229,7 @@ async function handleDsCheckout(payNow) {
     if (items.length === 0) { alert("Step 4 FAIL: no variation items selected. Go back and pick variations first."); return; }
     const cartPayload = {
       items,
-      mode: isCat ? "purchase" : "dropship",
+      mode: isCat ? "cat_purchase" : "dropship",
       marketplaces: dsInfo.selected,
     };
     console.log("[DS] cartPayload=", cartPayload);
