@@ -805,10 +805,12 @@ function renderCatalogCartHtml() {
     if (!isOpen) continue;
     // Breakdown box under header (for cat_purchase/dropship)
     if (mode === "cat_purchase" || mode === "dropship") {
+      // Use first row's marketplace count as representative (typically all rows share same mkt set)
+      const mpCount = (items[0].marketplaces || []).length;
       html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
         ${includePurchase ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Product value</span><span>₹${productValue.toLocaleString("en-IN")}</span></div>` : ""}
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Imaging (₹300 × ${items.length})</span><span>₹${imagingAmt.toLocaleString("en-IN")}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Listing (₹50 × marketplaces × products)</span><span>₹${listingAmt.toLocaleString("en-IN")}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Imaging (₹300 × ${items.length} products)</span><span>₹${imagingAmt.toLocaleString("en-IN")}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Listing (₹50 × ${mpCount} mkt × ${items.length} products)</span><span>₹${listingAmt.toLocaleString("en-IN")}</span></div>
       </div>`;
     }
     for (const it of items) {
