@@ -406,8 +406,8 @@
     </div>
 
     <div style="display:flex;gap:8px;">
-      <button type="button" id="dsAddCart" onclick="window.__handleDsCheckout && window.__handleDsCheckout(false)" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
-      <button type="button" id="dsPayNow" onclick="window.__handleDsCheckout && window.__handleDsCheckout(true)" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
+      <button type="button" id="dsAddCart" onclick="alert('CLICK REGISTERED: Add to Cart · handler=' + (typeof window.__handleDsCheckout)); if(window.__handleDsCheckout) window.__handleDsCheckout(false);" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+      <button type="button" id="dsPayNow" onclick="alert('CLICK REGISTERED: Pay Now · handler=' + (typeof window.__handleDsCheckout)); if(window.__handleDsCheckout) window.__handleDsCheckout(true);" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
     </div>
   </div>
 </div>
