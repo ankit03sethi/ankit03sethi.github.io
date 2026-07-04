@@ -410,7 +410,7 @@
       <div style="display:flex;justify-content:space-between;color:#475467;">
         <span>Wallet balance</span><span id="dsWalletBal">—</span>
       </div>
-      <div id="dsShortfallRow" style="display:none;justify-content:space-between;font-weight:700;color:#b45309;margin-top:4px;">
+      <div id="dsShortfallRow" style="display:none;justify-content:space-between;font-weight:800;color:#0f172a;font-size:15px;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;">
         <span>Amount to add in wallet</span><span id="dsShortfallAmt">—</span>
       </div>
     </div>
@@ -637,6 +637,12 @@ function renderProductDetail(data) {
             <div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;color:#1f6feb;">
               <span>Total</span><span>₹<span id="cartTotal">0</span></span>
             </div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #bfdbfe;color:#475467;font-size:12.5px;">
+              <span>Wallet balance</span><span id="purWalletBal">—</span>
+            </div>
+            <div id="purShortfallRow" style="display:none;justify-content:space-between;font-weight:800;color:#0f172a;font-size:15px;margin-top:6px;">
+              <span>Amount to add in wallet</span><span id="purShortfallAmt">—</span>
+            </div>
           </div>
           <div id="purchaseButtons" style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
@@ -714,7 +720,27 @@ function renderProductDetail(data) {
     const cc = $("#cartCount"); if (cc) cc.textContent = items.length;
     const cq = $("#cartQty"); if (cq) cq.textContent = totalQty;
     const ct = $("#cartTotal"); if (ct) ct.textContent = totalAmt.toLocaleString("en-IN");
+    // Wallet + shortfall (Option 1 Purchase tab)
+    const walletPaise = Number(_dsWalletPaise || 0);
+    const wb = document.getElementById("purWalletBal");
+    if (wb) wb.textContent = "₹" + (walletPaise/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const shortfall = Math.max(0, totalAmt * 100 - walletPaise);
+    const sr = document.getElementById("purShortfallRow");
+    const sa = document.getElementById("purShortfallAmt");
+    if (sr && sa) {
+      if (shortfall > 0 && totalAmt > 0) {
+        sr.style.display = "flex";
+        sa.textContent = "₹" + (shortfall/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else sr.style.display = "none";
+    }
+    const buyBtn = document.getElementById("buyNowBtn");
+    if (buyBtn && totalAmt > 0) {
+      if (shortfall > 0) buyBtn.textContent = "💳 Add ₹" + Math.round(shortfall/100) + " & Pay";
+      else buyBtn.textContent = "🔒 Pay ₹" + totalAmt + " from wallet";
+    } else if (buyBtn) buyBtn.textContent = "⚡ Buy Now";
   }
+  // Load wallet balance on detail render so numbers are right on first show
+  if (typeof loadDsWallet === "function") { loadDsWallet().then(() => updateCartSummary()); }
 
   // Wire variation checkboxes + per-item qty
   wrap.querySelectorAll(".var-check").forEach(chk => chk.addEventListener("change", () => {
@@ -925,13 +951,16 @@ function renderProductDetail(data) {
     const { items, totalAmt } = getSelectedCart();
     if (items.length === 0) { alert("Please select at least one option"); return; }
     const session = await ensureLogin(); if (!session) return;
+    const btn = $("#buyNowBtn"); const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Processing…";
     try {
-      // Save to cart for record then open wallet-first pay flow (same as other services)
       await saveToCart(session, "purchase", []);
       const payItems = items.map(it => ({ product_id: p.id, color_id: it.color?.id || null, qty: it.qty, unit_price_inr: p.price_inr || 0 }));
-      window.startCatalogPayment("purchase", payItems, []);
+      await window.doCatalogPayInline("purchase", payItems, [], btn);
+      btn.disabled = false; btn.textContent = orig;
     } catch (e) {
       toast(e.message, true);
+      btn.disabled = false; btn.textContent = orig;
     }
   });
   $("#dropshipBtn")?.addEventListener("click", () => {
@@ -1101,15 +1130,16 @@ async function handleDsCheckout(payNow) {
       document.getElementById("dropshipModal").classList.add("hidden");
       return;
     }
-    if (typeof window.startCatalogPayment !== "function") { alert("Step 5 FAIL: startCatalogPayment not loaded. Refresh page."); return; }
-    // Wallet-first pay flow (same as other services): wallet check → Razorpay for shortfall → OTP → debit
+    if (typeof window.doCatalogPayInline !== "function") { alert("Step 5 FAIL: doCatalogPayInline not loaded. Refresh page."); return; }
+    // Inline wallet-first pay: Razorpay opens directly for shortfall (no separate confirm modal)
     const payItems = (_lastDropshipItems || []).map(it => ({
       product_id: product.id,
       color_id: it.color?.id || null,
       qty: it.qty,
       unit_price_inr: product.price_inr || 0,
     }));
-    window.startCatalogPayment(isCat ? "cat_purchase" : "dropship", payItems, dsInfo.selected);
+    const payBtn = document.getElementById("dsPayNow");
+    await window.doCatalogPayInline(isCat ? "cat_purchase" : "dropship", payItems, dsInfo.selected, payBtn);
   } catch (e) {
     alert("Error: " + e.message);
   }
@@ -1444,6 +1474,84 @@ async function openRazorpayForShortfall(session, shortfall_paise, description) {
     } catch (e) { reject(e); }
   });
 }
+
+// INLINE flow (matches Trademark modal on home): no 2nd confirm popup.
+// - Wallet has enough → directly debit (v2 wallet-pay-catalog, no OTP)
+// - Wallet short → Razorpay opens for shortfall → credited → then debit
+window.doCatalogPayInline = async function (mode, items, marketplaces, statusBtn) {
+  const setBtn = (t) => { if (statusBtn) statusBtn.textContent = t; };
+  const { data: { session } } = await sbPay.auth.getSession();
+  if (!session) {
+    if (confirm("Please sign in to continue. Go to sign in?")) location.href = "/home/?next=" + encodeURIComponent(location.pathname);
+    return;
+  }
+  const tryDebit = async () => {
+    const r = await fetch(`${SB_URL}/functions/v1/wallet-pay-catalog`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SB_KEY },
+      body: JSON.stringify({ mode, items, marketplaces }),
+    });
+    return await r.json();
+  };
+  setBtn("Checking wallet…");
+  let j = await tryDebit();
+  if (j.code === "demo_account") { alert(j.message); return; }
+  if (j.ok) {
+    alert("✓ Payment successful! Paid ₹" + (j.total_paise/100).toFixed(2) + " from wallet.\nOur team will contact you shortly.");
+    const dsm = document.getElementById("dropshipModal"); if (dsm) dsm.classList.add("hidden");
+    if (typeof loadDsWallet === "function") await loadDsWallet();
+    return;
+  }
+  if (j.code === "insufficient") {
+    // Razorpay for shortfall → credit wallet → auto-debit
+    setBtn("Opening payment…");
+    const short = j.shortfall_paise;
+    const orderRes = await fetch(`${SB_URL}/functions/v1/analytics-wallet-recharge-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SB_KEY },
+      body: JSON.stringify({ amount_paise: short }),
+    });
+    const order = await orderRes.json();
+    if (!order.ok) { alert("Payment setup failed: " + (order.error || "unknown")); return; }
+    if (typeof Razorpay === "undefined") { alert("Payment library not loaded — refresh page."); return; }
+    await new Promise((resolve) => {
+      const rzp = new Razorpay({
+        key: order.key_id, amount: order.amount_paise, currency: order.currency, order_id: order.order_id,
+        name: "Cursive World", description: "Add ₹" + (short/100).toFixed(2) + " for " + j.service_name,
+        prefill: { email: session.user.email, contact: session.user.user_metadata?.mobile || "" },
+        theme: { color: "#1f6feb" },
+        handler: async function (response) {
+          setBtn("Crediting wallet…");
+          try {
+            const cr = await fetch(`${SB_URL}/functions/v1/analytics-wallet-recharge-confirm`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SB_KEY },
+              body: JSON.stringify({ razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
+            });
+            const cj = await cr.json();
+            if (!cj.ok) throw new Error(cj.error || "Recharge failed");
+            setBtn("Debiting order…");
+            const j2 = await tryDebit();
+            if (j2.ok) {
+              alert("✓ Payment successful! Paid ₹" + (j2.total_paise/100).toFixed(2) + " from wallet.\nOur team will contact you shortly.");
+              const dsm = document.getElementById("dropshipModal"); if (dsm) dsm.classList.add("hidden");
+              if (typeof loadDsWallet === "function") await loadDsWallet();
+            } else {
+              alert("Recharge succeeded but debit failed: " + (j2.error || j2.message || "unknown") + "\nPayment ID: " + response.razorpay_payment_id + "\nContact support.");
+            }
+          } catch (e) {
+            alert("Recharge confirm failed: " + e.message + "\nPayment ID: " + response.razorpay_payment_id);
+          }
+          resolve();
+        },
+        modal: { ondismiss: function () { resolve(); } },
+      });
+      rzp.open();
+    });
+    return;
+  }
+  alert("Error: " + (j.error || j.message || "unknown"));
+};
 
 // Public entry: call this from any Pay Now button. Handles wallet-first + Razorpay-for-shortfall + OTP.
 window.startCatalogPayment = async function (mode, items, marketplaces) {
