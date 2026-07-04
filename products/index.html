@@ -507,8 +507,9 @@ function renderProductDetail(data) {
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
             <div id="modeTabs" style="display:flex;gap:0;margin-bottom:14px;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;background:#f8fafc;">
-              <button type="button" data-mode="purchase" class="mode-tab active" style="flex:1;padding:9px 12px;border:0;background:#1f6feb;color:#fff;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🛒 Purchase</button>
-              <button type="button" data-mode="dropship" class="mode-tab" style="flex:1;padding:9px 12px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">📦 Dropshipping</button>
+              <button type="button" data-mode="purchase" class="mode-tab active" style="flex:1;padding:8px 6px;border:0;background:#1f6feb;color:#fff;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">🛒 Purchase</button>
+              <button type="button" data-mode="cat_purchase" class="mode-tab" style="flex:1;padding:8px 6px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">🎨 Cataloging + Purchase</button>
+              <button type="button" data-mode="dropship" class="mode-tab" style="flex:1;padding:8px 6px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">📦 Cataloging + Dropshipping</button>
             </div>
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more</div>
             <div id="varList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
@@ -541,7 +542,7 @@ function renderProductDetail(data) {
             </div>
           </div>
           <div id="purchaseButtons" style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart to Buy</button>
+            <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
             <button type="button" id="buyNowBtn" class="p-btn p-btn-primary" style="flex:1;min-width:140px;font-size:14px;padding:11px 16px;">⚡ Buy Now</button>
           </div>
           <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;display:none;">📦 Add to Cart for Drop Shipping</button>
@@ -643,7 +644,7 @@ function renderProductDetail(data) {
 
   updateCartSummary();
 
-  // Mode tabs (Purchase / Dropshipping)
+  // Mode tabs (Purchase / Cataloging + Purchase / Cataloging + Dropshipping)
   let _mode = "purchase";
   const applyMode = () => {
     // Style tabs
@@ -652,15 +653,16 @@ function renderProductDetail(data) {
       t.style.background = active ? "#1f6feb" : "transparent";
       t.style.color = active ? "#fff" : "#475467";
     });
-    // Show/hide qty controls
+    const isDropship = _mode === "dropship";
+    // Show/hide qty controls (both Purchase and Cataloging+Purchase show qty)
     wrap.querySelectorAll(".var-qty-wrap").forEach(w => {
-      w.style.display = _mode === "purchase" ? "flex" : "none";
+      w.style.display = isDropship ? "none" : "flex";
     });
     // Show/hide cart summary
-    const cs = $("#cartSummary"); if (cs) cs.style.display = _mode === "purchase" ? "block" : "none";
+    const cs = $("#cartSummary"); if (cs) cs.style.display = isDropship ? "none" : "block";
     // Toggle buttons
-    const pb = $("#purchaseButtons"); if (pb) pb.style.display = _mode === "purchase" ? "flex" : "none";
-    const db = $("#dropshipBtn"); if (db) db.style.display = _mode === "purchase" ? "none" : "block";
+    const pb = $("#purchaseButtons"); if (pb) pb.style.display = isDropship ? "none" : "flex";
+    const db = $("#dropshipBtn"); if (db) db.style.display = isDropship ? "block" : "none";
   };
   wrap.querySelectorAll(".mode-tab").forEach(t => t.addEventListener("click", () => {
     _mode = t.dataset.mode;
@@ -779,7 +781,7 @@ function renderDesignsForColor() {
   if (!clr) { wrap.innerHTML = ""; return; }
   const designs = clr.designs || [];
   if (designs.length === 0) {
-    wrap.innerHTML = `<div style="color:#94a3b8;font-size:12px;">No specific designs — order this color as-is.</div>`;
+    wrap.innerHTML = "";
     return;
   }
   wrap.innerHTML = `
