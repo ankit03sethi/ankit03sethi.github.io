@@ -765,12 +765,45 @@ function openCartModal() {
   })();
 }
 function effectivePaise(it) { return Math.max(0, (it.total_paise || 0) - (it.discount_paise || 0)); }
+function catalogCartTotals() {
+  // Compute grouped totals (with volume discount) across catalog items
+  let productValueTotal = 0, discountedProductTotal = 0, imagingTotal = 0, listingTotal = 0, groupsGrand = 0;
+  if (_catalogCartItems && _catalogCartItems.length > 0) {
+    const byMode = {};
+    for (const it of _catalogCartItems) { (byMode[it.mode] = byMode[it.mode] || []).push(it); }
+    for (const mode of Object.keys(byMode)) {
+      const items = byMode[mode];
+      const includePurchase = (mode === "purchase" || mode === "cat_purchase");
+      const productValue = items.reduce((s, it) => s + ((it.unit_price_inr || 0) * (it.qty || 0)), 0);
+      const discountPct = includePurchase && productValue >= 100000 ? 15 : includePurchase && productValue >= 50000 ? 10 : includePurchase && productValue >= 25000 ? 5 : 0;
+      const discountInr = Math.round(productValue * discountPct / 100);
+      const discountedProductValue = productValue - discountInr;
+      let imagingAmt = 0, listingAmt = 0;
+      if (mode === "cat_purchase" || mode === "dropship") {
+        imagingAmt = 300 * items.length;
+        for (const it of items) listingAmt += 50 * ((it.marketplaces || []).length);
+      }
+      const groupSum = (includePurchase ? discountedProductValue : 0) + imagingAmt + listingAmt;
+      productValueTotal += includePurchase ? productValue : 0;
+      discountedProductTotal += includePurchase ? discountedProductValue : 0;
+      imagingTotal += imagingAmt;
+      listingTotal += listingAmt;
+      groupsGrand += groupSum;
+    }
+  }
+  return { productValueTotal, discountedProductTotal, imagingTotal, listingTotal, groupsGrand };
+}
 function cartTotalsBreakdown() {
   const cart = getCart();
-  const gross = cart.reduce((s, it) => s + (it.total_paise || 0), 0);
-  const itemDiscount = cart.reduce((s, it) => s + (it.discount_paise || 0), 0);
+  const svcGross = cart.reduce((s, it) => s + (it.total_paise || 0), 0);
+  const svcItemDiscount = cart.reduce((s, it) => s + (it.discount_paise || 0), 0);
+  // Catalog totals in paise
+  const cat = catalogCartTotals();
+  const catGrossPaise = cat.groupsGrand * 100;
+  const gross = svcGross + catGrossPaise;
+  const itemDiscount = svcItemDiscount;
   const net = gross - itemDiscount;
-  return { gross, itemDiscount, net };
+  return { gross, itemDiscount, net, cat };
 }
 function renderCatalogCartHtml() {
   if (!_catalogCartItems || _catalogCartItems.length === 0) return "";
@@ -947,8 +980,28 @@ function renderCartModal() {
     return;
   }
   if (cart.length === 0 && _catalogCartItems.length > 0) {
-    body.innerHTML = renderCatalogCartHtml();
+    // Unified control bar even for catalog-only cart
+    const totalItems = _catalogCartItems.length;
+    const unifiedBar = `<div style="position:sticky;top:0;background:#fff;padding:8px 0 10px;margin-bottom:6px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;z-index:1;">
+      <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;color:#334155;font-size:13px;">
+        <input type="checkbox" id="unifiedSelectAll" onchange="toggleAllUnifiedCart(this.checked)" style="width:15px;height:15px;cursor:pointer;">
+        Select all (${totalItems})
+      </label>
+      <button id="unifiedRemoveSelBtn" type="button" onclick="removeSelectedUnifiedCart()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;">🗑 Remove selected</button>
+    </div>`;
+    body.innerHTML = unifiedBar + renderCatalogCartHtml();
     $("#cartFooter").style.display = "block";
+    // Render footer breakdown for catalog-only cart
+    const { gross, itemDiscount, net } = cartTotalsBreakdown();
+    const adj = Math.min(_cartWalletPaise, net);
+    const due = Math.max(0, net - _cartWalletPaise);
+    const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits: p % 100 ? 2 : 0 });
+    $("#cartBreakdown").innerHTML =
+      `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span style="color:#64748b;">Cart subtotal</span><span style="color:#0f172a;font-weight:600;">${fmt(gross)}</span></div>` +
+      (adj > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0;color:#16a34a;"><span>Adjustment from wallet</span><span>−${fmt(adj)}</span></div>` : "") +
+      `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:6px 0 0;margin-top:4px;border-top:1px solid #e2e8f0;"><span style="color:#0f172a;">Amount to add in wallet</span><span style="color:#1f6feb;">${fmt(due)}</span></div>` +
+      `<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Wallet balance: ${fmt(_cartWalletPaise)}</div>`;
+    $("#cartPayBtnAmt").textContent = fmt(due);
     return;
   }
   $("#cartFooter").style.display = "block";
