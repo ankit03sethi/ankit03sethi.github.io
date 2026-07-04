@@ -205,79 +205,58 @@
     .toast.err { background: #dc2626; }
     .hidden { display: none !important; }
 
-    /* 3D mode tabs */
+    /* Mode tabs - normal weight */
     .mt-badge {
       display: inline-block;
-      background: #1f6feb;
-      color: #fff;
+      color: #1f6feb;
       font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      padding: 3px 8px;
-      border-radius: 4px;
-      margin-bottom: 6px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
       align-self: flex-start;
-      box-shadow: 0 2px 4px rgba(31,111,235,0.25);
       text-transform: uppercase;
     }
     .mode-tab-3d {
       width: 100%;
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 10px;
+      display: flex; align-items: center; gap: 7px;
+      padding: 8px 9px;
       background: #fff;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
       cursor: pointer;
       text-align: left;
       color: #0f172a;
-      box-shadow:
-        0 4px 10px rgba(15,23,42,0.06),
-        0 1px 2px rgba(15,23,42,0.04),
-        inset 0 1px 0 rgba(255,255,255,0.9);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
+      transition: border-color .15s ease, background .15s ease, color .15s ease;
     }
     .mode-tab-3d:hover {
-      background: linear-gradient(180deg, #1f6feb 0%, #1858d6 100%);
-      border-color: #1858d6;
-      color: #fff;
-      box-shadow:
-        0 10px 24px rgba(31,111,235,0.28),
-        0 4px 8px rgba(15,23,42,0.10),
-        inset 0 1px 0 rgba(255,255,255,0.4);
-      transform: translateY(-3px);
+      border-color: #1f6feb;
+      background: #eff6ff;
     }
-    .mode-tab-3d:hover .mt-icon { background: rgba(255,255,255,0.2); }
-    .mode-tab-3d:active { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(31,111,235,0.12); }
     .mode-tab-3d.active {
-      background: linear-gradient(180deg, #1f6feb 0%, #1858d6 100%);
-      border-color: #1858d6;
+      background: #1f6feb;
+      border-color: #1f6feb;
       color: #fff;
-      box-shadow:
-        0 12px 24px rgba(31,111,235,0.35),
-        0 4px 8px rgba(15,23,42,0.10),
-        inset 0 1px 0 rgba(255,255,255,0.4);
-      transform: translateY(-2px);
     }
     .mode-tab-3d.active .mt-icon { background: rgba(255,255,255,0.2); }
     .mode-tab-3d .mt-icon {
-      width: 34px; height: 34px; border-radius: 9px;
-      display: grid; place-items: center; font-size: 17px;
-      background: #eff6ff;
+      width: 26px; height: 26px; border-radius: 6px;
+      display: grid; place-items: center; font-size: 14px;
+      background: #f1f5f9;
       flex-shrink: 0;
-      box-shadow: 0 2px 4px rgba(31,111,235,0.15), inset 0 1px 0 rgba(255,255,255,0.5);
-      transition: background .18s ease;
+      transition: background .15s ease;
     }
+    .mode-tab-3d:hover .mt-icon { background: rgba(31,111,235,0.15); }
     .mode-tab-3d .mt-txt {
       flex: 1; min-width: 0;
-      font-weight: 700;
-      font-size: 12.5px;
+      font-weight: 600;
+      font-size: 12px;
       line-height: 1.25;
       word-wrap: break-word;
     }
     @media (max-width: 640px) {
-      .mode-tab-3d { flex-direction: column; text-align: center; padding: 10px 6px; gap: 6px; }
-      .mode-tab-3d .mt-txt { font-size: 11.5px; }
-      .mt-badge { font-size: 9px; padding: 2px 6px; }
+      .mode-tab-3d { flex-direction: column; text-align: center; padding: 7px 5px; gap: 4px; }
+      .mode-tab-3d .mt-txt { font-size: 11px; }
+      .mt-badge { font-size: 9px; }
     }
 
     /* Product detail modal */
@@ -608,6 +587,16 @@ function renderProductDetail(data) {
               </div>
             </div>
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more <span style="color:#64748b;font-weight:500;font-size:11.5px;">· min qty 10 per product · +5 steps</span></div>
+            <div id="applyAllBar" style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:10px;flex-wrap:wrap;">
+              <span style="font-size:12px;font-weight:700;color:#0f172a;">Quick set qty:</span>
+              <div style="display:flex;align-items:center;gap:0;">
+                <button type="button" id="applyMinus" style="width:24px;height:26px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:5px 0 0 5px;font-size:14px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
+                <input id="applyQty" type="number" min="10" step="5" value="10" style="width:50px;height:26px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:12px;font-weight:700;padding:0;" />
+                <button type="button" id="applyPlus" style="width:24px;height:26px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 5px 5px 0;font-size:14px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
+              </div>
+              <button type="button" id="applyAllBtn" style="background:#1f6feb;color:#fff;border:0;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">✓ Apply to all</button>
+              <span id="applyErr" style="color:#dc2626;font-size:11px;font-weight:600;display:none;"></span>
+            </div>
             <div id="varList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
               ${colors.map(c => `
                 <label class="var-row" data-cid="${c.id}" style="border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -724,26 +713,87 @@ function renderProductDetail(data) {
     if (chk.checked) { _selectedColorId = cid; renderDesignsForColor(); }
     updateCartSummary();
   }));
+  const flagQtyError = (q, msg) => {
+    q.style.borderColor = "#dc2626";
+    q.style.background = "#fef2f2";
+    q.title = msg || "Minimum qty is 10";
+  };
+  const clearQtyError = (q) => {
+    q.style.borderColor = "#cbd5e1";
+    q.style.background = "#fff";
+    q.title = "";
+  };
+  wrap.querySelectorAll(".var-qty").forEach(q => q.addEventListener("focus", () => {
+    q.select();
+    clearQtyError(q);
+  }));
   wrap.querySelectorAll(".var-qty").forEach(q => q.addEventListener("input", () => {
-    // Allow any number typed, min 10
-    const v = Math.max(10, parseInt(q.value, 10) || 10);
-    q.value = v; updateCartSummary();
+    // Free typing — no auto-correct. Just update cart if value ≥ 10, else flag
+    const raw = q.value.trim();
+    if (raw === "") { flagQtyError(q, "Enter qty (min 10)"); return; }
+    const n = parseInt(raw, 10);
+    if (isNaN(n) || n < 10) flagQtyError(q, "Minimum qty is 10");
+    else clearQtyError(q);
+    updateCartSummary();
   }));
   wrap.querySelectorAll(".var-qty").forEach(q => q.addEventListener("blur", () => {
-    // On blur, enforce min 10
-    const v = Math.max(10, parseInt(q.value, 10) || 10);
-    q.value = v; updateCartSummary();
+    // On blur, if invalid, snap back to 10 and show alert
+    const n = parseInt(q.value, 10);
+    if (isNaN(n) || n < 10) {
+      alert("Minimum quantity per product is 10. Setting to 10.");
+      q.value = 10;
+      clearQtyError(q);
+      updateCartSummary();
+    }
   }));
   wrap.querySelectorAll(".var-qty-minus").forEach(b => b.addEventListener("click", () => {
     const cid = b.dataset.cid;
     const q = wrap.querySelector(`.var-qty[data-cid="${cid}"]`);
-    q.value = Math.max(10, (parseInt(q.value, 10) || 10) - 5); updateCartSummary();
+    q.value = Math.max(10, (parseInt(q.value, 10) || 10) - 5);
+    clearQtyError(q); updateCartSummary();
   }));
   wrap.querySelectorAll(".var-qty-plus").forEach(b => b.addEventListener("click", () => {
     const cid = b.dataset.cid;
     const q = wrap.querySelector(`.var-qty[data-cid="${cid}"]`);
-    q.value = Math.max(10, (parseInt(q.value, 10) || 10) + 5); updateCartSummary();
+    q.value = Math.max(10, (parseInt(q.value, 10) || 10) + 5);
+    clearQtyError(q); updateCartSummary();
   }));
+
+  // Apply to all
+  const applyQtyIn = $("#applyQty");
+  const applyErr = $("#applyErr");
+  $("#applyMinus")?.addEventListener("click", () => {
+    applyQtyIn.value = Math.max(10, (parseInt(applyQtyIn.value, 10) || 10) - 5);
+    applyErr.style.display = "none";
+  });
+  $("#applyPlus")?.addEventListener("click", () => {
+    applyQtyIn.value = Math.max(10, (parseInt(applyQtyIn.value, 10) || 10) + 5);
+    applyErr.style.display = "none";
+  });
+  applyQtyIn?.addEventListener("input", () => { applyErr.style.display = "none"; });
+  $("#applyAllBtn")?.addEventListener("click", () => {
+    const n = parseInt(applyQtyIn.value, 10);
+    if (isNaN(n) || n < 10) {
+      applyErr.textContent = "Minimum 10";
+      applyErr.style.display = "inline";
+      return;
+    }
+    wrap.querySelectorAll(".var-qty").forEach(q => { q.value = n; clearQtyError(q); });
+    // Also auto-check all rows so total shows something
+    wrap.querySelectorAll(".var-check").forEach(chk => {
+      chk.checked = true;
+      const row = wrap.querySelector(`.var-row[data-cid="${chk.dataset.cid}"]`);
+      if (row) row.style.borderColor = "#1f6feb";
+    });
+    updateCartSummary();
+    applyErr.textContent = `✓ Applied to ${wrap.querySelectorAll(".var-qty").length} products`;
+    applyErr.style.display = "inline";
+    applyErr.style.color = "#16a34a";
+    setTimeout(() => {
+      applyErr.style.display = "none";
+      applyErr.style.color = "#dc2626";
+    }, 2500);
+  });
 
   updateCartSummary();
 
