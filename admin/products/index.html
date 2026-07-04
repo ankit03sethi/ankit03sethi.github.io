@@ -675,7 +675,7 @@ $("#pSave").addEventListener("click", async () => {
     variation_types: selectedVariationTypes(),
   };
   const j = await call("save_product", payload);
-  if (j.ok) { toast("✓ Saved product"); _selectedProdId = j.product.id; await loadAll(); }
+  if (j.ok) { toast("✓ Saved product"); _selectedProdId = null; await loadAll(); }
   else toast(j.error, true);
 });
 
