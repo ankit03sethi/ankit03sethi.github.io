@@ -496,6 +496,8 @@ async function init() {
 function showLogin() {
   hide($("#homeView")); show($("#loginView"));
   hide($("#emailChip")); hide($("#topSignOutBtn"));
+  // Cart chip should only exist for signed-in customers
+  const chip = $("#cartChip"); if (chip) chip.classList.add("hidden");
 }
 
 async function showHome(session) {
@@ -510,6 +512,7 @@ async function showHome(session) {
   $("#emailChip").textContent = session.user.email;
   show($("#emailChip"));
   show($("#topSignOutBtn"));
+  const chip = $("#cartChip"); if (chip) chip.classList.remove("hidden");
   await loadWallet(session);
   await loadCatalogCartCount();
   refreshCartChip();
