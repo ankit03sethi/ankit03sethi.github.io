@@ -1366,19 +1366,21 @@ const fmt = (p) => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigi
 let _catPayState = null; // { mode, items, marketplaces, intent_hash, action_token, wallet_balance_paise, total_paise, breakdown, session, otp_id }
 
 function closeCatPayModal() {
-  $$("#catPayModal").style.display = "none";
+  const m = $$("#catPayModal"); if (m) m.style.display = "none";
   _catPayState = null;
 }
-$$("#catPayCloseBtn").addEventListener("click", closeCatPayModal);
-$$("#catPayCancelBtn").addEventListener("click", closeCatPayModal);
-$$("#catPayModal").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeCatPayModal(); });
+// Attach only if legacy modal still exists (backwards-compat; new UX is inline)
+$$("#catPayCloseBtn")?.addEventListener("click", closeCatPayModal);
+$$("#catPayCancelBtn")?.addEventListener("click", closeCatPayModal);
+$$("#catPayModal")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) closeCatPayModal(); });
 
 function showCatPayError(msg) {
   const el = $$("#catPayError");
+  if (!el) return;
   el.textContent = msg;
   el.style.display = "block";
 }
-function hideCatPayError() { $$("#catPayError").style.display = "none"; }
+function hideCatPayError() { const el = $$("#catPayError"); if (el) el.style.display = "none"; }
 
 async function callWalletPayCatalog(session, mode, items, marketplaces, action_token) {
   const body = { mode, items, marketplaces };
