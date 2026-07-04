@@ -501,12 +501,16 @@ function renderProductDetail(data) {
         </div>
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
+            <div id="modeTabs" style="display:flex;gap:0;margin-bottom:14px;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;background:#f8fafc;">
+              <button type="button" data-mode="purchase" class="mode-tab active" style="flex:1;padding:9px 12px;border:0;background:#1f6feb;color:#fff;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🛒 Purchase</button>
+              <button type="button" data-mode="dropship" class="mode-tab" style="flex:1;padding:9px 12px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">📦 Dropshipping</button>
+            </div>
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more</div>
             <div id="varList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
               ${colors.map(c => `
-                <div class="var-row" data-cid="${c.id}" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#fff;display:flex;align-items:center;gap:10px;">
-                  <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;" />
-                  ${c.hex_code ? `<span style="width:20px;height:20px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
+                <label class="var-row" data-cid="${c.id}" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#fff;display:flex;align-items:center;gap:10px;cursor:pointer;">
+                  <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;" />
+                  ${c.hex_code ? `<span style="width:22px;height:22px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
                   <div style="flex:1;min-width:0;">
                     <div style="font-weight:700;font-size:13px;color:#0f172a;">${esc(c.name)}</div>
                     ${c.product_code ? `<div style="font-size:11px;color:#1f6feb;font-weight:600;">${esc(c.product_code)}</div>` : ''}
@@ -516,7 +520,7 @@ function renderProductDetail(data) {
                     <input class="var-qty" data-cid="${c.id}" type="number" min="1" value="1" style="width:44px;height:28px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:13px;font-weight:700;padding:0;" />
                     <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:28px;height:28px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 6px 6px 0;font-size:16px;font-weight:700;cursor:pointer;padding:0;">+</button>
                   </div>
-                </div>
+                </label>
               `).join("")}
             </div>
             <div id="designsWrap"></div>
@@ -532,11 +536,11 @@ function renderProductDetail(data) {
               <span>Total</span><span>₹<span id="cartTotal">0</span></span>
             </div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div id="purchaseButtons" style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart to Buy</button>
             <button type="button" id="buyNowBtn" class="p-btn p-btn-primary" style="flex:1;min-width:140px;font-size:14px;padding:11px 16px;">⚡ Buy Now</button>
           </div>
-          <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;margin-top:8px;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;">📦 Add to Cart for Drop Shipping</button>
+          <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;display:none;">📦 Add to Cart for Drop Shipping</button>
         </div>
         ${(p.bullet_points || []).length || p.description ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -634,6 +638,31 @@ function renderProductDetail(data) {
   }));
 
   updateCartSummary();
+
+  // Mode tabs (Purchase / Dropshipping)
+  let _mode = "purchase";
+  const applyMode = () => {
+    // Style tabs
+    wrap.querySelectorAll(".mode-tab").forEach(t => {
+      const active = t.dataset.mode === _mode;
+      t.style.background = active ? "#1f6feb" : "transparent";
+      t.style.color = active ? "#fff" : "#475467";
+    });
+    // Show/hide qty controls
+    wrap.querySelectorAll(".var-qty-wrap").forEach(w => {
+      w.style.display = _mode === "purchase" ? "flex" : "none";
+    });
+    // Show/hide cart summary
+    const cs = $("#cartSummary"); if (cs) cs.style.display = _mode === "purchase" ? "block" : "none";
+    // Toggle buttons
+    const pb = $("#purchaseButtons"); if (pb) pb.style.display = _mode === "purchase" ? "flex" : "none";
+    const db = $("#dropshipBtn"); if (db) db.style.display = _mode === "purchase" ? "none" : "block";
+  };
+  wrap.querySelectorAll(".mode-tab").forEach(t => t.addEventListener("click", () => {
+    _mode = t.dataset.mode;
+    applyMode();
+  }));
+  applyMode();
 
   function buildCartMessage(prefix, footer) {
     const { items, totalQty, totalAmt } = getSelectedCart();
