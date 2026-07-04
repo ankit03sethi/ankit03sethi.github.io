@@ -300,6 +300,61 @@
   </div>
 </div>
 
+<!-- Dropshipping modal -->
+<div id="dropshipModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;padding:20px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0 0 4px;font-size:18px;">📦 Drop Shipping Service</h3>
+        <div style="color:#64748b;font-size:12px;">We do imaging + listing on your chosen marketplaces</div>
+      </div>
+      <button type="button" id="dsClose" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;">×</button>
+    </div>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Base charge</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:#374151;">
+        <span>Product imaging + listing</span>
+        <b>₹300</b>
+      </div>
+    </div>
+
+    <label style="display:block;font-weight:700;font-size:13px;margin-bottom:8px;">Select marketplaces to list on (₹50 each)</label>
+    <div id="dsMps" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <label class="ds-mp"><input type="checkbox" value="Amazon" /> <span>🛒 Amazon</span></label>
+      <label class="ds-mp"><input type="checkbox" value="Flipkart" /> <span>🛍️ Flipkart</span></label>
+      <label class="ds-mp"><input type="checkbox" value="Meesho" /> <span>🎯 Meesho</span></label>
+      <label class="ds-mp"><input type="checkbox" value="JioMart" /> <span>🏬 JioMart</span></label>
+      <label class="ds-mp"><input type="checkbox" value="FirstCry" /> <span>👶 FirstCry</span></label>
+      <label class="ds-mp"><input type="checkbox" value="Myntra" /> <span>👗 Myntra</span></label>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
+        <span>Base</span><span>₹300</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#374151;">
+        <span>Marketplaces (<span id="dsMpCount">0</span> × ₹50)</span><span>₹<span id="dsMpTotal">0</span></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid #bfdbfe;padding-top:8px;font-weight:800;font-size:16px;">
+        <span>Total</span><span style="color:#1f6feb;">₹<span id="dsTotal">300</span></span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button type="button" id="dsAddCart" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+      <button type="button" id="dsPayNow" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ds-mp { display:flex; align-items:center; gap:6px; padding:8px 10px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; user-select:none; }
+  .ds-mp:hover { border-color:#1f6feb; }
+  .ds-mp input:checked ~ span { color:#1f6feb; }
+  .ds-mp:has(input:checked) { background:#eff6ff; border-color:#1f6feb; }
+</style>
+
 <!-- Product detail modal -->
 <div id="detailModal" class="modal-back">
   <div class="modal" style="max-width:520px;">
@@ -418,6 +473,8 @@ function renderProductDetail(data) {
   const cat = data.category;
   const colors = data.colors || [];
   _selectedColorId = colors.length ? colors[0].id : null;
+  _lastDetailProduct = p;
+  _lastDetailProductId = p.id;
   const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
   const imgs = (p.image_urls || []).length ? p.image_urls : [""];
 
@@ -467,10 +524,10 @@ function renderProductDetail(data) {
             <button type="button" id="qtyPlus" style="width:36px;height:36px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 6px 6px 0;font-size:18px;font-weight:700;cursor:pointer;">+</button>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+            <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart to Buy</button>
             <button type="button" id="buyNowBtn" class="p-btn p-btn-primary" style="flex:1;min-width:140px;font-size:14px;padding:11px 16px;">⚡ Buy Now</button>
           </div>
-          <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;margin-top:8px;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;">📦 Add For Drop shipping</button>
+          <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;margin-top:8px;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;">📦 Add to Cart for Drop Shipping</button>
         </div>
         ${(p.bullet_points || []).length || p.description ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -566,23 +623,64 @@ function renderProductDetail(data) {
   });
 
   $("#dropshipBtn")?.addEventListener("click", () => {
-    const qty = Math.max(1, parseInt(qtyIn.value, 10) || 1);
-    const clr = (_catalogGrid._colors || []).find(c => c.id === _selectedColorId);
-    const total = p.price_inr * qty;
-    const parts = [
-      `Add For Drop Shipping 📦`,
-      `Product: ${p.title}`,
-      p.product_code ? `Product ID: ${p.product_code}` : null,
-      clr ? `Variation: ${clr.name}${clr.product_code ? ` (${clr.product_code})` : ''}` : null,
-      `Qty: ${qty}`,
-      `Total: ₹${total}`,
-      `I want to add this to my dropshipping catalog. Please share terms.`,
-    ].filter(Boolean).join("\n");
-    window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
+    // Reset modal state
+    document.querySelectorAll("#dsMps input").forEach(i => { i.checked = false; });
+    updateDsTotal();
+    $("#dropshipModal").classList.remove("hidden");
   });
 
   renderDesignsForColor();
 }
+
+function updateDsTotal() {
+  const checked = document.querySelectorAll("#dsMps input:checked");
+  const count = checked.length;
+  const mpTotal = count * 50;
+  const total = 300 + mpTotal;
+  const cEl = document.getElementById("dsMpCount"); if (cEl) cEl.textContent = count;
+  const mtEl = document.getElementById("dsMpTotal"); if (mtEl) mtEl.textContent = mpTotal;
+  const tEl = document.getElementById("dsTotal"); if (tEl) tEl.textContent = total;
+  return { count, total, selected: Array.from(checked).map(c => c.value) };
+}
+
+// Wire up dropship modal (once, global)
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("#dsMps input").forEach(inp => {
+    inp.addEventListener("change", updateDsTotal);
+  });
+  document.getElementById("dsClose")?.addEventListener("click", () => {
+    document.getElementById("dropshipModal").classList.add("hidden");
+  });
+  document.getElementById("dropshipModal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.add("hidden");
+  });
+  document.getElementById("dsAddCart")?.addEventListener("click", () => sendDropshipMessage(false));
+  document.getElementById("dsPayNow")?.addEventListener("click", () => sendDropshipMessage(true));
+});
+
+function sendDropshipMessage(payNow) {
+  const { count, total, selected } = updateDsTotal();
+  if (count === 0) { alert("Please select at least one marketplace"); return; }
+  // Find current product from URL or global state
+  const activeCard = document.querySelector(".prod-card.active") || null;
+  const productId = _lastDetailProductId;
+  const product = _lastDetailProduct;
+  const parts = [
+    payNow ? `💳 Drop Shipping - Pay Now request` : `🛒 Add to Cart - Drop Shipping`,
+    product ? `Product: ${product.title}` : null,
+    product && product.product_code ? `Product ID: ${product.product_code}` : null,
+    `Marketplaces: ${selected.join(", ")}`,
+    `Charges: ₹300 (base) + ₹50 × ${count} = ₹${total}`,
+    ``,
+    payNow ? `Please share payment link.` : `Please add to my cart.`,
+  ].filter(Boolean).join("\n");
+  window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
+  document.getElementById("dropshipModal").classList.add("hidden");
+}
+
+// Track last-viewed product for dropship messaging
+let _lastDetailProductId = null;
+let _lastDetailProduct = null;
 
 function renderDesignsForColor() {
   const wrap = $("#designsWrap");
