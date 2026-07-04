@@ -569,14 +569,15 @@ function renderProductDetail(data) {
   _lastDetailProduct = p;
   _lastDetailProductId = p.id;
   _lastDetailColors = colors;
-  // Persist product context in URL hash — but preserve any modal state params already present
+  // URL: /products/?p=<code_or_id>  (query param). Modal state stays in hash for stateful UI.
   try {
-    const cur = parseHash();
-    if (!cur.p) {
-      // No hash yet — set to just p=id
-      history.replaceState(null, "", "#p=" + p.id);
+    const paramId = (p.product_code && String(p.product_code).trim()) || String(p.id);
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get("p") !== paramId) {
+      urlParams.set("p", paramId);
+      const q = urlParams.toString();
+      history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + (location.hash || ""));
     }
-    // else: keep whatever modal params are already in URL so refresh restores them
   } catch (_) {}
   const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
   const imgs = (p.image_urls || []).length ? p.image_urls : [""];
@@ -683,7 +684,7 @@ function renderProductDetail(data) {
           <button type="button" id="catPurchaseNextBtn" class="p-btn p-btn-primary" style="width:100%;background:#7c3aed;border:0;color:#fff;font-size:14px;padding:11px 16px;display:none;">Next → Choose marketplaces</button>
           <button type="button" id="dropshipBtn" class="p-btn p-btn-primary" style="width:100%;background:#7c3aed;border:0;color:#fff;font-size:14px;padding:11px 16px;display:none;">Next → Choose marketplaces</button>
           <!-- Anonymous CTA — shown only when body.anon -->
-          <a href="/home/?next=${encodeURIComponent('/products/#p=' + p.id)}" class="anon-cta p-btn p-btn-primary" style="width:100%;background:#1f6feb;border:0;color:#fff;font-size:15px;padding:12px 16px;text-align:center;text-decoration:none;font-weight:700;">🔒 Sign in to purchase</a>
+          <a href="/home/?next=${encodeURIComponent('/products/?p=' + ((p.product_code && String(p.product_code).trim()) || p.id))}" class="anon-cta p-btn p-btn-primary" style="width:100%;background:#1f6feb;border:0;color:#fff;font-size:15px;padding:12px 16px;text-align:center;text-decoration:none;font-weight:700;">🔒 Sign in to purchase</a>
         </div>
         ${(p.bullet_points || []).length || p.description ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -724,7 +725,15 @@ function renderProductDetail(data) {
   });
 
   // Back button
-  $("#backToGrid").addEventListener("click", () => { try { history.replaceState(null, "", location.pathname); } catch (_) {} renderGrid(); });
+  $("#backToGrid").addEventListener("click", () => {
+    try {
+      const qp = new URLSearchParams(location.search);
+      qp.delete("p");
+      const q = qp.toString();
+      history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + (location.hash || ""));
+    } catch (_) {}
+    renderGrid();
+  });
 
   // Helper: get selected variations with their qty
   function getSelectedCart() {
@@ -1468,11 +1477,34 @@ $("#signOutBtn").addEventListener("click", async () => {
 async function init() {
   // Default to anonymous view until we know the session (avoid flashing purchase controls)
   document.body.classList.add("anon");
-  // Restore product detail + modal state from URL hash
+  // Product identity is now in query param ?p=<code_or_id>; modal state stays in hash
+  const qp = new URLSearchParams(location.search);
+  const pParam = (qp.get("p") || "").trim();
   const hashState = parseHash();
-  if (hashState.p && /^\d+$/.test(hashState.p)) {
-    await showProductDetail(Number(hashState.p));
-    // If modal state was open (m, items, mp), restore it
+  // Legacy support: allow old #p=<id> URLs to still work
+  const legacyId = hashState.p && /^\d+$/.test(hashState.p) ? Number(hashState.p) : null;
+  if (pParam) {
+    // Try direct numeric first
+    if (/^\d+$/.test(pParam)) {
+      await showProductDetail(Number(pParam));
+    } else {
+      // Non-numeric = product_code. Load grid first, find matching id.
+      await loadCatalog();
+      const grid = _catalogGrid || [];
+      let foundId = null;
+      for (const cat of grid) {
+        for (const prod of (cat.products || [])) {
+          if (String(prod.product_code || "").trim() === pParam) { foundId = prod.id; break; }
+        }
+        if (foundId) break;
+      }
+      if (foundId) await showProductDetail(foundId);
+    }
+    if (hashState.m && (hashState.m === "cat_purchase" || hashState.m === "dropship") && hashState.items) {
+      setTimeout(() => restoreModalFromHash(hashState), 250);
+    }
+  } else if (legacyId) {
+    await showProductDetail(legacyId);
     if (hashState.m && (hashState.m === "cat_purchase" || hashState.m === "dropship") && hashState.items) {
       setTimeout(() => restoreModalFromHash(hashState), 250);
     }
