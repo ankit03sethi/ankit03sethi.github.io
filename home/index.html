@@ -514,6 +514,9 @@ async function showHome(session) {
   await loadCatalogCartCount();
   refreshCartChip();
 
+  // Auto-reopen cart if #cart hash is in URL (persistence across refresh)
+  if ((location.hash || "").includes("cart")) { try { openCartModal(); } catch (_) {} }
+
   // Auto-open service modal if ?service=TAG was passed (from service-page redirect)
   // INSTANT open — no setTimeout delay. Wallet balance fills in as it arrives.
   const svc = qp.get("service");
@@ -747,6 +750,8 @@ let _cartWalletPaise = 0;
 function openCartModal() {
   renderCartModal();
   $("#cartModal").style.display = "flex";
+  // Persist open state so refresh keeps cart open
+  try { if (location.hash !== "#cart") history.replaceState(null, "", "#cart"); } catch (_) {}
   // Refresh catalog items each open
   loadCatalogCartCount().then(() => { refreshCartChip(); renderCartModal(); });
   // Fetch wallet
@@ -843,7 +848,7 @@ function renderCatalogCartHtml() {
     if (!isOpen) continue;
     // For Option 1 (Purchase), show a compact discount line if applicable
     if (mode === "purchase" && discountPct > 0) {
-      html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
+      html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 90px 8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
         <div style="display:flex;justify-content:space-between;padding:2px 0;color:#94a3b8;text-decoration:line-through;font-size:11.5px;"><span>Product value</span><span>₹${productValue.toLocaleString("en-IN")}</span></div>
         <div style="display:flex;justify-content:space-between;padding:2px 0;color:#16a34a;font-weight:700;"><span>Product value after ${discountPct}% discount</span><span>₹${discountedProductValue.toLocaleString("en-IN")}</span></div>
       </div>`;
@@ -861,7 +866,7 @@ function renderCatalogCartHtml() {
           productLine = `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Product value</span><span>₹${productValue.toLocaleString("en-IN")}</span></div>`;
         }
       }
-      html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
+      html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 90px 8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
         ${productLine}
         <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Imaging (₹300 × ${items.length} products)</span><span>₹${imagingAmt.toLocaleString("en-IN")}</span></div>
         <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Listing (₹50 × ${mpCount} mkt × ${items.length} products)</span><span>₹${listingAmt.toLocaleString("en-IN")}</span></div>
@@ -1130,8 +1135,8 @@ window.removeCartItem = function (id) {
 document.addEventListener("click", (e) => {
   if (!e.target) return;
   if (e.target.id === "cartChip" || e.target.closest && e.target.closest("#cartChip")) { openCartModal(); return; }
-  if (e.target.id === "cartCloseBtn") { $("#cartModal").style.display = "none"; return; }
-  if (e.target.id === "cartModal") { $("#cartModal").style.display = "none"; return; }
+  if (e.target.id === "cartCloseBtn") { $("#cartModal").style.display = "none"; try { history.replaceState(null, "", location.pathname); } catch (_) {} return; }
+  if (e.target.id === "cartModal") { $("#cartModal").style.display = "none"; try { history.replaceState(null, "", location.pathname); } catch (_) {} return; }
 });
 
 // Cart Pay button — process items sequentially after wallet is funded
@@ -1168,6 +1173,7 @@ $("#cartPayBtn").addEventListener("click", async () => {
     // Clear cart
     saveCart([]);
     $("#cartModal").style.display = "none";
+    try { history.replaceState(null, "", location.pathname); } catch (_) {}
     alert("✓ All " + cart.length + " item(s) purchased successfully. Our team will reach out shortly.");
     if (session) await loadWallet(session);
   }
