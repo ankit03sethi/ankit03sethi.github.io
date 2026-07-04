@@ -776,29 +776,24 @@ function renderCatalogCartHtml() {
   // Group items by mode
   const groups = {};
   for (const it of _catalogCartItems) { (groups[it.mode] = groups[it.mode] || []).push(it); }
-  // Top header + Select all / Remove selected
-  let html = `<div style="margin:10px 0 6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div style="font-size:12px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">📦 Product Catalog Items</div>
-    <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
-      <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-weight:600;color:#334155;">
-        <input type="checkbox" id="catCartSelectAll" onchange="toggleAllCatalogCart(this.checked)" style="width:14px;height:14px;cursor:pointer;">
-        Select all
-      </label>
-      <button id="catCartRemoveSelBtn" type="button" onclick="removeSelectedCatalogCart()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">🗑 Remove selected</button>
-    </div>
-  </div>`;
+  let html = '<div style="margin:8px 0 4px;font-size:12px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">📦 Product Catalog Items</div>';
   // Render each mode group
   for (const mode of modeOrder) {
     const items = groups[mode]; if (!items || items.length === 0) continue;
     const label = modeLabel[mode] || mode;
     const color = modeColor[mode] || "#334155";
-    html += `<div style="margin:12px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;">${label} <span style="opacity:.7;font-weight:600;">(${items.length})</span></div>`;
+    // Sum of item subtotals in this group (unit_price × qty for each row)
+    const groupSum = items.reduce((s, it) => s + ((it.unit_price_inr || 0) * (it.qty || 0)), 0);
+    html += `<div style="margin:12px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;">
+      <span>${label} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
+      <span>₹${groupSum.toLocaleString("en-IN")}</span>
+    </div>`;
     for (const it of items) {
       const code = (it.catalog_colors && it.catalog_colors.product_code) || (it.catalog_products && it.catalog_products.product_code) || ("P" + it.product_id + (it.color_id ? "-" + it.color_id : ""));
       const mps = (it.marketplaces || []).join(", ");
       const sub = (it.unit_price_inr || 0) * (it.qty || 0);
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
-        <input type="checkbox" class="catCartItemChk" data-id="${it.id}" style="width:14px;height:14px;cursor:pointer;" onchange="updateCatCartSelectAllState()">
+        <input type="checkbox" class="unifiedCartChk" data-kind="cat" data-id="${it.id}" style="width:14px;height:14px;cursor:pointer;" onchange="updateUnifiedSelectAllState()">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;color:#0f172a;">ID: ${escapeHtml(code)}</div>
           <div style="font-size:11.5px;color:#64748b;margin-top:1px;">Qty ${it.qty}${mps ? " · " + escapeHtml(mps) : ""}</div>
@@ -810,7 +805,7 @@ function renderCatalogCartHtml() {
       </div>`;
     }
   }
-  html += '<div style="margin-top:10px;text-align:center;"><a href="/products/" style="color:#7c3aed;text-decoration:none;font-weight:700;font-size:12.5px;">Go to Products →</a></div>';
+  html += '<div style="margin-top:12px;text-align:center;"><button type="button" onclick="location.href=\'/home/\'" style="background:#eff6ff;color:#1f6feb;border:1.5px solid #bfdbfe;border-radius:8px;padding:8px 18px;font-weight:700;font-size:13px;cursor:pointer;">+ Add more</button></div>';
   return html;
 }
 function toggleAllCatalogCart(checked) {
@@ -844,6 +839,50 @@ async function removeSelectedCatalogCart() {
 window.toggleAllCatalogCart = toggleAllCatalogCart;
 window.updateCatCartSelectAllState = updateCatCartSelectAllState;
 window.removeSelectedCatalogCart = removeSelectedCatalogCart;
+
+// UNIFIED cart controls — one Select-all + Remove-selected that acts on BOTH services & catalog items
+function toggleAllUnifiedCart(checked) {
+  document.querySelectorAll(".unifiedCartChk").forEach(chk => { chk.checked = checked; });
+}
+function updateUnifiedSelectAllState() {
+  const boxes = document.querySelectorAll(".unifiedCartChk");
+  const sel = document.getElementById("unifiedSelectAll");
+  if (!sel || boxes.length === 0) return;
+  const total = boxes.length;
+  const checked = Array.from(boxes).filter(b => b.checked).length;
+  sel.checked = checked === total;
+  sel.indeterminate = checked > 0 && checked < total;
+}
+async function removeSelectedUnifiedCart() {
+  const svcIds = [], catIds = [];
+  document.querySelectorAll(".unifiedCartChk").forEach(chk => {
+    if (!chk.checked) return;
+    if (chk.dataset.kind === "svc") svcIds.push(chk.dataset.id);
+    else if (chk.dataset.kind === "cat") catIds.push(Number(chk.dataset.id));
+  });
+  const total = svcIds.length + catIds.length;
+  if (total === 0) { alert("Select at least one item to remove."); return; }
+  if (!confirm("Remove " + total + " item" + (total === 1 ? "" : "s") + " from cart?")) return;
+  const btn = document.getElementById("unifiedRemoveSelBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Removing..."; }
+  try {
+    // Remove services (localStorage)
+    if (svcIds.length > 0) {
+      const kept = getCart().filter(it => !svcIds.includes(it.id));
+      saveCart(kept);
+    }
+    // Remove catalog (Supabase)
+    if (catIds.length > 0) {
+      await sb.from("catalog_cart").delete().in("id", catIds);
+      await loadCatalogCartCount();
+    }
+    refreshCartChip();
+    renderCartModal();
+  } catch (e) { alert("Remove failed: " + e.message); }
+}
+window.toggleAllUnifiedCart = toggleAllUnifiedCart;
+window.updateUnifiedSelectAllState = updateUnifiedSelectAllState;
+window.removeSelectedUnifiedCart = removeSelectedUnifiedCart;
 function renderCartModal() {
   const cart = getCart();
   const totalCount = cart.length + (_catalogCartItems ? _catalogCartItems.length : 0);
@@ -856,32 +895,57 @@ function renderCartModal() {
   }
   if (cart.length === 0 && _catalogCartItems.length > 0) {
     body.innerHTML = renderCatalogCartHtml();
-    $("#cartFooter").style.display = "none";
+    $("#cartFooter").style.display = "block";
     return;
   }
   $("#cartFooter").style.display = "block";
+  // Group services by service_tag so each service type has its own header (like catalog OPTION headers)
+  const svcGroups = {};
+  for (const it of cart) { (svcGroups[it.service_tag] = svcGroups[it.service_tag] || []).push(it); }
+  const svcColor = { gst: "#f97316", trademark: "#a855f7", udyam: "#10b981", iec: "#06b6d4", platform_account: "#ec4899", imaging: "#8b5cf6", website: "#10b981", listing: "#f59e0b", service: "#1f6feb", business_launcher: "#16a34a" };
   let html = "";
-  for (const it of cart) {
-    const eff = effectivePaise(it);
-    const couponLine = it.coupon_code ?
-      `<div style="font-size:11.5px;color:#16a34a;margin-top:2px;">&#10003; Coupon <b>${escapeHtml(it.coupon_code)}</b>${it.discount_paise ? ` saved ₹${(it.discount_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.discount_paise % 100 ? 2 : 0 })}` : ""}</div>` : "";
-    const priceCol = it.discount_paise > 0 ?
-      `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
-       <div style="font-size:14px;font-weight:700;color:#16a34a;">₹${(eff/100).toLocaleString("en-IN", { minimumFractionDigits: eff % 100 ? 2 : 0 })}</div>` :
-      `<div style="font-size:14px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>`;
-    html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9;">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13.5px;font-weight:600;color:#0f172a;">${escapeHtml(it.label)}</div>
-        <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${escapeHtml(it.service_name)} · ${it.qty_display} unit${it.qty_display === 1 ? "" : "s"}</div>
-        ${couponLine}
-      </div>
-      <div style="text-align:right;margin-left:10px;flex-shrink:0;">
-        ${priceCol}
-        <button onclick="removeCartItem('${it.id}')" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:2px;font-weight:600;">Remove</button>
-      </div>
+  for (const tag of Object.keys(svcGroups)) {
+    const items = svcGroups[tag];
+    const svcName = items[0].service_name || tag;
+    const color = svcColor[tag] || "#334155";
+    const groupTotalPaise = items.reduce((s, it) => s + effectivePaise(it), 0);
+    const groupTotalStr = "₹" + (groupTotalPaise/100).toLocaleString("en-IN", { minimumFractionDigits: groupTotalPaise % 100 ? 2 : 0 });
+    html += `<div style="margin:10px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;">
+      <span>${escapeHtml(svcName)} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
+      <span>${groupTotalStr}</span>
     </div>`;
+    for (const it of items) {
+      const eff = effectivePaise(it);
+      const couponLine = it.coupon_code ?
+        `<div style="font-size:11.5px;color:#16a34a;margin-top:2px;">&#10003; Coupon <b>${escapeHtml(it.coupon_code)}</b>${it.discount_paise ? ` saved ₹${(it.discount_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.discount_paise % 100 ? 2 : 0 })}` : ""}</div>` : "";
+      const priceCol = it.discount_paise > 0 ?
+        `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
+         <div style="font-size:14px;font-weight:700;color:#16a34a;">₹${(eff/100).toLocaleString("en-IN", { minimumFractionDigits: eff % 100 ? 2 : 0 })}</div>` :
+        `<div style="font-size:14px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
+        <input type="checkbox" class="unifiedCartChk" data-kind="svc" data-id="${it.id}" style="width:14px;height:14px;margin-top:4px;cursor:pointer;" onchange="updateUnifiedSelectAllState()">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(it.label)}</div>
+          <div style="font-size:11.5px;color:#64748b;margin-top:1px;">${it.qty_display} unit${it.qty_display === 1 ? "" : "s"}</div>
+          ${couponLine}
+        </div>
+        <div style="text-align:right;margin-left:10px;flex-shrink:0;">
+          ${priceCol}
+          <button onclick="removeCartItem('${it.id}')" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:1px;font-weight:600;">Remove</button>
+        </div>
+      </div>`;
+    }
   }
-  body.innerHTML = html + renderCatalogCartHtml();
+  // Unified Select-all + Remove-selected bar at the very top; catalog items on top, services below
+  const totalItems = cart.length + (_catalogCartItems ? _catalogCartItems.length : 0);
+  const unifiedBar = `<div style="position:sticky;top:0;background:#fff;padding:8px 0 10px;margin-bottom:6px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;z-index:1;">
+    <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;color:#334155;font-size:13px;">
+      <input type="checkbox" id="unifiedSelectAll" onchange="toggleAllUnifiedCart(this.checked)" style="width:15px;height:15px;cursor:pointer;">
+      Select all (${totalItems})
+    </label>
+    <button id="unifiedRemoveSelBtn" type="button" onclick="removeSelectedUnifiedCart()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;">🗑 Remove selected</button>
+  </div>`;
+  body.innerHTML = unifiedBar + renderCatalogCartHtml() + html;
   const { gross, itemDiscount, net } = cartTotalsBreakdown();
   const adj = Math.min(_cartWalletPaise, net);
   const due = Math.max(0, net - _cartWalletPaise);
