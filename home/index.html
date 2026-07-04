@@ -632,7 +632,7 @@ async function loadCatalogCartCount() {
     if (!session) { _catalogCartCount = 0; _catalogCartItems = []; return; }
     // Fetch items + join product name via nested select
     const r = await sb.from("catalog_cart")
-      .select("id, product_id, color_id, qty, mode, marketplaces, unit_price_inr, catalog_products(title), catalog_colors(name)")
+      .select("id, product_id, color_id, qty, mode, marketplaces, unit_price_inr, catalog_products(title, product_code), catalog_colors(name, product_code)")
       .order("created_at", { ascending: false });
     _catalogCartItems = r.data || [];
     _catalogCartCount = _catalogCartItems.length;
@@ -770,8 +770,13 @@ function cartTotalsBreakdown() {
 }
 function renderCatalogCartHtml() {
   if (!_catalogCartItems || _catalogCartItems.length === 0) return "";
-  const modeLabel = { purchase: "Purchase", dropship: "Cataloging + Dropshipping", cat_purchase: "Cataloging + Purchase" };
-  // Header row: title on left, Select all + Remove selected on right
+  const modeLabel = { purchase: "Option 1 · Purchase", cat_purchase: "Option 2 · Cataloging + Purchase", dropship: "Option 3 · Cataloging + Dropshipping" };
+  const modeColor = { purchase: "#1f6feb", cat_purchase: "#7c3aed", dropship: "#0ea5e9" };
+  const modeOrder = ["purchase", "cat_purchase", "dropship"];
+  // Group items by mode
+  const groups = {};
+  for (const it of _catalogCartItems) { (groups[it.mode] = groups[it.mode] || []).push(it); }
+  // Top header + Select all / Remove selected
   let html = `<div style="margin:10px 0 6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div style="font-size:12px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">📦 Product Catalog Items</div>
     <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
@@ -782,24 +787,30 @@ function renderCatalogCartHtml() {
       <button id="catCartRemoveSelBtn" type="button" onclick="removeSelectedCatalogCart()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">🗑 Remove selected</button>
     </div>
   </div>`;
-  for (const it of _catalogCartItems) {
-    const title = (it.catalog_products && it.catalog_products.title) || ("Product #" + it.product_id);
-    const color = it.catalog_colors && it.catalog_colors.name;
-    const mps = (it.marketplaces || []).join(", ") || "—";
-    const sub = (it.unit_price_inr || 0) * (it.qty || 0);
-    html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
-      <input type="checkbox" class="catCartItemChk" data-id="${it.id}" style="width:14px;height:14px;margin-top:4px;cursor:pointer;" onchange="updateCatCartSelectAllState()">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13.5px;font-weight:600;color:#0f172a;">${escapeHtml(title)}${color ? " · " + escapeHtml(color) : ""}</div>
-        <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${escapeHtml(modeLabel[it.mode] || it.mode)} · Qty ${it.qty}${it.marketplaces && it.marketplaces.length ? " · " + escapeHtml(mps) : ""}</div>
-      </div>
-      <div style="text-align:right;margin-left:10px;flex-shrink:0;">
-        <div style="font-size:14px;font-weight:700;color:#0f172a;">₹${sub.toLocaleString("en-IN")}</div>
-        <button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:2px;font-weight:600;">Remove</button>
-      </div>
-    </div>`;
+  // Render each mode group
+  for (const mode of modeOrder) {
+    const items = groups[mode]; if (!items || items.length === 0) continue;
+    const label = modeLabel[mode] || mode;
+    const color = modeColor[mode] || "#334155";
+    html += `<div style="margin:12px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;">${label} <span style="opacity:.7;font-weight:600;">(${items.length})</span></div>`;
+    for (const it of items) {
+      const code = (it.catalog_colors && it.catalog_colors.product_code) || (it.catalog_products && it.catalog_products.product_code) || ("P" + it.product_id + (it.color_id ? "-" + it.color_id : ""));
+      const mps = (it.marketplaces || []).join(", ");
+      const sub = (it.unit_price_inr || 0) * (it.qty || 0);
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
+        <input type="checkbox" class="catCartItemChk" data-id="${it.id}" style="width:14px;height:14px;cursor:pointer;" onchange="updateCatCartSelectAllState()">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:#0f172a;">ID: ${escapeHtml(code)}</div>
+          <div style="font-size:11.5px;color:#64748b;margin-top:1px;">Qty ${it.qty}${mps ? " · " + escapeHtml(mps) : ""}</div>
+        </div>
+        <div style="text-align:right;margin-left:10px;flex-shrink:0;">
+          <div style="font-size:13.5px;font-weight:700;color:#0f172a;">₹${sub.toLocaleString("en-IN")}</div>
+          <button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:1px;font-weight:600;">Remove</button>
+        </div>
+      </div>`;
+    }
   }
-  html += '<div style="margin-top:8px;text-align:center;"><a href="/products/" style="color:#7c3aed;text-decoration:none;font-weight:700;font-size:12.5px;">Go to Products →</a></div>';
+  html += '<div style="margin-top:10px;text-align:center;"><a href="/products/" style="color:#7c3aed;text-decoration:none;font-weight:700;font-size:12.5px;">Go to Products →</a></div>';
   return html;
 }
 function toggleAllCatalogCart(checked) {
