@@ -406,8 +406,8 @@
     </div>
 
     <div style="display:flex;gap:8px;">
-      <button type="button" id="dsAddCart" onclick="if(window.__handleDsCheckout) { window.__handleDsCheckout(false); } else { alert('handler not loaded — refresh page'); }" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
-      <button type="button" id="dsPayNow" onclick="if(window.__handleDsCheckout) { window.__handleDsCheckout(true); } else { alert('handler not loaded — refresh page'); }" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
+      <button type="button" id="dsAddCart" onclick="this.textContent='⏳ ADDING...'; if(window.__handleDsCheckout) { window.__handleDsCheckout(false); } else { this.textContent='❌ NO HANDLER — REFRESH'; }" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+      <button type="button" id="dsPayNow" onclick="this.textContent='⏳ PROCESSING...'; if(window.__handleDsCheckout) { window.__handleDsCheckout(true); } else { this.textContent='❌ NO HANDLER — REFRESH'; }" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
     </div>
   </div>
 </div>
