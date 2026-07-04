@@ -1006,9 +1006,17 @@ document.addEventListener("click", (e) => {
 
 window.__handleDsCheckout = async function (payNow) { return handleDsCheckout(payNow); };
 async function handleDsCheckout(payNow) {
-  const dsInfo = updateDsTotal();
-  if (dsInfo.count === 0) { alert("Please select at least one marketplace"); return; }
-  const { data: { session } } = await sb.auth.getSession();
+  console.log("[DS] handleDsCheckout called, payNow=", payNow);
+  let dsInfo;
+  try { dsInfo = updateDsTotal(); } catch (e) { alert("Step 1 FAIL: " + e.message); return; }
+  console.log("[DS] dsInfo=", dsInfo);
+  if (!dsInfo || dsInfo.count === 0) { alert("Please select at least one marketplace"); return; }
+  let session;
+  try {
+    const r = await sb.auth.getSession();
+    session = r?.data?.session;
+  } catch (e) { alert("Step 2 (auth) FAIL: " + e.message); return; }
+  console.log("[DS] session=", !!session);
   if (!session) {
     if (confirm("Please sign in to continue. Go to sign in / sign up?")) {
       location.href = "/home/?next=" + encodeURIComponent(location.pathname);
@@ -1016,27 +1024,34 @@ async function handleDsCheckout(payNow) {
     return;
   }
   const product = _lastDetailProduct;
+  console.log("[DS] product=", product);
+  if (!product) { alert("Step 3 FAIL: product context lost. Please close modal and re-open the product."); return; }
   const isCat = _lastDropshipMode === "cat_purchase";
+  console.log("[DS] isCat=", isCat, "mode=", _lastDropshipMode, "items=", _lastDropshipItems);
   try {
     // Save to cart
     const items = (_lastDropshipItems || []).map(it => ({ product_id: product.id, color_id: it.color?.id || null, qty: it.qty }));
+    if (items.length === 0) { alert("Step 4 FAIL: no variation items selected. Go back and pick variations first."); return; }
     const cartPayload = {
       items,
       mode: isCat ? "purchase" : "dropship",
       marketplaces: dsInfo.selected,
     };
+    console.log("[DS] cartPayload=", cartPayload);
     const cr = await fetch(`${SUPABASE_URL}/functions/v1/catalog-cart-add`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
       body: JSON.stringify(cartPayload),
     });
     const cj = await cr.json();
+    console.log("[DS] cart response=", cj);
     if (!cj.ok) throw new Error(cj.error || "Cart save failed");
     if (!payNow) {
       alert(`✓ Added to cart · Total ₹${dsInfo.total}\nOur team will contact you shortly.`);
       document.getElementById("dropshipModal").classList.add("hidden");
       return;
     }
+    if (typeof window.startCatalogPayment !== "function") { alert("Step 5 FAIL: startCatalogPayment not loaded. Refresh page."); return; }
     // Wallet-first pay flow (same as other services): wallet check → Razorpay for shortfall → OTP → debit
     const payItems = (_lastDropshipItems || []).map(it => ({
       product_id: product.id,
