@@ -110,8 +110,8 @@
       display: flex; align-items: center; justify-content: center;
       color: #94a3b8; font-size: 36px;
     }
-    .prod-body { padding: 12px 14px; }
-    .prod-title { font-size: 14px; font-weight: 700; margin: 0 0 6px; color: #0f172a; line-height: 1.35; height: 38px; overflow: hidden; }
+    .prod-body { padding: 10px 14px; }
+    .prod-title { font-size: 14px; font-weight: 700; margin: 0; color: #0f172a; line-height: 1.35; overflow: hidden; }
     .prod-price { display: flex; align-items: baseline; gap: 8px; }
     .prod-price .now { color: #0f172a; font-weight: 800; font-size: 16px; }
     .prod-price .mrp { color: #94a3b8; font-size: 12px; text-decoration: line-through; }
@@ -379,12 +379,9 @@ function renderGrid() {
       <div class="cat-tag">${esc(c.name)}${vc > 0 ? ` · ${vc} product${vc === 1 ? '' : 's'}` : ''}</div>
       <div class="prod-img"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
       <div class="prod-body">
-        <div class="prod-title">${esc(p.title)}</div>
-        <div class="prod-price" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <span style="display:flex;align-items:baseline;gap:6px;">
-            <span class="now">₹${p.price_inr}</span>
-            ${p.mrp_inr > p.price_inr ? `<span class="mrp">₹${p.mrp_inr}</span>` : ""}
-          </span>
+        <div class="prod-title" style="margin-bottom:2px;">${esc(p.title)}</div>
+        <div class="prod-price" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;">
+          <span class="now">₹${p.price_inr}</span>
           <span style="font-size:11px;color:#1f6feb;font-weight:600;white-space:nowrap;">${vc > 0 ? `See ${vc} more →` : 'See details →'}</span>
         </div>
       </div>
@@ -445,10 +442,8 @@ function renderProductDetail(data) {
           ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;">₹${p.mrp_inr}</span>` : ''}
           ${off > 0 ? `<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ''}
         </div>
-        ${(p.bullet_points || []).length ? `<ul style="padding-left:18px;margin:0 0 14px;color:#374151;font-size:13px;line-height:1.7;">${(p.bullet_points||[]).map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ''}
-        ${p.description ? `<div style="color:#475467;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:14px;">${esc(p.description)}</div>` : ''}
         ${colors.length ? `
-          <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available colors (${colors.length})</div>
             <div id="colorChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
               ${colors.map(c => `
@@ -462,8 +457,24 @@ function renderProductDetail(data) {
           </div>
         ` : ''}
         <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
-          <a href="https://wa.me/919625737475?text=${encodeURIComponent('Hi, I want to know more about ' + p.title)}" class="p-btn p-btn-primary" style="text-decoration:none;">💬 Enquire on WhatsApp</a>
+          <label style="display:block;font-weight:700;font-size:13px;margin-bottom:8px;">Quantity</label>
+          <div style="display:flex;align-items:center;gap:0;margin-bottom:14px;">
+            <button type="button" id="qtyMinus" style="width:36px;height:36px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px 0 0 6px;font-size:18px;font-weight:700;cursor:pointer;">−</button>
+            <input id="qtyInput" type="number" min="1" value="1" style="width:60px;height:36px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:14px;font-weight:700;" />
+            <button type="button" id="qtyPlus" style="width:36px;height:36px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 6px 6px 0;font-size:18px;font-weight:700;cursor:pointer;">+</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+            <button type="button" id="buyNowBtn" class="p-btn p-btn-primary" style="flex:1;min-width:140px;font-size:14px;padding:11px 16px;">⚡ Buy Now</button>
+          </div>
         </div>
+        ${(p.bullet_points || []).length || p.description ? `
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;">About this product</div>
+            ${(p.bullet_points || []).length ? `<ul style="padding-left:18px;margin:0 0 14px;color:#374151;font-size:13px;line-height:1.7;">${(p.bullet_points||[]).map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ''}
+            ${p.description ? `<div style="color:#475467;font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(p.description)}</div>` : ''}
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
@@ -497,6 +508,53 @@ function renderProductDetail(data) {
 
   // Back button
   $("#backToGrid").addEventListener("click", () => renderGrid());
+
+  // Quantity controls
+  const qtyIn = $("#qtyInput");
+  $("#qtyMinus")?.addEventListener("click", () => {
+    const v = Math.max(1, (parseInt(qtyIn.value, 10) || 1) - 1);
+    qtyIn.value = v;
+  });
+  $("#qtyPlus")?.addEventListener("click", () => {
+    const v = Math.max(1, (parseInt(qtyIn.value, 10) || 1) + 1);
+    qtyIn.value = v;
+  });
+  qtyIn?.addEventListener("input", () => {
+    const v = Math.max(1, parseInt(qtyIn.value, 10) || 1);
+    qtyIn.value = v;
+  });
+
+  // Add to cart + Buy Now
+  $("#addCartBtn")?.addEventListener("click", () => {
+    const qty = Math.max(1, parseInt(qtyIn.value, 10) || 1);
+    const clr = (_catalogGrid._colors || []).find(c => c.id === _selectedColorId);
+    const total = p.price_inr * qty;
+    const parts = [
+      `Hi! I'd like to add this to cart:`,
+      `Product: ${p.title}`,
+      p.product_code ? `Product ID: ${p.product_code}` : null,
+      clr ? `Variation: ${clr.name}${clr.product_code ? ` (${clr.product_code})` : ''}` : null,
+      `Qty: ${qty}`,
+      `Total: ₹${total}`,
+    ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
+  });
+
+  $("#buyNowBtn")?.addEventListener("click", () => {
+    const qty = Math.max(1, parseInt(qtyIn.value, 10) || 1);
+    const clr = (_catalogGrid._colors || []).find(c => c.id === _selectedColorId);
+    const total = p.price_inr * qty;
+    const parts = [
+      `Buy Now request 🛒`,
+      `Product: ${p.title}`,
+      p.product_code ? `Product ID: ${p.product_code}` : null,
+      clr ? `Variation: ${clr.name}${clr.product_code ? ` (${clr.product_code})` : ''}` : null,
+      `Qty: ${qty}`,
+      `Total: ₹${total}`,
+      `Please share payment + delivery details.`,
+    ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
+  });
 
   renderDesignsForColor();
 }
