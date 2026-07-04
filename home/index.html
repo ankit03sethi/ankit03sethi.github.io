@@ -837,8 +837,8 @@ function renderCatalogCartHtml() {
     const chevron = isOpen ? "▼" : "▶";
     html += `<div onclick="toggleCartGroup('${gid}')" style="margin:12px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;cursor:pointer;user-select:none;gap:10px;">
       <span style="flex:1;min-width:0;"><span style="display:inline-block;width:14px;font-size:9px;">${chevron}</span> ${label} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
-      <span>₹${groupSum.toLocaleString("en-IN")}</span>
-      <button onclick="event.stopPropagation(); removeCatalogModeGroup('${mode}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;">Remove</button>
+      <span style="min-width:80px;text-align:right;">₹${groupSum.toLocaleString("en-IN")}</span>
+      <button onclick="event.stopPropagation(); removeCatalogModeGroup('${mode}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;min-width:70px;">Remove</button>
     </div>`;
     if (!isOpen) continue;
     // For Option 1 (Purchase), show a compact discount line if applicable
@@ -872,23 +872,18 @@ function renderCatalogCartHtml() {
       const mps = (it.marketplaces || []).join(", ");
       const unitInr = it.unit_price_inr || 0;
       const sub = unitInr * (it.qty || 0);
-      // Option 3 (Dropshipping): customer doesn't buy the product — hide Price · Qty · subtotal
       const isDropship = mode === "dropship";
       const metaLine = isDropship
         ? (mps ? escapeHtml(mps) : "")
         : (`Price ₹${unitInr.toLocaleString("en-IN")} · Qty ${it.qty}` + (mps ? " · " + escapeHtml(mps) : ""));
-      const rightCol = isDropship
-        ? `<button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;font-weight:600;">Remove</button>`
-        : `<div style="font-size:13.5px;font-weight:700;color:#0f172a;">₹${sub.toLocaleString("en-IN")}</div>
-           <button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:1px;font-weight:600;">Remove</button>`;
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
+      // Item row uses same 3-column flex as header so price and Remove line up
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px 8px 22px;border-bottom:1px solid #f1f5f9;gap:10px;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;color:#0f172a;">ID: ${escapeHtml(code)}</div>
           ${metaLine ? `<div style="font-size:11.5px;color:#64748b;margin-top:1px;">${metaLine}</div>` : ""}
         </div>
-        <div style="text-align:right;margin-left:10px;flex-shrink:0;">
-          ${rightCol}
-        </div>
+        <span style="font-size:13.5px;font-weight:700;color:#0f172a;min-width:80px;text-align:right;">${isDropship ? "" : "₹" + sub.toLocaleString("en-IN")}</span>
+        <button onclick="removeCatalogCartItem(${it.id})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;">Remove</button>
       </div>`;
     }
   }
@@ -1036,8 +1031,8 @@ function renderCartModal() {
     const chevron = isOpen ? "▼" : "▶";
     html += `<div onclick="toggleCartGroup('${gid}')" style="margin:10px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;cursor:pointer;user-select:none;gap:10px;">
       <span style="flex:1;min-width:0;"><span style="display:inline-block;width:14px;font-size:9px;">${chevron}</span> ${escapeHtml(svcName)} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
-      <span>${groupTotalStr}</span>
-      <button onclick="event.stopPropagation(); removeServiceTagGroup('${tag}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;">Remove</button>
+      <span style="min-width:80px;text-align:right;">${groupTotalStr}</span>
+      <button onclick="event.stopPropagation(); removeServiceTagGroup('${tag}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;min-width:70px;">Remove</button>
     </div>`;
     if (!isOpen) continue;
     for (const it of items) {
@@ -1048,16 +1043,18 @@ function renderCartModal() {
         `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
          <div style="font-size:14px;font-weight:700;color:#16a34a;">₹${(eff/100).toLocaleString("en-IN", { minimumFractionDigits: eff % 100 ? 2 : 0 })}</div>` :
         `<div style="font-size:14px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>`;
-      html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:10px;">
+      const priceOnly = it.discount_paise > 0
+        ? `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>
+           <div style="font-size:13.5px;font-weight:700;color:#16a34a;">₹${(eff/100).toLocaleString("en-IN", { minimumFractionDigits: eff % 100 ? 2 : 0 })}</div>`
+        : `<div style="font-size:13.5px;font-weight:700;color:#0f172a;">₹${(it.total_paise/100).toLocaleString("en-IN", { minimumFractionDigits: it.total_paise % 100 ? 2 : 0 })}</div>`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px 8px 22px;border-bottom:1px solid #f1f5f9;gap:10px;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(it.label)}</div>
           <div style="font-size:11.5px;color:#64748b;margin-top:1px;">${it.qty_display} unit${it.qty_display === 1 ? "" : "s"}</div>
           ${couponLine}
         </div>
-        <div style="text-align:right;margin-left:10px;flex-shrink:0;">
-          ${priceCol}
-          <button onclick="removeCartItem('${it.id}')" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:1px;font-weight:600;">Remove</button>
-        </div>
+        <div style="min-width:60px;text-align:right;">${priceOnly}</div>
+        <button onclick="removeCartItem('${it.id}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;">Remove</button>
       </div>`;
     }
   }
