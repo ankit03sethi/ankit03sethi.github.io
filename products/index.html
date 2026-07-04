@@ -1595,17 +1595,47 @@ window.doCatalogPayInline = async function (mode, items, marketplaces, statusBtn
     if (confirm("Please sign in to continue. Go to sign in?")) location.href = "/home/?next=" + encodeURIComponent(location.pathname);
     return;
   }
-  const tryDebit = async () => {
+  const tryDebit = async (action_token) => {
+    const body = { mode, items, marketplaces };
+    if (action_token) body.action_token = action_token;
     const r = await fetch(`${SB_URL}/functions/v1/wallet-pay-catalog`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SB_KEY },
-      body: JSON.stringify({ mode, items, marketplaces }),
+      body: JSON.stringify(body),
     });
     return await r.json();
   };
+  // OTP flow: request OTP, prompt user, verify → returns action_token, retry debit
+  const runOtpAndDebit = async (intent_hash, intent_description) => {
+    setBtn("Sending OTP…");
+    const otpRes = await fetch(`${SB_URL}/functions/v1/payment-otp-request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SB_KEY },
+      body: JSON.stringify({ intent_hash, intent_description }),
+    });
+    const or = await otpRes.json();
+    if (!or.ok) { alert("Could not send OTP: " + (or.error || "unknown")); resetBtn(); return null; }
+    const code = prompt("6-digit code sent to " + or.masked_email + ". Enter to confirm ₹" + (intent_description.match(/₹([\d.,]+)/) ? intent_description.match(/₹([\d.,]+)/)[1] : "") + " debit:");
+    if (!code || !/^\d{6}$/.test(code)) { alert("Cancelled — no valid code entered"); resetBtn(); return null; }
+    setBtn("Verifying…");
+    const vr = await fetch(`${SB_URL}/functions/v1/payment-otp-verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token, "apikey": SB_KEY },
+      body: JSON.stringify({ intent_hash, otp_code: code }),
+    });
+    const vj = await vr.json();
+    if (!vj.ok) { alert("OTP verify failed: " + (vj.error || "unknown")); resetBtn(); return null; }
+    return vj.action_token;
+  };
   setBtn("Checking wallet…");
-  let j = await tryDebit();
+  let j = await tryDebit(null);
   if (j.code === "demo_account") { alert(j.message); return; }
+  if (j.otp_required) {
+    const token = await runOtpAndDebit(j.intent_hash, j.intent_description);
+    if (!token) return;
+    setBtn("Debiting…");
+    j = await tryDebit(token);
+  }
   if (j.ok) {
     alert("✓ Payment successful! Paid ₹" + (j.total_paise/100).toFixed(2) + " from wallet.\nOur team will contact you shortly.");
     const dsm = document.getElementById("dropshipModal"); if (dsm) dsm.classList.add("hidden");
@@ -1641,7 +1671,12 @@ window.doCatalogPayInline = async function (mode, items, marketplaces, statusBtn
             const cj = await cr.json();
             if (!cj.ok) throw new Error(cj.error || "Recharge failed");
             setBtn("Debiting order…");
-            const j2 = await tryDebit();
+            let j2 = await tryDebit(null);
+            if (j2.otp_required) {
+              const token = await runOtpAndDebit(j2.intent_hash, j2.intent_description);
+              if (token) { setBtn("Debiting…"); j2 = await tryDebit(token); }
+              else { alert("Recharge succeeded but OTP cancelled. Balance credited to wallet — pay again from cart.\nPayment ID: " + response.razorpay_payment_id); resolve(); return; }
+            }
             if (j2.ok) {
               alert("✓ Payment successful! Paid ₹" + (j2.total_paise/100).toFixed(2) + " from wallet.\nOur team will contact you shortly.");
               const dsm = document.getElementById("dropshipModal"); if (dsm) dsm.classList.add("hidden");
