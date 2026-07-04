@@ -206,7 +206,7 @@
     .toast.err { background: #dc2626; }
     .hidden { display: none !important; }
     /* Anonymous-visitor gate — hide all purchase controls when not signed in */
-    body.anon .mode-tabs,
+    body.anon #modeTabs,
     body.anon #cartSummary,
     body.anon #purchaseButtons,
     body.anon #catPurchaseNextBtn,
@@ -216,7 +216,8 @@
     body.anon .var-qty,
     body.anon .qty-btn,
     body.anon #cartChip,
-    body.anon #openManageBtn { display: none !important; }
+    body.anon #openManageBtn,
+    body.anon #signOutBtn { display: none !important; }
     body.anon .var-row { pointer-events: none; opacity: 0.95; }
     body.anon .anon-cta { display: block !important; }
     .anon-cta { display: none; }
