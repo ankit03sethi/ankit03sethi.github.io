@@ -625,14 +625,28 @@ const CART_KEY = "cursive_cart_v1";
 function getCart() { try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]"); } catch { return []; } }
 function saveCart(arr) { localStorage.setItem(CART_KEY, JSON.stringify(arr)); refreshCartChip(); }
 let _catalogCartCount = 0;
+let _catalogCartItems = [];
 async function loadCatalogCartCount() {
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { _catalogCartCount = 0; return; }
-    const r = await sb.from("catalog_cart").select("id", { count: "exact", head: true });
-    _catalogCartCount = r.count || 0;
-  } catch (_) { _catalogCartCount = 0; }
+    if (!session) { _catalogCartCount = 0; _catalogCartItems = []; return; }
+    // Fetch items + join product name via nested select
+    const r = await sb.from("catalog_cart")
+      .select("id, product_id, color_id, qty, mode, marketplaces, unit_price_inr, catalog_products(title), catalog_colors(name)")
+      .order("created_at", { ascending: false });
+    _catalogCartItems = r.data || [];
+    _catalogCartCount = _catalogCartItems.length;
+  } catch (_) { _catalogCartCount = 0; _catalogCartItems = []; }
 }
+async function removeCatalogCartItem(id) {
+  try {
+    await sb.from("catalog_cart").delete().eq("id", id);
+    await loadCatalogCartCount();
+    refreshCartChip();
+    renderCartModal();
+  } catch (e) { alert("Remove failed: " + e.message); }
+}
+window.removeCatalogCartItem = removeCatalogCartItem;
 function refreshCartChip() {
   const cart = getCart();
   const chip = $("#cartChip"); const cnt = $("#cartCount");
@@ -729,6 +743,8 @@ let _cartWalletPaise = 0;
 function openCartModal() {
   renderCartModal();
   $("#cartModal").style.display = "flex";
+  // Refresh catalog items each open
+  loadCatalogCartCount().then(() => { refreshCartChip(); renderCartModal(); });
   // Fetch wallet
   (async () => {
     try {
@@ -752,12 +768,41 @@ function cartTotalsBreakdown() {
   const net = gross - itemDiscount;
   return { gross, itemDiscount, net };
 }
+function renderCatalogCartHtml() {
+  if (!_catalogCartItems || _catalogCartItems.length === 0) return "";
+  const modeLabel = { purchase: "Purchase", dropship: "Cataloging + Dropshipping", cat_purchase: "Cataloging + Purchase" };
+  let html = '<div style="margin:10px 0 6px;font-size:12px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">📦 Product Catalog Items</div>';
+  for (const it of _catalogCartItems) {
+    const title = (it.catalog_products && it.catalog_products.title) || ("Product #" + it.product_id);
+    const color = it.catalog_colors && it.catalog_colors.name;
+    const mps = (it.marketplaces || []).join(", ") || "—";
+    const sub = (it.unit_price_inr || 0) * (it.qty || 0);
+    html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:600;color:#0f172a;">${escapeHtml(title)}${color ? " · " + escapeHtml(color) : ""}</div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${escapeHtml(modeLabel[it.mode] || it.mode)} · Qty ${it.qty}${it.marketplaces && it.marketplaces.length ? " · " + escapeHtml(mps) : ""}</div>
+      </div>
+      <div style="text-align:right;margin-left:10px;flex-shrink:0;">
+        <div style="font-size:14px;font-weight:700;color:#0f172a;">₹${sub.toLocaleString("en-IN")}</div>
+        <button onclick="removeCatalogCartItem(${it.id})" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;margin-top:2px;font-weight:600;">Remove</button>
+      </div>
+    </div>`;
+  }
+  html += '<div style="margin-top:8px;text-align:center;"><a href="/products/" style="color:#7c3aed;text-decoration:none;font-weight:700;font-size:12.5px;">Go to Products →</a></div>';
+  return html;
+}
 function renderCartModal() {
   const cart = getCart();
-  $("#cartHeaderCount").textContent = cart.length + " item" + (cart.length === 1 ? "" : "s");
+  const totalCount = cart.length + (_catalogCartItems ? _catalogCartItems.length : 0);
+  $("#cartHeaderCount").textContent = totalCount + " item" + (totalCount === 1 ? "" : "s");
   const body = $("#cartBody");
-  if (cart.length === 0) {
-    body.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px;font-size:14px;">Your cart is empty.<br><span style="font-size:12px;">Add services from the home page to get started.</span></div>';
+  if (totalCount === 0) {
+    body.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px;font-size:14px;">Your cart is empty.<br><span style="font-size:12px;">Add services from the home page or products from /products/ to get started.</span></div>';
+    $("#cartFooter").style.display = "none";
+    return;
+  }
+  if (cart.length === 0 && _catalogCartItems.length > 0) {
+    body.innerHTML = renderCatalogCartHtml();
     $("#cartFooter").style.display = "none";
     return;
   }
@@ -783,7 +828,7 @@ function renderCartModal() {
       </div>
     </div>`;
   }
-  body.innerHTML = html;
+  body.innerHTML = html + renderCatalogCartHtml();
   const { gross, itemDiscount, net } = cartTotalsBreakdown();
   const adj = Math.min(_cartWalletPaise, net);
   const due = Math.max(0, net - _cartWalletPaise);
