@@ -10,6 +10,7 @@
   <meta name="description" content="Browse in-stock products from Cursive sellers." />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -844,13 +845,85 @@ function renderProductDetail(data) {
     return lines.join("\n");
   }
 
-  $("#addCartBtn")?.addEventListener("click", () => {
-    const msg = buildCartMessage(`🛒 Add to Cart request`, `Please add these to my cart.`);
-    if (msg) window.open(`https://wa.me/919625737475?text=${encodeURIComponent(msg)}`, "_blank");
+  const ensureLogin = async () => {
+    const res = await sb.auth.getSession();
+    if (!res.data.session) {
+      if (confirm("Please sign in to continue. Go to sign in / sign up?")) {
+        location.href = "/home/?next=" + encodeURIComponent(location.pathname);
+      }
+      return null;
+    }
+    return res.data.session;
+  };
+
+  const saveToCart = async (session, mode, marketplaces) => {
+    const { items } = getSelectedCart();
+    if (items.length === 0) throw new Error("Please select at least one option");
+    const payload = {
+      items: items.map(it => ({ product_id: p.id, color_id: it.color?.id || null, qty: it.qty })),
+      mode: mode || "purchase",
+      marketplaces: marketplaces || [],
+    };
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/catalog-cart-add`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "Could not add to cart");
+    return j;
+  };
+
+  const openRazorpay = async (session, total_paise, description, meta) => {
+    if (typeof Razorpay === "undefined") { alert("Payment library not loaded. Please refresh."); return; }
+    const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/catalog-checkout-order`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ total_paise, description, meta }),
+    });
+    const order = await orderRes.json();
+    if (!order.ok) throw new Error(order.error || "Could not create order");
+    const rzp = new Razorpay({
+      key: order.key_id, amount: order.amount_paise, currency: order.currency, order_id: order.order_id,
+      name: "Cursive World", description: order.description || description,
+      prefill: { email: session.user.email },
+      theme: { color: "#1f6feb" },
+      handler: function (response) {
+        alert(`✓ Payment successful!\nPayment ID: ${response.razorpay_payment_id}\n\nOur team will contact you shortly.`);
+      },
+    });
+    rzp.open();
+  };
+
+  $("#addCartBtn")?.addEventListener("click", async () => {
+    const { items } = getSelectedCart();
+    if (items.length === 0) { alert("Please select at least one option"); return; }
+    const session = await ensureLogin(); if (!session) return;
+    const btn = $("#addCartBtn"); const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Adding...";
+    try {
+      const j = await saveToCart(session, "purchase", []);
+      toast(`✓ Added ${j.added} item${j.added === 1 ? '' : 's'} to cart`);
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
   });
-  $("#buyNowBtn")?.addEventListener("click", () => {
-    const msg = buildCartMessage(`⚡ Buy Now request`, `Please share payment + delivery details.`);
-    if (msg) window.open(`https://wa.me/919625737475?text=${encodeURIComponent(msg)}`, "_blank");
+
+  $("#buyNowBtn")?.addEventListener("click", async () => {
+    const { items, totalAmt } = getSelectedCart();
+    if (items.length === 0) { alert("Please select at least one option"); return; }
+    const session = await ensureLogin(); if (!session) return;
+    try {
+      // Save to cart for record then open Razorpay
+      await saveToCart(session, "purchase", []);
+      await openRazorpay(session, totalAmt * 100, `${p.title} · ${items.length} item(s)`, {
+        product_id: p.id, mode: "purchase", item_count: items.length,
+      });
+    } catch (e) {
+      toast(e.message, true);
+    }
   });
   $("#dropshipBtn")?.addEventListener("click", () => {
     const { items } = getSelectedCart();
@@ -928,9 +1001,71 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("dropshipModal")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) e.currentTarget.classList.add("hidden");
   });
-  document.getElementById("dsAddCart")?.addEventListener("click", () => sendDropshipMessage(false));
-  document.getElementById("dsPayNow")?.addEventListener("click", () => sendDropshipMessage(true));
+  document.getElementById("dsAddCart")?.addEventListener("click", () => handleDsCheckout(false));
+  document.getElementById("dsPayNow")?.addEventListener("click", () => handleDsCheckout(true));
 });
+
+async function handleDsCheckout(payNow) {
+  const dsInfo = updateDsTotal();
+  if (dsInfo.count === 0) { alert("Please select at least one marketplace"); return; }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    if (confirm("Please sign in to continue. Go to sign in / sign up?")) {
+      location.href = "/home/?next=" + encodeURIComponent(location.pathname);
+    }
+    return;
+  }
+  const product = _lastDetailProduct;
+  const isCat = _lastDropshipMode === "cat_purchase";
+  try {
+    // Save to cart
+    const items = (_lastDropshipItems || []).map(it => ({ product_id: product.id, color_id: it.color?.id || null, qty: it.qty }));
+    const cartPayload = {
+      items,
+      mode: isCat ? "purchase" : "dropship",
+      marketplaces: dsInfo.selected,
+    };
+    const cr = await fetch(`${SUPABASE_URL}/functions/v1/catalog-cart-add`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(cartPayload),
+    });
+    const cj = await cr.json();
+    if (!cj.ok) throw new Error(cj.error || "Cart save failed");
+    if (!payNow) {
+      alert(`✓ Added to cart · Total ₹${dsInfo.total}\nOur team will contact you shortly.`);
+      document.getElementById("dropshipModal").classList.add("hidden");
+      return;
+    }
+    // Open Razorpay
+    if (typeof Razorpay === "undefined") { alert("Payment library not loaded. Please refresh."); return; }
+    const desc = (isCat ? "Cataloging + Purchase" : "Cataloging + Dropshipping") + " · " + dsInfo.prodCount + " products";
+    const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/catalog-checkout-order`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        total_paise: dsInfo.total * 100,
+        description: desc,
+        meta: { mode: isCat ? "cat_purchase" : "dropship", product_id: product.id, marketplaces: dsInfo.selected, prod_count: dsInfo.prodCount },
+      }),
+    });
+    const order = await orderRes.json();
+    if (!order.ok) throw new Error(order.error || "Could not create order");
+    const rzp = new Razorpay({
+      key: order.key_id, amount: order.amount_paise, currency: order.currency, order_id: order.order_id,
+      name: "Cursive World", description: order.description || desc,
+      prefill: { email: session.user.email },
+      theme: { color: "#1f6feb" },
+      handler: function (response) {
+        alert(`✓ Payment successful!\nPayment ID: ${response.razorpay_payment_id}\n\nOur team will contact you shortly.`);
+        document.getElementById("dropshipModal").classList.add("hidden");
+      },
+    });
+    rzp.open();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
 
 function sendDropshipMessage(payNow) {
   const dsInfo = updateDsTotal();
