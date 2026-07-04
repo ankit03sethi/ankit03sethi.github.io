@@ -101,7 +101,7 @@
     </div>
   </a>
   <div class="topbar-right">
-    <button id="cartChip" type="button" class="email-chip hidden" style="cursor:pointer;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;" title="View cart">
+    <button id="cartChip" type="button" class="email-chip" style="cursor:pointer;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;opacity:0.75;" title="View cart">
       &#128722; Cart <span id="cartCount" style="background:#92400e;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;min-width:18px;text-align:center;">0</span>
     </button>
     <span id="emailChip" class="email-chip hidden"></span>
@@ -627,8 +627,10 @@ function refreshCartChip() {
   const chip = $("#cartChip"); const cnt = $("#cartCount");
   if (!chip || !cnt) return;
   cnt.textContent = cart.length;
-  if (cart.length > 0) chip.classList.remove("hidden");
-  else chip.classList.add("hidden");
+  // Always visible so user knows cart exists — even when empty
+  chip.classList.remove("hidden");
+  // Slight visual hint when empty vs. filled
+  chip.style.opacity = cart.length > 0 ? "1" : "0.75";
 }
 function cartTotalPaise() { return getCart().reduce((s, it) => s + (it.total_paise || 0), 0); }
 function addCurrentSvcToCart() {
