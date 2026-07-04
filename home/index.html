@@ -622,6 +622,10 @@ init();
 // SHOPPING CART — additive, doesn't touch existing pay flow
 // =====================================================================
 const CART_KEY = "cursive_cart_v1";
+// Collapsible group state — headers default collapsed; click header to expand
+const _cartOpenGroups = new Set();
+function toggleCartGroup(gid) { if (_cartOpenGroups.has(gid)) _cartOpenGroups.delete(gid); else _cartOpenGroups.add(gid); renderCartModal(); }
+window.toggleCartGroup = toggleCartGroup;
 function getCart() { try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]"); } catch { return []; } }
 function saveCart(arr) { localStorage.setItem(CART_KEY, JSON.stringify(arr)); refreshCartChip(); }
 let _catalogCartCount = 0;
@@ -782,12 +786,15 @@ function renderCatalogCartHtml() {
     const items = groups[mode]; if (!items || items.length === 0) continue;
     const label = modeLabel[mode] || mode;
     const color = modeColor[mode] || "#334155";
-    // Sum of item subtotals in this group (unit_price × qty for each row)
     const groupSum = items.reduce((s, it) => s + ((it.unit_price_inr || 0) * (it.qty || 0)), 0);
-    html += `<div style="margin:12px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;">
-      <span>${label} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
+    const gid = "cat-" + mode;
+    const isOpen = _cartOpenGroups.has(gid);
+    const chevron = isOpen ? "▼" : "▶";
+    html += `<div onclick="toggleCartGroup('${gid}')" style="margin:12px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;cursor:pointer;user-select:none;">
+      <span><span style="display:inline-block;width:14px;font-size:9px;">${chevron}</span> ${label} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
       <span>₹${groupSum.toLocaleString("en-IN")}</span>
     </div>`;
+    if (!isOpen) continue;
     for (const it of items) {
       const code = (it.catalog_colors && it.catalog_colors.product_code) || (it.catalog_products && it.catalog_products.product_code) || ("P" + it.product_id + (it.color_id ? "-" + it.color_id : ""));
       const mps = (it.marketplaces || []).join(", ");
@@ -805,7 +812,6 @@ function renderCatalogCartHtml() {
       </div>`;
     }
   }
-  html += '<div style="margin-top:12px;text-align:center;"><button type="button" onclick="location.href=\'/home/\'" style="background:#eff6ff;color:#1f6feb;border:1.5px solid #bfdbfe;border-radius:8px;padding:8px 18px;font-weight:700;font-size:13px;cursor:pointer;">+ Add more</button></div>';
   return html;
 }
 function toggleAllCatalogCart(checked) {
@@ -910,10 +916,14 @@ function renderCartModal() {
     const color = svcColor[tag] || "#334155";
     const groupTotalPaise = items.reduce((s, it) => s + effectivePaise(it), 0);
     const groupTotalStr = "₹" + (groupTotalPaise/100).toLocaleString("en-IN", { minimumFractionDigits: groupTotalPaise % 100 ? 2 : 0 });
-    html += `<div style="margin:10px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;">
-      <span>${escapeHtml(svcName)} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
+    const gid = "svc-" + tag;
+    const isOpen = _cartOpenGroups.has(gid);
+    const chevron = isOpen ? "▼" : "▶";
+    html += `<div onclick="toggleCartGroup('${gid}')" style="margin:10px 0 4px;padding:6px 10px;background:${color}15;border-left:3px solid ${color};border-radius:0 6px 6px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.3px;cursor:pointer;user-select:none;">
+      <span><span style="display:inline-block;width:14px;font-size:9px;">${chevron}</span> ${escapeHtml(svcName)} <span style="opacity:.7;font-weight:600;">(${items.length})</span></span>
       <span>${groupTotalStr}</span>
     </div>`;
+    if (!isOpen) continue;
     for (const it of items) {
       const eff = effectivePaise(it);
       const couponLine = it.coupon_code ?
