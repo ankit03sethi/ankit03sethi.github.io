@@ -437,10 +437,13 @@ function renderProductDetail(data) {
       <div>
         <h1 style="margin:0 0 6px;font-size:22px;">${esc(p.title)}</h1>
         ${p.product_code ? `<div style="color:#64748b;font-size:12px;margin-bottom:8px;">Product ID: <b style="color:#1f6feb;">${esc(p.product_code)}</b></div>` : ''}
-        <div style="margin-bottom:14px;">
+        <div style="margin-bottom:6px;">
           <span style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
           ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;">₹${p.mrp_inr}</span>` : ''}
           ${off > 0 ? `<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ''}
+        </div>
+        <div id="totalLine" style="margin-bottom:14px;font-size:14px;color:#475467;">
+          Total: <b style="color:#1f6feb;font-size:18px;">₹<span id="totalAmt">${p.price_inr}</span></b>
         </div>
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
@@ -467,6 +470,7 @@ function renderProductDetail(data) {
             <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
             <button type="button" id="buyNowBtn" class="p-btn p-btn-primary" style="flex:1;min-width:140px;font-size:14px;padding:11px 16px;">⚡ Buy Now</button>
           </div>
+          <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;margin-top:8px;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;">📦 Add For Drop shipping</button>
         </div>
         ${(p.bullet_points || []).length || p.description ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -509,19 +513,24 @@ function renderProductDetail(data) {
   // Back button
   $("#backToGrid").addEventListener("click", () => renderGrid());
 
-  // Quantity controls
+  // Quantity controls + live total
   const qtyIn = $("#qtyInput");
+  const totalAmt = $("#totalAmt");
+  const updateTotal = () => {
+    const q = Math.max(1, parseInt(qtyIn.value, 10) || 1);
+    if (totalAmt) totalAmt.textContent = (p.price_inr * q).toLocaleString("en-IN");
+  };
   $("#qtyMinus")?.addEventListener("click", () => {
     const v = Math.max(1, (parseInt(qtyIn.value, 10) || 1) - 1);
-    qtyIn.value = v;
+    qtyIn.value = v; updateTotal();
   });
   $("#qtyPlus")?.addEventListener("click", () => {
     const v = Math.max(1, (parseInt(qtyIn.value, 10) || 1) + 1);
-    qtyIn.value = v;
+    qtyIn.value = v; updateTotal();
   });
   qtyIn?.addEventListener("input", () => {
     const v = Math.max(1, parseInt(qtyIn.value, 10) || 1);
-    qtyIn.value = v;
+    qtyIn.value = v; updateTotal();
   });
 
   // Add to cart + Buy Now
@@ -552,6 +561,22 @@ function renderProductDetail(data) {
       `Qty: ${qty}`,
       `Total: ₹${total}`,
       `Please share payment + delivery details.`,
+    ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
+  });
+
+  $("#dropshipBtn")?.addEventListener("click", () => {
+    const qty = Math.max(1, parseInt(qtyIn.value, 10) || 1);
+    const clr = (_catalogGrid._colors || []).find(c => c.id === _selectedColorId);
+    const total = p.price_inr * qty;
+    const parts = [
+      `Add For Drop Shipping 📦`,
+      `Product: ${p.title}`,
+      p.product_code ? `Product ID: ${p.product_code}` : null,
+      clr ? `Variation: ${clr.name}${clr.product_code ? ` (${clr.product_code})` : ''}` : null,
+      `Qty: ${qty}`,
+      `Total: ₹${total}`,
+      `I want to add this to my dropshipping catalog. Please share terms.`,
     ].filter(Boolean).join("\n");
     window.open(`https://wa.me/919625737475?text=${encodeURIComponent(parts)}`, "_blank");
   });
