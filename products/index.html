@@ -366,7 +366,7 @@
   <div style="background:#fff;border-radius:14px;padding:20px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
       <div>
-        <h3 id="dsModalTitle" style="margin:0 0 4px;font-size:18px;">📦 Drop Shipping Service <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:800;margin-left:6px;">V-DEBUG-3</span></h3>
+        <h3 id="dsModalTitle" style="margin:0 0 4px;font-size:18px;">📦 Drop Shipping Service</h3>
         <div id="dsModalSubtitle" style="color:#64748b;font-size:12px;">We do imaging + listing on your chosen marketplaces</div>
       </div>
       <button type="button" id="dsClose" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;">×</button>
@@ -406,8 +406,8 @@
     </div>
 
     <div style="display:flex;gap:8px;">
-      <button type="button" id="dsAddCart" onmousedown="alert('MOUSEDOWN: Add to Cart · V-DEBUG-3');" onclick="alert('CLICK: Add to Cart · handler=' + (typeof window.__handleDsCheckout)); if(window.__handleDsCheckout) window.__handleDsCheckout(false);" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart [V3]</button>
-      <button type="button" id="dsPayNow" onmousedown="alert('MOUSEDOWN: Pay Now · V-DEBUG-3');" onclick="alert('CLICK: Pay Now · handler=' + (typeof window.__handleDsCheckout)); if(window.__handleDsCheckout) window.__handleDsCheckout(true);" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now [V3]</button>
+      <button type="button" id="dsAddCart" onclick="if(window.__handleDsCheckout) { window.__handleDsCheckout(false); } else { alert('handler not loaded — refresh page'); }" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+      <button type="button" id="dsPayNow" onclick="if(window.__handleDsCheckout) { window.__handleDsCheckout(true); } else { alert('handler not loaded — refresh page'); }" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
     </div>
   </div>
 </div>
