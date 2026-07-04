@@ -813,7 +813,7 @@ function renderCatalogCartHtml() {
   // Group items by mode
   const groups = {};
   for (const it of _catalogCartItems) { (groups[it.mode] = groups[it.mode] || []).push(it); }
-  let html = '<div style="margin:8px 0 4px;font-size:12px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">📦 Product Catalog Items</div>';
+  let html = "";
   // Render each mode group
   for (const mode of modeOrder) {
     const items = groups[mode]; if (!items || items.length === 0) continue;
