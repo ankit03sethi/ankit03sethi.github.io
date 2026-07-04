@@ -405,10 +405,20 @@
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;">
-      <button type="button" id="dsAddCart" onclick="this.textContent='⏳ ADDING...'; if(window.__handleDsCheckout) { window.__handleDsCheckout(false); } else { this.textContent='❌ NO HANDLER — REFRESH'; }" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
-      <button type="button" id="dsPayNow" onclick="this.textContent='⏳ PROCESSING...'; if(window.__handleDsCheckout) { window.__handleDsCheckout(true); } else { this.textContent='❌ NO HANDLER — REFRESH'; }" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
+    <!-- Wallet + shortfall breakdown (inline, same UX as home page services) -->
+    <div id="dsWalletBox" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;color:#475467;">
+        <span>Wallet balance</span><span id="dsWalletBal">—</span>
+      </div>
+      <div id="dsShortfallRow" style="display:none;justify-content:space-between;font-weight:700;color:#b45309;margin-top:4px;">
+        <span>Amount to add in wallet</span><span id="dsShortfallAmt">—</span>
+      </div>
     </div>
+    <div style="display:flex;gap:8px;">
+      <button type="button" id="dsAddCart" onclick="if(window.__handleDsCheckout) window.__handleDsCheckout(false);" class="p-btn" style="flex:1;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
+      <button type="button" id="dsPayNow" onclick="if(window.__handleDsCheckout) window.__handleDsCheckout(true);" class="p-btn p-btn-primary" style="flex:1;font-size:14px;padding:11px 16px;">💳 Pay Now</button>
+    </div>
+    <p style="text-align:center;color:#94a3b8;font-size:11.5px;margin:10px 0 0;">Razorpay opens only for the due amount. It auto-credits your wallet then debits this order.</p>
   </div>
 </div>
 
@@ -937,6 +947,7 @@ function renderProductDetail(data) {
     if (st) st.textContent = "We do imaging + listing on your chosen marketplaces";
     updateDsTotal();
     $("#dropshipModal").classList.remove("hidden");
+    loadDsWallet();
   });
 
   $("#catPurchaseNextBtn")?.addEventListener("click", () => {
@@ -953,6 +964,7 @@ function renderProductDetail(data) {
     if (st) st.textContent = "You buy the products and we do imaging + listing on marketplaces";
     updateDsTotal();
     $("#dropshipModal").classList.remove("hidden");
+    loadDsWallet();
   });
 
   renderDesignsForColor();
@@ -986,7 +998,45 @@ function updateDsTotal() {
   } else {
     if (pl) pl.style.display = "none";
   }
+  // Wallet + shortfall row (mirrors home page service modal)
+  const walletPaise = Number(_dsWalletPaise ?? 0);
+  const totalPaise = total * 100;
+  const shortfall = Math.max(0, totalPaise - walletPaise);
+  const walletBalEl = document.getElementById("dsWalletBal");
+  if (walletBalEl) walletBalEl.textContent = "₹" + (walletPaise/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const shortRow = document.getElementById("dsShortfallRow");
+  const shortAmt = document.getElementById("dsShortfallAmt");
+  if (shortRow && shortAmt) {
+    if (shortfall > 0 && total > 0) {
+      shortRow.style.display = "flex";
+      shortAmt.textContent = "₹" + (shortfall/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else {
+      shortRow.style.display = "none";
+    }
+  }
+  // Update Pay Now label to show amount and mode
+  const payBtn = document.getElementById("dsPayNow");
+  if (payBtn && total > 0) {
+    if (shortfall > 0) payBtn.textContent = "💳 Add ₹" + (shortfall/100).toFixed(0) + " & Pay";
+    else payBtn.textContent = "🔒 Pay ₹" + total + " from wallet";
+  } else if (payBtn) payBtn.textContent = "💳 Pay Now";
   return { count, total, selected: Array.from(checked).map(c => c.value), prodCount, baseAmt, mpTotal, purchaseAmt };
+}
+
+let _dsWalletPaise = 0;
+async function loadDsWallet() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/analytics-wallet-summary`, {
+      headers: { "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_ANON_KEY },
+    });
+    const j = await r.json();
+    if (j && (j.balance_paise !== undefined || j.wallet_balance_paise !== undefined)) {
+      _dsWalletPaise = Number(j.balance_paise ?? j.wallet_balance_paise ?? 0);
+      updateDsTotal();
+    }
+  } catch (_) {}
 }
 
 // Wire up dropship modal (once, global)
@@ -1271,7 +1321,7 @@ init();
 </script>
 
 <!-- OTP + wallet-first flow modal (same UX as home page services) -->
-<div id="catPayModal" class="modal-back" style="display:none;">
+<div id="catPayModal" class="modal-back" style="display:none;z-index:400;">
   <div class="modal" style="max-width:440px;">
     <div class="modal-head">
       <h2 id="catPayTitle" style="font-size:16px;">Confirm payment</h2>
@@ -1398,6 +1448,8 @@ async function openRazorpayForShortfall(session, shortfall_paise, description) {
 // Public entry: call this from any Pay Now button. Handles wallet-first + Razorpay-for-shortfall + OTP.
 window.startCatalogPayment = async function (mode, items, marketplaces) {
   hideCatPayError();
+  // Close the dropship/marketplace modal so payment modal is visible
+  const dsm = document.getElementById("dropshipModal"); if (dsm) dsm.classList.add("hidden");
   const { data: { session } } = await sbPay.auth.getSession();
   if (!session) {
     if (confirm("Please sign in to continue. Go to sign in?")) location.href = "/home/?next=" + encodeURIComponent(location.pathname);
