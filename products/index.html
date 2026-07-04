@@ -990,18 +990,18 @@ function updateDsTotal() {
 }
 
 // Wire up dropship modal (once, global)
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("#dsMps input").forEach(inp => {
-    inp.addEventListener("change", updateDsTotal);
-  });
-  document.getElementById("dsClose")?.addEventListener("click", () => {
-    document.getElementById("dropshipModal").classList.add("hidden");
-  });
-  document.getElementById("dropshipModal")?.addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) e.currentTarget.classList.add("hidden");
-  });
-  document.getElementById("dsAddCart")?.addEventListener("click", () => handleDsCheckout(false));
-  document.getElementById("dsPayNow")?.addEventListener("click", () => handleDsCheckout(true));
+// Event delegation on document so buttons work regardless of DOM ready timing
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.closest && e.target.closest("#dsMps")) updateDsTotal();
+});
+document.addEventListener("click", (e) => {
+  if (!e.target) return;
+  const t = e.target;
+  const isBtn = (id) => t.id === id || (t.closest && t.closest("#" + id));
+  if (isBtn("dsClose")) { document.getElementById("dropshipModal")?.classList.add("hidden"); return; }
+  if (t.id === "dropshipModal") { t.classList.add("hidden"); return; }
+  if (isBtn("dsAddCart")) { handleDsCheckout(false); return; }
+  if (isBtn("dsPayNow")) { handleDsCheckout(true); return; }
 });
 
 async function handleDsCheckout(payNow) {
