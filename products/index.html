@@ -205,6 +205,58 @@
     .toast.err { background: #dc2626; }
     .hidden { display: none !important; }
 
+    /* 3D mode tabs */
+    .mode-tab-3d {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 10px;
+      background: #fff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      box-shadow:
+        0 4px 10px rgba(15,23,42,0.06),
+        0 1px 2px rgba(15,23,42,0.04),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .mode-tab-3d:hover {
+      border-color: #1f6feb;
+      box-shadow:
+        0 10px 24px rgba(31,111,235,0.18),
+        0 4px 8px rgba(15,23,42,0.08),
+        inset 0 1px 0 rgba(255,255,255,1);
+      transform: translateY(-3px);
+    }
+    .mode-tab-3d:active { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(31,111,235,0.12); }
+    .mode-tab-3d.active {
+      background: linear-gradient(180deg, #1f6feb 0%, #1858d6 100%);
+      border-color: #1858d6;
+      color: #fff;
+      box-shadow:
+        0 12px 24px rgba(31,111,235,0.35),
+        0 4px 8px rgba(15,23,42,0.10),
+        inset 0 1px 0 rgba(255,255,255,0.4);
+      transform: translateY(-2px);
+    }
+    .mode-tab-3d.active .mt-sub { color: rgba(255,255,255,0.85); }
+    .mode-tab-3d .mt-icon {
+      width: 34px; height: 34px; border-radius: 9px;
+      display: grid; place-items: center; font-size: 17px;
+      background: #eff6ff;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(31,111,235,0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+    }
+    .mode-tab-3d.active .mt-icon { background: rgba(255,255,255,0.2); }
+    .mode-tab-3d .mt-txt { flex: 1; min-width: 0; line-height: 1.2; }
+    .mode-tab-3d .mt-title { font-weight: 800; font-size: 13px; margin-bottom: 1px; }
+    .mode-tab-3d .mt-sub { font-size: 10.5px; font-weight: 600; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 640px) {
+      .mode-tab-3d { flex-direction: column; text-align: center; padding: 10px 6px; gap: 4px; }
+      .mode-tab-3d .mt-sub { font-size: 9.5px; white-space: normal; }
+    }
+
     /* Product detail modal */
     .detail-img { width: 100%; aspect-ratio: 1; background: #fff; border: 1px solid #f1f5f9; border-radius: 10px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-bottom: 12px; }
     .detail-thumbs { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
@@ -509,10 +561,19 @@ function renderProductDetail(data) {
         </div>
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
-            <div id="modeTabs" style="display:flex;gap:0;margin-bottom:14px;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;background:#f8fafc;">
-              <button type="button" data-mode="purchase" class="mode-tab active" style="flex:1;padding:8px 6px;border:0;background:#1f6feb;color:#fff;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">🛒 Purchase</button>
-              <button type="button" data-mode="cat_purchase" class="mode-tab" style="flex:1;padding:8px 6px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">🎨 Cataloging + Purchase</button>
-              <button type="button" data-mode="dropship" class="mode-tab" style="flex:1;padding:8px 6px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">📦 Cataloging + Dropshipping</button>
+            <div id="modeTabs" style="display:flex;gap:10px;margin-bottom:14px;">
+              <button type="button" data-mode="purchase" class="mode-tab-3d active" data-icon="🛒" data-sublabel="Purchase">
+                <div class="mt-icon">🛒</div>
+                <div class="mt-txt"><div class="mt-title">Option 1</div><div class="mt-sub">Purchase</div></div>
+              </button>
+              <button type="button" data-mode="cat_purchase" class="mode-tab-3d" data-icon="🎨" data-sublabel="Cataloging + Purchase">
+                <div class="mt-icon">🎨</div>
+                <div class="mt-txt"><div class="mt-title">Option 2</div><div class="mt-sub">Cataloging + Purchase</div></div>
+              </button>
+              <button type="button" data-mode="dropship" class="mode-tab-3d" data-icon="📦" data-sublabel="Cataloging + Dropshipping">
+                <div class="mt-icon">📦</div>
+                <div class="mt-txt"><div class="mt-title">Option 3</div><div class="mt-sub">Cataloging + Dropshipping</div></div>
+              </button>
             </div>
             <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more <span style="color:#64748b;font-weight:500;font-size:11.5px;">· min qty 10 per product · +5 steps</span></div>
             <div id="varList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
@@ -658,7 +719,7 @@ function renderProductDetail(data) {
   let _mode = "purchase";
   const applyMode = () => {
     // Style tabs
-    wrap.querySelectorAll(".mode-tab").forEach(t => {
+    wrap.querySelectorAll(".mode-tab-3d").forEach(t => {
       const active = t.dataset.mode === _mode;
       t.style.background = active ? "#1f6feb" : "transparent";
       t.style.color = active ? "#fff" : "#475467";
@@ -679,7 +740,7 @@ function renderProductDetail(data) {
     // Dropship mode shows dropship button
     const db = $("#dropshipBtn"); if (db) db.style.display = isDropship ? "block" : "none";
   };
-  wrap.querySelectorAll(".mode-tab").forEach(t => t.addEventListener("click", () => {
+  wrap.querySelectorAll(".mode-tab-3d").forEach(t => t.addEventListener("click", () => {
     _mode = t.dataset.mode;
     applyMode();
   }));
