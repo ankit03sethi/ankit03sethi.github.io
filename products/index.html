@@ -1080,8 +1080,16 @@ document.addEventListener("click", (e) => {
   if (!e.target) return;
   const t = e.target;
   const isBtn = (id) => t.id === id || (t.closest && t.closest("#" + id));
-  if (isBtn("dsClose") || isBtn("dsBack")) { document.getElementById("dropshipModal")?.classList.add("hidden"); return; }
-  if (t.id === "dropshipModal") { t.classList.add("hidden"); return; }
+  if (isBtn("dsClose") || isBtn("dsBack")) {
+    document.getElementById("dropshipModal")?.classList.add("hidden");
+    document.body.style.overflow = ""; document.documentElement.style.overflow = "";
+    return;
+  }
+  if (t.id === "dropshipModal") {
+    t.classList.add("hidden");
+    document.body.style.overflow = ""; document.documentElement.style.overflow = "";
+    return;
+  }
   if (isBtn("dsAddCart")) { handleDsCheckout(false); return; }
   if (isBtn("dsPayNow")) { handleDsCheckout(true); return; }
 });
@@ -1536,13 +1544,16 @@ window.doCatalogPayInline = async function (mode, items, marketplaces, statusBtn
           }
           resolve();
         },
-        modal: { ondismiss: function () { resetBtn(); resolve(); } },
+        modal: { ondismiss: function () { resetBtn(); document.body.style.overflow = ""; document.documentElement.style.overflow = ""; resolve(); } },
       });
       rzp.open();
     });
+    // After Razorpay flow ends (success/dismiss/error), restore scroll defensively
+    document.body.style.overflow = ""; document.documentElement.style.overflow = "";
     return;
   }
   resetBtn();
+  document.body.style.overflow = ""; document.documentElement.style.overflow = "";
   alert("Error: " + (j.error || j.message || "unknown"));
 };
 
