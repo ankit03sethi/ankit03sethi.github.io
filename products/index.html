@@ -374,17 +374,17 @@ function renderGrid() {
     const p = item.hero;
     const c = item.category;
     const img = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : "";
-    const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
+    const vc = p.variant_count || 0;
     html += `<div class="prod-card" data-pid="${p.id}">
-      <div class="cat-tag">${esc(c.name)}</div>
+      <div class="cat-tag">${esc(c.name)}${vc > 0 ? ` · ${vc} variant${vc === 1 ? '' : 's'}` : ''}</div>
       <div class="prod-img"${img ? ` style="background-image:url('${esc(img)}')"` : ""}>${img ? "" : "📷"}</div>
       <div class="prod-body">
         <div class="prod-title">${esc(p.title)}</div>
         <div class="prod-price">
           <span class="now">₹${p.price_inr}</span>
           ${p.mrp_inr > p.price_inr ? `<span class="mrp">₹${p.mrp_inr}</span>` : ""}
-          ${off > 0 ? `<span class="off">${off}% OFF</span>` : ""}
         </div>
+        ${vc > 0 ? `<div style="margin-top:6px;font-size:11px;color:#1f6feb;font-weight:600;">See ${vc} more →</div>` : `<div style="margin-top:6px;font-size:11px;color:#1f6feb;font-weight:600;">See details →</div>`}
       </div>
     </div>`;
   }
