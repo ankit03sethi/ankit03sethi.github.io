@@ -550,6 +550,7 @@ function renderProductDetail(data) {
   _selectedColorId = colors.length ? colors[0].id : null;
   _lastDetailProduct = p;
   _lastDetailProductId = p.id;
+  _lastDetailColors = colors;
   // Persist product context in URL hash so refresh returns to the same detail page
   try { if (location.hash !== "#p=" + p.id) history.replaceState(null, "", "#p=" + p.id); } catch (_) {}
   const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
@@ -980,6 +981,7 @@ function renderProductDetail(data) {
     updateDsTotal();
     $("#dropshipModal").classList.remove("hidden");
     loadDsWallet();
+    writeModalHash();
   });
 
   $("#catPurchaseNextBtn")?.addEventListener("click", () => {
@@ -995,6 +997,7 @@ function renderProductDetail(data) {
     if (tt) tt.textContent = "🎨 Cataloging + Purchase";
     if (st) st.textContent = "You buy the products and we do imaging + listing on marketplaces";
     updateDsTotal();
+    writeModalHash();
     $("#dropshipModal").classList.remove("hidden");
     loadDsWallet();
   });
@@ -1055,6 +1058,68 @@ function updateDsTotal() {
   return { count, total, selected: Array.from(checked).map(c => c.value), prodCount, baseAmt, mpTotal, purchaseAmt };
 }
 
+// URL hash helpers to persist modal state across refresh
+function writeModalHash() {
+  try {
+    const pid = _lastDetailProductId; if (!pid) return;
+    const parts = ["p=" + pid, "m=" + (_lastDropshipMode || "purchase")];
+    const items = (_lastDropshipItems || []).map(it => (it.color?.id || 0) + ":" + it.qty).join(",");
+    if (items) parts.push("items=" + items);
+    const mps = Array.from(document.querySelectorAll("#dsMps input:checked")).map(i => i.value).join(",");
+    if (mps) parts.push("mp=" + mps);
+    if (_lastDropshipPurchaseAmt) parts.push("pa=" + _lastDropshipPurchaseAmt);
+    history.replaceState(null, "", "#" + parts.join("&"));
+  } catch (_) {}
+}
+function clearModalHash() {
+  try {
+    const pid = _lastDetailProductId;
+    if (pid) history.replaceState(null, "", "#p=" + pid);
+    else history.replaceState(null, "", location.pathname);
+  } catch (_) {}
+}
+function parseHash() {
+  const h = (location.hash || "").replace(/^#/, "");
+  if (!h) return {};
+  const out = {};
+  h.split("&").forEach(kv => { const [k, v] = kv.split("="); if (k) out[k] = decodeURIComponent(v || ""); });
+  return out;
+}
+// Called from init() after showProductDetail completes to restore modal
+function restoreModalFromHash(state) {
+  try {
+    if (!_lastDetailProduct) return;
+    const colors = _lastDetailColors || [];
+    // Rebuild items from hash "colorId:qty,colorId:qty"
+    const items = (state.items || "").split(",").filter(Boolean).map(pair => {
+      const [cidStr, qtyStr] = pair.split(":");
+      const cid = Number(cidStr), qty = Math.max(1, parseInt(qtyStr, 10) || 10);
+      const color = colors.find(c => c.id === cid) || null;
+      return { color, qty, subtotal: (color ? (color.price_inr || _lastDetailProduct.price_inr) : _lastDetailProduct.price_inr) * qty };
+    });
+    if (!items.length) return;
+    _lastDropshipItems = items;
+    _lastDropshipMode = state.m;
+    _lastDropshipPurchaseAmt = state.pa ? Number(state.pa) : (state.m === "cat_purchase" ? items.reduce((s, it) => s + it.subtotal, 0) : 0);
+    // Restore marketplace checkboxes
+    const mpVals = (state.mp || "").split(",").filter(Boolean);
+    document.querySelectorAll("#dsMps input").forEach(i => { i.checked = mpVals.includes(i.value); });
+    // Set header
+    const tt = document.getElementById("dsModalTitle");
+    const st = document.getElementById("dsModalSubtitle");
+    if (state.m === "cat_purchase") {
+      if (tt) tt.textContent = "🎨 Cataloging + Purchase";
+      if (st) st.textContent = "You buy the products and we do imaging + listing on marketplaces";
+    } else {
+      if (tt) tt.textContent = "📦 Drop Shipping Service";
+      if (st) st.textContent = "We do imaging + listing on your chosen marketplaces";
+    }
+    updateDsTotal();
+    document.getElementById("dropshipModal")?.classList.remove("hidden");
+    if (typeof loadDsWallet === "function") loadDsWallet();
+  } catch (e) { console.warn("restoreModalFromHash failed:", e); }
+}
+
 let _dsWalletPaise = 0;
 async function loadDsWallet() {
   try {
@@ -1074,7 +1139,7 @@ async function loadDsWallet() {
 // Wire up dropship modal (once, global)
 // Event delegation on document so buttons work regardless of DOM ready timing
 document.addEventListener("change", (e) => {
-  if (e.target && e.target.closest && e.target.closest("#dsMps")) updateDsTotal();
+  if (e.target && e.target.closest && e.target.closest("#dsMps")) { updateDsTotal(); writeModalHash(); }
 });
 document.addEventListener("click", (e) => {
   if (!e.target) return;
@@ -1083,11 +1148,13 @@ document.addEventListener("click", (e) => {
   if (isBtn("dsClose") || isBtn("dsBack")) {
     document.getElementById("dropshipModal")?.classList.add("hidden");
     document.body.style.overflow = ""; document.documentElement.style.overflow = "";
+    if (typeof clearModalHash === "function") clearModalHash();
     return;
   }
   if (t.id === "dropshipModal") {
     t.classList.add("hidden");
     document.body.style.overflow = ""; document.documentElement.style.overflow = "";
+    if (typeof clearModalHash === "function") clearModalHash();
     return;
   }
   if (isBtn("dsAddCart")) { handleDsCheckout(false); return; }
@@ -1161,6 +1228,7 @@ async function handleDsCheckout(payNow) {
 // Track last-viewed product for dropship messaging
 let _lastDetailProductId = null;
 let _lastDetailProduct = null;
+let _lastDetailColors = [];
 
 function renderDesignsForColor() {
   const wrap = $("#designsWrap");
@@ -1343,10 +1411,14 @@ $("#signOutBtn").addEventListener("click", async () => {
 
 // ============ INIT ============
 async function init() {
-  // Restore product detail from URL hash (e.g. after refresh or Razorpay bounce-back)
-  const hashMatch = /^#p=(\d+)$/.exec(location.hash || "");
-  if (hashMatch) {
-    showProductDetail(Number(hashMatch[1]));
+  // Restore product detail + modal state from URL hash
+  const hashState = parseHash();
+  if (hashState.p && /^\d+$/.test(hashState.p)) {
+    await showProductDetail(Number(hashState.p));
+    // If modal state was open (m, items, mp), restore it
+    if (hashState.m && (hashState.m === "cat_purchase" || hashState.m === "dropship") && hashState.items) {
+      setTimeout(() => restoreModalFromHash(hashState), 250);
+    }
   } else {
     loadCatalog();
   }
