@@ -307,8 +307,8 @@
   <div style="background:#fff;border-radius:14px;padding:20px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
       <div>
-        <h3 style="margin:0 0 4px;font-size:18px;">📦 Drop Shipping Service</h3>
-        <div style="color:#64748b;font-size:12px;">We do imaging + listing on your chosen marketplaces</div>
+        <h3 id="dsModalTitle" style="margin:0 0 4px;font-size:18px;">📦 Drop Shipping Service</h3>
+        <div id="dsModalSubtitle" style="color:#64748b;font-size:12px;">We do imaging + listing on your chosen marketplaces</div>
       </div>
       <button type="button" id="dsClose" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;">×</button>
     </div>
@@ -332,11 +332,14 @@
     </div>
 
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-bottom:16px;">
+      <div id="dsPurchaseLine" style="display:none;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
+        <span>Purchase amount</span><span>₹<span id="dsPurchaseAmt">0</span></span>
+      </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
         <span>Products selected</span><b><span id="dsProdCount">0</span></b>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
-        <span>Base (₹300 × <span id="dsProdCount2">0</span>)</span><span>₹<span id="dsBaseAmt">0</span></span>
+        <span>Cataloging base (₹300 × <span id="dsProdCount2">0</span>)</span><span>₹<span id="dsBaseAmt">0</span></span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#374151;">
         <span>Marketplaces (<span id="dsMpCount">0</span> × ₹50 × <span id="dsProdCount3">0</span> prod)</span><span>₹<span id="dsMpTotal">0</span></span>
@@ -545,6 +548,7 @@ function renderProductDetail(data) {
             <button type="button" id="addCartBtn" class="p-btn" style="flex:1;min-width:140px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b;font-size:14px;padding:11px 16px;">🛒 Add to Cart</button>
             <button type="button" id="buyNowBtn" class="p-btn p-btn-primary" style="flex:1;min-width:140px;font-size:14px;padding:11px 16px;">⚡ Buy Now</button>
           </div>
+          <button type="button" id="catPurchaseNextBtn" class="p-btn p-btn-primary" style="width:100%;background:#7c3aed;border:0;color:#fff;font-size:14px;padding:11px 16px;display:none;">Next → Choose marketplaces</button>
           <button type="button" id="dropshipBtn" class="p-btn" style="width:100%;background:#ecfdf5;color:#065f46;border:1.5px solid #10b981;font-size:14px;padding:11px 16px;display:none;">📦 Add to Cart for Drop Shipping</button>
         </div>
         ${(p.bullet_points || []).length || p.description ? `
@@ -654,14 +658,19 @@ function renderProductDetail(data) {
       t.style.color = active ? "#fff" : "#475467";
     });
     const isDropship = _mode === "dropship";
-    // Show/hide qty controls (both Purchase and Cataloging+Purchase show qty)
+    const isCatPurchase = _mode === "cat_purchase";
+    const isPurchase = _mode === "purchase";
+    // Qty visible for Purchase and Cat+Purchase modes
     wrap.querySelectorAll(".var-qty-wrap").forEach(w => {
       w.style.display = isDropship ? "none" : "flex";
     });
-    // Show/hide cart summary
+    // Cart summary visible for Purchase and Cat+Purchase
     const cs = $("#cartSummary"); if (cs) cs.style.display = isDropship ? "none" : "block";
-    // Toggle buttons
-    const pb = $("#purchaseButtons"); if (pb) pb.style.display = isDropship ? "none" : "flex";
+    // Buttons: purchase mode shows Add to Cart / Buy Now
+    const pb = $("#purchaseButtons"); if (pb) pb.style.display = isPurchase ? "flex" : "none";
+    // Cat+Purchase mode shows "Next → Choose marketplaces"
+    const cpb = $("#catPurchaseNextBtn"); if (cpb) cpb.style.display = isCatPurchase ? "block" : "none";
+    // Dropship mode shows dropship button
     const db = $("#dropshipBtn"); if (db) db.style.display = isDropship ? "block" : "none";
   };
   wrap.querySelectorAll(".mode-tab").forEach(t => t.addEventListener("click", () => {
@@ -697,7 +706,29 @@ function renderProductDetail(data) {
     const { items } = getSelectedCart();
     if (items.length === 0) { alert("Please select at least one option"); return; }
     _lastDropshipItems = items;
+    _lastDropshipMode = "dropship";
+    _lastDropshipPurchaseAmt = 0;
     document.querySelectorAll("#dsMps input").forEach(i => { i.checked = false; });
+    const tt = document.getElementById("dsModalTitle");
+    const st = document.getElementById("dsModalSubtitle");
+    if (tt) tt.textContent = "📦 Drop Shipping Service";
+    if (st) st.textContent = "We do imaging + listing on your chosen marketplaces";
+    updateDsTotal();
+    $("#dropshipModal").classList.remove("hidden");
+  });
+
+  $("#catPurchaseNextBtn")?.addEventListener("click", () => {
+    const { items, totalAmt } = getSelectedCart();
+    if (items.length === 0) { alert("Please select at least one option"); return; }
+    _lastDropshipItems = items;
+    _lastDropshipMode = "cat_purchase";
+    _lastDropshipPurchaseAmt = totalAmt;
+    document.querySelectorAll("#dsMps input").forEach(i => { i.checked = false; });
+    // Update modal header for Cataloging + Purchase mode
+    const tt = document.getElementById("dsModalTitle");
+    const st = document.getElementById("dsModalSubtitle");
+    if (tt) tt.textContent = "🎨 Cataloging + Purchase";
+    if (st) st.textContent = "You buy the products and we do imaging + listing on marketplaces";
     updateDsTotal();
     $("#dropshipModal").classList.remove("hidden");
   });
@@ -706,15 +737,17 @@ function renderProductDetail(data) {
 }
 
 let _lastDropshipItems = [];
+let _lastDropshipMode = "dropship";
+let _lastDropshipPurchaseAmt = 0;
 
 function updateDsTotal() {
   const checked = document.querySelectorAll("#dsMps input:checked");
   const count = checked.length;
-  // Number of products selected on the main page (from _lastDropshipItems)
   const prodCount = Math.max(1, (_lastDropshipItems || []).length);
   const baseAmt = 300 * prodCount;
   const mpTotal = count * 50 * prodCount;
-  const total = baseAmt + mpTotal;
+  const purchaseAmt = _lastDropshipMode === "cat_purchase" ? (_lastDropshipPurchaseAmt || 0) : 0;
+  const total = purchaseAmt + baseAmt + mpTotal;
   const cEl = document.getElementById("dsMpCount"); if (cEl) cEl.textContent = count;
   const mtEl = document.getElementById("dsMpTotal"); if (mtEl) mtEl.textContent = mpTotal;
   const tEl = document.getElementById("dsTotal"); if (tEl) tEl.textContent = total;
@@ -722,7 +755,16 @@ function updateDsTotal() {
   const pcEl2 = document.getElementById("dsProdCount2"); if (pcEl2) pcEl2.textContent = prodCount;
   const pcEl3 = document.getElementById("dsProdCount3"); if (pcEl3) pcEl3.textContent = prodCount;
   const baEl = document.getElementById("dsBaseAmt"); if (baEl) baEl.textContent = baseAmt;
-  return { count, total, selected: Array.from(checked).map(c => c.value), prodCount, baseAmt, mpTotal };
+  // Show/hide purchase line
+  const pl = document.getElementById("dsPurchaseLine");
+  const pa = document.getElementById("dsPurchaseAmt");
+  if (_lastDropshipMode === "cat_purchase") {
+    if (pl) pl.style.display = "flex";
+    if (pa) pa.textContent = purchaseAmt;
+  } else {
+    if (pl) pl.style.display = "none";
+  }
+  return { count, total, selected: Array.from(checked).map(c => c.value), prodCount, baseAmt, mpTotal, purchaseAmt };
 }
 
 // Wire up dropship modal (once, global)
@@ -741,11 +783,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function sendDropshipMessage(payNow) {
-  const { count, total, selected } = updateDsTotal();
+  const dsInfo = updateDsTotal();
+  const { count, total, selected } = dsInfo;
   if (count === 0) { alert("Please select at least one marketplace"); return; }
   const product = _lastDetailProduct;
+  const isCat = _lastDropshipMode === "cat_purchase";
+  const modeLabel = isCat ? `🎨 Cataloging + Purchase` : `📦 Drop Shipping`;
   const lines = [
-    payNow ? `💳 Drop Shipping · Pay Now` : `📦 Drop Shipping · Add to Cart`,
+    payNow ? `${modeLabel} · Pay Now` : `${modeLabel} · Add to Cart`,
     ``,
     product ? `Product: ${product.title}` : null,
     product && product.product_code ? `Product ID: ${product.product_code}` : null,
@@ -754,13 +799,14 @@ function sendDropshipMessage(payNow) {
     lines.push(``, `Selected variations:`);
     _lastDropshipItems.forEach((it, i) => {
       const label = it.color ? `${it.color.name}${it.color.product_code ? ` (${it.color.product_code})` : ''}` : (product?.title || 'Product');
-      lines.push(`${i + 1}. ${label} × ${it.qty}`);
+      const qtyStr = isCat ? ` × ${it.qty} = ₹${it.subtotal}` : ` × ${it.qty}`;
+      lines.push(`${i + 1}. ${label}${qtyStr}`);
     });
   }
   lines.push(``, `Marketplaces: ${selected.join(", ")}`);
-  const dsInfo = updateDsTotal();
   lines.push(`Products: ${dsInfo.prodCount}`);
-  lines.push(`Base: ₹300 × ${dsInfo.prodCount} = ₹${dsInfo.baseAmt}`);
+  if (isCat) lines.push(`Purchase amount: ₹${dsInfo.purchaseAmt}`);
+  lines.push(`Cataloging base: ₹300 × ${dsInfo.prodCount} = ₹${dsInfo.baseAmt}`);
   lines.push(`Marketplaces: ${count} × ₹50 × ${dsInfo.prodCount} = ₹${dsInfo.mpTotal}`);
   lines.push(`Total: ₹${total}`);
   lines.push(``, payNow ? `Please share payment link.` : `Please add to my cart.`);
