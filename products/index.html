@@ -364,12 +364,13 @@
 <!-- Dropshipping modal -->
 <div id="dropshipModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:14px;padding:20px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-      <div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:8px;">
+      <button type="button" id="dsBack" style="background:#f1f5f9;border:1px solid #e2e8f0;font-size:13px;font-weight:600;color:#334155;padding:6px 12px;border-radius:8px;cursor:pointer;flex-shrink:0;">← Back</button>
+      <div style="flex:1;min-width:0;text-align:center;">
         <h3 id="dsModalTitle" style="margin:0 0 4px;font-size:18px;">📦 Drop Shipping Service</h3>
         <div id="dsModalSubtitle" style="color:#64748b;font-size:12px;">We do imaging + listing on your chosen marketplaces</div>
       </div>
-      <button type="button" id="dsClose" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;">×</button>
+      <button type="button" id="dsClose" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;flex-shrink:0;">×</button>
     </div>
 
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
@@ -549,6 +550,8 @@ function renderProductDetail(data) {
   _selectedColorId = colors.length ? colors[0].id : null;
   _lastDetailProduct = p;
   _lastDetailProductId = p.id;
+  // Persist product context in URL hash so refresh returns to the same detail page
+  try { if (location.hash !== "#p=" + p.id) history.replaceState(null, "", "#p=" + p.id); } catch (_) {}
   const off = p.mrp_inr > p.price_inr ? Math.round(((p.mrp_inr - p.price_inr) / p.mrp_inr) * 100) : 0;
   const imgs = (p.image_urls || []).length ? p.image_urls : [""];
 
@@ -690,7 +693,7 @@ function renderProductDetail(data) {
   });
 
   // Back button
-  $("#backToGrid").addEventListener("click", () => renderGrid());
+  $("#backToGrid").addEventListener("click", () => { try { history.replaceState(null, "", location.pathname); } catch (_) {} renderGrid(); });
 
   // Helper: get selected variations with their qty
   function getSelectedCart() {
@@ -1077,7 +1080,7 @@ document.addEventListener("click", (e) => {
   if (!e.target) return;
   const t = e.target;
   const isBtn = (id) => t.id === id || (t.closest && t.closest("#" + id));
-  if (isBtn("dsClose")) { document.getElementById("dropshipModal")?.classList.add("hidden"); return; }
+  if (isBtn("dsClose") || isBtn("dsBack")) { document.getElementById("dropshipModal")?.classList.add("hidden"); return; }
   if (t.id === "dropshipModal") { t.classList.add("hidden"); return; }
   if (isBtn("dsAddCart")) { handleDsCheckout(false); return; }
   if (isBtn("dsPayNow")) { handleDsCheckout(true); return; }
@@ -1332,7 +1335,13 @@ $("#signOutBtn").addEventListener("click", async () => {
 
 // ============ INIT ============
 async function init() {
-  loadCatalog(); // public — always
+  // Restore product detail from URL hash (e.g. after refresh or Razorpay bounce-back)
+  const hashMatch = /^#p=(\d+)$/.exec(location.hash || "");
+  if (hashMatch) {
+    showProductDetail(Number(hashMatch[1]));
+  } else {
+    loadCatalog();
+  }
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     _session = session;
@@ -1460,7 +1469,9 @@ async function openRazorpayForShortfall(session, shortfall_paise, description) {
 // - Wallet has enough → directly debit (v2 wallet-pay-catalog, no OTP)
 // - Wallet short → Razorpay opens for shortfall → credited → then debit
 window.doCatalogPayInline = async function (mode, items, marketplaces, statusBtn) {
+  const originalBtnText = statusBtn ? statusBtn.textContent : "";
   const setBtn = (t) => { if (statusBtn) statusBtn.textContent = t; };
+  const resetBtn = () => { if (statusBtn) { statusBtn.disabled = false; statusBtn.textContent = originalBtnText; } };
   const { data: { session } } = await sbPay.auth.getSession();
   if (!session) {
     if (confirm("Please sign in to continue. Go to sign in?")) location.href = "/home/?next=" + encodeURIComponent(location.pathname);
@@ -1525,12 +1536,13 @@ window.doCatalogPayInline = async function (mode, items, marketplaces, statusBtn
           }
           resolve();
         },
-        modal: { ondismiss: function () { resolve(); } },
+        modal: { ondismiss: function () { resetBtn(); resolve(); } },
       });
       rzp.open();
     });
     return;
   }
+  resetBtn();
   alert("Error: " + (j.error || j.message || "unknown"));
 };
 
