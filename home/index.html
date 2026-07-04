@@ -511,6 +511,8 @@ async function showHome(session) {
   show($("#emailChip"));
   show($("#topSignOutBtn"));
   await loadWallet(session);
+  await loadCatalogCartCount();
+  refreshCartChip();
 
   // Auto-open service modal if ?service=TAG was passed (from service-page redirect)
   // INSTANT open — no setTimeout delay. Wallet balance fills in as it arrives.
@@ -622,15 +624,25 @@ init();
 const CART_KEY = "cursive_cart_v1";
 function getCart() { try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]"); } catch { return []; } }
 function saveCart(arr) { localStorage.setItem(CART_KEY, JSON.stringify(arr)); refreshCartChip(); }
+let _catalogCartCount = 0;
+async function loadCatalogCartCount() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { _catalogCartCount = 0; return; }
+    const r = await sb.from("catalog_cart").select("id", { count: "exact", head: true });
+    _catalogCartCount = r.count || 0;
+  } catch (_) { _catalogCartCount = 0; }
+}
 function refreshCartChip() {
   const cart = getCart();
   const chip = $("#cartChip"); const cnt = $("#cartCount");
   if (!chip || !cnt) return;
-  cnt.textContent = cart.length;
+  const total = cart.length + _catalogCartCount;
+  cnt.textContent = total;
   // Always visible so user knows cart exists — even when empty
   chip.classList.remove("hidden");
   // Slight visual hint when empty vs. filled
-  chip.style.opacity = cart.length > 0 ? "1" : "0.75";
+  chip.style.opacity = total > 0 ? "1" : "0.75";
 }
 function cartTotalPaise() { return getCart().reduce((s, it) => s + (it.total_paise || 0), 0); }
 function addCurrentSvcToCart() {
