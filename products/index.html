@@ -514,7 +514,7 @@ function renderProductDetail(data) {
               <button type="button" data-mode="cat_purchase" class="mode-tab" style="flex:1;padding:8px 6px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">🎨 Cataloging + Purchase</button>
               <button type="button" data-mode="dropship" class="mode-tab" style="flex:1;padding:8px 6px;border:0;background:transparent;color:#475467;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;line-height:1.2;">📦 Cataloging + Dropshipping</button>
             </div>
-            <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Available options (${colors.length}) — pick one or more <span style="color:#64748b;font-weight:500;font-size:11.5px;">· min qty 10 per product · +5 steps</span></div>
             <div id="varList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
               ${colors.map(c => `
                 <label class="var-row" data-cid="${c.id}" style="border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -525,7 +525,7 @@ function renderProductDetail(data) {
                   </div>
                   <div class="var-qty-wrap" data-cid="${c.id}" style="display:flex;align-items:center;gap:0;">
                     <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
-                    <input class="var-qty" data-cid="${c.id}" type="number" min="1" value="1" style="width:32px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
+                    <input class="var-qty" data-cid="${c.id}" type="number" min="10" step="5" value="10" style="width:36px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
                     <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
                   </div>
                 </label>
@@ -606,11 +606,11 @@ function renderProductDetail(data) {
         totalAmt += p.price_inr * q;
       }
     });
-    // If no variations exist, treat product itself as one item (auto-add with qty 1)
+    // If no variations exist, treat product itself as one item (auto-add with qty 10)
     if (colors.length === 0) {
-      items.push({ color: null, qty: 1, subtotal: p.price_inr });
-      totalQty = 1;
-      totalAmt = p.price_inr;
+      items.push({ color: null, qty: 10, subtotal: p.price_inr * 10 });
+      totalQty = 10;
+      totalAmt = p.price_inr * 10;
     }
     return { items, totalQty, totalAmt };
   }
@@ -632,18 +632,24 @@ function renderProductDetail(data) {
     updateCartSummary();
   }));
   wrap.querySelectorAll(".var-qty").forEach(q => q.addEventListener("input", () => {
-    const v = Math.max(1, parseInt(q.value, 10) || 1);
+    // Allow any number typed, min 10
+    const v = Math.max(10, parseInt(q.value, 10) || 10);
+    q.value = v; updateCartSummary();
+  }));
+  wrap.querySelectorAll(".var-qty").forEach(q => q.addEventListener("blur", () => {
+    // On blur, enforce min 10
+    const v = Math.max(10, parseInt(q.value, 10) || 10);
     q.value = v; updateCartSummary();
   }));
   wrap.querySelectorAll(".var-qty-minus").forEach(b => b.addEventListener("click", () => {
     const cid = b.dataset.cid;
     const q = wrap.querySelector(`.var-qty[data-cid="${cid}"]`);
-    q.value = Math.max(1, (parseInt(q.value, 10) || 1) - 1); updateCartSummary();
+    q.value = Math.max(10, (parseInt(q.value, 10) || 10) - 5); updateCartSummary();
   }));
   wrap.querySelectorAll(".var-qty-plus").forEach(b => b.addEventListener("click", () => {
     const cid = b.dataset.cid;
     const q = wrap.querySelector(`.var-qty[data-cid="${cid}"]`);
-    q.value = Math.max(1, (parseInt(q.value, 10) || 1) + 1); updateCartSummary();
+    q.value = Math.max(10, (parseInt(q.value, 10) || 10) + 5); updateCartSummary();
   }));
 
   updateCartSummary();
