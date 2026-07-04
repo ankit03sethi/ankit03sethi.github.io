@@ -205,6 +205,10 @@
     .toast.err { background: #dc2626; }
     .hidden { display: none !important; }
 
+    /* Variation list — unified list style, tight rows */
+    #varList .var-row:last-child { border-bottom: 0; }
+    #varList .var-row:hover { background: #f8fafc; }
+
     /* Mode tabs - normal weight */
     .mt-badge {
       display: block;
@@ -367,15 +371,12 @@
       <button type="button" id="dsClose" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;padding:0;line-height:1;">×</button>
     </div>
 
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:16px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Base charge per product</div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;color:#374151;">
-        <span>Product imaging + listing</span>
-        <b>₹300</b>
-      </div>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:700;font-size:13px;">Cataloging base</span>
+      <b style="font-size:15px;">₹300 <span style="color:#64748b;font-weight:500;font-size:11px;">/ per product</span></b>
     </div>
 
-    <label style="display:block;font-weight:700;font-size:13px;margin-bottom:8px;">Select marketplaces to list on (₹50 each, per product)</label>
+    <label style="display:block;font-weight:700;font-size:13px;margin-bottom:8px;">Select marketplaces <span style="color:#64748b;font-weight:500;font-size:11px;">· ₹50 / per product each</span></label>
     <div id="dsMps" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <label class="ds-mp"><input type="checkbox" value="Amazon" /> <span>🛒 Amazon</span></label>
       <label class="ds-mp"><input type="checkbox" value="Flipkart" /> <span>🛍️ Flipkart</span></label>
@@ -387,16 +388,16 @@
 
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-bottom:16px;">
       <div id="dsPurchaseLine" style="display:none;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
-        <span>Purchase amount</span><span>₹<span id="dsPurchaseAmt">0</span></span>
+        <span>Purchase</span><span>₹<span id="dsPurchaseAmt">0</span></span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
-        <span>Products selected</span><b><span id="dsProdCount">0</span></b>
+        <span>Products</span><b><span id="dsProdCount">0</span></b>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#374151;">
-        <span>Cataloging base (₹300 × <span id="dsProdCount2">0</span>)</span><span>₹<span id="dsBaseAmt">0</span></span>
+        <span>₹300 × <span id="dsProdCount2">0</span></span><span>₹<span id="dsBaseAmt">0</span></span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#374151;">
-        <span>Marketplaces (<span id="dsMpCount">0</span> × ₹50 × <span id="dsProdCount3">0</span> prod)</span><span>₹<span id="dsMpTotal">0</span></span>
+        <span><span id="dsMpCount">0</span> × ₹50 × <span id="dsProdCount3">0</span></span><span>₹<span id="dsMpTotal">0</span></span>
       </div>
       <div style="display:flex;justify-content:space-between;border-top:1px solid #bfdbfe;padding-top:8px;font-weight:800;font-size:16px;">
         <span>Total</span><span style="color:#1f6feb;">₹<span id="dsTotal">0</span></span>
@@ -597,9 +598,9 @@ function renderProductDetail(data) {
               <button type="button" id="applyAllBtn" style="background:#1f6feb;color:#fff;border:0;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">✓ Apply to all</button>
               <span id="applyErr" style="color:#dc2626;font-size:11px;font-weight:600;display:none;"></span>
             </div>
-            <div id="varList" style="display:flex;flex-direction:column;gap:2px;margin-bottom:14px;">
+            <div id="varList" style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
               ${colors.map(c => `
-                <label class="var-row" data-cid="${c.id}" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;background:#fff;display:flex;align-items:center;gap:7px;cursor:pointer;">
+                <label class="var-row" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:5px 10px;background:#fff;display:flex;align-items:center;gap:7px;cursor:pointer;">
                   <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
                   ${c.hex_code ? `<span style="width:16px;height:16px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
                   <div style="flex:1;min-width:0;line-height:1.2;">
@@ -708,7 +709,7 @@ function renderProductDetail(data) {
   wrap.querySelectorAll(".var-check").forEach(chk => chk.addEventListener("change", () => {
     const cid = Number(chk.dataset.cid);
     const row = wrap.querySelector(`.var-row[data-cid="${cid}"]`);
-    if (row) row.style.borderColor = chk.checked ? "#1f6feb" : "#e2e8f0";
+    if (row) row.style.background = chk.checked ? "#eff6ff" : "#fff";
     // Auto-set selected color for design display
     if (chk.checked) { _selectedColorId = cid; renderDesignsForColor(); }
     updateCartSummary();
