@@ -373,6 +373,7 @@
         <div class="totals-inner">
           <div class="totals-row subtotal"><span class="lbl">Subtotal</span><span class="amt" id="tSub">₹0</span></div>
           <div class="totals-row gst hidden" id="tGstRow"><span class="lbl" id="tGstLbl">GST</span><span class="amt" id="tGst">₹0</span></div>
+          <div class="totals-row hidden" id="tVolRow" style="color:#16a34a;"><span class="lbl" id="tVolLbl">Volume discount</span><span class="amt" id="tVol">-₹0</span></div>
           <div class="totals-row grand"><span class="lbl">Total</span><span class="amt" id="tTotal">₹0</span></div>
         </div>
       </div>
@@ -430,6 +431,7 @@ const fmtN = n => n.toLocaleString("en-IN", { minimumFractionDigits:2, maximumFr
 const fmt  = paise => "₹" + fmtN(paise/100);
 const fmtInt = n => n.toLocaleString("en-IN");
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" }) : "—";
+const fmtDateOnly = fmtDate;
 
 // Indian number-to-words (integer rupees)
 function numberToIndianWords(num) {
@@ -527,9 +529,10 @@ function render() {
       displayName = `Product: ${name}`;
     }
     const gstTag = gstPct !== 18 ? `<span class="item-gstpct">GST ${gstPct}%</span>` : "";
+    const discRow = (it.discount_paise > 0) ? `<div style="font-size:11px;color:#16a34a;margin-top:2px;">discount &minus;${fmt(it.discount_paise)}</div>` : "";
     rowsHtml += `<tr>
       <td class="col-num">${idx + 1}</td>
-      <td><div class="item-name">${esc(displayName)}${gstTag}</div></td>
+      <td><div class="item-name">${esc(displayName)}${gstTag}</div>${discRow}</td>
       <td><div class="item-desc">${esc(details) || '&mdash;'}</div></td>
       <td class="col-qty">${it.qty}</td>
       <td class="col-rate">${fmtN(it.unit_price_paise/100)}</td>
@@ -547,15 +550,22 @@ function render() {
   } else {
     $("#tGstRow").classList.add("hidden");
   }
+  if (q.volume_discount_paise && Number(q.volume_discount_paise) > 0) {
+    $("#tVolRow").classList.remove("hidden");
+    $("#tVolLbl").textContent = `Volume discount (${Number(q.volume_discount_percent)}%)`;
+    $("#tVol").textContent = "-₹" + fmtN(Number(q.volume_discount_paise)/100);
+  } else {
+    $("#tVolRow").classList.add("hidden");
+  }
   $("#tTotal").textContent = "₹" + fmtN(q.total_paise/100);
 
   // Words
   const rupees = Math.round(q.total_paise / 100);
   $("#tWords").textContent = "Rupees " + numberToIndianWords(rupees) + " Only";
 
-  // Terms
-  const hoursValid = q.valid_until ? Math.max(1, Math.round((new Date(q.valid_until).getTime() - new Date(q.created_at).getTime()) / 3600000)) : 24;
-  $("#termValid").textContent = `This quotation is valid for ${hoursValid} hour${hoursValid===1?"":"s"} from date of issue.`;
+  // Terms - use days instead of hours
+  const daysValid = q.valid_until ? Math.max(1, Math.round((new Date(q.valid_until).getTime() - new Date(q.created_at).getTime()) / 86400000)) : 1;
+  $("#termValid").textContent = `This quotation is valid for ${daysValid} day${daysValid===1?"":"s"} from date of issue.`;
   if (q.gst_paise > 0) {
     if (allSameGst) $("#termGst").textContent = `All prices are inclusive of applicable GST (${firstGst}%).`;
     else $("#termGst").textContent = "GST applied per line item as shown above.";
