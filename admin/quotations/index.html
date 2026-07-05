@@ -83,7 +83,6 @@
   </div>
   <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
     <span id="emailChip" style="background:#f1f5f9;color:#475467;padding:5px 10px;border-radius:6px;font-size:12.5px;font-weight:600;" class="hidden"></span>
-    <a href="/admin/products/" class="b-outline" style="padding:7px 12px;border-radius:6px;font-weight:600;font-size:13px;text-decoration:none;">📦 Products</a>
     <button id="signOutBtn" class="hidden b-danger" style="padding:7px 12px;">Logout</button>
   </div>
 </header>
@@ -167,11 +166,13 @@
           <!-- Items -->
           <div class="panel">
             <h2>📦 Line Items</h2>
-            <div style="display:flex;gap:8px;margin-bottom:8px;position:relative;">
-              <input id="itemSearch" type="text" placeholder="🔍 Search by product ID, code or service name..." style="flex:1;padding:10px 12px;font-size:14px;" autocomplete="off" />
+            <div style="display:flex;gap:8px;margin-bottom:12px;position:relative;">
+              <div style="flex:1;position:relative;">
+                <input id="itemSearch" type="text" placeholder="🔍 Search by product ID, code, name or service..." style="width:100%;padding:10px 12px;font-size:14px;box-sizing:border-box;" autocomplete="off" />
+                <div id="searchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;max-height:360px;overflow-y:auto;background:#fff;border:1px solid #d0d7de;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
+              </div>
               <button id="addCustomBtn" class="b-ghost">+ Custom item</button>
             </div>
-            <div id="searchResults" style="display:none;max-height:280px;overflow-y:auto;background:#fff;border:1px solid #d0d7de;border-radius:6px;margin-bottom:12px;box-shadow:0 4px 12px rgba(0,0,0,.05);"></div>
             <div style="margin-bottom:6px;font-size:11px;color:#475467;text-transform:uppercase;font-weight:700;letter-spacing:.4px;">
               <div class="row-4">
                 <div>Description</div>
@@ -388,17 +389,7 @@ async function loadCatalogOptions() {
 function normalizeItems() {
   if (!_catalog) return [];
   const out = [];
-  for (const s of (_catalog.services || [])) {
-    out.push({
-      kind: "service",
-      key: s.key,
-      id_shown: s.key.toUpperCase().replace(/_/g, "-"),
-      name: s.name,
-      price: s.price_inr,
-      gst: s.gst_percent || 18,
-      hsn: "9983",
-    });
-  }
+  // Products FIRST
   for (const p of (_catalog.products || [])) {
     out.push({
       kind: "product",
@@ -408,6 +399,18 @@ function normalizeItems() {
       price: p.price_inr,
       gst: p.effective_gst_percent || 18,
       hsn: p.effective_hsn_code || "",
+    });
+  }
+  // Services after
+  for (const s of (_catalog.services || [])) {
+    out.push({
+      kind: "service",
+      key: s.key,
+      id_shown: s.key.toUpperCase().replace(/_/g, "-"),
+      name: s.name,
+      price: s.price_inr,
+      gst: s.gst_percent || 18,
+      hsn: "",
     });
   }
   return out;
@@ -429,7 +432,13 @@ function renderSearchResults(query) {
     return;
   }
   let html = "";
+  let lastKind = null;
   for (const it of filtered) {
+    if (it.kind !== lastKind) {
+      const hdr = it.kind === "product" ? "📦 PRODUCTS" : "🧾 SERVICES";
+      html += `<div style="padding:8px 14px;background:#f8fafc;font-size:11px;font-weight:800;color:#1f6feb;letter-spacing:.6px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;">${hdr}</div>`;
+      lastKind = it.kind;
+    }
     const badge = it.kind === "service"
       ? `<span style="background:#eff6ff;color:#1f6feb;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Service</span>`
       : `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Product</span>`;
