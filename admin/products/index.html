@@ -755,6 +755,8 @@ function openColorDialog(id, type) {
   $("#mColorCode").value = existing?.product_code || "";
   $("#mColorVideo").value = existing?.video_url || "";
   $("#mColorPos").value = existing?.position || 100;
+  $("#mColorPrice").value = existing?.price_inr || "";
+  $("#mColorMrp").value = existing?.mrp_inr || "";
   // Show hex input only for color type
   const hexRow = $("#mColorHex").parentElement.querySelector("label");
   if (_colorEditType === "color") {
