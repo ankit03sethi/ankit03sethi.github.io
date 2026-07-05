@@ -242,6 +242,16 @@
     <input id="mColorCode" type="text" placeholder="e.g. WE-45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
     <input id="mColorPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div>
+        <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Price ₹ (variation)</label>
+        <input id="mColorPrice" type="number" min="1" placeholder="Leave blank = use product price" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
+      </div>
+      <div>
+        <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">MRP ₹ (variation)</label>
+        <input id="mColorMrp" type="number" min="1" placeholder="Optional strike-through" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
+      </div>
+    </div>
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Video URL or upload (optional)</label>
     <div style="display:flex;gap:6px;margin-bottom:14px;">
       <input id="mColorVideo" type="url" placeholder="https://youtu.be/..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
@@ -811,6 +821,8 @@ $("#mColorSave").addEventListener("click", async () => {
     image_urls: _colorUploaded.slice(),
     position: Number($("#mColorPos").value) || 100,
     variation_type: _colorEditType,
+    price_inr: $("#mColorPrice").value ? Number($("#mColorPrice").value) : null,
+    mrp_inr: $("#mColorMrp").value ? Number($("#mColorMrp").value) : null,
   });
   if (j.ok) { toast("✓ Saved"); $("#colorModal").classList.add("hidden"); await loadAll(); }
   else toast(j.error, true);
