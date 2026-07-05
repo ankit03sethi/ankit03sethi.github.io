@@ -494,10 +494,9 @@ function render() {
     const dashSplit = raw.split(/\s+[—–-]\s+/);
     if (dashSplit.length > 1) { name = dashSplit[0]; details = dashSplit.slice(1).join(" — "); }
     const gstTag = gstPct !== 18 ? `<span class="item-gstpct">GST ${gstPct}%</span>` : "";
-    const hsn = it.hsn_code ? `<div class="item-hsn">HSN: ${esc(it.hsn_code)}</div>` : "";
     rowsHtml += `<tr>
       <td class="col-num">${idx + 1}</td>
-      <td><div class="item-name">${esc(name)}${gstTag}</div>${hsn}</td>
+      <td><div class="item-name">${esc(name)}${gstTag}</div></td>
       <td><div class="item-desc">${esc(details) || '&mdash;'}</div></td>
       <td class="col-qty">${it.qty}</td>
       <td class="col-rate">${fmtN(it.unit_price_paise/100)}</td>
