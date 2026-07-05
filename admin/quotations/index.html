@@ -47,6 +47,7 @@
     .st-cancelled { background:#f3f4f6; color:#6b7280; }
     .st-follow_up { background:#fef3c7; color:#92400e; }
     .st-paid { background:#d1fae5; color:#065f46; font-weight:800; }
+    .st-rejected { background:#fee2e2; color:#991b1b; font-weight:700; }
     .filter-tab {
       padding:8px 14px;background:#f1f5f9;color:#475467;border:1px solid #e2e8f0;
       border-radius:20px;cursor:pointer;font-weight:600;font-size:12.5px;
@@ -118,6 +119,7 @@
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="paid">💰 Paid</button>
+        <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
       </div>
       <div id="listWrap"></div>
     </div>
@@ -230,7 +232,8 @@
                 <button id="markPaidBtn" style="flex:1;background:#065f46;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">💰 Paid</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
-                <button id="markFollowUpBtn" class="b-warn" style="width:100%;">📞 Mark for Follow Up</button>
+                <button id="markFollowUpBtn" class="b-warn" style="flex:1;">📞 Follow Up</button>
+                <button id="markRejectedBtn" style="flex:1;background:#991b1b;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">❌ Reject</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
                 <button id="deleteBtn" class="b-danger" style="width:100%;">🗑️ Delete Quotation</button>
@@ -343,6 +346,7 @@ function matchesFilter(q, f) {
   if (f === "accepted") return ["accepted","paid"].includes(q.status);
   if (f === "paid") return q.status === "paid";
   if (f === "expired") return q.status === "expired";
+  if (f === "rejected") return q.status === "rejected";
   return false;
 }
 
