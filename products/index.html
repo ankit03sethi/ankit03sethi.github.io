@@ -500,6 +500,7 @@ let _selectedColorId = null;
 
 async function loadCatalog() {
   const wrap = $("#catalogWrap");
+  if (!wrap) { console.error("[catalog] #catalogWrap not found"); return; }
   wrap.innerHTML = `<div class="empty"><div class="icon">⏳</div>Loading categories...</div>`;
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/catalog-public?op=grid`, {
@@ -513,7 +514,8 @@ async function loadCatalog() {
     _catalogGrid = j.grid || [];
     renderGrid();
   } catch (e) {
-    wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Network error</div>`;
+    console.error("[catalog] load failed:", e);
+    wrap.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Network error: ${esc(e.message || String(e))}</div>`;
   }
 }
 
@@ -1550,19 +1552,25 @@ async function init() {
   if (session) {
     _session = session;
     document.body.classList.remove("anon");
+    const homeBtn = $("#homeLinkBtn"); if (homeBtn) homeBtn.style.display = "";
     $("#openManageBtn").classList.remove("hidden");
     $("#signOutBtn").classList.remove("hidden");
     $("#signInLink").classList.add("hidden");
     await loadWallet();
   } else {
     document.body.classList.add("anon");
+    const homeBtn = $("#homeLinkBtn"); if (homeBtn) homeBtn.style.display = "none";
     const walletEl = $("#walletAmt");
     if (walletEl) walletEl.textContent = "—";
     const balance = $("#heroCta") && $("#heroCta").querySelector(".balance");
     if (balance) balance.style.display = "none";
   }
 }
-init();
+init().catch(e => {
+  console.error("[init] failed:", e);
+  const w = document.getElementById("catalogWrap");
+  if (w) w.innerHTML = `<div class="empty"><div class="icon">⚠️</div>Init error: ${(e && e.message) || String(e)}</div>`;
+});
 </script>
 
 <!-- OTP + wallet-first flow modal (same UX as home page services) -->
