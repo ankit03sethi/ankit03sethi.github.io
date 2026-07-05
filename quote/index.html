@@ -33,10 +33,12 @@
     .top-band {
       background: var(--brand-blue);
       color:#fff;
-      padding:26px 40px 22px;
+      padding:24px 32px 20px;
       display:flex;
       justify-content:space-between;
       align-items:center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .brand-row { display:flex; align-items:center; gap:14px; }
     .brand-box {
@@ -65,7 +67,7 @@
 
     /* Meta info row */
     .meta {
-      padding:22px 40px;
+      padding:20px 32px;
       display:grid;
       grid-template-columns:1fr 1fr;
       gap:18px;
@@ -76,7 +78,7 @@
 
     /* From / To */
     .parties {
-      padding:0 40px 24px;
+      padding:0 32px 22px;
       display:grid;
       grid-template-columns:1fr 1fr;
       gap:40px;
@@ -415,7 +417,7 @@
   </div>
 </main>
 
-<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:820px;background:#fff;"></div>
+<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:800px;background:#fff;overflow:hidden;"></div>
 
 <script type="module">
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -567,21 +569,34 @@ $("#printBtn").addEventListener("click", () => window.print());
 $("#pdfBtn").addEventListener("click", async () => {
   const area = $("#pdfArea");
   area.innerHTML = $("#quoteDoc").outerHTML;
-  // Strip ribbon from PDF (or keep — up to you)
+  // Strip ribbon from PDF
   const rib = area.querySelector(".ribbon"); if (rib) rib.remove();
+  // A4 at 96dpi = 794x1123px. Use 800px source width so nothing is cut on the right.
+  const A4_WIDTH_PX = 800;
+  area.style.width = A4_WIDTH_PX + "px";
   const opt = {
     margin: 0,
     filename: `${_quote.quote_number}.pdf`,
-    image: { type:"jpeg", quality:0.95 },
-    html2canvas: { scale:2, useCORS:true, backgroundColor:"#ffffff" },
-    jsPDF: { unit:"mm", format:"a4", orientation:"portrait" },
+    image: { type:"jpeg", quality:0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      windowWidth: A4_WIDTH_PX,
+      scrollX: 0,
+      scrollY: 0,
+      width: A4_WIDTH_PX,
+    },
+    jsPDF: { unit:"mm", format:"a4", orientation:"portrait", compress:true },
+    pagebreak: { mode:["css", "legacy"] }
   };
   await html2pdf().from(area).set(opt).save();
 });
 
 $("#waBtn").addEventListener("click", () => {
   const q = _quote;
-  const msg = `Hi Cursive World team, I have a question about quotation ${q.quote_number}.`;
+  // Pre-fill message ends with 2 newlines so cursor lands on new line after 1-line gap
+  const msg = `Hi Cursive World team, I have a question regarding quotation ${q.quote_number}.\n\n`;
   window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
 });
 
