@@ -115,7 +115,6 @@
         <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="paid">💰 Paid</button>
-        <button class="filter-tab" data-filter="cancelled">Cancelled</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
       </div>
       <div id="listWrap"></div>
@@ -226,8 +225,7 @@
                 <button id="markPaidBtn" style="flex:1;background:#065f46;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">💰 Paid</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
-                <button id="markFollowUpBtn" class="b-warn" style="flex:1;">📞 Follow Up</button>
-                <button id="cancelQuoteBtn" class="b-danger" style="flex:1;">❌ Cancel</button>
+                <button id="markFollowUpBtn" class="b-warn" style="width:100%;">📞 Mark for Follow Up</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
                 <button id="deleteBtn" class="b-danger" style="width:100%;">🗑️ Delete Quotation</button>
@@ -328,9 +326,27 @@ async function loadList() {
   renderFilteredList();
 }
 
+// Funnel logic: once a quote reaches a stage, it stays counted in earlier stages too
+function matchesFilter(q, f) {
+  if (f === "all") return true;
+  if (f === "draft") return q.status === "draft";
+  // "Sent" = anything that has been sent (or moved further)
+  if (f === "sent") return ["sent","follow_up","accepted","paid"].includes(q.status);
+  // "Follow Up" = sent quotes not yet accepted/paid — auto-includes sent
+  if (f === "follow_up") return ["sent","follow_up"].includes(q.status);
+  // "Accepted" = accepted or paid (paid implies accepted)
+  if (f === "accepted") return ["accepted","paid"].includes(q.status);
+  if (f === "paid") return q.status === "paid";
+  if (f === "expired") return q.status === "expired";
+  return false;
+}
+
 function updateFilterCounts() {
-  const counts = { all: _allQuotes.length };
-  for (const q of _allQuotes) counts[q.status] = (counts[q.status] || 0) + 1;
+  const counts = {};
+  document.querySelectorAll(".filter-tab").forEach(tab => {
+    const f = tab.dataset.filter;
+    counts[f] = _allQuotes.filter(q => matchesFilter(q, f)).length;
+  });
   document.querySelectorAll(".filter-tab").forEach(tab => {
     const f = tab.dataset.filter;
     const c = counts[f] || 0;
@@ -340,7 +356,7 @@ function updateFilterCounts() {
 }
 
 function renderFilteredList() {
-  const qs = _currentFilter === "all" ? _allQuotes : _allQuotes.filter(q => q.status === _currentFilter);
+  const qs = _allQuotes.filter(q => matchesFilter(q, _currentFilter));
   if (qs.length === 0) {
     $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.'}</div>`;
     return;
@@ -806,7 +822,6 @@ async function changeStatus(newStatus, confirmMsg, successMsg) {
 $("#markAcceptedBtn").addEventListener("click", () => changeStatus("accepted", "Mark as ACCEPTED by customer?", "Marked as accepted"));
 $("#markPaidBtn").addEventListener("click",     () => changeStatus("paid",     "Mark as PAID by customer?",     "Marked as paid ✓"));
 $("#markFollowUpBtn").addEventListener("click", () => changeStatus("follow_up", "Mark for FOLLOW UP?",           "Marked for follow up"));
-$("#cancelQuoteBtn").addEventListener("click",  () => changeStatus("cancelled", "Cancel this quotation?",         "Cancelled"));
 
 $("#deleteBtn").addEventListener("click", async () => {
   const q = _currentQuote; if (!q) return;
