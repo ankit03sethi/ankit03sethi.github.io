@@ -606,9 +606,9 @@ function renderProductDetail(data) {
         <h1 style="margin:0 0 6px;font-size:22px;">${esc(p.title)}</h1>
         ${p.product_code ? `<div style="color:#64748b;font-size:12px;margin-bottom:8px;">Product ID: <b style="color:#1f6feb;">${esc(p.product_code)}</b></div>` : ''}
         <div style="margin-bottom:6px;">
-          <span style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
-          ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;">₹${p.mrp_inr}</span>` : ''}
-          ${off > 0 ? `<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ''}
+          <span id="mainProdPrice" style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
+          <span id="mainProdMrp" style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;${p.mrp_inr > p.price_inr ? '' : 'display:none;'}">${p.mrp_inr > p.price_inr ? `₹${p.mrp_inr}` : """"}</span>
+          <span id="mainProdOff" style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;${off > 0 ? '' : 'display:none;'}">${off > 0 ? `${off}% OFF` : """"}</span>
         </div>
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
