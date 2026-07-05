@@ -103,10 +103,13 @@
 
       <table>
         <thead><tr>
-          <th>Item Description</th>
-          <th style="text-align:center;width:70px;">Qty</th>
-          <th style="text-align:right;width:100px;">Unit ₹</th>
-          <th style="text-align:right;width:120px;">Total ₹</th>
+          <th>Item</th>
+          <th style="text-align:center;width:50px;">Qty</th>
+          <th style="text-align:right;width:75px;">Unit ₹</th>
+          <th style="text-align:right;width:80px;">Base ₹</th>
+          <th style="text-align:center;width:55px;">GST %</th>
+          <th style="text-align:right;width:75px;">GST ₹</th>
+          <th style="text-align:right;width:90px;">Total ₹</th>
         </tr></thead>
         <tbody id="itemsBody"></tbody>
       </table>
@@ -114,7 +117,7 @@
       <div class="totals">
         <div class="totals-inner">
           <div class="totals-row">Subtotal <b id="tSub">₹0.00</b></div>
-          <div class="totals-row" style="color:#64748b;">GST (18%) <b id="tGst">₹0.00</b></div>
+          <div class="totals-row" style="color:#64748b;">GST <b id="tGst">₹0.00</b></div>
           <div class="totals-row grand">TOTAL <span id="tTotal">₹0.00</span></div>
         </div>
       </div>
@@ -215,11 +218,18 @@ function render() {
   // Items
   let rowsHtml = "";
   for (const it of _items) {
+    const gstPct = it.gst_percent !== null && it.gst_percent !== undefined ? Number(it.gst_percent) : 18;
+    const gstP = it.gst_paise || 0;
+    const lineTotal = (it.total_paise || 0) + gstP;
+    const hsn = it.hsn_code ? `<br><span style="color:#94a3b8;font-size:11px;">HSN: ${esc(it.hsn_code)}</span>` : "";
     rowsHtml += `<tr>
-      <td>${esc(it.description)}</td>
+      <td>${esc(it.description)}${hsn}</td>
       <td style="text-align:center;">${it.qty}</td>
       <td style="text-align:right;">${fmt(it.unit_price_paise)}</td>
-      <td style="text-align:right;font-weight:600;">${fmt(it.total_paise)}</td>
+      <td style="text-align:right;">${fmt(it.total_paise)}</td>
+      <td style="text-align:center;">${gstPct}%</td>
+      <td style="text-align:right;">${fmt(gstP)}</td>
+      <td style="text-align:right;font-weight:600;">${fmt(lineTotal)}</td>
     </tr>`;
   }
   $("#itemsBody").innerHTML = rowsHtml;
