@@ -32,7 +32,9 @@
     .b-wa { background:#25D366; color:#fff; }
     .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-    .row-4 { display:grid; grid-template-columns:2fr 70px 100px 90px 130px 40px; gap:8px; align-items:center; margin-bottom:6px; }
+    .row-4 { display:grid; grid-template-columns:1.7fr 55px 85px 65px 55px 75px 125px 32px; gap:6px; align-items:center; margin-bottom:6px; }
+    .row-4 input[readonly] { background:#f1f5f9; color:#475467; cursor:not-allowed; }
+    .row-4 select:disabled { background:#f1f5f9; color:#475467; cursor:not-allowed; opacity:1; }
     table { width:100%; border-collapse:collapse; }
     th { background:#f8fafc; padding:10px 8px; text-align:left; font-size:11px; color:#475467; text-transform:uppercase; letter-spacing:.4px; border-bottom:2px solid #e2e8f0; }
     td { padding:10px 8px; font-size:13px; border-bottom:1px solid #f1f5f9; }
@@ -114,8 +116,8 @@
         <button class="filter-tab" data-filter="sent">Sent</button>
         <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
-        <button class="filter-tab" data-filter="paid">💰 Paid</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
+        <button class="filter-tab" data-filter="paid">💰 Paid</button>
       </div>
       <div id="listWrap"></div>
     </div>
@@ -177,7 +179,9 @@
                 <div>Description</div>
                 <div style="text-align:center;">Qty</div>
                 <div style="text-align:right;">Unit ₹</div>
-                <div style="text-align:center;">GST %</div>
+                <div style="text-align:center;">GST%</div>
+                <div style="text-align:center;">Disc%</div>
+                <div style="text-align:right;">Disc ₹</div>
                 <div style="text-align:right;">Total ₹</div>
                 <div></div>
               </div>
@@ -200,11 +204,12 @@
             <div class="totals">
               <div style="display:flex;justify-content:space-between;">Subtotal <b id="tSub">₹0.00</b></div>
               <div style="display:flex;justify-content:space-between;color:#64748b;">GST <b id="tGst">₹0.00</b></div>
+              <div id="tVolRow" style="display:none;justify-content:space-between;color:#16a34a;font-size:12.5px;"><span id="tVolLbl">Volume discount</span> <b id="tVolAmt">-₹0.00</b></div>
               <div class="grand" style="display:flex;justify-content:space-between;">Total <span id="tTotal">₹0.00</span></div>
             </div>
-            <label style="margin-top:14px;">Valid for (hours)</label>
-            <input id="validHours" type="number" value="24" min="1" max="8760" />
-            <div class="helper">Default 24 hours. Set to 720 for 30 days.</div>
+            <label style="margin-top:14px;">Valid for (days)</label>
+            <input id="validDays" type="number" value="1" min="1" max="365" />
+            <div class="helper">Default 1 day. Set to 30 for 30 days.</div>
           </div>
 
           <!-- Actions -->
@@ -251,7 +256,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
-const fmtDate = iso => iso ? new Date(iso).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
 
 function toast(msg, isErr) {
   const t = document.createElement("div");
@@ -520,15 +525,15 @@ function openBuilder(quote) {
     $("#custAddress").value = quote.customer_address || "";
     $("#notes").value = quote.notes || "";
     if (quote.valid_until) {
-      const hoursLeft = Math.max(1, Math.round((new Date(quote.valid_until).getTime() - Date.now()) / 3600000));
-      $("#validHours").value = hoursLeft;
+      const daysLeft = Math.max(1, Math.round((new Date(quote.valid_until).getTime() - Date.now()) / (86400000)));
+      $("#validDays").value = daysLeft;
     }
     $("#postSaveActions").classList.remove("hidden");
     setShareUrl(quote.share_token);
   } else {
     $("#builderTitle").textContent = "New Quotation";
     ["custName","custEmail","custPhone","custGst","custAddress","notes"].forEach(id => $("#"+id).value = "");
-    $("#validHours").value = 24;
+    $("#validDays").value = 1;
   }
   renderItems();
 }
@@ -546,6 +551,7 @@ async function openQuote(id) {
     unit_price_inr: it.unit_price_paise / 100,
     gst_percent: it.gst_percent !== null && it.gst_percent !== undefined ? Number(it.gst_percent) : 18,
     hsn_code: it.hsn_code || "",
+    discount_inr: it.discount_paise ? it.discount_paise / 100 : 0,
   }));
   renderItems();
 }
@@ -580,28 +586,51 @@ function renderItems() {
     const gstAmt = lineBase * gstPct / 100;
     const lineTotal = lineBase + gstAmt;
     const gstOpts = GST_OPTS.map(g => `<option value="${g}"${g===gstPct?" selected":""}>${g}%</option>`).join("");
+    // Lock unit price + GST for products and services (only custom is editable)
+    const isCustom = (it.item_type || "custom") === "custom";
+    const lockAttr = isCustom ? "" : "readonly";
+    const disabledAttr = isCustom ? "" : "disabled";
+    // Discount calc
+    const discInr = Number(it.discount_inr || 0);
+    const discPct = lineBase > 0 ? ((discInr / lineBase) * 100) : 0;
+    // Net calc
+    const net = Math.max(0, lineBase - discInr);
+    const gstAmtNet = net * gstPct / 100;
+    const lineTotalNet = net + gstAmtNet;
     html += `<div class="row-4">
       <input type="text" data-i="${i}" data-k="description" value="${esc(it.description)}" placeholder="Item description" />
       <input type="number" data-i="${i}" data-k="qty" value="${it.qty}" min="1" style="text-align:center;" />
-      <input type="number" data-i="${i}" data-k="unit_price_inr" value="${it.unit_price_inr}" min="0" step="0.01" style="text-align:right;" />
-      <select data-i="${i}" data-k="gst_percent" style="padding:8px 6px;border:1px solid #d0d7de;border-radius:6px;font-size:12px;">${gstOpts}</select>
+      <input type="number" ${lockAttr} data-i="${i}" data-k="unit_price_inr" value="${it.unit_price_inr}" min="0" step="0.01" style="text-align:right;" />
+      <select ${disabledAttr} data-i="${i}" data-k="gst_percent" style="padding:8px 6px;border:1px solid #d0d7de;border-radius:6px;font-size:12px;">${gstOpts}</select>
+      <input type="number" data-i="${i}" data-k="discount_percent" value="${discInr > 0 ? discPct.toFixed(1) : ''}" placeholder="0" min="0" max="100" step="0.1" style="text-align:center;font-size:11px;" />
+      <input type="number" data-i="${i}" data-k="discount_inr" value="${discInr > 0 ? discInr.toFixed(2) : ''}" placeholder="0" min="0" step="0.01" style="text-align:right;font-size:11px;" />
       <div style="text-align:right;font-weight:700;font-size:13px;color:#0f172a;">
-        ₹${lineTotal.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
-        <div style="font-size:10.5px;color:#64748b;font-weight:500;">base ₹${lineBase.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})} + GST ₹${gstAmt.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+        ₹${lineTotalNet.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
+        <div style="font-size:10.5px;color:#64748b;font-weight:500;">net ₹${net.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})} + GST ₹${gstAmtNet.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
       </div>
       <button class="b-ghost" data-remove="${i}" style="color:#dc2626;padding:4px 8px;">✕</button>
     </div>`;
   });
   wrap.innerHTML = html;
   wrap.querySelectorAll("input, select").forEach(inp => {
+    if (inp.readOnly || inp.disabled) return;
     const evt = inp.tagName === "SELECT" ? "change" : "input";
     inp.addEventListener(evt, () => {
       const i = Number(inp.dataset.i);
       const k = inp.dataset.k;
-      if (k === "qty") _items[i][k] = Math.max(1, parseInt(inp.value,10) || 1);
-      else if (k === "unit_price_inr" || k === "gst_percent") _items[i][k] = Number(inp.value);
-      else _items[i][k] = inp.value;
-      renderItems(); // full rerender to keep total math accurate
+      const item = _items[i];
+      if (k === "qty") item[k] = Math.max(1, parseInt(inp.value,10) || 1);
+      else if (k === "unit_price_inr" || k === "gst_percent") item[k] = Number(inp.value);
+      else if (k === "discount_percent") {
+        const pct = Math.max(0, Math.min(100, Number(inp.value) || 0));
+        const gross = (Number(item.unit_price_inr) || 0) * (parseInt(item.qty,10) || 0);
+        item.discount_inr = pct > 0 ? Math.round(gross * pct) / 100 : 0;
+      }
+      else if (k === "discount_inr") {
+        item.discount_inr = Math.max(0, Number(inp.value) || 0);
+      }
+      else item[k] = inp.value;
+      renderItems();
     });
   });
   wrap.querySelectorAll("[data-remove]").forEach(b => {
@@ -610,23 +639,46 @@ function renderItems() {
   computeTotals();
 }
 
+function volumeTierPct(prodGross) {
+  if (prodGross >= 100000) return 15;
+  if (prodGross >= 50000) return 10;
+  if (prodGross >= 25000) return 5;
+  return 0;
+}
 function computeTotals() {
-  let sub = 0, gst = 0;
+  let subNet = 0, gst = 0, totalDisc = 0, prodGross = 0;
   for (const it of _items) {
-    const base = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
-    const g = base * Number(it.gst_percent ?? 18) / 100;
-    sub += base; gst += g;
+    const gross = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+    const disc = Math.max(0, Number(it.discount_inr) || 0);
+    const net = Math.max(0, gross - disc);
+    const g = net * Number(it.gst_percent ?? 18) / 100;
+    subNet += net; gst += g; totalDisc += disc;
+    if ((it.item_type || "custom") === "product") prodGross += gross;
   }
-  const total = sub + gst;
-  $("#tSub").textContent = "₹" + sub.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const volPct = volumeTierPct(prodGross);
+  const volDisc = Math.round(prodGross * volPct) / 100;
+  const total = subNet + gst - volDisc;
+  $("#tSub").textContent = "₹" + subNet.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
   $("#tGst").textContent = "₹" + gst.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
   $("#tTotal").textContent = "₹" + total.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  // Volume tier row - only render if applies
+  const volRow = document.getElementById("tVolRow");
+  if (volRow) {
+    if (volPct > 0) {
+      volRow.style.display = "flex";
+      document.getElementById("tVolLbl").textContent = `Volume discount (${volPct}% on ₹${prodGross.toLocaleString("en-IN")})`;
+      document.getElementById("tVolAmt").textContent = "-₹" + volDisc.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+    } else {
+      volRow.style.display = "none";
+    }
+  }
 }
 
 // ============ SAVE ============
 $("#saveBtn").addEventListener("click", async () => {
   if (!$("#custName").value.trim()) { toast("Customer name required", true); return; }
   if (_items.length === 0) { toast("Add at least 1 item", true); return; }
+  const validDays = Math.max(1, parseInt($("#validDays").value,10) || 1);
   const body = {
     op:"save",
     id: _currentQuote?.id || null,
@@ -638,8 +690,8 @@ $("#saveBtn").addEventListener("click", async () => {
       address: $("#custAddress").value.trim(),
     },
     notes: $("#notes").value.trim(),
-    items: _items,
-    valid_hours: parseInt($("#validHours").value,10) || 24,
+    items: _items.map(it => ({ ...it, discount_inr: Number(it.discount_inr || 0) })),
+    valid_hours: validDays * 24,
     include_gst: true,
   };
   $("#saveBtn").disabled = true;
@@ -826,8 +878,17 @@ $("#markFollowUpBtn").addEventListener("click", () => changeStatus("follow_up", 
 $("#deleteBtn").addEventListener("click", async () => {
   const q = _currentQuote; if (!q) return;
   if (!confirm(`DELETE quotation ${q.quote_number} permanently? This cannot be undone.`)) return;
-  const j = await callFn("admin-quotations", { op:"delete", id:q.id });
+  const isSent = q.status !== "draft";
+  let password = "";
+  if (isSent) {
+    password = prompt(`This quotation has already been ${q.status}. Enter your admin password to confirm delete:`);
+    if (!password) return;
+  }
+  const j = await callFn("admin-quotations", { op:"delete", id:q.id, password });
   if (j.ok) { toast("Deleted"); $("#builderView").classList.add("hidden"); $("#listView").classList.remove("hidden"); loadList(); }
+  else if (j.requires_password) {
+    toast(j.error || "Password required", true);
+  }
   else toast(j.error || "Failed", true);
 });
 
