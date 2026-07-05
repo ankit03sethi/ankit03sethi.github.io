@@ -534,6 +534,7 @@ function openBuilder(quote) {
     }
     $("#postSaveActions").classList.remove("hidden");
     setShareUrl(quote.share_token);
+    setTimeout(updateActionButtonsVisibility, 0);
   } else {
     $("#builderTitle").textContent = "New Quotation";
     ["custName","custEmail","custPhone","custGst","custAddress","notes"].forEach(id => $("#"+id).value = "");
@@ -875,9 +876,20 @@ async function changeStatus(newStatus, confirmMsg, successMsg) {
   } else toast(j.error || "Failed", true);
 }
 
-$("#markAcceptedBtn").addEventListener("click", () => changeStatus("accepted", "Mark as ACCEPTED by customer?", "Marked as accepted"));
-$("#markPaidBtn").addEventListener("click",     () => changeStatus("paid",     "Mark as PAID by customer?",     "Marked as paid ✓"));
-$("#markFollowUpBtn").addEventListener("click", () => changeStatus("follow_up", "Mark for FOLLOW UP?",           "Marked for follow up"));
+async function changeStatusThenRefresh(newStatus, confirmMsg, successMsg) {
+  await changeStatus(newStatus, confirmMsg, successMsg);
+  updateActionButtonsVisibility();
+}
+$("#markAcceptedBtn").addEventListener("click", () => changeStatusThenRefresh("accepted", "Mark as ACCEPTED by customer?", "Marked as accepted"));
+$("#markPaidBtn").addEventListener("click",     () => changeStatusThenRefresh("paid",     "Mark as PAID by customer?",     "Marked as paid ✓"));
+$("#markFollowUpBtn").addEventListener("click", () => changeStatusThenRefresh("follow_up", "Mark for FOLLOW UP?",           "Marked for follow up"));
+$("#markRejectedBtn").addEventListener("click", () => changeStatusThenRefresh("rejected", "Mark as REJECTED by customer?", "Marked as rejected"));
+
+function updateActionButtonsVisibility() {
+  const q = _currentQuote; if (!q) return;
+  // Hide Reject button if already rejected — can't reject twice
+  $("#markRejectedBtn").style.display = q.status === "rejected" ? "none" : "";
+}
 
 $("#deleteBtn").addEventListener("click", async () => {
   const q = _currentQuote; if (!q) return;
