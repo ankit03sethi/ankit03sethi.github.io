@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quotations · Admin · Cursive</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    body { background:#f8fafc; margin:0; color:#0f172a; font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
+    main { max-width:1180px; margin:0 auto; padding:20px; }
+    .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:18px; margin-bottom:14px; }
+    h1 { font-size:20px; margin:0 0 4px; }
+    h2 { margin:0 0 12px; font-size:15px; color:#0f172a; }
+    h3 { margin:0 0 6px; font-size:12px; color:#475467; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+    label { display:block; font-size:11.5px; font-weight:700; color:#475467; margin:10px 0 4px; text-transform:uppercase; letter-spacing:.3px; }
+    input, textarea, select {
+      width:100%; padding:8px 10px; border:1px solid #d0d7de; border-radius:6px;
+      font-size:13px; font-family:inherit; box-sizing:border-box; background:#fff;
+    }
+    input:focus, textarea:focus, select:focus { outline:2px solid #1f6feb; outline-offset:-1px; border-color:#1f6feb; }
+    textarea { resize:vertical; min-height:60px; }
+    button { padding:8px 14px; border-radius:6px; border:none; cursor:pointer; font-weight:600; font-size:13px; }
+    .b-primary { background:#1f6feb; color:#fff; }
+    .b-primary:hover { background:#0d4cb8; }
+    .b-outline { background:#fff; color:#1f6feb; border:1px solid #1f6feb; }
+    .b-success { background:#16a34a; color:#fff; }
+    .b-warn { background:#f59e0b; color:#fff; }
+    .b-danger { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    .b-ghost { background:transparent; color:#475467; }
+    .b-wa { background:#25D366; color:#fff; }
+    .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+    .row-4 { display:grid; grid-template-columns:2fr 80px 120px 120px 40px; gap:8px; align-items:center; margin-bottom:6px; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; padding:10px 8px; text-align:left; font-size:11px; color:#475467; text-transform:uppercase; letter-spacing:.4px; border-bottom:2px solid #e2e8f0; }
+    td { padding:10px 8px; font-size:13px; border-bottom:1px solid #f1f5f9; }
+    tr:hover td { background:#f8fafc; }
+    .status-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+    .st-draft { background:#f1f5f9; color:#475467; }
+    .st-sent { background:#dbeafe; color:#1e40af; }
+    .st-accepted { background:#dcfce7; color:#15803d; }
+    .st-expired { background:#fee2e2; color:#b91c1c; }
+    .st-cancelled { background:#f3f4f6; color:#6b7280; }
+    .toast { position:fixed; right:20px; bottom:20px; background:#16a34a; color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; z-index:200; box-shadow:0 8px 20px rgba(0,0,0,.15); }
+    .toast.err { background:#dc2626; }
+    .hidden { display:none !important; }
+    .totals { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; font-size:14px; line-height:1.9; }
+    .totals .grand { color:#1f6feb; font-size:20px; font-weight:800; border-top:2px solid #0f172a; margin-top:8px; padding-top:8px; }
+    .action-bar { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid #e2e8f0; }
+    .helper { color:#94a3b8; font-size:12px; margin-top:4px; }
+    .qnum-badge { display:inline-block; background:#1f6feb; color:#fff; padding:4px 10px; border-radius:6px; font-weight:700; font-size:13px; letter-spacing:.5px; }
+    .col-wrap { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+    @media (max-width:900px) { .col-wrap { grid-template-columns:1fr; } .row-4 { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" style="cursor:default;">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Quotations · Admin</div>
+    </div>
+  </div>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
+    <span id="emailChip" style="background:#f1f5f9;color:#475467;padding:5px 10px;border-radius:6px;font-size:12.5px;font-weight:600;" class="hidden"></span>
+    <a href="/admin/products/" class="b-outline" style="padding:7px 12px;border-radius:6px;font-weight:600;font-size:13px;text-decoration:none;">📦 Products</a>
+    <button id="signOutBtn" class="hidden b-danger" style="padding:7px 12px;">Logout</button>
+  </div>
+</header>
+
+<main>
+  <!-- Login gate -->
+  <div id="loginPanel" class="panel hidden" style="max-width:400px;margin:60px auto;">
+    <h1 style="text-align:center;">🔒 Admin Login</h1>
+    <p style="color:#64748b;font-size:13px;text-align:center;">Sign in to manage quotations</p>
+    <label>Email</label>
+    <input id="loginEmail" type="text" placeholder="admin@cursive.world" />
+    <label>Password</label>
+    <input id="loginPass" type="password" placeholder="••••••••" />
+    <div id="loginErr" style="color:#dc2626;font-size:12px;margin-top:8px;display:none;"></div>
+    <button id="loginBtn" class="b-primary" style="width:100%;margin-top:14px;padding:10px;">Sign in</button>
+  </div>
+
+  <!-- Main app (hidden until login) -->
+  <div id="app" class="hidden">
+    <!-- LIST VIEW -->
+    <div id="listView" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h1 style="margin:0;">📋 Quotations</h1>
+        <button id="newBtn" class="b-primary">+ New Quotation</button>
+      </div>
+      <div id="listWrap"></div>
+    </div>
+
+    <!-- BUILDER VIEW -->
+    <div id="builderView" class="hidden">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <button id="backBtn" class="b-ghost" style="padding:0;">← Back to list</button>
+            <h1 id="builderTitle" style="margin:8px 0 0;">New Quotation</h1>
+            <div id="qnumBadge" class="qnum-badge hidden" style="margin-top:4px;"></div>
+          </div>
+          <div id="statusHere"></div>
+        </div>
+      </div>
+
+      <div class="col-wrap">
+        <div>
+          <!-- Customer -->
+          <div class="panel">
+            <h2>👤 Customer Info</h2>
+            <label>Name *</label>
+            <input id="custName" type="text" placeholder="Ram Kumar" />
+            <div class="row-2">
+              <div>
+                <label>Email</label>
+                <input id="custEmail" type="text" placeholder="ram@example.com" />
+              </div>
+              <div>
+                <label>Phone (with country code)</label>
+                <input id="custPhone" type="text" placeholder="+919999888877" />
+              </div>
+            </div>
+            <div class="row-2">
+              <div>
+                <label>GST Number (optional)</label>
+                <input id="custGst" type="text" placeholder="27ABCDE1234F1Z5" />
+              </div>
+              <div>
+                <label>Address (optional)</label>
+                <input id="custAddress" type="text" placeholder="Mumbai, MH" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Items -->
+          <div class="panel">
+            <h2>📦 Line Items</h2>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <select id="itemPicker" style="flex:1;">
+                <option value="">— Select product or service to add —</option>
+              </select>
+              <button id="addItemBtn" class="b-outline">+ Add</button>
+              <button id="addCustomBtn" class="b-ghost">+ Custom item</button>
+            </div>
+            <div style="margin-bottom:6px;font-size:11px;color:#475467;text-transform:uppercase;font-weight:700;letter-spacing:.4px;">
+              <div class="row-4">
+                <div>Description</div>
+                <div style="text-align:center;">Qty</div>
+                <div style="text-align:right;">Unit ₹</div>
+                <div style="text-align:right;">Total ₹</div>
+                <div></div>
+              </div>
+            </div>
+            <div id="itemsWrap"></div>
+            <div id="emptyItems" class="helper" style="text-align:center;padding:16px;">No items yet. Pick from dropdown or add custom.</div>
+          </div>
+
+          <!-- Notes -->
+          <div class="panel">
+            <h2>📝 Notes (optional)</h2>
+            <textarea id="notes" placeholder="Terms, delivery info, custom message..."></textarea>
+          </div>
+        </div>
+
+        <div>
+          <!-- Totals -->
+          <div class="panel">
+            <h2>💰 Totals</h2>
+            <div class="totals">
+              <div style="display:flex;justify-content:space-between;">Subtotal <b id="tSub">₹0.00</b></div>
+              <div style="display:flex;justify-content:space-between;color:#64748b;">GST (18%) <b id="tGst">₹0.00</b></div>
+              <div class="grand" style="display:flex;justify-content:space-between;">Total <span id="tTotal">₹0.00</span></div>
+            </div>
+            <label style="margin-top:14px;">Valid for (hours)</label>
+            <input id="validHours" type="number" value="24" min="1" max="8760" />
+            <div class="helper">Default 24 hours. Set to 720 for 30 days.</div>
+          </div>
+
+          <!-- Actions -->
+          <div class="panel">
+            <h2>🚀 Actions</h2>
+            <button id="saveBtn" class="b-primary" style="width:100%;">💾 Save Quotation</button>
+            <div id="postSaveActions" class="hidden" style="margin-top:12px;">
+              <div class="action-bar" style="border:0;padding:0;margin:0;">
+                <button id="pdfBtn" class="b-outline" style="flex:1;">📄 Download PDF</button>
+                <button id="emailBtn" class="b-success" style="flex:1;">📧 Email</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="waBtn" class="b-wa" style="flex:1;">💬 WhatsApp</button>
+                <button id="copyLinkBtn" class="b-outline" style="flex:1;">🔗 Copy Link</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="markAcceptedBtn" class="b-success" style="flex:1;">✅ Mark Accepted</button>
+                <button id="cancelQuoteBtn" class="b-danger" style="flex:1;">❌ Cancel</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="deleteBtn" class="b-danger" style="width:100%;">🗑️ Delete Quotation</button>
+              </div>
+              <div style="font-size:12px;color:#64748b;margin-top:12px;text-align:center;">Share URL:<br><a id="shareUrlLink" href="#" target="_blank" style="color:#1f6feb;word-break:break-all;font-size:11.5px;"></a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Hidden PDF template -->
+<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:800px;background:#fff;padding:40px;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, storageKey:"pd_tracker_auth" } });
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmtDate = iso => iso ? new Date(iso).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+
+function toast(msg, isErr) {
+  const t = document.createElement("div");
+  t.className = "toast" + (isErr ? " err" : "");
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+let _session = null;
+let _catalog = null; // { products, services }
+let _items = [];     // current line items
+let _currentQuote = null; // saved quote object
+
+// ============ AUTH ============
+async function refreshSession() {
+  const { data:{ session } } = await sb.auth.getSession();
+  _session = session;
+  if (session) {
+    $("#loginPanel").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    $("#emailChip").textContent = session.user.email;
+    $("#emailChip").classList.remove("hidden");
+    $("#signOutBtn").classList.remove("hidden");
+    await loadList();
+    await loadCatalogOptions();
+  } else {
+    $("#loginPanel").classList.remove("hidden");
+    $("#app").classList.add("hidden");
+    $("#emailChip").classList.add("hidden");
+    $("#signOutBtn").classList.add("hidden");
+  }
+}
+
+$("#loginBtn").addEventListener("click", async () => {
+  const email = $("#loginEmail").value.trim();
+  const password = $("#loginPass").value;
+  if (!email || !password) { $("#loginErr").textContent = "Enter email and password"; $("#loginErr").style.display = "block"; return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { $("#loginErr").textContent = error.message; $("#loginErr").style.display = "block"; return; }
+  $("#loginErr").style.display = "none";
+  await refreshSession();
+});
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refreshSession(); });
+$("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+
+// ============ CALL EDGE ============
+async function callFn(name, body, method = "POST") {
+  const url = `${SUPABASE_URL}/functions/v1/${name}`;
+  const r = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + _session.access_token,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: method === "GET" ? undefined : JSON.stringify(body || {}),
+  });
+  return await r.json();
+}
+
+// ============ LIST ============
+async function loadList() {
+  $("#listWrap").innerHTML = `<div class="helper" style="padding:20px;text-align:center;">Loading...</div>`;
+  const j = await callFn("admin-quotations", { op:"list" });
+  if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error||"")}</div>`; return; }
+  const qs = j.quotations || [];
+  if (qs.length === 0) { $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">No quotations yet. Click <b>+ New Quotation</b> to create one.</div>`; return; }
+  let html = `<table><thead><tr>
+    <th>Quote #</th><th>Customer</th><th>Total</th><th>Status</th><th>Valid Until</th><th>Created</th><th></th>
+  </tr></thead><tbody>`;
+  for (const q of qs) {
+    html += `<tr data-id="${q.id}" style="cursor:pointer;">
+      <td><b>${esc(q.quote_number)}</b></td>
+      <td>${esc(q.customer_name)}${q.customer_email?`<br><small style="color:#64748b;">${esc(q.customer_email)}</small>`:""}</td>
+      <td><b>${fmt(q.total_paise)}</b></td>
+      <td><span class="status-badge st-${q.status}">${q.status}</span></td>
+      <td style="font-size:12px;color:#64748b;">${fmtDate(q.valid_until)}</td>
+      <td style="font-size:12px;color:#64748b;">${fmtDate(q.created_at)}</td>
+      <td><button class="b-ghost" data-open="${q.id}">Open →</button></td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  $("#listWrap").innerHTML = html;
+  $("#listWrap").querySelectorAll("[data-open]").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); openQuote(Number(b.dataset.open)); });
+  });
+  $("#listWrap").querySelectorAll("tr[data-id]").forEach(r => {
+    r.addEventListener("click", () => openQuote(Number(r.dataset.id)));
+  });
+}
+
+// ============ CATALOG PICKER ============
+async function loadCatalogOptions() {
+  const j = await callFn("admin-quotations", { op:"catalog_options" });
+  if (!j.ok) return;
+  _catalog = j;
+  const sel = $("#itemPicker");
+  sel.innerHTML = `<option value="">— Select product or service to add —</option>`;
+  const gS = document.createElement("optgroup"); gS.label = "Services";
+  for (const s of (j.services || [])) {
+    const o = document.createElement("option");
+    o.value = `service:${s.key}`; o.textContent = `${s.name} — ₹${s.price_inr}`;
+    o.dataset.name = s.name; o.dataset.price = s.price_inr;
+    gS.appendChild(o);
+  }
+  sel.appendChild(gS);
+  const gP = document.createElement("optgroup"); gP.label = "Products";
+  for (const p of (j.products || [])) {
+    const o = document.createElement("option");
+    o.value = `product:${p.id}`;
+    o.textContent = `${p.title}${p.product_code?` [${p.product_code}]`:""} — ₹${p.price_inr}`;
+    o.dataset.name = p.title; o.dataset.price = p.price_inr;
+    gP.appendChild(o);
+  }
+  sel.appendChild(gP);
+}
+
+// ============ BUILDER ============
+$("#newBtn").addEventListener("click", () => openBuilder(null));
+$("#backBtn").addEventListener("click", () => { $("#builderView").classList.add("hidden"); $("#listView").classList.remove("hidden"); loadList(); });
+
+function openBuilder(quote) {
+  _currentQuote = quote;
+  _items = [];
+  $("#listView").classList.add("hidden");
+  $("#builderView").classList.remove("hidden");
+  $("#postSaveActions").classList.add("hidden");
+  $("#qnumBadge").classList.add("hidden");
+  $("#statusHere").innerHTML = "";
+  if (quote) {
+    $("#builderTitle").textContent = "Edit Quotation";
+    $("#qnumBadge").textContent = quote.quote_number;
+    $("#qnumBadge").classList.remove("hidden");
+    $("#statusHere").innerHTML = `<span class="status-badge st-${quote.status}">${quote.status}</span>`;
+    $("#custName").value = quote.customer_name || "";
+    $("#custEmail").value = quote.customer_email || "";
+    $("#custPhone").value = quote.customer_phone || "";
+    $("#custGst").value = quote.customer_gst || "";
+    $("#custAddress").value = quote.customer_address || "";
+    $("#notes").value = quote.notes || "";
+    if (quote.valid_until) {
+      const hoursLeft = Math.max(1, Math.round((new Date(quote.valid_until).getTime() - Date.now()) / 3600000));
+      $("#validHours").value = hoursLeft;
+    }
+    $("#postSaveActions").classList.remove("hidden");
+    setShareUrl(quote.share_token);
+  } else {
+    $("#builderTitle").textContent = "New Quotation";
+    ["custName","custEmail","custPhone","custGst","custAddress","notes"].forEach(id => $("#"+id).value = "");
+    $("#validHours").value = 24;
+  }
+  renderItems();
+}
+
+async function openQuote(id) {
+  const j = await callFn("admin-quotations", { op:"get", id });
+  if (!j.ok) { toast(j.error || "Not found", true); return; }
+  openBuilder(j.quotation);
+  _items = (j.items || []).map(it => ({
+    item_type: it.item_type,
+    item_ref_id: it.item_ref_id,
+    item_ref_key: it.item_ref_key,
+    description: it.description,
+    qty: it.qty,
+    unit_price_inr: it.unit_price_paise / 100,
+  }));
+  renderItems();
+}
+
+$("#addItemBtn").addEventListener("click", () => {
+  const sel = $("#itemPicker");
+  const val = sel.value;
+  if (!val) { toast("Pick a service or product first", true); return; }
+  const opt = sel.options[sel.selectedIndex];
+  const [type, ref] = val.split(":");
+  _items.push({
+    item_type: type === "service" ? "service" : "product",
+    item_ref_id: type === "product" ? Number(ref) : null,
+    item_ref_key: type === "service" ? ref : null,
+    description: opt.dataset.name,
+    qty: 1,
+    unit_price_inr: Number(opt.dataset.price),
+  });
+  sel.value = "";
+  renderItems();
+});
+
+$("#addCustomBtn").addEventListener("click", () => {
+  _items.push({ item_type:"custom", item_ref_id:null, item_ref_key:null, description:"", qty:1, unit_price_inr:0 });
+  renderItems();
+});
+
+function renderItems() {
+  const wrap = $("#itemsWrap");
+  if (_items.length === 0) { wrap.innerHTML = ""; $("#emptyItems").classList.remove("hidden"); computeTotals(); return; }
+  $("#emptyItems").classList.add("hidden");
+  let html = "";
+  _items.forEach((it, i) => {
+    const total = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+    html += `<div class="row-4">
+      <input type="text" data-i="${i}" data-k="description" value="${esc(it.description)}" placeholder="Item description" />
+      <input type="number" data-i="${i}" data-k="qty" value="${it.qty}" min="1" style="text-align:center;" />
+      <input type="number" data-i="${i}" data-k="unit_price_inr" value="${it.unit_price_inr}" min="0" step="0.01" style="text-align:right;" />
+      <div style="text-align:right;font-weight:700;font-size:14px;color:#0f172a;">₹${total.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <button class="b-ghost" data-remove="${i}" style="color:#dc2626;padding:4px 8px;">✕</button>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const i = Number(inp.dataset.i);
+      const k = inp.dataset.k;
+      _items[i][k] = k === "qty" ? Math.max(1, parseInt(inp.value,10) || 1) : (k === "unit_price_inr" ? Number(inp.value) : inp.value);
+      // update total inline without full rerender
+      const totalDiv = inp.closest(".row-4").children[3];
+      const t = (Number(_items[i].unit_price_inr) || 0) * (parseInt(_items[i].qty,10) || 0);
+      totalDiv.textContent = "₹" + t.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+      computeTotals();
+    });
+  });
+  wrap.querySelectorAll("[data-remove]").forEach(b => {
+    b.addEventListener("click", () => { _items.splice(Number(b.dataset.remove), 1); renderItems(); });
+  });
+  computeTotals();
+}
+
+function computeTotals() {
+  let sub = 0;
+  for (const it of _items) sub += (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+  const gst = Math.round(sub * 18) / 100;
+  const total = sub + gst;
+  $("#tSub").textContent = "₹" + sub.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("#tGst").textContent = "₹" + gst.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("#tTotal").textContent = "₹" + total.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ============ SAVE ============
+$("#saveBtn").addEventListener("click", async () => {
+  if (!$("#custName").value.trim()) { toast("Customer name required", true); return; }
+  if (_items.length === 0) { toast("Add at least 1 item", true); return; }
+  const body = {
+    op:"save",
+    id: _currentQuote?.id || null,
+    customer: {
+      name: $("#custName").value.trim(),
+      email: $("#custEmail").value.trim(),
+      phone: $("#custPhone").value.trim(),
+      gst: $("#custGst").value.trim(),
+      address: $("#custAddress").value.trim(),
+    },
+    notes: $("#notes").value.trim(),
+    items: _items,
+    valid_hours: parseInt($("#validHours").value,10) || 24,
+    include_gst: true,
+  };
+  $("#saveBtn").disabled = true;
+  $("#saveBtn").textContent = "Saving...";
+  try {
+    const j = await callFn("admin-quotations", body);
+    if (!j.ok) { toast(j.error || "Save failed", true); return; }
+    _currentQuote = j.quotation;
+    toast("Saved: " + _currentQuote.quote_number);
+    $("#qnumBadge").textContent = _currentQuote.quote_number;
+    $("#qnumBadge").classList.remove("hidden");
+    $("#builderTitle").textContent = "Edit Quotation";
+    $("#statusHere").innerHTML = `<span class="status-badge st-${_currentQuote.status}">${_currentQuote.status}</span>`;
+    $("#postSaveActions").classList.remove("hidden");
+    setShareUrl(_currentQuote.share_token);
+  } finally {
+    $("#saveBtn").disabled = false;
+    $("#saveBtn").textContent = "💾 Save Quotation";
+  }
+});
+
+function setShareUrl(token) {
+  const url = `${location.origin}/quote/?t=${token}`;
+  $("#shareUrlLink").href = url;
+  $("#shareUrlLink").textContent = url;
+}
+
+// ============ PDF ============
+function buildPdfHtml() {
+  const q = _currentQuote;
+  const rows = _items.map(it => {
+    const t = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+    return `<tr>
+      <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;">${esc(it.description)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:center;">${it.qty}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:right;">₹${Number(it.unit_price_inr).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:right;font-weight:600;">₹${t.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+    </tr>`;
+  }).join("");
+  const sub = _items.reduce((s,it) => s + (Number(it.unit_price_inr)||0) * (parseInt(it.qty,10)||0), 0);
+  const gst = Math.round(sub * 18) / 100;
+  const total = sub + gst;
+  const validUntil = q.valid_until ? fmtDate(q.valid_until) : "";
+  return `<div style="padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1f6feb;">
+      <div>
+        <div style="font-size:34px;font-weight:800;color:#1f6feb;line-height:1;">cursive<sup style="font-size:12px;">®</sup></div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">India's seller toolkit</div>
+        <div style="font-size:12px;color:#64748b;margin-top:8px;">cursive.world · contact@cursive.world</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px;font-weight:700;color:#0f172a;">QUOTATION</div>
+        <div style="background:#1f6feb;color:#fff;padding:6px 12px;border-radius:6px;font-weight:700;margin-top:6px;">${esc(q.quote_number)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:6px;">Date: ${fmtDate(q.created_at)}</div>
+        ${validUntil ? `<div style="font-size:11px;color:#b91c1c;margin-top:2px;">Valid until: ${validUntil}</div>` : ""}
+      </div>
+    </div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Quotation For</div>
+      <div style="font-size:15px;font-weight:700;">${esc(q.customer_name)}</div>
+      ${q.customer_email ? `<div style="font-size:12px;color:#475467;">${esc(q.customer_email)}</div>` : ""}
+      ${q.customer_phone ? `<div style="font-size:12px;color:#475467;">${esc(q.customer_phone)}</div>` : ""}
+      ${q.customer_gst ? `<div style="font-size:12px;color:#475467;">GST: ${esc(q.customer_gst)}</div>` : ""}
+      ${q.customer_address ? `<div style="font-size:12px;color:#475467;">${esc(q.customer_address)}</div>` : ""}
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px;text-align:left;font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0;">Item Description</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0;width:60px;">Qty</th>
+          <th style="padding:8px;text-align:right;font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0;width:100px;">Unit ₹</th>
+          <th style="padding:8px;text-align:right;font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0;width:120px;">Total ₹</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <table style="width:280px;">
+        <tr><td style="padding:6px;font-size:13px;">Subtotal</td><td style="padding:6px;text-align:right;font-size:13px;">₹${sub.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+        <tr><td style="padding:6px;font-size:13px;color:#64748b;">GST (18%)</td><td style="padding:6px;text-align:right;font-size:13px;color:#64748b;">₹${gst.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+        <tr style="border-top:2px solid #0f172a;"><td style="padding:8px 6px;font-size:16px;font-weight:800;">TOTAL</td><td style="padding:8px 6px;text-align:right;font-size:18px;font-weight:800;color:#1f6feb;">₹${total.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+      </table>
+    </div>
+    ${q.notes ? `<div style="background:#f8fafc;border-left:3px solid #1f6feb;padding:12px 14px;margin-top:20px;font-size:12px;color:#475467;line-height:1.5;"><b>Notes:</b><br>${esc(q.notes).replace(/\n/g,"<br>")}</div>` : ""}
+    <div style="margin-top:30px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;font-size:11px;color:#94a3b8;">
+      Thank you for choosing Cursive. Payment terms as agreed. For queries, reach us at contact@cursive.world<br>
+      This is a computer-generated quotation.
+    </div>
+  </div>`;
+}
+
+$("#pdfBtn").addEventListener("click", async () => {
+  const q = _currentQuote;
+  if (!q) return;
+  const area = $("#pdfArea");
+  area.innerHTML = buildPdfHtml();
+  const opt = {
+    margin: 10,
+    filename: `${q.quote_number}.pdf`,
+    image: { type:"jpeg", quality:0.95 },
+    html2canvas: { scale:2, useCORS:true },
+    jsPDF: { unit:"mm", format:"a4", orientation:"portrait" },
+  };
+  await html2pdf().from(area).set(opt).save();
+  toast("PDF downloaded");
+});
+
+// ============ EMAIL ============
+$("#emailBtn").addEventListener("click", async () => {
+  const q = _currentQuote;
+  if (!q) return;
+  if (!q.customer_email) { toast("Customer email is empty — save with email first", true); return; }
+  if (!confirm(`Send quote to ${q.customer_email}?`)) return;
+  $("#emailBtn").disabled = true;
+  $("#emailBtn").textContent = "Sending...";
+  try {
+    const j = await callFn("quotation-email", { id: q.id });
+    if (j.ok) {
+      toast("Email sent from " + (j.sent_from || "contact@cursive.world"));
+      _currentQuote.status = "sent";
+      $("#statusHere").innerHTML = `<span class="status-badge st-sent">sent</span>`;
+    } else {
+      toast("Email failed: " + (j.error || ""), true);
+    }
+  } finally {
+    $("#emailBtn").disabled = false;
+    $("#emailBtn").textContent = "📧 Email";
+  }
+});
+
+// ============ WHATSAPP ============
+$("#waBtn").addEventListener("click", () => {
+  const q = _currentQuote;
+  if (!q) return;
+  const url = `${location.origin}/quote/?t=${q.share_token}`;
+  const total = fmt(q.total_paise);
+  const validUntil = q.valid_until ? fmtDate(q.valid_until) : "";
+  const msg = `Hi ${q.customer_name},\n\nHere's your quotation from Cursive:\n\n📋 Quote #: ${q.quote_number}\n💰 Total: ${total}${validUntil?`\n⏰ Valid until: ${validUntil}`:""}\n\nView details: ${url}\n\nQuestions? Reply here or email contact@cursive.world.\n\nTeam Cursive`;
+  let phone = (q.customer_phone || "").replace(/\D/g,"");
+  if (phone && phone.length === 10) phone = "91" + phone;
+  const waUrl = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(waUrl, "_blank");
+  // Mark as sent
+  callFn("admin-quotations", { op:"mark_sent", id:q.id }).then(() => {
+    _currentQuote.status = "sent";
+    $("#statusHere").innerHTML = `<span class="status-badge st-sent">sent</span>`;
+  });
+});
+
+// ============ COPY LINK ============
+$("#copyLinkBtn").addEventListener("click", async () => {
+  const q = _currentQuote;
+  if (!q) return;
+  const url = `${location.origin}/quote/?t=${q.share_token}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Link copied to clipboard");
+  } catch (e) {
+    prompt("Copy this link:", url);
+  }
+});
+
+// ============ STATUS ACTIONS ============
+$("#markAcceptedBtn").addEventListener("click", async () => {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm("Mark this quotation as ACCEPTED by customer?")) return;
+  const j = await callFn("admin-quotations", { op:"update_status", id:q.id, status:"accepted" });
+  if (j.ok) { toast("Marked as accepted"); _currentQuote.status = "accepted"; $("#statusHere").innerHTML = `<span class="status-badge st-accepted">accepted</span>`; }
+  else toast(j.error || "Failed", true);
+});
+
+$("#cancelQuoteBtn").addEventListener("click", async () => {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm("Cancel this quotation? Customer can still view via link but marked as cancelled.")) return;
+  const j = await callFn("admin-quotations", { op:"update_status", id:q.id, status:"cancelled" });
+  if (j.ok) { toast("Cancelled"); _currentQuote.status = "cancelled"; $("#statusHere").innerHTML = `<span class="status-badge st-cancelled">cancelled</span>`; }
+  else toast(j.error || "Failed", true);
+});
+
+$("#deleteBtn").addEventListener("click", async () => {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm(`DELETE quotation ${q.quote_number} permanently? This cannot be undone.`)) return;
+  const j = await callFn("admin-quotations", { op:"delete", id:q.id });
+  if (j.ok) { toast("Deleted"); $("#builderView").classList.add("hidden"); $("#listView").classList.remove("hidden"); loadList(); }
+  else toast(j.error || "Failed", true);
+});
+
+// ============ INIT ============
+refreshSession();
+</script>
+
+</body></html>
