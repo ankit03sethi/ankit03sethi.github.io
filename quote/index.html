@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quotation · Cursive World</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
@@ -33,14 +33,32 @@
     .top-band {
       background: var(--brand-blue);
       color:#fff;
-      padding:32px 40px 26px;
+      padding:26px 40px 22px;
       display:flex;
       justify-content:space-between;
-      align-items:flex-start;
+      align-items:center;
     }
-    .brand-name { font-size:36px; font-weight:800; line-height:1; letter-spacing:-0.5px; }
-    .brand-tag  { font-size:13px; opacity:.9; margin-top:6px; font-weight:400; }
-    .doc-title  { font-size:30px; font-weight:800; letter-spacing:2px; }
+    .brand-row { display:flex; align-items:center; gap:14px; }
+    .brand-box {
+      background:#fff;
+      border-radius:10px;
+      width:56px; height:56px;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+      box-shadow:0 4px 10px rgba(0,0,0,.08);
+    }
+    .brand-box svg { display:block; }
+    .brand-wordmark {
+      font-family:'Dancing Script', cursive;
+      font-size:44px;
+      font-weight:700;
+      line-height:1;
+      color:#fff;
+      letter-spacing:-0.5px;
+    }
+    .brand-wordmark sup { font-size:14px; font-weight:400; margin-left:2px; }
+    .brand-tag  { font-size:12.5px; opacity:.92; margin-top:2px; font-weight:400; color:#fff; letter-spacing:.2px; }
+    .doc-title  { font-size:28px; font-weight:800; letter-spacing:2px; color:#fff; }
 
     /* Orange accent bar */
     .accent { height:6px; background: var(--orange); }
@@ -288,9 +306,17 @@
       <div id="ribbonHolder"></div>
 
       <div class="top-band">
-        <div>
-          <div class="brand-name">Cursive World</div>
-          <div class="brand-tag">E-Commerce Services &amp; Solutions</div>
+        <div class="brand-row">
+          <div class="brand-box" aria-label="cursive logo">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1f6feb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 17 9 11 13 15 21 6"/>
+              <polyline points="15 6 21 6 21 12"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+            <div class="brand-tag">India's seller toolkit</div>
+          </div>
         </div>
         <div class="doc-title">QUOTATION</div>
       </div>
@@ -488,15 +514,20 @@ function render() {
     const gstPct = it.gst_percent !== null && it.gst_percent !== undefined ? Number(it.gst_percent) : 18;
     if (firstGst === null) firstGst = gstPct;
     if (gstPct !== firstGst) allSameGst = false;
-    // Parse description: if contains " — ", split into name and details; else name is desc, details empty
+    // Parse description: if contains " — ", split into name and details
     const raw = it.description || "";
     let name = raw, details = "";
     const dashSplit = raw.split(/\s+[—–-]\s+/);
     if (dashSplit.length > 1) { name = dashSplit[0]; details = dashSplit.slice(1).join(" — "); }
+    // Prefix products with "Product:" and services stay as-is
+    let displayName = name;
+    if (it.item_type === "product") {
+      displayName = `Product: ${name}`;
+    }
     const gstTag = gstPct !== 18 ? `<span class="item-gstpct">GST ${gstPct}%</span>` : "";
     rowsHtml += `<tr>
       <td class="col-num">${idx + 1}</td>
-      <td><div class="item-name">${esc(name)}${gstTag}</div></td>
+      <td><div class="item-name">${esc(displayName)}${gstTag}</div></td>
       <td><div class="item-desc">${esc(details) || '&mdash;'}</div></td>
       <td class="col-qty">${it.qty}</td>
       <td class="col-rate">${fmtN(it.unit_price_paise/100)}</td>
