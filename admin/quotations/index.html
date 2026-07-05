@@ -43,6 +43,17 @@
     .st-accepted { background:#dcfce7; color:#15803d; }
     .st-expired { background:#fee2e2; color:#b91c1c; }
     .st-cancelled { background:#f3f4f6; color:#6b7280; }
+    .st-follow_up { background:#fef3c7; color:#92400e; }
+    .st-paid { background:#d1fae5; color:#065f46; font-weight:800; }
+    .filter-tab {
+      padding:8px 14px;background:#f1f5f9;color:#475467;border:1px solid #e2e8f0;
+      border-radius:20px;cursor:pointer;font-weight:600;font-size:12.5px;
+      transition:all .15s ease;
+    }
+    .filter-tab:hover { background:#e0e7ff; color:#1f6feb; }
+    .filter-tab.active { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .filter-tab .cnt { display:inline-block;margin-left:6px;background:rgba(255,255,255,.3);padding:1px 6px;border-radius:8px;font-size:10.5px;font-weight:700; }
+    .filter-tab:not(.active) .cnt { background:#e2e8f0;color:#475467; }
     .toast { position:fixed; right:20px; bottom:20px; background:#16a34a; color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; z-index:200; box-shadow:0 8px 20px rgba(0,0,0,.15); }
     .toast.err { background:#dc2626; }
     .hidden { display:none !important; }
@@ -97,6 +108,16 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <h1 style="margin:0;">📋 Quotations</h1>
         <button id="newBtn" class="b-primary">+ New Quotation</button>
+      </div>
+      <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
+        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="draft">Draft</button>
+        <button class="filter-tab" data-filter="sent">Sent</button>
+        <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
+        <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
+        <button class="filter-tab" data-filter="paid">💰 Paid</button>
+        <button class="filter-tab" data-filter="cancelled">Cancelled</button>
+        <button class="filter-tab" data-filter="expired">Expired</button>
       </div>
       <div id="listWrap"></div>
     </div>
@@ -200,7 +221,11 @@
                 <button id="copyLinkBtn" class="b-outline" style="flex:1;">🔗 Copy Link</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
-                <button id="markAcceptedBtn" class="b-success" style="flex:1;">✅ Mark Accepted</button>
+                <button id="markAcceptedBtn" class="b-success" style="flex:1;">✅ Accepted</button>
+                <button id="markPaidBtn" style="flex:1;background:#065f46;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">💰 Paid</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="markFollowUpBtn" class="b-warn" style="flex:1;">📞 Follow Up</button>
                 <button id="cancelQuoteBtn" class="b-danger" style="flex:1;">❌ Cancel</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
@@ -290,12 +315,35 @@ async function callFn(name, body, method = "POST") {
 }
 
 // ============ LIST ============
+let _allQuotes = [];
+let _currentFilter = "all";
+
 async function loadList() {
   $("#listWrap").innerHTML = `<div class="helper" style="padding:20px;text-align:center;">Loading...</div>`;
   const j = await callFn("admin-quotations", { op:"list" });
   if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error||"")}</div>`; return; }
-  const qs = j.quotations || [];
-  if (qs.length === 0) { $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">No quotations yet. Click <b>+ New Quotation</b> to create one.</div>`; return; }
+  _allQuotes = j.quotations || [];
+  updateFilterCounts();
+  renderFilteredList();
+}
+
+function updateFilterCounts() {
+  const counts = { all: _allQuotes.length };
+  for (const q of _allQuotes) counts[q.status] = (counts[q.status] || 0) + 1;
+  document.querySelectorAll(".filter-tab").forEach(tab => {
+    const f = tab.dataset.filter;
+    const c = counts[f] || 0;
+    const label = tab.textContent.replace(/\s*\d+$/, "").replace(/\s*\(.*\)$/, "");
+    tab.innerHTML = `${label}<span class="cnt">${c}</span>`;
+  });
+}
+
+function renderFilteredList() {
+  const qs = _currentFilter === "all" ? _allQuotes : _allQuotes.filter(q => q.status === _currentFilter);
+  if (qs.length === 0) {
+    $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.'}</div>`;
+    return;
+  }
   let html = `<table><thead><tr>
     <th>Quote #</th><th>Customer</th><th>Total</th><th>Status</th><th>Valid Until</th><th>Created</th><th></th>
   </tr></thead><tbody>`;
@@ -304,7 +352,7 @@ async function loadList() {
       <td><b>${esc(q.quote_number)}</b></td>
       <td>${esc(q.customer_name)}${q.customer_email?`<br><small style="color:#64748b;">${esc(q.customer_email)}</small>`:""}</td>
       <td><b>${fmt(q.total_paise)}</b></td>
-      <td><span class="status-badge st-${q.status}">${q.status}</span></td>
+      <td><span class="status-badge st-${q.status}">${q.status.replace("_"," ")}</span></td>
       <td style="font-size:12px;color:#64748b;">${fmtDate(q.valid_until)}</td>
       <td style="font-size:12px;color:#64748b;">${fmtDate(q.created_at)}</td>
       <td><button class="b-ghost" data-open="${q.id}">Open →</button></td>
@@ -319,6 +367,16 @@ async function loadList() {
     r.addEventListener("click", () => openQuote(Number(r.dataset.id)));
   });
 }
+
+// Wire filter tabs
+document.querySelectorAll(".filter-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    _currentFilter = tab.dataset.filter;
+    renderFilteredList();
+  });
+});
 
 // ============ CATALOG PICKER (search + list) ============
 async function loadCatalogOptions() {
@@ -725,21 +783,21 @@ $("#copyLinkBtn").addEventListener("click", async () => {
 });
 
 // ============ STATUS ACTIONS ============
-$("#markAcceptedBtn").addEventListener("click", async () => {
+async function changeStatus(newStatus, confirmMsg, successMsg) {
   const q = _currentQuote; if (!q) return;
-  if (!confirm("Mark this quotation as ACCEPTED by customer?")) return;
-  const j = await callFn("admin-quotations", { op:"update_status", id:q.id, status:"accepted" });
-  if (j.ok) { toast("Marked as accepted"); _currentQuote.status = "accepted"; $("#statusHere").innerHTML = `<span class="status-badge st-accepted">accepted</span>`; }
-  else toast(j.error || "Failed", true);
-});
+  if (!confirm(confirmMsg)) return;
+  const j = await callFn("admin-quotations", { op:"update_status", id:q.id, status:newStatus });
+  if (j.ok) {
+    toast(successMsg);
+    _currentQuote.status = newStatus;
+    $("#statusHere").innerHTML = `<span class="status-badge st-${newStatus}">${newStatus.replace("_"," ")}</span>`;
+  } else toast(j.error || "Failed", true);
+}
 
-$("#cancelQuoteBtn").addEventListener("click", async () => {
-  const q = _currentQuote; if (!q) return;
-  if (!confirm("Cancel this quotation? Customer can still view via link but marked as cancelled.")) return;
-  const j = await callFn("admin-quotations", { op:"update_status", id:q.id, status:"cancelled" });
-  if (j.ok) { toast("Cancelled"); _currentQuote.status = "cancelled"; $("#statusHere").innerHTML = `<span class="status-badge st-cancelled">cancelled</span>`; }
-  else toast(j.error || "Failed", true);
-});
+$("#markAcceptedBtn").addEventListener("click", () => changeStatus("accepted", "Mark as ACCEPTED by customer?", "Marked as accepted"));
+$("#markPaidBtn").addEventListener("click",     () => changeStatus("paid",     "Mark as PAID by customer?",     "Marked as paid ✓"));
+$("#markFollowUpBtn").addEventListener("click", () => changeStatus("follow_up", "Mark for FOLLOW UP?",           "Marked for follow up"));
+$("#cancelQuoteBtn").addEventListener("click",  () => changeStatus("cancelled", "Cancel this quotation?",         "Cancelled"));
 
 $("#deleteBtn").addEventListener("click", async () => {
   const q = _currentQuote; if (!q) return;
