@@ -220,7 +220,6 @@
     body.anon .var-qty-plus,
     body.anon #cartChip,
     body.anon #openManageBtn,
-    body.anon #homeLinkBtn,
     body.anon #signOutBtn { display: none !important; }
     body.anon .var-row { pointer-events: none; opacity: 0.95; }
     body.anon .anon-cta { display: block !important; }
@@ -228,9 +227,7 @@
 
     /* Variation list — unified list style, tight rows */
     #varList .var-row:last-child { border-bottom: 0; }
-    #varList .var-row { cursor: pointer; transition: background .15s ease, border-color .15s ease; }
-    #varList .var-row:hover { background: #eff6ff; border-color: #1f6feb; }
-    #varList .var-row.anon-selected { background: #dbeafe; border-color: #1f6feb; box-shadow: inset 0 0 0 2px #1f6feb; }
+    #varList .var-row:hover { background: #f8fafc; }
 
     /* Mode tabs - normal weight */
     .mt-badge {
@@ -309,7 +306,7 @@
     </div>
   </a>
   <div class="topbar-right" style="display:flex;align-items:center;gap:14px;">
-    <a id="homeLinkBtn" href="/home/" class="p-btn p-btn-primary">Home</a>
+    <a id="homeLinkBtn" href="/home/" class="p-btn p-btn-primary" style="display:none;">Home</a>
     <a id="signInLink" href="/home/" class="p-btn p-btn-outline">Login</a>
     <button id="signOutBtn" class="p-btn p-btn-outline hidden" type="button">Logout</button>
     <button id="openManageBtn" style="display:none;" type="button" aria-hidden="true"></button>
@@ -608,9 +605,9 @@ function renderProductDetail(data) {
         <h1 style="margin:0 0 6px;font-size:22px;">${esc(p.title)}</h1>
         ${p.product_code ? `<div style="color:#64748b;font-size:12px;margin-bottom:8px;">Product ID: <b style="color:#1f6feb;">${esc(p.product_code)}</b></div>` : ''}
         <div style="margin-bottom:6px;">
-          <span id="mainProdPrice" style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
-          <span id="mainProdMrp" style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;${p.mrp_inr > p.price_inr ? '' : 'display:none;'}">${p.mrp_inr > p.price_inr ? `₹${p.mrp_inr}` : """"}</span>
-          <span id="mainProdOff" style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;${off > 0 ? '' : 'display:none;'}">${off > 0 ? `${off}% OFF` : """"}</span>
+          <span style="font-size:28px;font-weight:800;color:#0f172a;">₹${p.price_inr}</span>
+          ${p.mrp_inr > p.price_inr ? `<span style="color:#94a3b8;text-decoration:line-through;margin-left:10px;font-size:16px;">₹${p.mrp_inr}</span>` : ''}
+          ${off > 0 ? `<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;">${off}% OFF</span>` : ''}
         </div>
         ${colors.length ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:6px;">
@@ -650,7 +647,7 @@ function renderProductDetail(data) {
             </div>
             <div id="varList" style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
               ${colors.map(c => `
-                <label class="var-row" data-cid="${c.id}" data-price="${c.price_inr || p.price_inr}" data-mrp="${c.mrp_inr || p.mrp_inr || '}" data-img="${((c.image_urls || [])[0]) || ((p.image_urls || [])[0]) || '}" style="border-bottom:1px solid #e2e8f0;padding:2px 10px;background:#fff;display:flex;align-items:center;gap:7px;cursor:pointer;min-height:32px;">
+                <label class="var-row" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:2px 10px;background:#fff;display:flex;align-items:center;gap:7px;cursor:pointer;min-height:32px;">
                   <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
                   ${c.hex_code ? `<span style="width:16px;height:16px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
                   <div style="flex:1;min-width:0;line-height:1.2;">
@@ -1301,34 +1298,6 @@ async function handleDsCheckout(payNow) {
 // Track last-viewed product for dropship messaging
 let _lastDetailProductId = null;
 let _lastDetailProduct = null;
-// Anon click: highlight variation row + swap image if variation has one
-document.addEventListener("click", (e) => {
-  const row = e.target && e.target.closest && e.target.closest("#varList .var-row");
-  if (!row) return;
-  document.querySelectorAll("#varList .var-row").forEach(r => r.classList.remove("anon-selected"));
-  row.classList.add("anon-selected");
-  // Swap main image if variation has one
-  const img = row.getAttribute("data-img");
-  const main = document.getElementById("detailMainImg");
-  if (img && main) main.style.backgroundImage = `url('${img}')`;
-  // Update displayed price + MRP
-  const price = row.getAttribute("data-price");
-  const mrp = row.getAttribute("data-mrp");
-  const priceEl = document.getElementById("mainProdPrice");
-  const mrpEl = document.getElementById("mainProdMrp");
-  const offEl = document.getElementById("mainProdOff");
-  if (price && priceEl) priceEl.textContent = "₹" + Number(price).toLocaleString("en-IN");
-  if (mrpEl) {
-    if (mrp && Number(mrp) > Number(price)) {
-      mrpEl.textContent = "₹" + Number(mrp).toLocaleString("en-IN");
-      mrpEl.style.display = "";
-      if (offEl) { const off = Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100); offEl.textContent = off + "% OFF"; offEl.style.display = ""; }
-    } else {
-      mrpEl.style.display = "none";
-      if (offEl) offEl.style.display = "none";
-    }
-  }
-});
 let _lastDetailColors = [];
 
 function renderDesignsForColor() {
