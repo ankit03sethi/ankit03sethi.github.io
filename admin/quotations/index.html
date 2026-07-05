@@ -146,13 +146,11 @@
           <!-- Items -->
           <div class="panel">
             <h2>📦 Line Items</h2>
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
-              <select id="itemPicker" style="flex:1;">
-                <option value="">— Select product or service to add —</option>
-              </select>
-              <button id="addItemBtn" class="b-outline">+ Add</button>
+            <div style="display:flex;gap:8px;margin-bottom:8px;position:relative;">
+              <input id="itemSearch" type="text" placeholder="🔍 Search by product ID, code or service name..." style="flex:1;padding:10px 12px;font-size:14px;" autocomplete="off" />
               <button id="addCustomBtn" class="b-ghost">+ Custom item</button>
             </div>
+            <div id="searchResults" style="display:none;max-height:280px;overflow-y:auto;background:#fff;border:1px solid #d0d7de;border-radius:6px;margin-bottom:12px;box-shadow:0 4px 12px rgba(0,0,0,.05);"></div>
             <div style="margin-bottom:6px;font-size:11px;color:#475467;text-transform:uppercase;font-weight:700;letter-spacing:.4px;">
               <div class="row-4">
                 <div>Description</div>
@@ -323,34 +321,97 @@ async function loadList() {
   });
 }
 
-// ============ CATALOG PICKER ============
+// ============ CATALOG PICKER (search + list) ============
 async function loadCatalogOptions() {
   const j = await callFn("admin-quotations", { op:"catalog_options" });
   if (!j.ok) return;
   _catalog = j;
-  const sel = $("#itemPicker");
-  sel.innerHTML = `<option value="">— Select product or service to add —</option>`;
-  const gS = document.createElement("optgroup"); gS.label = "Services (18% GST)";
-  for (const s of (j.services || [])) {
-    const o = document.createElement("option");
-    o.value = `service:${s.key}`; o.textContent = `${s.name} — ₹${s.price_inr}`;
-    o.dataset.name = s.name; o.dataset.price = s.price_inr;
-    o.dataset.gst = s.gst_percent || 18;
-    o.dataset.hsn = "9983";
-    gS.appendChild(o);
+}
+
+function normalizeItems() {
+  if (!_catalog) return [];
+  const out = [];
+  for (const s of (_catalog.services || [])) {
+    out.push({
+      kind: "service",
+      key: s.key,
+      id_shown: s.key.toUpperCase().replace(/_/g, "-"),
+      name: s.name,
+      price: s.price_inr,
+      gst: s.gst_percent || 18,
+      hsn: "9983",
+    });
   }
-  sel.appendChild(gS);
-  const gP = document.createElement("optgroup"); gP.label = "Products";
-  for (const p of (j.products || [])) {
-    const o = document.createElement("option");
-    o.value = `product:${p.id}`;
-    o.textContent = `${p.title}${p.product_code?` [${p.product_code}]`:""} — ₹${p.price_inr} (GST ${p.effective_gst_percent}%)`;
-    o.dataset.name = p.title; o.dataset.price = p.price_inr;
-    o.dataset.gst = p.effective_gst_percent || 18;
-    o.dataset.hsn = p.effective_hsn_code || "";
-    gP.appendChild(o);
+  for (const p of (_catalog.products || [])) {
+    out.push({
+      kind: "product",
+      id: p.id,
+      id_shown: p.product_code || `#${p.id}`,
+      name: p.title,
+      price: p.price_inr,
+      gst: p.effective_gst_percent || 18,
+      hsn: p.effective_hsn_code || "",
+    });
   }
-  sel.appendChild(gP);
+  return out;
+}
+
+function renderSearchResults(query) {
+  const all = normalizeItems();
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? all.filter(x =>
+        (x.id_shown || "").toLowerCase().includes(q) ||
+        (x.name || "").toLowerCase().includes(q) ||
+        (x.key || "").toLowerCase().includes(q))
+    : all;
+  const wrap = $("#searchResults");
+  if (filtered.length === 0) {
+    wrap.innerHTML = `<div style="padding:16px;color:#94a3b8;font-size:13px;text-align:center;">No matches. Try another search or use "+ Custom item".</div>`;
+    wrap.style.display = "block";
+    return;
+  }
+  let html = "";
+  for (const it of filtered) {
+    const badge = it.kind === "service"
+      ? `<span style="background:#eff6ff;color:#1f6feb;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Service</span>`
+      : `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Product</span>`;
+    html += `<div class="sr-item" data-kind="${it.kind}" data-id="${it.id || ""}" data-key="${it.key || ""}" data-name="${esc(it.name)}" data-idshown="${esc(it.id_shown)}" data-price="${it.price}" data-gst="${it.gst}" data-hsn="${esc(it.hsn)}"
+        style="padding:10px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:2px;">
+            <span style="font-family:ui-monospace,monospace;font-weight:700;color:#0f172a;font-size:13.5px;">${esc(it.id_shown)}</span>
+            ${badge}
+            <span style="font-size:10px;color:#94a3b8;">GST ${it.gst}%</span>
+          </div>
+          <div style="font-size:12px;color:#64748b;">${esc(it.name)}</div>
+        </div>
+        <div style="font-weight:800;font-size:14px;color:#0f172a;white-space:nowrap;">₹${Number(it.price).toLocaleString("en-IN")}</div>
+      </div>`;
+  }
+  wrap.innerHTML = html;
+  wrap.style.display = "block";
+  wrap.querySelectorAll(".sr-item").forEach(el => {
+    el.addEventListener("mouseenter", () => el.style.background = "#f0f6ff");
+    el.addEventListener("mouseleave", () => el.style.background = "");
+    el.addEventListener("click", () => {
+      const kind = el.dataset.kind;
+      _items.push({
+        item_type: kind,
+        item_ref_id: kind === "product" ? Number(el.dataset.id) : null,
+        item_ref_key: kind === "service" ? el.dataset.key : null,
+        description: el.dataset.idshown, // <-- USE PRODUCT ID, NOT TITLE
+        qty: 1,
+        unit_price_inr: Number(el.dataset.price),
+        gst_percent: Number(el.dataset.gst || 18),
+        hsn_code: el.dataset.hsn || "",
+      });
+      $("#itemSearch").value = "";
+      $("#searchResults").style.display = "none";
+      renderItems();
+      $("#itemSearch").focus();
+    });
+  });
 }
 
 // ============ BUILDER ============
@@ -407,24 +468,16 @@ async function openQuote(id) {
   renderItems();
 }
 
-$("#addItemBtn").addEventListener("click", () => {
-  const sel = $("#itemPicker");
-  const val = sel.value;
-  if (!val) { toast("Pick a service or product first", true); return; }
-  const opt = sel.options[sel.selectedIndex];
-  const [type, ref] = val.split(":");
-  _items.push({
-    item_type: type === "service" ? "service" : "product",
-    item_ref_id: type === "product" ? Number(ref) : null,
-    item_ref_key: type === "service" ? ref : null,
-    description: opt.dataset.name,
-    qty: 1,
-    unit_price_inr: Number(opt.dataset.price),
-    gst_percent: Number(opt.dataset.gst || 18),
-    hsn_code: opt.dataset.hsn || "",
-  });
-  sel.value = "";
-  renderItems();
+// Search-driven picker
+$("#itemSearch").addEventListener("focus", () => renderSearchResults($("#itemSearch").value));
+$("#itemSearch").addEventListener("input", () => renderSearchResults($("#itemSearch").value));
+$("#itemSearch").addEventListener("keydown", e => {
+  if (e.key === "Escape") { $("#searchResults").style.display = "none"; $("#itemSearch").blur(); }
+});
+document.addEventListener("click", e => {
+  if (!e.target.closest("#itemSearch") && !e.target.closest("#searchResults")) {
+    $("#searchResults").style.display = "none";
+  }
 });
 
 $("#addCustomBtn").addEventListener("click", () => {
@@ -607,20 +660,13 @@ function buildPdfHtml() {
   </div>`;
 }
 
-$("#pdfBtn").addEventListener("click", async () => {
+$("#pdfBtn").addEventListener("click", () => {
   const q = _currentQuote;
   if (!q) return;
-  const area = $("#pdfArea");
-  area.innerHTML = buildPdfHtml();
-  const opt = {
-    margin: 10,
-    filename: `${q.quote_number}.pdf`,
-    image: { type:"jpeg", quality:0.95 },
-    html2canvas: { scale:2, useCORS:true },
-    jsPDF: { unit:"mm", format:"a4", orientation:"portrait" },
-  };
-  await html2pdf().from(area).set(opt).save();
-  toast("PDF downloaded");
+  // Open the branded customer view in new tab, user clicks Download PDF there (matches sample design)
+  const url = `/quote/?t=${q.share_token}`;
+  window.open(url, "_blank");
+  toast("Opened preview — click Download PDF");
 });
 
 // ============ EMAIL ============
