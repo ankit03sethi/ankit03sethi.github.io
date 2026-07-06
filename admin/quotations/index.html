@@ -239,6 +239,12 @@
                 <button id="deleteBtn" class="b-danger" style="width:100%;">🗑️ Delete Quotation</button>
               </div>
               <div style="font-size:12px;color:#64748b;margin-top:12px;text-align:center;">Share URL:<br><a id="shareUrlLink" href="#" target="_blank" style="color:#1f6feb;word-break:break-all;font-size:11.5px;"></a></div>
+              <!-- Invoice section (shown only when quote is paid) -->
+              <div id="invoiceSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;">
+                <div style="font-weight:800;color:#166534;font-size:13px;margin-bottom:8px;">💼 Invoice</div>
+                <div id="invoiceStatus" style="font-size:12.5px;color:#64748b;margin-bottom:8px;"></div>
+                <div id="invoiceActions"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -940,8 +946,43 @@ $("#markRejectedBtn").addEventListener("click", () => changeStatusThenRefresh("r
 
 function updateActionButtonsVisibility() {
   const q = _currentQuote; if (!q) return;
-  // Hide Reject button if already rejected — can't reject twice
   $("#markRejectedBtn").style.display = q.status === "rejected" ? "none" : "";
+  // Show invoice section only for paid quotes
+  if (q.status === "paid") {
+    $("#invoiceSection").style.display = "block";
+    loadInvoiceForQuote(q.id);
+  } else {
+    $("#invoiceSection").style.display = "none";
+  }
+}
+
+async function loadInvoiceForQuote(quoteId) {
+  const j = await callFn("admin-invoices", { op:"get_by_quote", quotation_id:quoteId });
+  const status = $("#invoiceStatus"); const actions = $("#invoiceActions");
+  if (!j.ok) { status.textContent = "Error checking invoice"; return; }
+  const inv = j.invoice;
+  if (inv) {
+    status.innerHTML = `<b style="color:#166534;">✓ Invoice ${esc(inv.invoice_number)}</b><br>${inv.emailed_at ? "Emailed on " + fmtDate(inv.emailed_at) : "Not yet emailed"}`;
+    actions.innerHTML = `
+      <a href="/invoice/?t=${esc(inv.share_token)}" target="_blank" class="b-outline" style="padding:6px 10px;font-size:12px;border-radius:5px;text-decoration:none;display:inline-block;">📄 View Invoice</a>
+      <button id="resendInvBtn" class="b-primary" style="padding:6px 10px;font-size:12px;margin-left:4px;">📧 Send/Resend</button>
+    `;
+    document.getElementById("resendInvBtn").addEventListener("click", async () => {
+      if (!confirm("Send invoice email to customer?")) return;
+      const r = await callFn("admin-invoices", { op:"email", id: inv.id });
+      if (r.ok) { toast("✓ Emailed"); loadInvoiceForQuote(quoteId); }
+      else toast(r.error || "Failed", true);
+    });
+  } else {
+    status.innerHTML = `<span style="color:#b91c1c;">No invoice yet</span>`;
+    actions.innerHTML = `<button id="genInvBtn" class="b-primary" style="padding:6px 12px;font-size:12px;">➕ Generate Invoice</button>`;
+    document.getElementById("genInvBtn").addEventListener("click", async () => {
+      if (!confirm("Generate an invoice for this paid quote?")) return;
+      const r = await callFn("admin-invoices", { op:"generate_from_quote", quotation_id:quoteId });
+      if (r.ok) { toast("✓ Invoice generated"); loadInvoiceForQuote(quoteId); }
+      else toast(r.error || "Failed", true);
+    });
+  }
 }
 
 $("#deleteBtn").addEventListener("click", async () => {
