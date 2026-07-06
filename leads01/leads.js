@@ -27,46 +27,52 @@ const NEW_SUBS = [
 const MANUAL_ADD_SUBS = new Set(["manual_call", "manual_wa"]);
 
 const FOLLOW_SUBS = [
-  { id: "not_picked",      title: "Call not picked" },
-  { id: "callback",        title: "Call me later" },
-  { id: "interested",      title: "Interested" },
-  { id: "in_progress",     title: "Send Quote" },
-  { id: "quotation_sent",  title: "Quote Sent" },
-  { id: "lost",            title: "Lost" },
-  { id: "never_visited",   title: "Never visited" },
-  { id: "dont_call_again", title: "Don't call again" },
-  { id: "not_interested",  title: "Not interested" },
+  { id: "not_picked",         title: "Call not picked" },
+  { id: "callback",           title: "Call me later" },
+  { id: "interested",         title: "Interested" },
+  { id: "in_progress",        title: "Send Quote" },
+  { id: "quotation_sent",     title: "Quote Sent" },
+  { id: "already_purchased",  title: "Already Purchased" },
+  { id: "lost",               title: "Lost" },
+  { id: "never_visited",      title: "Never visited" },
+  { id: "dont_call_again",    title: "Don't call again" },
+  { id: "not_interested",     title: "Not interested" },
 ];
 
 const TALK_STATUS_OPTIONS = [
-  { value: "",                label: "— select —" },
-  { value: "not_picked",      label: "Call not picked" },
-  { value: "callback",        label: "Call me later" },
-  { value: "interested",      label: "Interested" },
-  { value: "in_progress",     label: "Send Quote" },
-  { value: "quotation_sent",  label: "Quote Sent" },
-  { value: "lost",            label: "Lost" },
-  { value: "never_visited",   label: "Never visited" },
-  { value: "dont_call_again", label: "Don't call again" },
-  { value: "not_interested",  label: "Not interested" },
-  { value: "won_offline",     label: "Won (paid offline)" },
+  { value: "",                  label: "— select —" },
+  { value: "not_picked",        label: "Call not picked" },
+  { value: "callback",          label: "Call me later" },
+  { value: "interested",        label: "Interested" },
+  { value: "in_progress",       label: "Send Quote" },
+  { value: "quotation_sent",    label: "Quote Sent" },
+  { value: "already_purchased", label: "Already Purchased" },
+  { value: "lost",              label: "Lost" },
+  { value: "never_visited",     label: "Never visited" },
+  { value: "dont_call_again",   label: "Don't call again" },
+  { value: "not_interested",    label: "Not interested" },
+  { value: "won_offline",       label: "Won (paid offline)" },
 ];
 
 // State machine: from each sub-tab, these are the valid next moves.
-// Mirrors status.xlsx column-wise: row 1 = tab, rows 3+ = allowed next statuses.
 const STATUS_TRANSITIONS = {
-  not_picked:      ["callback", "interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested"],
-  callback:        ["interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested"],
-  interested:      ["in_progress", "quotation_sent", "lost"],
-  in_progress:     ["quotation_sent", "lost"],
-  quotation_sent:  ["won_offline", "lost"],
-  lost:            [],
-  never_visited:   [],
-  dont_call_again: [],
-  not_interested:  [],
+  not_picked:        ["callback", "interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested"],
+  callback:          ["interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested"],
+  interested:        ["in_progress", "quotation_sent", "already_purchased", "lost"],
+  in_progress:       ["quotation_sent", "already_purchased", "lost"],
+  quotation_sent:    ["won_offline", "already_purchased", "lost"],
+  already_purchased: [],
+  lost:              [],
+  never_visited:     [],
+  dont_call_again:   [],
+  not_interested:    [],
 };
-// For New-bucket leads (no talk_status yet) — show the 4 entry-point statuses.
-const NEW_BUCKET_STATUS_OPTIONS = ["not_picked", "callback", "interested", "in_progress"];
+// For New-bucket leads — show ALL Follow-Up statuses so admin can classify from any entry-point tab.
+const NEW_BUCKET_STATUS_OPTIONS = [
+  "not_picked", "callback", "interested", "in_progress",
+  "quotation_sent", "already_purchased", "lost",
+  "never_visited", "dont_call_again", "not_interested"
+];
 
 let pipelineCache = [];
 let activeTop = "new";
