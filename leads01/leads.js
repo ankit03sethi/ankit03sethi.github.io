@@ -13,6 +13,7 @@ const show = (el) => el && el.classList.remove("hidden");
 const hide = (el) => el && el.classList.add("hidden");
 
 const NEW_SUBS = [
+  { id: "manual_ref",    title: "Reference" },       // manual-add tab (referrals)
   { id: "manual_call",   title: "Call" },            // manual-add tab
   { id: "manual_wa",     title: "WhatsApp" },        // manual-add tab
   { id: "lead_captured", title: "Lead captured" },
@@ -21,17 +22,16 @@ const NEW_SUBS = [
   { id: "callback",      title: "Callback" },
   { id: "click_to_call", title: "Click to Call" },
   { id: "click_to_wa",   title: "Click to WhatsApp" },
-  { id: "payment",       title: "Payment" }, // single tab — clicked pay OR initiated Razorpay
+  { id: "payment",       title: "Payment" },
 ];
 // Sub-tabs that allow manual add (Add lead button + form)
-const MANUAL_ADD_SUBS = new Set(["manual_call", "manual_wa"]);
+const MANUAL_ADD_SUBS = new Set(["manual_ref", "manual_call", "manual_wa"]);
 
 const FOLLOW_SUBS = [
   { id: "not_picked",         title: "Call not picked" },
   { id: "callback",           title: "Call me later" },
   { id: "interested",         title: "Interested" },
   { id: "in_progress",        title: "Send Quote" },
-  { id: "quotation_sent",     title: "Quote Sent" },
   { id: "already_purchased",  title: "Already Purchased" },
   { id: "lost",               title: "Lost" },
   { id: "never_visited",      title: "Never visited" },
@@ -58,9 +58,8 @@ const TALK_STATUS_OPTIONS = [
 const STATUS_TRANSITIONS = {
   not_picked:        ["callback", "interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested"],
   callback:          ["interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested"],
-  interested:        ["in_progress", "quotation_sent", "already_purchased", "lost"],
-  in_progress:       ["quotation_sent", "already_purchased", "lost"],
-  quotation_sent:    ["won_offline", "already_purchased", "lost"],
+  interested:        ["in_progress", "already_purchased", "lost"],
+  in_progress:       ["already_purchased", "won_offline", "lost"],
   already_purchased: [],
   lost:              [],
   never_visited:     [],
@@ -268,12 +267,12 @@ function bucketOf(lead) {
   return "new";
 }
 function newSubOf(lead) {
+  if (lead.manual_status === "manual_ref")  return "manual_ref";
   if (lead.manual_status === "manual_call") return "manual_call";
   if (lead.manual_status === "manual_wa")   return "manual_wa";
   if (lead.manual_status === "callback") return "callback";
   if (lead.manual_status === "clicked_wa") return "click_to_wa";
   if (lead.manual_status === "clicked_call") return "click_to_call";
-  // Single Payment tab: either clicked the "Register now to pay" button OR initiated Razorpay
   if (lead.manual_status === "clicked_pay") return "payment";
   if (lead.latest_event === "payment_initiated") return "payment";
   if (lead.latest_event === "otp_verified")      return "otp_verified";
@@ -281,6 +280,8 @@ function newSubOf(lead) {
   return "lead_captured";
 }
 function followSubOf(lead) {
+  // Route quotation_sent leads back to Send Quote (Quote Sent tab removed)
+  if (lead.talk_status === "quotation_sent") return "in_progress";
   if (lead.talk_status) return lead.talk_status;
   if (lead.manual_status === "callback") return "callback";
   return "in_progress";
@@ -322,7 +323,8 @@ function switchTop(top) {
   paneStage?.classList.toggle("hidden", isEmbedded);
   paneQuot?.classList.toggle("hidden", !isEmbedded);
   if (subTabs) subTabs.style.display = isEmbedded ? "none" : "";
-  if (toolbar) toolbar.style.display = isEmbedded ? "none" : "";
+  // Keep the top toolbar (search + refresh + date range) VISIBLE on all tabs
+  if (toolbar) toolbar.style.display = "";
 
   if (top === "quotations") {
     const f = $("#quotationsFrame");
@@ -368,7 +370,12 @@ function renderSubTabs() {
   `).join("");
 
   document.querySelectorAll(".sub-tab").forEach((btn) =>
-    btn.addEventListener("click", () => { activeSub = btn.dataset.sub; expandedRows.clear(); renderActive(); })
+    btn.addEventListener("click", () => {
+      activeSub = btn.dataset.sub;
+      expandedRows.clear();
+      remarkFilter = ""; // reset per-tab so dropdown/filter refreshes
+      renderActive();
+    })
   );
 
   if (!subs.find((s) => s.id === activeSub)) {
@@ -396,10 +403,10 @@ function renderPane() {
   wireRowHandlers();
 }
 
-// Manual-add bar: Add lead button + inline form (Call / WhatsApp sub-tabs only)
+// Manual-add bar: Add lead button + inline form (Reference / Call / WhatsApp sub-tabs)
 function renderManualAddBar(el) {
-  const type = activeSub === "manual_call" ? "call" : "wa";
-  const label = type === "call" ? "Call" : "WhatsApp";
+  const type = activeSub === "manual_ref" ? "ref" : (activeSub === "manual_call" ? "call" : "wa");
+  const label = type === "ref" ? "Reference" : (type === "call" ? "Call" : "WhatsApp");
   el.innerHTML = `
     <div class="manual-add-wrap" style="background:#f0f7ff;border:1px solid #cfe0ff;border-radius:6px;padding:10px 12px;margin:8px 0;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -487,16 +494,23 @@ function renderRows() {
   if (activeTop === "done")   rows = inBucket;
 
   const qq = (remarkFilter || "").trim().toLowerCase();
-  if (qq) rows = rows.filter((l) => (l.remarks || "").toLowerCase().includes(qq));
+  if (qq) rows = rows.filter((l) =>
+    (l.remarks || "").toLowerCase().includes(qq) ||
+    (l.latest_remark_header || "").toLowerCase().includes(qq)
+  );
 
   const searchTerm = ($("#searchBox")?.value || "").trim().toLowerCase();
   if (searchTerm) {
     rows = rows.filter((l) =>
       (l.email || "").toLowerCase().includes(searchTerm) ||
+      (l.alt_email || "").toLowerCase().includes(searchTerm) ||
       (l.mobile || "").toLowerCase().includes(searchTerm) ||
+      (l.alt_mobile || "").toLowerCase().includes(searchTerm) ||
+      (l.whatsapp || "").toLowerCase().includes(searchTerm) ||
       (l.service_name || "").toLowerCase().includes(searchTerm) ||
       (l.service_type || "").toLowerCase().includes(searchTerm) ||
-      (l.remarks || "").toLowerCase().includes(searchTerm)
+      (l.remarks || "").toLowerCase().includes(searchTerm) ||
+      (l.latest_remark_header || "").toLowerCase().includes(searchTerm)
     );
   }
 
@@ -506,16 +520,30 @@ function renderRows() {
 }
 
 function buildRemarkOptions() {
-  const distinct = new Map();
-  pipelineCache.forEach((l) => {
-    const r = (l.remarks || "").trim();
-    if (r) distinct.set(r, (distinct.get(r) || 0) + 1);
+  // Only leads in the CURRENT sub-tab, and show only the LATEST remark HEADER per customer.
+  const rows = leadsInCurrentSubTab();
+  const seen = new Map(); // customer_key -> latest header (or first line of remark)
+  rows.forEach((l) => {
+    const cur = l.customer_key;
+    if (seen.has(cur)) return;
+    const h = (l.latest_remark_header || "").trim() || (l.remarks || "").split("\n")[0].trim();
+    if (h) seen.set(cur, h);
   });
-  return Array.from(distinct.entries())
+  const counts = new Map();
+  seen.forEach((h) => counts.set(h, (counts.get(h) || 0) + 1));
+  return Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 30)
-    .map(([txt, cnt]) => `<option value="${esc(txt)}" ${txt === remarkFilter ? "selected" : ""}>${esc(txt.slice(0, 50))} (${cnt})</option>`)
+    .map(([txt, cnt]) => `<option value="${esc(txt)}" ${txt === remarkFilter ? "selected" : ""}>${esc(txt.slice(0, 60))} (${cnt})</option>`)
     .join("");
+}
+
+// All leads currently visible in the active sub-tab (matches renderRows() logic minus filters)
+function leadsInCurrentSubTab() {
+  const inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+  if (activeTop === "new")    return inBucket.filter((l) => newSubOf(l) === activeSub);
+  if (activeTop === "follow") return inBucket.filter((l) => followSubOf(l) === activeSub);
+  return inBucket;
 }
 
 function renderToolbarInto(el) {
@@ -586,8 +614,13 @@ function renderTable(rows, readOnly) {
 }
 
 function rowHtml(l, readOnly) {
-  const phone = (l.mobile || "").replace(/\D/g, "");
-  const waPhone = phone.length === 10 ? "91" + phone : phone;
+  // LATEST values: prefer alt_* / whatsapp overrides, fall back to base
+  const latestEmail  = l.alt_email  || l.email  || "";
+  const latestMobile = l.alt_mobile || l.mobile || "";
+  const latestWA     = l.whatsapp   || latestMobile;  // WA defaults to mobile if not separately set
+  const phone = (latestMobile || "").replace(/\D/g, "");
+  const waPhone = (latestWA || "").replace(/\D/g, "");
+  const waPhoneFmt = waPhone.length === 10 ? "91" + waPhone : waPhone;
   const waText = encodeURIComponent(`Hi! This is cursive. I see you started ${l.service_name || l.service_type || ""} - quick chat?`);
   const cur = esc(l.customer_key || "");
   const ageHrs = (Date.now() - new Date(l.last_event_at).getTime()) / 3600000;
@@ -597,8 +630,17 @@ function rowHtml(l, readOnly) {
 
   const statusValue = l.talk_status || "";
   const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "—";
-  const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call">Call</a>` : "";
-  const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa">WhatsApp</a>` : "";
+  const callBtn = phone ? `<a href="tel:+${(phone.length===10?"91":"")+phone}" class="call" style="display:inline-block;padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">📞 Call</a>` : "";
+  const waBtn   = waPhone ? `<a href="https://wa.me/${waPhoneFmt}?text=${waText}" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">💬 WhatsApp</a>` : "";
+
+  // Contact cell HTML: latest email + mobile + WhatsApp + Update button
+  const contactCell = `
+    <div style="font-size:12.5px;line-height:1.4;">
+      ${latestEmail ? `<div><a href="mailto:${esc(latestEmail)}" style="color:#0f766e;">${esc(latestEmail)}</a></div>` : `<div class="muted-small">no email</div>`}
+      ${latestMobile ? `<div class="muted-small" style="color:#0f172a;font-weight:600;">📱 ${esc(latestMobile)}</div>` : ""}
+      ${(l.whatsapp && l.whatsapp !== latestMobile) ? `<div class="muted-small" style="color:#065f46;">💬 ${esc(l.whatsapp)}</div>` : ""}
+      ${readOnly ? "" : `<button data-action="edit-contact" data-customer-key="${cur}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">✏️ Update contact</button>`}
+    </div>`;
   // Send Quote button - appears in Send Quote sub-tab; opens Quotations tab with prefilled data
   const quotePrefill = new URLSearchParams({
     new: "1",
@@ -619,13 +661,11 @@ function rowHtml(l, readOnly) {
         <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
         <span class="done-tag">${esc(bucketReason(l))}</span>
       </td>
-      <td>
-        ${l.email ? `<div>${esc(l.email)}</div>` : ""}
-        ${l.mobile ? `<div class="muted-small">${esc(l.mobile)}</div>` : ""}
-      </td>
+      <td>${contactCell}</td>
       <td>
         <div>${esc(ageStr)} ago</div>
         <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
+        <div style="margin-top:6px;">${callBtn}${waBtn}</div>
       </td>
       <td><span class="muted-small" style="font-weight:600;color:#0f172a;">${esc(statusLabel)}</span></td>
       <td>${remarksCell}</td>
@@ -644,13 +684,11 @@ function rowHtml(l, readOnly) {
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
     </td>
-    <td>
-      ${l.email ? `<div><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></div>` : ""}
-      ${l.mobile ? `<div class="muted-small">${esc(l.mobile)}</div>` : ""}
-    </td>
+    <td>${contactCell}</td>
     <td>
       <div>${esc(ageStr)} ago</div>
       <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
+      <div style="margin-top:6px;">${callBtn}${waBtn}</div>
       ${quoteBtn ? `<div style="margin-top:6px;">${quoteBtn}</div>` : ""}
     </td>
     <td>
@@ -697,6 +735,7 @@ function buildStatusOptionsHtml(allowedIds, currentValue) {
 
 function renderRemarksCell(l, readOnly) {
   const cur = esc(l.customer_key || "");
+  const latestHeader = l.latest_remark_header || "";
   const latest = l.remarks || "";
   const latestAt = l.latest_remark_at || l.manual_updated_at || "";
   const count = Number(l.remarks_count || 0);
@@ -705,9 +744,10 @@ function renderRemarksCell(l, readOnly) {
 
   let html = "";
 
-  if (latest) {
+  if (latest || latestHeader) {
     html += `<div class="remark-latest">
-      <div class="remark-text">${esc(latest)}</div>
+      ${latestHeader ? `<div style="font-weight:700;color:#0f172a;font-size:13px;">${esc(latestHeader)}</div>` : ""}
+      ${latest ? `<div class="remark-text" style="color:#334155;font-size:12.5px;">${esc(latest)}</div>` : ""}
       ${latestAt ? `<div class="remark-meta">${esc(fmtDate(latestAt))} ${esc(fmtTime(latestAt))}</div>` : ""}
     </div>`;
   } else {
@@ -719,10 +759,10 @@ function renderRemarksCell(l, readOnly) {
   }
   if (isExpanded) {
     const list = remarksByKey[l.customer_key] || [];
-    // skip the first one (already shown as latest)
     const older = list.slice(1);
     html += `<div class="remark-history">
       ${older.map((r) => `<div class="remark-older">
+        ${r.header ? `<div style="font-weight:700;color:#0f172a;">${esc(r.header)}</div>` : ""}
         <div class="remark-text">${esc(r.remark)}</div>
         <div class="remark-meta">${esc(fmtDate(r.created_at))} ${esc(fmtTime(r.created_at))}${r.created_by ? ` &middot; ${esc(r.created_by)}` : ""}</div>
       </div>`).join("")}
@@ -734,12 +774,13 @@ function renderRemarksCell(l, readOnly) {
     html += `<div class="add-remark-wrap">
       <button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>
       <div class="add-remark-form hidden">
-        <textarea class="add-remark-input" placeholder="Type new remark..." rows="2"></textarea>
-        <div class="add-remark-actions">
+        <input class="add-remark-header" type="text" placeholder="Header / short caption (e.g. Called at 3pm, discussed pricing)" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;font-weight:600;margin-bottom:4px;"/>
+        <textarea class="add-remark-input" placeholder="Full discussion / details..." rows="2" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;"></textarea>
+        <div class="add-remark-actions" style="margin-top:4px;">
           <button class="add-remark-save" data-action="add-remark-save" data-customer-key="${cur}">Save</button>
           <button class="add-remark-cancel" data-action="add-remark-cancel" data-customer-key="${cur}">Cancel</button>
         </div>
-        <div class="add-remark-error" style="display:none;"></div>
+        <div class="add-remark-error" style="display:none;color:#dc2626;font-size:11.5px;margin-top:3px;"></div>
       </div>
     </div>`;
   }
@@ -804,35 +845,43 @@ function wireRowHandlers() {
     }
     if (action === "add-remark-save") {
       const wrap = target.closest(".add-remark-wrap");
+      const headerInput = wrap.querySelector(".add-remark-header");
       const input = wrap.querySelector(".add-remark-input");
       const errBox = wrap.querySelector(".add-remark-error");
+      const header = (headerInput?.value || "").trim();
       const text = (input.value || "").trim();
       errBox.style.display = "none";
-      if (!text) {
-        errBox.textContent = "Type something before saving.";
+      if (!header && !text) {
+        errBox.textContent = "Fill header or body before saving.";
         errBox.style.display = "block";
         return;
       }
       target.disabled = true; target.textContent = "Saving...";
       try {
-        const saved = await callAdmin("add_remark", { customer_key: key, remark: text });
-        // Update cache
+        const saved = await callAdmin("add_remark", { customer_key: key, header, remark: text || header });
         const idx = pipelineCache.findIndex((x) => x.customer_key === key);
         if (idx >= 0) {
           pipelineCache[idx].remarks = saved.remark;
+          pipelineCache[idx].latest_remark_header = saved.header || "";
           pipelineCache[idx].latest_remark_at = saved.created_at;
           pipelineCache[idx].remarks_count = (pipelineCache[idx].remarks_count || 0) + 1;
         }
-        // Append to remarks cache too
-        if (remarksByKey[key]) {
-          remarksByKey[key].unshift(saved);
-        }
+        if (remarksByKey[key]) remarksByKey[key].unshift(saved);
         renderPane();
       } catch (err) {
         target.disabled = false; target.textContent = "Save";
         errBox.textContent = "Save failed: " + err.message;
         errBox.style.display = "block";
       }
+      return;
+    }
+    if (action === "edit-contact") {
+      showContactUpdateModal({
+        customer_key: key,
+        email: target.dataset.email || "",
+        mobile: target.dataset.mobile || "",
+        whatsapp: target.dataset.whatsapp || "",
+      });
       return;
     }
     if (action === "send-quote") {
@@ -869,6 +918,63 @@ function wireRowHandlers() {
       return;
     }
   });
+}
+
+// Contact update modal — 3 fields with append-only history
+function showContactUpdateModal(current) {
+  // Remove any existing modal
+  document.getElementById("contactUpdateModalOverlay")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "contactUpdateModalOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:460px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.2);">
+      <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:4px;">Update customer contact</div>
+      <div class="muted-small" style="margin-bottom:14px;color:#64748b;">Old values are kept forever — you're only adding a newer value to use going forward. Leave a field blank to keep the current one.</div>
+      <label style="display:block;font-size:12px;font-weight:600;color:#334155;margin-bottom:3px;">Email</label>
+      <input id="cuEmail" type="email" value="${esc(current.email)}" placeholder="customer@email.com" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:13.5px;margin-bottom:10px;"/>
+      <label style="display:block;font-size:12px;font-weight:600;color:#334155;margin-bottom:3px;">Mobile number (calls)</label>
+      <input id="cuMobile" type="tel" value="${esc(current.mobile)}" placeholder="10-digit mobile" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:13.5px;margin-bottom:10px;"/>
+      <label style="display:block;font-size:12px;font-weight:600;color:#334155;margin-bottom:3px;">WhatsApp number <span style="font-weight:400;color:#64748b;">(defaults to mobile if blank)</span></label>
+      <input id="cuWhatsapp" type="tel" value="${esc(current.whatsapp)}" placeholder="Only if different from mobile" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:13.5px;margin-bottom:14px;"/>
+      <div id="cuMsg" style="font-size:12px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="cuCancel" style="background:#e5e7eb;color:#111;padding:8px 14px;border:none;border-radius:5px;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="cuSave" style="background:#059669;color:#fff;padding:8px 16px;border:none;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;">Save contact</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const cleanup = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(); });
+  document.getElementById("cuCancel").onclick = cleanup;
+  document.getElementById("cuSave").onclick = async () => {
+    const email = (document.getElementById("cuEmail").value || "").trim().toLowerCase();
+    const mobile = (document.getElementById("cuMobile").value || "").replace(/\D/g, "");
+    const whatsapp = (document.getElementById("cuWhatsapp").value || "").replace(/\D/g, "");
+    const msg = document.getElementById("cuMsg");
+    msg.textContent = ""; msg.style.color = "";
+    if (email === current.email && mobile === current.mobile && whatsapp === current.whatsapp) {
+      msg.style.color = "#dc2626"; msg.textContent = "No changes.";
+      return;
+    }
+    const btn = document.getElementById("cuSave"); btn.disabled = true; btn.textContent = "Saving...";
+    try {
+      await callAdmin("update_lead_contact", {
+        customer_key: current.customer_key,
+        email: email || null,
+        mobile: mobile || null,
+        whatsapp: whatsapp || null,
+      });
+      msg.style.color = "#059669"; msg.textContent = "Saved. Refreshing...";
+      pipelineCache = await callAdmin("pipeline");
+      updateTopCounts();
+      renderActive();
+      setTimeout(cleanup, 400);
+    } catch (err) {
+      msg.style.color = "#dc2626"; msg.textContent = "Save failed: " + err.message;
+      btn.disabled = false; btn.textContent = "Save contact";
+    }
+  };
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
