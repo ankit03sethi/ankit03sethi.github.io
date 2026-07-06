@@ -26,7 +26,8 @@
       <div class="nav-sub">India's seller toolkit</div>
     </div>
   </a>
-  <div class="topbar-right">
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="totalPaidChip" class="hidden" style="background:#dcfce7;color:#065f46;padding:6px 14px;border-radius:20px;font-weight:700;font-size:13px;border:1px solid #86efac;" title="Total paid by customers in selected date range">💰 ₹0</span>
     <span id="emailChip" class="email-chip hidden"></span>
     <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
   </div>
@@ -50,6 +51,25 @@
     <input id="searchBox" class="search-box" type="search" placeholder="Search by email, mobile, invoice # or Razorpay ID..." autocomplete="off" />
     <button id="refreshBtn" class="btn-refresh" type="button">Refresh</button>
     <span class="last-refreshed" id="lastRefreshed"></span>
+  </div>
+
+  <div class="date-toolbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;font-size:13px;">
+    <span style="font-weight:600;color:#334155;">📅 Date range:</span>
+    <select id="dateRangePreset" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+      <option value="all">All time</option>
+      <option value="today">Today</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="last7">Last 7 days</option>
+      <option value="last30" selected>Last 30 days</option>
+      <option value="thismonth">This month</option>
+      <option value="lastmonth">Last month</option>
+      <option value="custom">Custom range</option>
+    </select>
+    <input type="date" id="dateFrom" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;display:none;" />
+    <span id="dateSep" style="display:none;">to</span>
+    <input type="date" id="dateTo" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;display:none;" />
+    <button id="dateApply" style="padding:6px 12px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;display:none;">Apply</button>
+    <span id="dateActiveRange" style="color:#64748b;font-size:12px;margin-left:auto;"></span>
   </div>
 
   <nav class="tabs top-tabs" id="topTabs">
@@ -85,6 +105,6 @@
   </p>
 </main>
 
-<script type="module" src="leads.js?v=2026070645"></script>
+<script type="module" src="leads.js?v=2026070650"></script>
 </body>
 </html>
