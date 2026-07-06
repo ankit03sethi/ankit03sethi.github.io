@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quotations · Admin · Cursive</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    body { background:#f8fafc; margin:0; color:#0f172a; font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
+    main { max-width:1180px; margin:0 auto; padding:20px; }
+    .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:18px; margin-bottom:14px; }
+    h1 { font-size:20px; margin:0 0 4px; }
+    h2 { margin:0 0 12px; font-size:15px; color:#0f172a; }
+    h3 { margin:0 0 6px; font-size:12px; color:#475467; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+    label { display:block; font-size:11.5px; font-weight:700; color:#475467; margin:10px 0 4px; text-transform:uppercase; letter-spacing:.3px; }
+    input, textarea, select {
+      width:100%; padding:8px 10px; border:1px solid #d0d7de; border-radius:6px;
+      font-size:13px; font-family:inherit; box-sizing:border-box; background:#fff;
+    }
+    input:focus, textarea:focus, select:focus { outline:2px solid #1f6feb; outline-offset:-1px; border-color:#1f6feb; }
+    textarea { resize:vertical; min-height:60px; }
+    button { padding:8px 14px; border-radius:6px; border:none; cursor:pointer; font-weight:600; font-size:13px; }
+    .b-primary { background:#1f6feb; color:#fff; }
+    .b-primary:hover { background:#0d4cb8; }
+    .b-outline { background:#fff; color:#1f6feb; border:1px solid #1f6feb; }
+    .b-success { background:#16a34a; color:#fff; }
+    .b-warn { background:#f59e0b; color:#fff; }
+    .b-danger { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    .b-ghost { background:transparent; color:#475467; }
+    .b-wa { background:#25D366; color:#fff; }
+    .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+    .row-4 { display:grid; grid-template-columns:1.7fr 55px 85px 65px 55px 75px 125px 32px; gap:6px; align-items:center; margin-bottom:6px; }
+    .row-4 input[readonly] { background:#f1f5f9; color:#475467; cursor:not-allowed; }
+    .row-4 select:disabled { background:#f1f5f9; color:#475467; cursor:not-allowed; opacity:1; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; padding:10px 8px; text-align:left; font-size:11px; color:#475467; text-transform:uppercase; letter-spacing:.4px; border-bottom:2px solid #e2e8f0; }
+    td { padding:10px 8px; font-size:13px; border-bottom:1px solid #f1f5f9; }
+    tr:hover td { background:#f8fafc; }
+    .status-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+    .st-draft { background:#f1f5f9; color:#475467; }
+    .st-sent { background:#dbeafe; color:#1e40af; }
+    .st-accepted { background:#dcfce7; color:#15803d; }
+    .st-expired { background:#fee2e2; color:#b91c1c; }
+    .st-cancelled { background:#f3f4f6; color:#6b7280; }
+    .st-follow_up { background:#fef3c7; color:#92400e; }
+    .st-regenerated { background:#ede9fe; color:#6d28d9; font-weight:700; }
+    .st-paid { background:#d1fae5; color:#065f46; font-weight:800; }
+    .st-rejected { background:#fee2e2; color:#991b1b; font-weight:700; }
+    .filter-tab {
+      padding:8px 14px;background:#f1f5f9;color:#475467;border:1px solid #e2e8f0;
+      border-radius:20px;cursor:pointer;font-weight:600;font-size:12.5px;
+      transition:all .15s ease;
+    }
+    .filter-tab:hover { background:#e0e7ff; color:#1f6feb; }
+    .filter-tab.active { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .filter-tab .cnt { display:inline-block;margin-left:6px;background:rgba(255,255,255,.3);padding:1px 6px;border-radius:8px;font-size:10.5px;font-weight:700; }
+    .filter-tab:not(.active) .cnt { background:#e2e8f0;color:#475467; }
+    .toast { position:fixed; right:20px; bottom:20px; background:#16a34a; color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; z-index:200; box-shadow:0 8px 20px rgba(0,0,0,.15); }
+    .toast.err { background:#dc2626; }
+    .hidden { display:none !important; }
+    .totals { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; font-size:14px; line-height:1.9; }
+    .totals .grand { color:#1f6feb; font-size:20px; font-weight:800; border-top:2px solid #0f172a; margin-top:8px; padding-top:8px; }
+    .action-bar { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid #e2e8f0; }
+    .helper { color:#94a3b8; font-size:12px; margin-top:4px; }
+    .qnum-badge { display:inline-block; background:#1f6feb; color:#fff; padding:4px 10px; border-radius:6px; font-weight:700; font-size:13px; letter-spacing:.5px; }
+    .col-wrap { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+    @media (max-width:900px) { .col-wrap { grid-template-columns:1fr; } .row-4 { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" style="cursor:default;">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Quotations · Admin</div>
+    </div>
+  </div>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
+    <span id="emailChip" style="background:#f1f5f9;color:#475467;padding:5px 10px;border-radius:6px;font-size:12.5px;font-weight:600;" class="hidden"></span>
+    <button id="signOutBtn" class="hidden b-danger" style="padding:7px 12px;">Logout</button>
+  </div>
+</header>
+
+<main>
+  <!-- Login gate -->
+  <div id="loginPanel" class="panel hidden" style="max-width:400px;margin:60px auto;">
+    <h1 style="text-align:center;">🔒 Admin Login</h1>
+    <p style="color:#64748b;font-size:13px;text-align:center;">Sign in to manage quotations</p>
+    <label>Email</label>
+    <input id="loginEmail" type="text" placeholder="admin@cursive.world" />
+    <label>Password</label>
+    <input id="loginPass" type="password" placeholder="••••••••" />
+    <div id="loginErr" style="color:#dc2626;font-size:12px;margin-top:8px;display:none;"></div>
+    <button id="loginBtn" class="b-primary" style="width:100%;margin-top:14px;padding:10px;">Sign in</button>
+  </div>
+
+  <!-- Main app (hidden until login) -->
+  <div id="app" class="hidden">
+    <!-- LIST VIEW -->
+    <div id="listView" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h1 style="margin:0;">📋 Quotations</h1>
+        <button id="newBtn" class="b-primary">+ New Quotation</button>
+      </div>
+      <div style="margin-bottom:14px;">
+        <input id="listSearchBox" type="text" placeholder="🔍 Search by quote #, name, email, mobile, or GST number..." style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box;" autocomplete="off" />
+      </div>
+      <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
+        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="draft">Draft</button>
+        <button class="filter-tab" data-filter="sent">Sent</button>
+        <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
+        <button class="filter-tab" data-filter="regenerated">🔄 Regenerated</button>
+        <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
+        <button class="filter-tab" data-filter="expired">Expired</button>
+        <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
+        <button class="filter-tab" data-filter="paid">💰 Paid</button>
+      </div>
+      <div id="listWrap"></div>
+    </div>
+
+    <!-- BUILDER VIEW -->
+    <div id="builderView" class="hidden">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <button id="backBtn" class="b-ghost" style="padding:0;">← Back to list</button>
+            <h1 id="builderTitle" style="margin:8px 0 0;">New Quotation</h1>
+            <div id="qnumBadge" class="qnum-badge hidden" style="margin-top:4px;"></div>
+          </div>
+          <div id="statusHere"></div>
+        </div>
+      </div>
+
+      <div class="col-wrap">
+        <div>
+          <!-- Customer -->
+          <div class="panel">
+            <h2>👤 Customer Info</h2>
+            <label>Name *</label>
+            <input id="custName" type="text" placeholder="Ram Kumar" />
+            <div class="row-2">
+              <div>
+                <label>Email</label>
+                <input id="custEmail" type="text" placeholder="ram@example.com" />
+              </div>
+              <div>
+                <label>Phone (with country code)</label>
+                <input id="custPhone" type="text" placeholder="+919999888877" />
+              </div>
+            </div>
+            <div class="row-2">
+              <div>
+                <label>GST Number (optional)</label>
+                <input id="custGst" type="text" placeholder="27ABCDE1234F1Z5" />
+              </div>
+              <div>
+                <label>Address (optional)</label>
+                <input id="custAddress" type="text" placeholder="Mumbai, MH" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Items -->
+          <div class="panel">
+            <h2>📦 Line Items</h2>
+            <div style="display:flex;gap:8px;margin-bottom:12px;position:relative;">
+              <div style="flex:1;position:relative;">
+                <input id="itemSearch" type="text" placeholder="🔍 Search by product ID, code, name or service..." style="width:100%;padding:10px 12px;font-size:14px;box-sizing:border-box;" autocomplete="off" />
+                <div id="searchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;max-height:360px;overflow-y:auto;background:#fff;border:1px solid #d0d7de;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
+              </div>
+              <button id="addCustomBtn" class="b-ghost">+ Custom item</button>
+            </div>
+            <div style="margin-bottom:6px;font-size:11px;color:#475467;text-transform:uppercase;font-weight:700;letter-spacing:.4px;">
+              <div class="row-4">
+                <div>Description</div>
+                <div style="text-align:center;">Qty</div>
+                <div style="text-align:right;">Unit ₹</div>
+                <div style="text-align:center;">GST%</div>
+                <div style="text-align:center;">Disc%</div>
+                <div style="text-align:right;">Disc ₹</div>
+                <div style="text-align:right;">Total ₹</div>
+                <div></div>
+              </div>
+            </div>
+            <div id="itemsWrap"></div>
+            <div id="emptyItems" class="helper" style="text-align:center;padding:16px;">No items yet. Pick from dropdown or add custom.</div>
+          </div>
+
+          <!-- Notes -->
+          <div class="panel">
+            <h2>📝 Notes (optional)</h2>
+            <textarea id="notes" placeholder="Terms, delivery info, custom message..."></textarea>
+          </div>
+        </div>
+
+        <div>
+          <!-- Totals -->
+          <div class="panel">
+            <h2>💰 Totals</h2>
+            <div class="totals">
+              <div style="display:flex;justify-content:space-between;">Subtotal <b id="tSub">₹0.00</b></div>
+              <div style="display:flex;justify-content:space-between;color:#64748b;">GST <b id="tGst">₹0.00</b></div>
+              <div id="tVolRow" style="display:none;justify-content:space-between;color:#16a34a;font-size:12.5px;"><span id="tVolLbl">Volume discount</span> <b id="tVolAmt">-₹0.00</b></div>
+              <div class="grand" style="display:flex;justify-content:space-between;">Total <span id="tTotal">₹0.00</span></div>
+            </div>
+            <label style="margin-top:14px;">Valid for (days)</label>
+            <input id="validDays" type="number" value="1" min="1" max="365" />
+            <div class="helper">Default 1 day. Set to 30 for 30 days.</div>
+          </div>
+
+          <!-- Actions -->
+          <div class="panel">
+            <h2>🚀 Actions</h2>
+            <button id="saveBtn" class="b-primary" style="width:100%;">💾 Save Quotation</button>
+            <div id="postSaveActions" class="hidden" style="margin-top:12px;">
+              <div class="action-bar" style="border:0;padding:0;margin:0;">
+                <button id="pdfBtn" class="b-outline" style="flex:1;">📄 Download PDF</button>
+                <button id="emailBtn" class="b-success" style="flex:1;">📧 Email</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="waBtn" class="b-wa" style="flex:1;">💬 WhatsApp</button>
+                <button id="copyLinkBtn" class="b-outline" style="flex:1;">🔗 Copy Link</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="markAcceptedBtn" class="b-success" style="flex:1;">✅ Accepted</button>
+                <button id="markPaidBtn" style="flex:1;background:#065f46;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">💰 Paid</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="markFollowUpBtn" class="b-warn" style="flex:1;">📞 Follow Up</button>
+                <button id="markRejectedBtn" style="flex:1;background:#991b1b;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">❌ Reject</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="recreateBtn" style="width:100%;background:#7c3aed;color:#fff;padding:9px 14px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🔄 Recreate as New Draft</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="deleteBtn" class="b-danger" style="width:100%;">🗑️ Delete Quotation</button>
+              </div>
+              <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;text-align:center;line-height:1.5;">
+                <b>Recreate</b> keeps this quote as-is and creates a fresh draft with the same items — perfect if a customer asks for a revised offer.
+              </div>
+              <div style="font-size:12px;color:#64748b;margin-top:12px;text-align:center;">Share URL:<br><a id="shareUrlLink" href="#" target="_blank" style="color:#1f6feb;word-break:break-all;font-size:11.5px;"></a></div>
+              <!-- Invoice section (shown only when quote is paid) -->
+              <div id="invoiceSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;">
+                <div style="font-weight:800;color:#166534;font-size:13px;margin-bottom:8px;">💼 Invoice</div>
+                <div id="invoiceStatus" style="font-size:12.5px;color:#64748b;margin-bottom:8px;"></div>
+                <div id="invoiceActions"></div>
+              </div>
+              <!-- History (previous versions) -->
+              <div id="historySection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;">
+                <div style="font-weight:800;color:#7c3aed;font-size:13px;margin-bottom:8px;">📚 Previous Versions</div>
+                <div id="historyList" style="font-size:12px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Hidden PDF template -->
+<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:800px;background:#fff;padding:40px;font-family:system-ui,-apple-system,sans-serif;color:#0f172a;"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, storageKey:"pd_tracker_auth" } });
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
+
+function toast(msg, isErr) {
+  const t = document.createElement("div");
+  t.className = "toast" + (isErr ? " err" : "");
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+let _session = null;
+let _catalog = null; // { products, services }
+let _items = [];     // current line items
+let _currentQuote = null; // saved quote object
+
+// ============ AUTH ============
+async function refreshSession() {
+  const { data:{ session } } = await sb.auth.getSession();
+  _session = session;
+  if (session) {
+    $("#loginPanel").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    $("#emailChip").textContent = session.user.email;
+    $("#emailChip").classList.remove("hidden");
+    $("#signOutBtn").classList.remove("hidden");
+    await loadList();
+    await loadCatalogOptions();
+  } else {
+    $("#loginPanel").classList.remove("hidden");
+    $("#app").classList.add("hidden");
+    $("#emailChip").classList.add("hidden");
+    $("#signOutBtn").classList.add("hidden");
+  }
+}
+
+$("#loginBtn").addEventListener("click", async () => {
+  const email = $("#loginEmail").value.trim();
+  const password = $("#loginPass").value;
+  if (!email || !password) { $("#loginErr").textContent = "Enter email and password"; $("#loginErr").style.display = "block"; return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { $("#loginErr").textContent = error.message; $("#loginErr").style.display = "block"; return; }
+  $("#loginErr").style.display = "none";
+  await refreshSession();
+});
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refreshSession(); });
+$("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+
+// ============ CALL EDGE ============
+async function callFn(name, body, method = "POST") {
+  const url = `${SUPABASE_URL}/functions/v1/${name}`;
+  const r = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + _session.access_token,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: method === "GET" ? undefined : JSON.stringify(body || {}),
+  });
+  return await r.json();
+}
+
+// ============ LIST ============
+let _allQuotes = [];
+let _currentFilter = "all";
+
+async function loadList() {
+  $("#listWrap").innerHTML = `<div class="helper" style="padding:20px;text-align:center;">Loading...</div>`;
+  const j = await callFn("admin-quotations", { op:"list" });
+  if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error||"")}</div>`; return; }
+  _allQuotes = j.quotations || [];
+  updateFilterCounts();
+  renderFilteredList();
+}
+
+// Funnel logic: once a quote reaches a stage, it stays counted in earlier stages too
+function matchesFilter(q, f) {
+  if (f === "all") return true;
+  if (f === "draft") return q.status === "draft";
+  // "Sent" = anything that has been sent (or moved further)
+  if (f === "sent") return ["sent","follow_up","regenerated","accepted","paid"].includes(q.status);
+  // "Follow Up" = sent quotes not yet accepted/paid — auto-includes sent
+  if (f === "follow_up") return ["sent","follow_up"].includes(q.status);
+  if (f === "regenerated") return q.status === "regenerated";
+  // "Accepted" = accepted or paid (paid implies accepted)
+  if (f === "accepted") return ["accepted","paid"].includes(q.status);
+  if (f === "paid") return q.status === "paid";
+  if (f === "expired") return q.status === "expired";
+  if (f === "rejected") return q.status === "rejected";
+  return false;
+}
+
+function searchMatches(q, term) {
+  if (!term) return true;
+  const t = term.toLowerCase().trim();
+  if (!t) return true;
+  return (q.quote_number || "").toLowerCase().includes(t) ||
+         (q.customer_name || "").toLowerCase().includes(t) ||
+         (q.customer_email || "").toLowerCase().includes(t) ||
+         (q.customer_phone || "").toLowerCase().includes(t) ||
+         (q.customer_gst || "").toLowerCase().includes(t);
+}
+
+function updateFilterCounts() {
+  const term = ($("#listSearchBox")?.value || "");
+  const searched = _allQuotes.filter(q => searchMatches(q, term));
+  const counts = {};
+  document.querySelectorAll(".filter-tab").forEach(tab => {
+    const f = tab.dataset.filter;
+    counts[f] = searched.filter(q => matchesFilter(q, f)).length;
+  });
+  document.querySelectorAll(".filter-tab").forEach(tab => {
+    const f = tab.dataset.filter;
+    const c = counts[f] || 0;
+    const label = tab.textContent.replace(/\s*\d+$/, "").replace(/\s*\(.*\)$/, "");
+    tab.innerHTML = `${label}<span class="cnt">${c}</span>`;
+  });
+}
+
+function renderFilteredList() {
+  const term = ($("#listSearchBox")?.value || "");
+  const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter));
+  if (qs.length === 0) {
+    $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.'}</div>`;
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>Quote #</th><th>Customer</th><th>Total</th><th>Status</th><th>Valid Until</th><th>Created</th><th></th>
+  </tr></thead><tbody>`;
+  for (const q of qs) {
+    html += `<tr data-id="${q.id}" style="cursor:pointer;">
+      <td><b>${esc(q.quote_number)}</b></td>
+      <td>${esc(q.customer_name)}${q.customer_email?`<br><small style="color:#64748b;">${esc(q.customer_email)}</small>`:""}</td>
+      <td><b>${fmt(q.total_paise)}</b></td>
+      <td><span class="status-badge st-${q.status}">${q.status.replace("_"," ")}</span></td>
+      <td style="font-size:12px;color:#64748b;">${fmtDate(q.valid_until)}</td>
+      <td style="font-size:12px;color:#64748b;">${fmtDate(q.created_at)}</td>
+      <td><button class="b-ghost" data-open="${q.id}">Open →</button></td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  $("#listWrap").innerHTML = html;
+  $("#listWrap").querySelectorAll("[data-open]").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); openQuote(Number(b.dataset.open)); });
+  });
+  $("#listWrap").querySelectorAll("tr[data-id]").forEach(r => {
+    r.addEventListener("click", () => openQuote(Number(r.dataset.id)));
+  });
+}
+
+// Wire filter tabs
+document.querySelectorAll(".filter-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    _currentFilter = tab.dataset.filter;
+    renderFilteredList();
+  });
+});
+
+// Wire search box
+$("#listSearchBox").addEventListener("input", () => {
+  updateFilterCounts();
+  renderFilteredList();
+});
+
+// ============ CATALOG PICKER (search + list) ============
+async function loadCatalogOptions() {
+  const j = await callFn("admin-quotations", { op:"catalog_options" });
+  if (!j.ok) return;
+  _catalog = j;
+}
+
+function normalizeItems() {
+  if (!_catalog) return [];
+  const out = [];
+  // Products FIRST
+  for (const p of (_catalog.products || [])) {
+    out.push({
+      kind: "product",
+      id: p.id,
+      id_shown: p.product_code || `#${p.id}`,
+      name: p.title,
+      price: p.price_inr,
+      gst: p.effective_gst_percent || 18,
+      hsn: p.effective_hsn_code || "",
+    });
+  }
+  // Services after
+  for (const s of (_catalog.services || [])) {
+    out.push({
+      kind: "service",
+      key: s.key,
+      id_shown: s.key.toUpperCase().replace(/_/g, "-"),
+      name: s.name,
+      price: s.price_inr,
+      gst: s.gst_percent || 18,
+      hsn: "",
+    });
+  }
+  return out;
+}
+
+function renderSearchResults(query) {
+  const all = normalizeItems();
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? all.filter(x =>
+        (x.id_shown || "").toLowerCase().includes(q) ||
+        (x.name || "").toLowerCase().includes(q) ||
+        (x.key || "").toLowerCase().includes(q))
+    : all;
+  const wrap = $("#searchResults");
+  if (filtered.length === 0) {
+    wrap.innerHTML = `<div style="padding:16px;color:#94a3b8;font-size:13px;text-align:center;">No matches. Try another search or use "+ Custom item".</div>`;
+    wrap.style.display = "block";
+    return;
+  }
+  let html = "";
+  let lastKind = null;
+  for (const it of filtered) {
+    if (it.kind !== lastKind) {
+      const hdr = it.kind === "product" ? "📦 PRODUCTS" : "🧾 SERVICES";
+      html += `<div style="padding:8px 14px;background:#f8fafc;font-size:11px;font-weight:800;color:#1f6feb;letter-spacing:.6px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;">${hdr}</div>`;
+      lastKind = it.kind;
+    }
+    const badge = it.kind === "service"
+      ? `<span style="background:#eff6ff;color:#1f6feb;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Service</span>`
+      : `<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Product</span>`;
+    html += `<div class="sr-item" data-kind="${it.kind}" data-id="${it.id || ""}" data-key="${it.key || ""}" data-name="${esc(it.name)}" data-idshown="${esc(it.id_shown)}" data-price="${it.price}" data-gst="${it.gst}" data-hsn="${esc(it.hsn)}"
+        style="padding:10px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:2px;">
+            <span style="font-family:ui-monospace,monospace;font-weight:700;color:#0f172a;font-size:13.5px;">${esc(it.id_shown)}</span>
+            ${badge}
+            <span style="font-size:10px;color:#94a3b8;">GST ${it.gst}%</span>
+          </div>
+          <div style="font-size:12px;color:#64748b;">${esc(it.name)}</div>
+        </div>
+        <div style="font-weight:800;font-size:14px;color:#0f172a;white-space:nowrap;">₹${Number(it.price).toLocaleString("en-IN")}</div>
+      </div>`;
+  }
+  wrap.innerHTML = html;
+  wrap.style.display = "block";
+  wrap.querySelectorAll(".sr-item").forEach(el => {
+    el.addEventListener("mouseenter", () => el.style.background = "#f0f6ff");
+    el.addEventListener("mouseleave", () => el.style.background = "");
+    el.addEventListener("click", () => {
+      const kind = el.dataset.kind;
+      _items.push({
+        item_type: kind,
+        item_ref_id: kind === "product" ? Number(el.dataset.id) : null,
+        item_ref_key: kind === "service" ? el.dataset.key : null,
+        description: el.dataset.idshown, // <-- USE PRODUCT ID, NOT TITLE
+        qty: 1,
+        unit_price_inr: Number(el.dataset.price),
+        gst_percent: Number(el.dataset.gst || 18),
+        hsn_code: "",
+      });
+      $("#itemSearch").value = "";
+      $("#searchResults").style.display = "none";
+      renderItems();
+      $("#itemSearch").focus();
+    });
+  });
+}
+
+// ============ BUILDER ============
+$("#newBtn").addEventListener("click", () => openBuilder(null));
+$("#backBtn").addEventListener("click", () => { $("#builderView").classList.add("hidden"); $("#listView").classList.remove("hidden"); loadList(); });
+
+function openBuilder(quote) {
+  _currentQuote = quote;
+  _items = [];
+  $("#listView").classList.add("hidden");
+  $("#builderView").classList.remove("hidden");
+  $("#postSaveActions").classList.add("hidden");
+  $("#qnumBadge").classList.add("hidden");
+  $("#statusHere").innerHTML = "";
+  if (quote) {
+    $("#builderTitle").textContent = "Edit Quotation";
+    $("#qnumBadge").textContent = quote.quote_number;
+    $("#qnumBadge").classList.remove("hidden");
+    $("#statusHere").innerHTML = `<span class="status-badge st-${quote.status}">${quote.status}</span>`;
+    $("#custName").value = quote.customer_name || "";
+    $("#custEmail").value = quote.customer_email || "";
+    $("#custPhone").value = quote.customer_phone || "";
+    $("#custGst").value = quote.customer_gst || "";
+    $("#custAddress").value = quote.customer_address || "";
+    $("#notes").value = quote.notes || "";
+    if (quote.valid_until) {
+      const daysLeft = Math.max(1, Math.round((new Date(quote.valid_until).getTime() - Date.now()) / (86400000)));
+      $("#validDays").value = daysLeft;
+    }
+    $("#postSaveActions").classList.remove("hidden");
+    setShareUrl(quote.share_token);
+    setTimeout(updateActionButtonsVisibility, 0);
+  } else {
+    $("#builderTitle").textContent = "New Quotation";
+    ["custName","custEmail","custPhone","custGst","custAddress","notes"].forEach(id => $("#"+id).value = "");
+    $("#validDays").value = 1;
+  }
+  renderItems();
+}
+
+async function openQuote(id) {
+  const j = await callFn("admin-quotations", { op:"get", id });
+  if (!j.ok) { toast(j.error || "Not found", true); return; }
+  openBuilder(j.quotation);
+  // Show previous versions history (if this quote has predecessors)
+  if (j.predecessors && j.predecessors.length > 0) {
+    let html = "";
+    for (const p of j.predecessors) {
+      html += `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:8px;background:#faf5ff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div><b>${esc(p.quote_number)}</b> <span class="status-badge st-${p.status}" style="margin-left:6px;">${p.status.replace("_"," ")}</span></div>
+          <div style="font-size:11px;color:#64748b;">${fmtDate(p.created_at)}</div>
+        </div>
+        <div style="font-size:12px;color:#475467;">Total: <b>${fmt(p.total_paise)}</b> · Subtotal: ${fmt(p.subtotal_paise)} · GST: ${fmt(p.gst_paise)}</div>
+        <button data-preview="${p.id}" style="margin-top:6px;padding:4px 10px;font-size:11px;background:#fff;color:#7c3aed;border:1px solid #7c3aed;border-radius:4px;cursor:pointer;">Show items →</button>
+        <div id="predItems_${p.id}" style="display:none;margin-top:8px;padding:8px;background:#fff;border-radius:4px;font-size:11.5px;"></div>
+      </div>`;
+    }
+    $("#historyList").innerHTML = html;
+    $("#historySection").style.display = "block";
+    // Wire preview buttons
+    document.querySelectorAll("[data-preview]").forEach(b => {
+      b.addEventListener("click", async () => {
+        const pid = Number(b.dataset.preview);
+        const container = document.getElementById("predItems_" + pid);
+        if (container.style.display === "block") { container.style.display = "none"; return; }
+        const rj = await callFn("admin-quotations", { op:"get_predecessor_items", id: pid });
+        if (rj.ok) {
+          let ihtml = "<table style='width:100%;font-size:11px;'><thead><tr><th style='text-align:left;padding:4px;'>Item</th><th style='text-align:center;padding:4px;'>Qty</th><th style='text-align:right;padding:4px;'>Unit</th><th style='text-align:right;padding:4px;'>Total</th></tr></thead><tbody>";
+          for (const it of (rj.items || [])) {
+            const total = (it.total_paise || 0) + (it.gst_paise || 0);
+            ihtml += `<tr><td style='padding:4px;'>${esc(it.description)}</td><td style='text-align:center;padding:4px;'>${it.qty}</td><td style='text-align:right;padding:4px;'>${fmt(it.unit_price_paise)}</td><td style='text-align:right;padding:4px;font-weight:600;'>${fmt(total)}</td></tr>`;
+          }
+          ihtml += "</tbody></table>";
+          container.innerHTML = ihtml;
+          container.style.display = "block";
+        }
+      });
+    });
+  } else {
+    $("#historySection").style.display = "none";
+  }
+  // Show superseded banner if applicable
+  if (j.superseded_by) {
+    const banner = document.createElement("div");
+    banner.id = "supersededBanner";
+    banner.style.cssText = "background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;";
+    banner.innerHTML = `⚠️ <b>This quote was recreated as ${esc(j.superseded_by.quote_number)}.</b> The customer payment link on this old quote is DISABLED. <button style="background:transparent;color:#b91c1c;border:0;text-decoration:underline;cursor:pointer;font-size:13px;" onclick="openNewerQuote(${j.superseded_by.id})">Open newer version →</button>`;
+    const target = $("#builderView .panel:first-child");
+    if (target && !document.getElementById("supersededBanner")) target.parentNode.insertBefore(banner, target.nextSibling);
+  } else {
+    const existing = document.getElementById("supersededBanner");
+    if (existing) existing.remove();
+  }
+  window.openNewerQuote = (nid) => openQuote(nid);
+  // Ensure catalog is loaded so we can refresh stale prices
+  if (!_catalog) await loadCatalogOptions();
+  _items = (j.items || []).map(it => ({
+    item_type: it.item_type,
+    item_ref_id: it.item_ref_id,
+    item_ref_key: it.item_ref_key,
+    description: it.description,
+    qty: it.qty,
+    unit_price_inr: it.unit_price_paise / 100,
+    gst_percent: it.gst_percent !== null && it.gst_percent !== undefined ? Number(it.gst_percent) : 18,
+    hsn_code: it.hsn_code || "",
+    discount_inr: it.discount_paise ? it.discount_paise / 100 : 0,
+  }));
+  // Auto-refresh prices from current catalog (fixes stale prices from earlier saves)
+  // Legacy key mapping: OLD service keys → CURRENT keys
+  const LEGACY_KEYS = {
+    "gst_registration": "gst",
+    "marketplace_setup": "platform_account",
+    "product_imaging": "imaging",
+    "product_listing": "listing",
+    "account_management": "service",
+    "business_launcher": "bl_growth",
+    "current_account": "platform_account",
+  };
+  if (_catalog) {
+    let changed = 0;
+    const changes = [];
+    for (const it of _items) {
+      let catPrice = null, catGst = null;
+      if (it.item_type === "service") {
+        // Try current key, then legacy key, then match by description
+        const currentKey = LEGACY_KEYS[it.item_ref_key] || it.item_ref_key;
+        let s = (_catalog.services || []).find(x => x.key === currentKey);
+        if (!s && it.description) {
+          const descLower = String(it.description).toLowerCase().replace(/[-_\s]/g, "");
+          s = (_catalog.services || []).find(x =>
+            descLower.includes(x.key.replace(/[-_\s]/g, "")) ||
+            x.name.toLowerCase().replace(/[-_\s()]/g, "").includes(descLower.slice(0, 6))
+          );
+        }
+        if (s) {
+          catPrice = Number(s.price_inr);
+          catGst = Number(s.gst_percent) || 18;
+          // Also fix legacy ref_key for future
+          it.item_ref_key = s.key;
+        }
+      } else if (it.item_type === "product" && it.item_ref_id) {
+        const p = (_catalog.products || []).find(x => x.id === Number(it.item_ref_id));
+        if (p) { catPrice = Number(p.price_inr); catGst = Number(p.effective_gst_percent) || 18; }
+      }
+      if (catPrice !== null && catPrice !== it.unit_price_inr) {
+        changes.push(`${it.description}: ₹${it.unit_price_inr} → ₹${catPrice}`);
+        it.unit_price_inr = catPrice;
+        changed++;
+      }
+      if (catGst !== null && catGst !== it.gst_percent) {
+        it.gst_percent = catGst;
+      }
+    }
+    if (changed > 0) {
+      toast(`✓ Refreshed ${changed} price(s) from catalog. Click Save to persist.`);
+      console.log("Price changes:", changes);
+    }
+  }
+  renderItems();
+}
+
+// Search-driven picker
+$("#itemSearch").addEventListener("focus", () => renderSearchResults($("#itemSearch").value));
+$("#itemSearch").addEventListener("input", () => renderSearchResults($("#itemSearch").value));
+$("#itemSearch").addEventListener("keydown", e => {
+  if (e.key === "Escape") { $("#searchResults").style.display = "none"; $("#itemSearch").blur(); }
+});
+document.addEventListener("click", e => {
+  if (!e.target.closest("#itemSearch") && !e.target.closest("#searchResults")) {
+    $("#searchResults").style.display = "none";
+  }
+});
+
+$("#addCustomBtn").addEventListener("click", () => {
+  _items.push({ item_type:"custom", item_ref_id:null, item_ref_key:null, description:"", qty:1, unit_price_inr:0, gst_percent:18, hsn_code:"" });
+  renderItems();
+});
+
+const GST_OPTS = [0, 3, 5, 12, 18, 28];
+
+function renderItems() {
+  const wrap = $("#itemsWrap");
+  if (_items.length === 0) { wrap.innerHTML = ""; $("#emptyItems").classList.remove("hidden"); computeTotals(); return; }
+  $("#emptyItems").classList.add("hidden");
+  let html = "";
+  _items.forEach((it, i) => {
+    const lineBase = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+    const gstPct = Number(it.gst_percent ?? 18);
+    const gstAmt = lineBase * gstPct / 100;
+    const lineTotal = lineBase + gstAmt;
+    const gstOpts = GST_OPTS.map(g => `<option value="${g}"${g===gstPct?" selected":""}>${g}%</option>`).join("");
+    // GST locked for products and services (custom editable); Unit price ALWAYS editable so admin can override
+    const isCustom = (it.item_type || "custom") === "custom";
+    const lockAttr = "";
+    const disabledAttr = isCustom ? "" : "disabled";
+    // Discount calc
+    const discInr = Number(it.discount_inr || 0);
+    const discPct = lineBase > 0 ? ((discInr / lineBase) * 100) : 0;
+    // Net calc
+    const net = Math.max(0, lineBase - discInr);
+    const gstAmtNet = net * gstPct / 100;
+    const lineTotalNet = net + gstAmtNet;
+    html += `<div class="row-4">
+      <input type="text" data-i="${i}" data-k="description" value="${esc(it.description)}" placeholder="Item description" />
+      <input type="number" data-i="${i}" data-k="qty" value="${it.qty}" min="1" style="text-align:center;" />
+      <input type="number" ${lockAttr} data-i="${i}" data-k="unit_price_inr" value="${it.unit_price_inr}" min="0" step="0.01" style="text-align:right;" />
+      <select ${disabledAttr} data-i="${i}" data-k="gst_percent" style="padding:8px 6px;border:1px solid #d0d7de;border-radius:6px;font-size:12px;">${gstOpts}</select>
+      <input type="number" data-i="${i}" data-k="discount_percent" value="${discInr > 0 ? discPct.toFixed(1) : ''}" placeholder="0" min="0" max="100" step="0.1" style="text-align:center;font-size:11px;" />
+      <input type="number" data-i="${i}" data-k="discount_inr" value="${discInr > 0 ? discInr.toFixed(2) : ''}" placeholder="0" min="0" step="0.01" style="text-align:right;font-size:11px;" />
+      <div style="text-align:right;font-weight:700;font-size:13px;color:#0f172a;">
+        ₹${lineTotalNet.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
+        <div style="font-size:10.5px;color:#64748b;font-weight:500;">net ₹${net.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})} + GST ₹${gstAmtNet.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>
+      <button class="b-ghost" data-remove="${i}" style="color:#dc2626;padding:4px 8px;">✕</button>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll("input, select").forEach(inp => {
+    if (inp.readOnly || inp.disabled) return;
+    const evt = inp.tagName === "SELECT" ? "change" : "input";
+    inp.addEventListener(evt, () => {
+      const i = Number(inp.dataset.i);
+      const k = inp.dataset.k;
+      const item = _items[i];
+      if (k === "qty") item[k] = Math.max(1, parseInt(inp.value,10) || 1);
+      else if (k === "unit_price_inr" || k === "gst_percent") item[k] = Number(inp.value);
+      else if (k === "discount_percent") {
+        const pct = Math.max(0, Math.min(100, Number(inp.value) || 0));
+        const gross = (Number(item.unit_price_inr) || 0) * (parseInt(item.qty,10) || 0);
+        item.discount_inr = pct > 0 ? Math.round(gross * pct) / 100 : 0;
+      }
+      else if (k === "discount_inr") {
+        item.discount_inr = Math.max(0, Number(inp.value) || 0);
+      }
+      else item[k] = inp.value;
+      renderItems();
+    });
+  });
+  wrap.querySelectorAll("[data-remove]").forEach(b => {
+    b.addEventListener("click", () => { _items.splice(Number(b.dataset.remove), 1); renderItems(); });
+  });
+  computeTotals();
+}
+
+function volumeTierPct(prodGross) {
+  if (prodGross >= 100000) return 15;
+  if (prodGross >= 50000) return 10;
+  if (prodGross >= 25000) return 5;
+  return 0;
+}
+function computeTotals() {
+  let subNet = 0, gst = 0, totalDisc = 0, prodGross = 0;
+  for (const it of _items) {
+    const gross = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+    const disc = Math.max(0, Number(it.discount_inr) || 0);
+    const net = Math.max(0, gross - disc);
+    const g = net * Number(it.gst_percent ?? 18) / 100;
+    subNet += net; gst += g; totalDisc += disc;
+    if ((it.item_type || "custom") === "product") prodGross += gross;
+  }
+  const volPct = volumeTierPct(prodGross);
+  const volDisc = Math.round(prodGross * volPct) / 100;
+  const total = subNet + gst - volDisc;
+  $("#tSub").textContent = "₹" + subNet.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("#tGst").textContent = "₹" + gst.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("#tTotal").textContent = "₹" + total.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  // Volume tier row - only render if applies
+  const volRow = document.getElementById("tVolRow");
+  if (volRow) {
+    if (volPct > 0) {
+      volRow.style.display = "flex";
+      document.getElementById("tVolLbl").textContent = `Volume discount (${volPct}% on ₹${prodGross.toLocaleString("en-IN")})`;
+      document.getElementById("tVolAmt").textContent = "-₹" + volDisc.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+    } else {
+      volRow.style.display = "none";
+    }
+  }
+}
+
+// ============ SAVE ============
+$("#saveBtn").addEventListener("click", async () => {
+  if (!$("#custName").value.trim()) { toast("Customer name required", true); return; }
+  if (_items.length === 0) { toast("Add at least 1 item", true); return; }
+  const validDays = Math.max(1, parseInt($("#validDays").value,10) || 1);
+  const body = {
+    op:"save",
+    id: _currentQuote?.id || null,
+    customer: {
+      name: $("#custName").value.trim(),
+      email: $("#custEmail").value.trim(),
+      phone: $("#custPhone").value.trim(),
+      gst: $("#custGst").value.trim(),
+      address: $("#custAddress").value.trim(),
+    },
+    notes: $("#notes").value.trim(),
+    items: _items.map(it => ({ ...it, discount_inr: Number(it.discount_inr || 0) })),
+    valid_hours: validDays * 24,
+    include_gst: true,
+  };
+  $("#saveBtn").disabled = true;
+  $("#saveBtn").textContent = "Saving...";
+  try {
+    const j = await callFn("admin-quotations", body);
+    if (!j.ok) { toast(j.error || "Save failed", true); return; }
+    _currentQuote = j.quotation;
+    toast("Saved: " + _currentQuote.quote_number);
+    $("#qnumBadge").textContent = _currentQuote.quote_number;
+    $("#qnumBadge").classList.remove("hidden");
+    $("#builderTitle").textContent = "Edit Quotation";
+    $("#statusHere").innerHTML = `<span class="status-badge st-${_currentQuote.status}">${_currentQuote.status}</span>`;
+    $("#postSaveActions").classList.remove("hidden");
+    setShareUrl(_currentQuote.share_token);
+  } finally {
+    $("#saveBtn").disabled = false;
+    $("#saveBtn").textContent = "💾 Save Quotation";
+  }
+});
+
+function setShareUrl(token) {
+  const url = `${location.origin}/quote/?t=${token}`;
+  $("#shareUrlLink").href = url;
+  $("#shareUrlLink").textContent = url;
+}
+
+// ============ PDF ============
+function buildPdfHtml() {
+  const q = _currentQuote;
+  let sub = 0, totalGst = 0;
+  const rows = _items.map(it => {
+    const base = (Number(it.unit_price_inr) || 0) * (parseInt(it.qty,10) || 0);
+    const gPct = Number(it.gst_percent ?? 18);
+    const gAmt = base * gPct / 100;
+    const line = base + gAmt;
+    sub += base; totalGst += gAmt;
+    return `<tr>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;">${esc(it.description)}${it.hsn_code?`<br><span style="color:#94a3b8;font-size:9.5px;">HSN: ${esc(it.hsn_code)}</span>`:""}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:center;">${it.qty}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:right;">₹${Number(it.unit_price_inr).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:right;">₹${base.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:center;">${gPct}%</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:right;">₹${gAmt.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:right;font-weight:600;">₹${line.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+    </tr>`;
+  }).join("");
+  const gst = totalGst;
+  const total = sub + gst;
+  const validUntil = q.valid_until ? fmtDate(q.valid_until) : "";
+  return `<div style="padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1f6feb;">
+      <div>
+        <div style="font-size:34px;font-weight:800;color:#1f6feb;line-height:1;">cursive<sup style="font-size:12px;">®</sup></div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">India's seller toolkit</div>
+        <div style="font-size:12px;color:#64748b;margin-top:8px;">cursive.world · contact@cursive.world</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px;font-weight:700;color:#0f172a;">QUOTATION</div>
+        <div style="background:#1f6feb;color:#fff;padding:6px 12px;border-radius:6px;font-weight:700;margin-top:6px;">${esc(q.quote_number)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:6px;">Date: ${fmtDate(q.created_at)}</div>
+        ${validUntil ? `<div style="font-size:11px;color:#b91c1c;margin-top:2px;">Valid until: ${validUntil}</div>` : ""}
+      </div>
+    </div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Quotation For</div>
+      <div style="font-size:15px;font-weight:700;">${esc(q.customer_name)}</div>
+      ${q.customer_email ? `<div style="font-size:12px;color:#475467;">${esc(q.customer_email)}</div>` : ""}
+      ${q.customer_phone ? `<div style="font-size:12px;color:#475467;">${esc(q.customer_phone)}</div>` : ""}
+      ${q.customer_gst ? `<div style="font-size:12px;color:#475467;">GST: ${esc(q.customer_gst)}</div>` : ""}
+      ${q.customer_address ? `<div style="font-size:12px;color:#475467;">${esc(q.customer_address)}</div>` : ""}
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px;text-align:left;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;">Item</th>
+          <th style="padding:8px;text-align:center;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;width:40px;">Qty</th>
+          <th style="padding:8px;text-align:right;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;width:70px;">Unit ₹</th>
+          <th style="padding:8px;text-align:right;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;width:75px;">Base ₹</th>
+          <th style="padding:8px;text-align:center;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;width:50px;">GST %</th>
+          <th style="padding:8px;text-align:right;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;width:70px;">GST ₹</th>
+          <th style="padding:8px;text-align:right;font-size:10px;color:#475467;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #e2e8f0;width:85px;">Total ₹</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <table style="width:280px;">
+        <tr><td style="padding:6px;font-size:13px;">Subtotal</td><td style="padding:6px;text-align:right;font-size:13px;">₹${sub.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+        <tr><td style="padding:6px;font-size:13px;color:#64748b;">GST</td><td style="padding:6px;text-align:right;font-size:13px;color:#64748b;">₹${gst.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+        <tr style="border-top:2px solid #0f172a;"><td style="padding:8px 6px;font-size:16px;font-weight:800;">TOTAL</td><td style="padding:8px 6px;text-align:right;font-size:18px;font-weight:800;color:#1f6feb;">₹${total.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+      </table>
+    </div>
+    ${q.notes ? `<div style="background:#f8fafc;border-left:3px solid #1f6feb;padding:12px 14px;margin-top:20px;font-size:12px;color:#475467;line-height:1.5;"><b>Notes:</b><br>${esc(q.notes).replace(/\n/g,"<br>")}</div>` : ""}
+    <div style="margin-top:30px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;font-size:11px;color:#94a3b8;">
+      Thank you for choosing Cursive. Payment terms as agreed. For queries, reach us at contact@cursive.world<br>
+      This is a computer-generated quotation.
+    </div>
+  </div>`;
+}
+
+$("#pdfBtn").addEventListener("click", () => {
+  const q = _currentQuote;
+  if (!q) return;
+  // Open the branded customer view in new tab, user clicks Download PDF there (matches sample design)
+  const url = `/quote/?t=${q.share_token}`;
+  window.open(url, "_blank");
+  toast("Opened preview — click Download PDF");
+});
+
+// ============ EMAIL ============
+$("#emailBtn").addEventListener("click", async () => {
+  const q = _currentQuote;
+  if (!q) return;
+  if (!q.customer_email) { toast("Customer email is empty — save with email first", true); return; }
+  if (!confirm(`Send quote to ${q.customer_email}?`)) return;
+  $("#emailBtn").disabled = true;
+  $("#emailBtn").textContent = "Sending...";
+  try {
+    const j = await callFn("quotation-email", { id: q.id });
+    if (j.ok) {
+      toast("Email sent from " + (j.sent_from || "contact@cursive.world"));
+      _currentQuote.status = "sent";
+      $("#statusHere").innerHTML = `<span class="status-badge st-sent">sent</span>`;
+    } else {
+      toast("Email failed: " + (j.error || ""), true);
+    }
+  } finally {
+    $("#emailBtn").disabled = false;
+    $("#emailBtn").textContent = "📧 Email";
+  }
+});
+
+// ============ WHATSAPP ============
+$("#waBtn").addEventListener("click", () => {
+  const q = _currentQuote;
+  if (!q) return;
+  const url = `${location.origin}/quote/?t=${q.share_token}`;
+  const total = fmt(q.total_paise);
+  const validUntil = q.valid_until ? fmtDate(q.valid_until) : "";
+  const msg = `Hi ${q.customer_name},\n\nHere's your quotation from Cursive:\n\n📋 Quote #: ${q.quote_number}\n💰 Total: ${total}${validUntil?`\n⏰ Valid until: ${validUntil}`:""}\n\nView details: ${url}\n\nQuestions? Reply here or email contact@cursive.world.\n\nTeam Cursive`;
+  let phone = (q.customer_phone || "").replace(/\D/g,"");
+  if (phone && phone.length === 10) phone = "91" + phone;
+  const waUrl = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(waUrl, "_blank");
+  // Mark as sent
+  callFn("admin-quotations", { op:"mark_sent", id:q.id }).then(() => {
+    _currentQuote.status = "sent";
+    $("#statusHere").innerHTML = `<span class="status-badge st-sent">sent</span>`;
+  });
+});
+
+// ============ COPY LINK ============
+$("#copyLinkBtn").addEventListener("click", async () => {
+  const q = _currentQuote;
+  if (!q) return;
+  const url = `${location.origin}/quote/?t=${q.share_token}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Link copied to clipboard");
+  } catch (e) {
+    prompt("Copy this link:", url);
+  }
+});
+
+// ============ STATUS ACTIONS ============
+async function changeStatus(newStatus, confirmMsg, successMsg) {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm(confirmMsg)) return;
+  const j = await callFn("admin-quotations", { op:"update_status", id:q.id, status:newStatus });
+  if (j.ok) {
+    toast(successMsg);
+    _currentQuote.status = newStatus;
+    $("#statusHere").innerHTML = `<span class="status-badge st-${newStatus}">${newStatus.replace("_"," ")}</span>`;
+  } else toast(j.error || "Failed", true);
+}
+
+async function changeStatusThenRefresh(newStatus, confirmMsg, successMsg) {
+  await changeStatus(newStatus, confirmMsg, successMsg);
+  updateActionButtonsVisibility();
+}
+$("#markAcceptedBtn").addEventListener("click", () => changeStatusThenRefresh("accepted", "Mark as ACCEPTED by customer?", "Marked as accepted"));
+$("#markPaidBtn").addEventListener("click",     () => changeStatusThenRefresh("paid",     "Mark as PAID by customer?",     "Marked as paid ✓"));
+$("#markFollowUpBtn").addEventListener("click", () => changeStatusThenRefresh("follow_up", "Mark for FOLLOW UP?",           "Marked for follow up"));
+$("#markRejectedBtn").addEventListener("click", () => changeStatusThenRefresh("rejected", "Mark as REJECTED by customer?", "Marked as rejected"));
+
+function updateActionButtonsVisibility() {
+  const q = _currentQuote; if (!q) return;
+  $("#markRejectedBtn").style.display = q.status === "rejected" ? "none" : "";
+  // Show invoice section only for paid quotes
+  if (q.status === "paid") {
+    $("#invoiceSection").style.display = "block";
+    loadInvoiceForQuote(q.id);
+  } else {
+    $("#invoiceSection").style.display = "none";
+  }
+}
+
+async function loadInvoiceForQuote(quoteId) {
+  const j = await callFn("admin-invoices", { op:"get_by_quote", quotation_id:quoteId });
+  const status = $("#invoiceStatus"); const actions = $("#invoiceActions");
+  if (!j.ok) { status.textContent = "Error checking invoice"; return; }
+  const inv = j.invoice;
+  if (inv) {
+    status.innerHTML = `<b style="color:#166534;">✓ Invoice ${esc(inv.invoice_number)}</b><br>${inv.emailed_at ? "Emailed on " + fmtDate(inv.emailed_at) : "Not yet emailed"}`;
+    actions.innerHTML = `
+      <a href="/invoice/?t=${esc(inv.share_token)}" target="_blank" class="b-outline" style="padding:6px 10px;font-size:12px;border-radius:5px;text-decoration:none;display:inline-block;">📄 View Invoice</a>
+      <button id="resendInvBtn" class="b-primary" style="padding:6px 10px;font-size:12px;margin-left:4px;">📧 Send/Resend</button>
+    `;
+    document.getElementById("resendInvBtn").addEventListener("click", async () => {
+      if (!confirm("Send invoice email to customer?")) return;
+      const r = await callFn("admin-invoices", { op:"email", id: inv.id });
+      if (r.ok) { toast("✓ Emailed"); loadInvoiceForQuote(quoteId); }
+      else toast(r.error || "Failed", true);
+    });
+  } else {
+    status.innerHTML = `<span style="color:#b91c1c;">No invoice yet</span>`;
+    actions.innerHTML = `<button id="genInvBtn" class="b-primary" style="padding:6px 12px;font-size:12px;">➕ Generate Invoice</button>`;
+    document.getElementById("genInvBtn").addEventListener("click", async () => {
+      if (!confirm("Generate an invoice for this paid quote?")) return;
+      const r = await callFn("admin-invoices", { op:"generate_from_quote", quotation_id:quoteId });
+      if (r.ok) { toast("✓ Invoice generated"); loadInvoiceForQuote(quoteId); }
+      else toast(r.error || "Failed", true);
+    });
+  }
+}
+
+$("#recreateBtn").addEventListener("click", async () => {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm(`Recreate ${q.quote_number} as a new draft?\n\n• Original ${q.quote_number} stays UNCHANGED in history\n• A new quote (e.g. QT-2026-0002) will be created with the same customer + items\n• You can edit everything on the new draft and send fresh`)) return;
+  $("#recreateBtn").disabled = true;
+  $("#recreateBtn").textContent = "⏳ Recreating...";
+  try {
+    const j = await callFn("admin-quotations", { op:"duplicate", id:q.id });
+    if (j.ok) {
+      toast(`✓ Created ${j.quotation.quote_number} as fresh draft`);
+      // Open the new quote for editing
+      await openQuote(j.quotation.id);
+    } else toast(j.error || "Failed", true);
+  } finally {
+    $("#recreateBtn").disabled = false;
+    $("#recreateBtn").innerHTML = "🔄 Recreate as New Draft";
+  }
+});
+
+$("#deleteBtn").addEventListener("click", async () => {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm(`DELETE quotation ${q.quote_number} permanently? This cannot be undone.`)) return;
+  const isSent = q.status !== "draft";
+  let password = "";
+  if (isSent) {
+    password = prompt(`This quotation has already been ${q.status}. Enter your admin password to confirm delete:`);
+    if (!password) return;
+  }
+  const j = await callFn("admin-quotations", { op:"delete", id:q.id, password });
+  if (j.ok) { toast("Deleted"); $("#builderView").classList.add("hidden"); $("#listView").classList.remove("hidden"); loadList(); }
+  else if (j.requires_password) {
+    toast(j.error || "Password required", true);
+  }
+  else toast(j.error || "Failed", true);
+});
+
+// ============ INIT ============
+refreshSession();
+</script>
+
+</body></html>
