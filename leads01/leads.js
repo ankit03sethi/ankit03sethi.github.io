@@ -21,8 +21,7 @@ const NEW_SUBS = [
   { id: "callback",      title: "Callback" },
   { id: "click_to_call", title: "Click to Call" },
   { id: "click_to_wa",   title: "Click to WhatsApp" },
-  { id: "payment",       title: "Payment" },
-  { id: "tried_payment", title: "Tried payment" },
+  { id: "payment",       title: "Payment" }, // single tab — clicked pay OR initiated Razorpay
 ];
 // Sub-tabs that allow manual add (Add lead button + form)
 const MANUAL_ADD_SUBS = new Set(["manual_call", "manual_wa"]);
@@ -162,8 +161,9 @@ function newSubOf(lead) {
   if (lead.manual_status === "callback") return "callback";
   if (lead.manual_status === "clicked_wa") return "click_to_wa";
   if (lead.manual_status === "clicked_call") return "click_to_call";
+  // Single Payment tab: either clicked the "Register now to pay" button OR initiated Razorpay
   if (lead.manual_status === "clicked_pay") return "payment";
-  if (lead.latest_event === "payment_initiated") return "tried_payment";
+  if (lead.latest_event === "payment_initiated") return "payment";
   if (lead.latest_event === "otp_verified")      return "otp_verified";
   if (lead.latest_event === "otp_sent")          return "otp_sent";
   return "lead_captured";
@@ -301,15 +301,12 @@ function renderManualAddBar(el) {
           <div><div class="muted-small" style="margin-bottom:3px;">Mobile</div><input id="manualAddMobile" type="tel" placeholder="10-digit mobile" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
           <div><div class="muted-small" style="margin-bottom:3px;">Email (optional)</div><input id="manualAddEmail" type="email" placeholder="customer@email.com" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
         </div>
-        <div style="margin-top:8px;">
-          <div class="muted-small" style="margin-bottom:3px;">Comment / initial remark (optional)</div>
-          <textarea id="manualAddComment" rows="2" placeholder="What did they say? Which service? Any details..." style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
-        </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
           <button id="manualAddSaveBtn" data-type="${type}" style="background:#059669;color:#fff;padding:6px 14px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
           <button id="manualAddCancelBtn" style="background:#e5e7eb;color:#111;padding:6px 12px;border-radius:4px;font-size:12.5px;border:0;cursor:pointer;">Cancel</button>
           <div id="manualAddMsg" style="font-size:12px;flex:1;"></div>
         </div>
+        <div class="muted-small" style="margin-top:6px;color:#64748b;">Once saved you can't change these details, but you can keep adding remarks. Remarks carry over to Follow Ups.</div>
       </div>
     </div>`;
   wireManualAddHandlers();
@@ -332,7 +329,7 @@ function wireManualAddHandlers() {
   cancelBtn.onclick = () => {
     form.classList.add("hidden");
     openBtn.style.display = "";
-    ["manualAddName","manualAddMobile","manualAddEmail","manualAddComment"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
     msg.textContent = "";
   };
   saveBtn.onclick = async () => {
@@ -340,7 +337,6 @@ function wireManualAddHandlers() {
     const name = ($("#manualAddName").value || "").trim();
     const mobile = ($("#manualAddMobile").value || "").replace(/\D/g, "");
     const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
-    const comment = ($("#manualAddComment").value || "").trim();
     msg.textContent = ""; msg.style.color = "";
     if (!mobile && !email) {
       msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
@@ -348,7 +344,7 @@ function wireManualAddHandlers() {
     }
     saveBtn.disabled = true; saveBtn.textContent = "Saving...";
     try {
-      const res = await callAdmin("add_manual_lead", { type, name, mobile, email, comment });
+      const res = await callAdmin("add_manual_lead", { type, name, mobile, email });
       // Show success + any duplicate info
       let dupMsg = "";
       if (res.duplicates && res.duplicates.length > 0) {
@@ -357,7 +353,7 @@ function wireManualAddHandlers() {
       }
       msg.style.color = "#059669";
       msg.textContent = "Saved." + dupMsg;
-      ["manualAddName","manualAddMobile","manualAddEmail","manualAddComment"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
       // Refresh pipeline so the new row appears
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
