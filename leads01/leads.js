@@ -201,7 +201,7 @@ function switchTop(top) {
 
   if (top === "quotations") {
     const f = $("#quotationsFrame");
-    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/admin/quotations"))) f.src = "/admin/quotations/";
+    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/";
     return;
   }
 
