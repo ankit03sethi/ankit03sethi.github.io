@@ -499,6 +499,7 @@ function numberToIndianWords(num) {
 
 let _quote = null;
 let _items = [];
+let _superseded_by = null;
 
 async function load() {
   const qp = new URLSearchParams(location.search);
@@ -512,6 +513,7 @@ async function load() {
     if (!j.ok) { showError(j.error || "Quotation not found"); return; }
     _quote = j.quotation;
     _items = j.items || [];
+    _superseded_by = j.superseded_by_number || null;
     render();
   } catch (e) {
     showError("Network error: " + e.message);
@@ -699,16 +701,23 @@ $("#waBtn").addEventListener("click", () => {
   window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
 });
 
-// Show Accept & Pay only when quote is payable
+// Show Accept & Pay only when quote is payable AND not superseded
 function updatePayButton() {
   const q = _quote; if (!q) return;
-  const payable = ["draft","sent","follow_up"].includes(q.status);
+  const payable = ["draft","sent","follow_up"].includes(q.status) && !_superseded_by;
   const btn = $("#acceptPayBtn");
   if (payable) {
     btn.style.display = "block";
     $("#payAmount").textContent = "₹" + fmtN(q.total_paise/100);
   } else {
     btn.style.display = "none";
+  }
+  // Show "replaced" banner if superseded
+  const vb = $("#validBanner");
+  if (_superseded_by && vb) {
+    vb.innerHTML = `<div class="valid-banner expired" style="background:#fee2e2;border-color:#fca5a5;color:#b91c1c;">
+      ⚠️ This quotation has been <b>REPLACED</b> by a newer version${_superseded_by ? ` (<b>${esc(_superseded_by)}</b>)` : ""}. This link is no longer active. Please contact us on WhatsApp <b>9625 73 74 75</b> for the updated quote.
+    </div>`;
   }
 }
 
