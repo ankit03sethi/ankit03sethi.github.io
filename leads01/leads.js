@@ -330,7 +330,7 @@ function switchTop(top) {
 
   if (top === "quotations") {
     const f = $("#quotationsFrame");
-    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/";
+    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/?v=" + Date.now();
     return;
   }
 
