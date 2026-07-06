@@ -186,11 +186,36 @@ function updateTopCounts() {
 function switchTop(top) {
   activeTop = top;
   document.querySelectorAll(".top-tab").forEach((b) => b.classList.toggle("active", b.dataset.top === top));
+
+  // Show/hide the correct panel based on tab
+  const paneStage = $("#paneStage");
+  const paneQuot = $("#paneQuotations");
+  const paneInv = $("#paneInvoices");
+  const subTabs = $("#subTabs");
+  const toolbar = document.querySelector(".toolbar");
+  const isEmbedded = top === "quotations" || top === "invoices";
+
+  paneStage?.classList.toggle("hidden", isEmbedded);
+  paneQuot?.classList.toggle("hidden", top !== "quotations");
+  paneInv?.classList.toggle("hidden", top !== "invoices");
+  if (subTabs) subTabs.style.display = isEmbedded ? "none" : "";
+  if (toolbar) toolbar.style.display = isEmbedded ? "none" : "";
+
+  if (top === "quotations") {
+    const f = $("#quotationsFrame");
+    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/admin/quotations"))) f.src = "/admin/quotations/";
+    return;
+  }
+  if (top === "invoices") {
+    const f = $("#invoicesFrame");
+    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/admin/invoices"))) f.src = "/admin/invoices/";
+    return;
+  }
+
   if (top === "new")    activeSub = "lead_captured";
   if (top === "follow") activeSub = "not_picked";
   if (top === "done")   activeSub = "all";
   expandedRows.clear();
-  // Clear filter when switching top tab so user starts fresh
   remarkFilter = "";
   $("#paneStage").innerHTML = "";
   renderActive();
