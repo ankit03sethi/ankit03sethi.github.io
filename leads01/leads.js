@@ -190,25 +190,18 @@ function switchTop(top) {
   // Show/hide the correct panel based on tab
   const paneStage = $("#paneStage");
   const paneQuot = $("#paneQuotations");
-  const paneInv = $("#paneInvoices");
   const subTabs = $("#subTabs");
   const toolbar = document.querySelector(".toolbar");
-  const isEmbedded = top === "quotations" || top === "invoices";
+  const isEmbedded = top === "quotations";
 
   paneStage?.classList.toggle("hidden", isEmbedded);
-  paneQuot?.classList.toggle("hidden", top !== "quotations");
-  paneInv?.classList.toggle("hidden", top !== "invoices");
+  paneQuot?.classList.toggle("hidden", !isEmbedded);
   if (subTabs) subTabs.style.display = isEmbedded ? "none" : "";
   if (toolbar) toolbar.style.display = isEmbedded ? "none" : "";
 
   if (top === "quotations") {
     const f = $("#quotationsFrame");
     if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/admin/quotations"))) f.src = "/admin/quotations/";
-    return;
-  }
-  if (top === "invoices") {
-    const f = $("#invoicesFrame");
-    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/admin/invoices"))) f.src = "/admin/invoices/";
     return;
   }
 
