@@ -37,6 +37,7 @@ const FOLLOW_SUBS = [
   { id: "never_visited",      title: "Never visited" },
   { id: "dont_call_again",    title: "Don't call again" },
   { id: "not_interested",     title: "Not interested" },
+  { id: "not_a_lead",         title: "Not A Lead" },
 ];
 
 const TALK_STATUS_OPTIONS = [
@@ -45,32 +46,33 @@ const TALK_STATUS_OPTIONS = [
   { value: "callback",          label: "Call me later" },
   { value: "interested",        label: "Interested" },
   { value: "in_progress",       label: "Send Quote" },
-  { value: "quotation_sent",    label: "Quote Sent" },
   { value: "already_purchased", label: "Already Purchased" },
   { value: "lost",              label: "Lost" },
   { value: "never_visited",     label: "Never visited" },
   { value: "dont_call_again",   label: "Don't call again" },
   { value: "not_interested",    label: "Not interested" },
+  { value: "not_a_lead",        label: "Not A Lead" },
   { value: "won_offline",       label: "Won (paid offline)" },
 ];
 
 // State machine: from each sub-tab, these are the valid next moves.
 const STATUS_TRANSITIONS = {
-  not_picked:        ["callback", "interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested"],
-  callback:          ["interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested"],
-  interested:        ["in_progress", "already_purchased", "lost"],
-  in_progress:       ["already_purchased", "won_offline", "lost"],
+  not_picked:        ["callback", "interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead"],
+  callback:          ["interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead"],
+  interested:        ["in_progress", "already_purchased", "lost", "not_a_lead"],
+  in_progress:       ["already_purchased", "won_offline", "lost", "not_a_lead"],
   already_purchased: [],
   lost:              [],
   never_visited:     [],
   dont_call_again:   [],
   not_interested:    [],
+  not_a_lead:        [],
 };
 // For New-bucket leads — show ALL Follow-Up statuses so admin can classify from any entry-point tab.
 const NEW_BUCKET_STATUS_OPTIONS = [
   "not_picked", "callback", "interested", "in_progress",
-  "quotation_sent", "already_purchased", "lost",
-  "never_visited", "dont_call_again", "not_interested"
+  "already_purchased", "lost",
+  "never_visited", "dont_call_again", "not_interested", "not_a_lead"
 ];
 
 let pipelineCache = [];
