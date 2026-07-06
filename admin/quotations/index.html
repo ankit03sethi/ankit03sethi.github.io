@@ -112,6 +112,9 @@
         <h1 style="margin:0;">📋 Quotations</h1>
         <button id="newBtn" class="b-primary">+ New Quotation</button>
       </div>
+      <div style="margin-bottom:14px;">
+        <input id="listSearchBox" type="text" placeholder="🔍 Search by quote #, name, email, mobile, or GST number..." style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box;" autocomplete="off" />
+      </div>
       <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
         <button class="filter-tab active" data-filter="all">All</button>
         <button class="filter-tab" data-filter="draft">Draft</button>
@@ -370,11 +373,24 @@ function matchesFilter(q, f) {
   return false;
 }
 
+function searchMatches(q, term) {
+  if (!term) return true;
+  const t = term.toLowerCase().trim();
+  if (!t) return true;
+  return (q.quote_number || "").toLowerCase().includes(t) ||
+         (q.customer_name || "").toLowerCase().includes(t) ||
+         (q.customer_email || "").toLowerCase().includes(t) ||
+         (q.customer_phone || "").toLowerCase().includes(t) ||
+         (q.customer_gst || "").toLowerCase().includes(t);
+}
+
 function updateFilterCounts() {
+  const term = ($("#listSearchBox")?.value || "");
+  const searched = _allQuotes.filter(q => searchMatches(q, term));
   const counts = {};
   document.querySelectorAll(".filter-tab").forEach(tab => {
     const f = tab.dataset.filter;
-    counts[f] = _allQuotes.filter(q => matchesFilter(q, f)).length;
+    counts[f] = searched.filter(q => matchesFilter(q, f)).length;
   });
   document.querySelectorAll(".filter-tab").forEach(tab => {
     const f = tab.dataset.filter;
@@ -385,7 +401,8 @@ function updateFilterCounts() {
 }
 
 function renderFilteredList() {
-  const qs = _allQuotes.filter(q => matchesFilter(q, _currentFilter));
+  const term = ($("#listSearchBox")?.value || "");
+  const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter));
   if (qs.length === 0) {
     $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.'}</div>`;
     return;
@@ -422,6 +439,12 @@ document.querySelectorAll(".filter-tab").forEach(tab => {
     _currentFilter = tab.dataset.filter;
     renderFilteredList();
   });
+});
+
+// Wire search box
+$("#listSearchBox").addEventListener("input", () => {
+  updateFilterCounts();
+  renderFilteredList();
 });
 
 // ============ CATALOG PICKER (search + list) ============
