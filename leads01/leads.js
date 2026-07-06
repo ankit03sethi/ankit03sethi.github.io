@@ -301,6 +301,10 @@ function renderManualAddBar(el) {
           <div><div class="muted-small" style="margin-bottom:3px;">Mobile</div><input id="manualAddMobile" type="tel" placeholder="10-digit mobile" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
           <div><div class="muted-small" style="margin-bottom:3px;">Email (optional)</div><input id="manualAddEmail" type="email" placeholder="customer@email.com" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
         </div>
+        <div style="margin-top:8px;">
+          <div class="muted-small" style="margin-bottom:3px;">Comment / initial remark (optional)</div>
+          <textarea id="manualAddComment" rows="2" placeholder="What did they say? Which service? Any details..." style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+        </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
           <button id="manualAddSaveBtn" data-type="${type}" style="background:#059669;color:#fff;padding:6px 14px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
           <button id="manualAddCancelBtn" style="background:#e5e7eb;color:#111;padding:6px 12px;border-radius:4px;font-size:12.5px;border:0;cursor:pointer;">Cancel</button>
@@ -328,7 +332,7 @@ function wireManualAddHandlers() {
   cancelBtn.onclick = () => {
     form.classList.add("hidden");
     openBtn.style.display = "";
-    ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    ["manualAddName","manualAddMobile","manualAddEmail","manualAddComment"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
     msg.textContent = "";
   };
   saveBtn.onclick = async () => {
@@ -336,6 +340,7 @@ function wireManualAddHandlers() {
     const name = ($("#manualAddName").value || "").trim();
     const mobile = ($("#manualAddMobile").value || "").replace(/\D/g, "");
     const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
+    const comment = ($("#manualAddComment").value || "").trim();
     msg.textContent = ""; msg.style.color = "";
     if (!mobile && !email) {
       msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
@@ -343,7 +348,7 @@ function wireManualAddHandlers() {
     }
     saveBtn.disabled = true; saveBtn.textContent = "Saving...";
     try {
-      const res = await callAdmin("add_manual_lead", { type, name, mobile, email });
+      const res = await callAdmin("add_manual_lead", { type, name, mobile, email, comment });
       // Show success + any duplicate info
       let dupMsg = "";
       if (res.duplicates && res.duplicates.length > 0) {
@@ -352,7 +357,7 @@ function wireManualAddHandlers() {
       }
       msg.style.color = "#059669";
       msg.textContent = "Saved." + dupMsg;
-      ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      ["manualAddName","manualAddMobile","manualAddEmail","manualAddComment"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
       // Refresh pipeline so the new row appears
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
@@ -462,7 +467,6 @@ function renderTable(rows, readOnly) {
       <th>Service</th>
       <th>Contact</th>
       <th>Last activity</th>
-      <th>Actions</th>
       <th style="min-width:160px;">Call status</th>
       <th style="min-width:260px;">Remarks (latest + history)</th>
       ${readOnly ? "" : "<th>Save / Add</th>"}
@@ -513,7 +517,6 @@ function rowHtml(l, readOnly) {
         <div>${esc(ageStr)} ago</div>
         <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
       </td>
-      <td><div class="row-actions">${callBtn}${waBtn}${quoteBtn}</div></td>
       <td><span class="muted-small" style="font-weight:600;color:#0f172a;">${esc(statusLabel)}</span></td>
       <td>${remarksCell}</td>
     </tr>`;
@@ -538,8 +541,8 @@ function rowHtml(l, readOnly) {
     <td>
       <div>${esc(ageStr)} ago</div>
       <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
+      ${quoteBtn ? `<div style="margin-top:6px;">${quoteBtn}</div>` : ""}
     </td>
-    <td><div class="row-actions">${callBtn}${waBtn}${quoteBtn}</div></td>
     <td>
       <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
     </td>
