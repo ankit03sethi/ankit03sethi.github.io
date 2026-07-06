@@ -355,8 +355,27 @@ async function loadList() {
   renderFilteredList();
 }
 
+// Date range filter (received from parent leads01 via postMessage)
+let _dateRangeFilter = { from: null, to: null };
+window.addEventListener("message", (ev) => {
+  if (ev?.data?.type === "cursive:date-range") {
+    _dateRangeFilter = { from: ev.data.from || null, to: ev.data.to || null };
+    if (typeof updateFilterCounts === "function") updateFilterCounts();
+    if (typeof renderFilteredList === "function") renderFilteredList();
+  }
+});
+function withinDateRange(q) {
+  const ts = q.created_at || q.updated_at;
+  if (!ts) return true;
+  const t = new Date(ts).getTime();
+  if (_dateRangeFilter.from && t < new Date(_dateRangeFilter.from).getTime()) return false;
+  if (_dateRangeFilter.to   && t > new Date(_dateRangeFilter.to  ).getTime()) return false;
+  return true;
+}
+
 // Funnel logic: once a quote reaches a stage, it stays counted in earlier stages too
 function matchesFilter(q, f) {
+  if (!withinDateRange(q)) return false;
   if (f === "all") return true;
   if (f === "draft") return q.status === "draft";
   // "Sent" = anything that has been sent (or moved further)
