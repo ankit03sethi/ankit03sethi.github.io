@@ -6,6 +6,7 @@
   <title>Quotation · Cursive World</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     :root {
       --brand-blue: #2456E6;
@@ -432,6 +433,10 @@
 
     <!-- Actions (hidden in print/PDF) -->
     <div class="actions no-print">
+      <!-- Accept & Pay CTA -->
+      <button id="acceptPayBtn" style="width:100%;background:#16a34a;color:#fff;padding:16px 20px;border:none;border-radius:8px;font-weight:800;font-size:16px;cursor:pointer;margin-bottom:12px;box-shadow:0 4px 12px rgba(22,163,74,.25);display:none;">
+        ✅ Accept &amp; Pay <span id="payAmount"></span>
+      </button>
       <div class="row">
         <button id="pdfBtn" class="btn b-primary" style="flex:1;">📄 Download PDF</button>
         <button id="waBtn" class="btn b-wa" style="flex:1;">💬 WhatsApp us</button>
@@ -440,6 +445,15 @@
       <div style="font-size:12px;color:var(--muted);margin-top:12px;text-align:center;">
         Questions? Reply on email or WhatsApp <b>9625 73 74 75</b>
       </div>
+    </div>
+
+    <!-- Success screen (hidden until payment success) -->
+    <div id="paySuccess" class="card no-print hidden" style="background:#f0fdf4;border:2px solid #86efac;padding:24px;text-align:center;margin-bottom:20px;">
+      <div style="font-size:44px;margin-bottom:8px;">🎉</div>
+      <h2 style="color:#166534;margin:0 0 8px;font-size:22px;">Payment Successful!</h2>
+      <p style="color:#166534;font-size:14px;margin:0 0 16px;">Thank you for accepting the quotation. Our team will get in touch shortly.</p>
+      <div id="accountInfo" style="background:#fff;border:1px solid #bbf7d0;border-radius:8px;padding:14px;font-size:13px;line-height:1.7;text-align:left;margin-bottom:16px;"></div>
+      <a href="/home/" class="btn b-primary" style="display:inline-block;padding:12px 24px;background:#1f6feb;color:#fff;font-weight:700;text-decoration:none;border-radius:8px;">Go to My Account →</a>
     </div>
   </div>
 </main>
@@ -598,6 +612,8 @@ function render() {
   } else {
     $("#termGst").textContent = "All prices are exclusive of applicable GST (18%).";
   }
+
+  updatePayButton();
 }
 
 $("#printBtn").addEventListener("click", () => window.print());
@@ -640,10 +656,107 @@ $("#pdfBtn").addEventListener("click", async () => {
 
 $("#waBtn").addEventListener("click", () => {
   const q = _quote;
-  // Pre-fill message ends with 2 newlines so cursor lands on new line after 1-line gap
   const msg = `Hi Cursive World team, I have a question regarding quotation ${q.quote_number}.\n\n`;
   window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
 });
+
+// Show Accept & Pay only when quote is payable
+function updatePayButton() {
+  const q = _quote; if (!q) return;
+  const payable = ["draft","sent","follow_up"].includes(q.status);
+  const btn = $("#acceptPayBtn");
+  if (payable) {
+    btn.style.display = "block";
+    $("#payAmount").textContent = "₹" + fmtN(q.total_paise/100);
+  } else {
+    btn.style.display = "none";
+  }
+}
+
+$("#acceptPayBtn").addEventListener("click", async () => {
+  const q = _quote; if (!q) return;
+  const btn = $("#acceptPayBtn");
+  btn.disabled = true;
+  btn.innerHTML = "⏳ Preparing payment...";
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/quote-accept-init`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token: new URLSearchParams(location.search).get("t") }),
+    });
+    const j = await r.json();
+    if (!j.ok) { alert(j.error || "Could not start payment"); btn.disabled = false; btn.innerHTML = "✅ Accept &amp; Pay " + "₹" + fmtN(q.total_paise/100); return; }
+
+    const rzp = new Razorpay({
+      key: j.key_id,
+      amount: j.amount_paise,
+      currency: j.currency,
+      order_id: j.order_id,
+      name: "Cursive World",
+      description: "Quotation " + j.quote_number,
+      image: "https://cursive.world/favicon.ico",
+      prefill: {
+        name: j.customer_name || "",
+        email: j.customer_email || "",
+        contact: (j.customer_phone || "").replace(/\D/g,"").slice(-10),
+      },
+      notes: { quote_number: j.quote_number },
+      theme: { color: "#2456E6" },
+      handler: async function (resp) {
+        btn.innerHTML = "⏳ Confirming...";
+        const vr = await fetch(`${SUPABASE_URL}/functions/v1/quote-accept-verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+          body: JSON.stringify({
+            token: new URLSearchParams(location.search).get("t"),
+            razorpay_payment_id: resp.razorpay_payment_id,
+            razorpay_order_id: resp.razorpay_order_id,
+            razorpay_signature: resp.razorpay_signature,
+          }),
+        });
+        const vj = await vr.json();
+        if (vj.ok) {
+          showSuccess(vj);
+        } else {
+          alert("Payment verification failed: " + (vj.error || ""));
+          btn.disabled = false;
+          btn.innerHTML = "✅ Accept &amp; Pay " + "₹" + fmtN(q.total_paise/100);
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          btn.disabled = false;
+          btn.innerHTML = "✅ Accept &amp; Pay " + "₹" + fmtN(q.total_paise/100);
+        },
+      },
+    });
+    rzp.open();
+  } catch (e) {
+    alert("Error: " + e.message);
+    btn.disabled = false;
+    btn.innerHTML = "✅ Accept &amp; Pay " + "₹" + fmtN(q.total_paise/100);
+  }
+});
+
+function showSuccess(vj) {
+  $("#acceptPayBtn").style.display = "none";
+  document.querySelector(".actions").style.display = "none";
+  const successCard = $("#paySuccess");
+  let info = "";
+  if (vj.account_created) {
+    info = `<b>✓ Your account has been created</b><br>Check your email <b>${esc(vj.email)}</b> for your login password. You can sign in at <a href="/home/">cursive.world/home/</a> to track your services.`;
+  } else if (vj.already_had_account) {
+    info = `<b>✓ Welcome back!</b><br>You already have an account. <a href="/home/">Sign in</a> with <b>${esc(vj.email)}</b> to view details.`;
+  } else {
+    info = `Payment received. You will hear from us soon.`;
+  }
+  $("#accountInfo").innerHTML = info;
+  successCard.classList.remove("hidden");
+  successCard.scrollIntoView({ behavior:"smooth", block:"start" });
+  // Update status pill
+  const chip = $("#statusChip");
+  if (chip) chip.innerHTML = '<span class="status-badge st-paid">paid</span>';
+}
 
 load();
 </script>
