@@ -428,6 +428,161 @@ function updateFilterCounts() {
   });
 }
 
+// ============ ADD / UPDATE CONTACT MODAL (per-row) ============
+async function openContactEditor(quoteId) {
+  const q = _allQuotes.find(x => Number(x.id) === Number(quoteId));
+  if (!q) { toast("Quote not found", true); return; }
+  document.getElementById("qcEditModal")?.remove();
+  const currentEmail = q.customer_email || "";
+  const currentPhone = q.customer_phone || "";
+  const currentName  = q.customer_name || "";
+  const currentGst   = q.customer_gst || "";
+  const overlay = document.createElement("div");
+  overlay.id = "qcEditModal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;";
+  const fieldRow = (label, icon, value, id, placeholder) => `
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#f8fafc;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">${icon} ${label} <span style="color:#059669;">(current)</span></div>
+          <div style="font-size:14px;color:#0f172a;font-weight:600;word-break:break-all;">${esc(value) || `<span style="color:#94a3b8;font-weight:400;">(no ${label.toLowerCase()} yet)</span>`}</div>
+        </div>
+        <button data-add="${id}" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Add new</button>
+      </div>
+      <div id="${id}Wrap" class="hidden" style="margin-top:8px;display:flex;gap:6px;">
+        <input id="${id}Input" type="text" placeholder="${placeholder}" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;"/>
+        <button data-savefield="${id}" style="background:#059669;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
+      </div>
+      <div id="${id}History" style="margin-top:8px;"></div>
+    </div>`;
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:560px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+      <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:4px;">Customer contact — ${esc(q.quote_number)}</div>
+      <div style="margin-bottom:14px;color:#64748b;font-size:12px;">Contact info is <b>add-only</b>. New value is used going forward for Call / WhatsApp / Email, and auto-syncs to leads01 for the same customer.</div>
+      ${fieldRow("Name",     "👤", currentName,  "qcName",  "Customer name")}
+      ${fieldRow("Email",    "📧", currentEmail, "qcEmail", "customer@email.com")}
+      ${fieldRow("Mobile",   "📱", currentPhone, "qcPhone", "10-digit mobile")}
+      ${fieldRow("GST No.",  "🧾", currentGst,   "qcGst",   "GSTIN (optional)")}
+      <div id="qcMsg" style="font-size:12px;margin-top:6px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button id="qcClose" style="background:#e5e7eb;color:#111;padding:8px 14px;border:none;border-radius:5px;font-size:13px;cursor:pointer;">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const cleanup = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(); });
+  document.getElementById("qcClose").onclick = cleanup;
+
+  overlay.querySelectorAll("[data-add]").forEach(btn => btn.addEventListener("click", () => {
+    const id = btn.dataset.add;
+    document.getElementById(id + "Wrap").classList.toggle("hidden");
+    document.getElementById(id + "Input")?.focus();
+  }));
+
+  const doSave = async (id, btn) => {
+    const input = document.getElementById(id + "Input");
+    const raw = (input.value || "").trim();
+    if (!raw) return;
+    const nextCustomer = {
+      name:  id === "qcName"  ? raw : (q.customer_name  || ""),
+      email: id === "qcEmail" ? raw.toLowerCase() : (q.customer_email || ""),
+      phone: id === "qcPhone" ? raw.replace(/\D/g,"") : (q.customer_phone || ""),
+      gst:   id === "qcGst"   ? raw : (q.customer_gst   || ""),
+      address: q.customer_address || "",
+    };
+    const msg = document.getElementById("qcMsg");
+    msg.textContent = ""; msg.style.color = "";
+    btn.disabled = true; btn.textContent = "Saving...";
+    try {
+      // Save via admin-quotations (uses existing save op with existing id)
+      const saveBody = {
+        op: "save",
+        id: q.id,
+        customer: nextCustomer,
+        notes: q.notes || "",
+        items: [], // items untouched — backend keeps existing
+        preserve_items: true,
+        valid_hours: 24, // placeholder — backend ignores if preserve_items
+        include_gst: true,
+      };
+      const j = await callFn("admin-quotations", saveBody);
+      if (!j.ok) throw new Error(j.error || "Save failed");
+      // Update local cache + re-render
+      Object.assign(q, {
+        customer_name: nextCustomer.name,
+        customer_email: nextCustomer.email,
+        customer_phone: nextCustomer.phone,
+        customer_gst: nextCustomer.gst,
+      });
+      msg.style.color = "#059669"; msg.textContent = "Saved & synced to leads01.";
+      updateFilterCounts();
+      renderFilteredList();
+      // Update the modal's current display
+      input.value = "";
+      document.getElementById(id + "Wrap").classList.add("hidden");
+      btn.disabled = false; btn.textContent = "Save";
+      // Simple redraw: close and reopen
+      setTimeout(() => { cleanup(); openContactEditor(q.id); }, 500);
+    } catch (err) {
+      msg.style.color = "#dc2626"; msg.textContent = "Save failed: " + err.message;
+      btn.disabled = false; btn.textContent = "Save";
+    }
+  };
+  overlay.querySelectorAll("[data-savefield]").forEach(btn => btn.addEventListener("click", () => doSave(btn.dataset.savefield, btn)));
+
+  // Load history from lead_contact_history — match by current email or phone
+  await loadQuoteContactHistory(currentEmail, currentPhone);
+}
+
+async function loadQuoteContactHistory(email, phone) {
+  try {
+    // Compute a customer_key using manual|<mobile-or-email> convention used by leads01
+    const key = (String(phone||"").replace(/\D/g,"") || String(email||"").toLowerCase()) + "|manual";
+    const j = await callFn("admin-data", { kind: "contact_history", customer_key: key });
+    const history = (j && j.data) || [];
+    const byField = { email: [], mobile: [], whatsapp: [] };
+    history.forEach((h) => { if (byField[h.field]) byField[h.field].push(h); });
+    renderQuoteHistoryList("qcEmailHistory",  byField.email);
+    renderQuoteHistoryList("qcPhoneHistory",  byField.mobile);
+  } catch (e) {
+    console.warn("history load failed:", e);
+  }
+}
+
+function renderQuoteHistoryList(elId, list) {
+  const el = document.getElementById(elId);
+  if (!el || !list || list.length === 0) return;
+  const asc = list.slice().reverse();
+  const values = [];
+  const seen = new Set();
+  const oldest = asc[0];
+  if (oldest?.old_value && String(oldest.old_value).trim()) {
+    const v = String(oldest.old_value).trim();
+    values.push({ value: v, at: null });
+    seen.add(v);
+  }
+  asc.forEach((h) => {
+    const v = (h.new_value || "").trim();
+    if (!v) return;
+    if (!seen.has(v) || values[values.length-1]?.value !== v) {
+      values.push({ value: v, at: h.changed_at });
+      seen.add(v);
+    }
+  });
+  values.reverse();
+  if (values.length === 0) return;
+  const rows = values.map((v, i) => `
+    <div style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;display:flex;justify-content:space-between;gap:6px;align-items:center;">
+      <span style="color:${i===0?"#059669":"#334155"};font-weight:600;word-break:break-all;">${esc(v.value)}${i===0?` <span style="font-size:10px;color:#059669;font-weight:700;">LATEST</span>`:""}</span>
+      ${v.at ? `<span style="color:#94a3b8;font-size:10.5px;white-space:nowrap;">${esc(fmtDate(v.at))}</span>` : `<span style="color:#94a3b8;font-size:10.5px;">(initial)</span>`}
+    </div>`).join("");
+  el.innerHTML = `
+    <div style="background:#fff;border:1px dashed #cbd5e1;border-radius:5px;margin-top:6px;">
+      <div style="padding:4px 8px;font-size:11px;font-weight:700;color:#64748b;background:#f1f5f9;">📜 All values (${values.length}) — read only</div>
+      ${rows}
+    </div>`;
+}
+
 function renderFilteredList() {
   const term = ($("#listSearchBox")?.value || "");
   const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter));
@@ -449,9 +604,10 @@ function renderFilteredList() {
       <td><b>${esc(q.quote_number)}</b></td>
       <td style="font-size:12.5px;line-height:1.4;">
         <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
-        ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : ""}
-        ${q.customer_phone ? `<div style="color:#334155;">📱 ${esc(q.customer_phone)}</div>` : ""}
+        ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
+        ${q.customer_phone ? `<div style="color:#334155;">📱 ${esc(q.customer_phone)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no phone</div>`}
         ${q.customer_gst ? `<div style="color:#64748b;font-size:11px;">GST: ${esc(q.customer_gst)}</div>` : ""}
+        <button data-editcontact="${q.id}" onclick="event.stopPropagation();openContactEditor(${q.id})" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>
       </td>
       <td>${callBtn}${waBtn}${emlBtn}</td>
       <td><b>${fmt(q.total_paise)}</b></td>
