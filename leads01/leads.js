@@ -941,6 +941,7 @@ async function showContactUpdateModal(current) {
         <div style="flex:1;min-width:0;">
           <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">${icon} ${label} <span style="color:#059669;">(latest)</span></div>
           <div style="font-size:14px;color:#0f172a;font-weight:600;word-break:break-all;">${esc(value) || `<span style="color:#94a3b8;font-weight:400;">(no ${label.toLowerCase()} yet)</span>`}</div>
+          <div id="${id}LatestTs" class="muted-small" style="color:#64748b;font-size:11px;margin-top:2px;"></div>
           ${hint ? `<div class="muted-small" style="color:#64748b;font-size:11px;margin-top:2px;">${hint}</div>` : ""}
         </div>
         <button data-add="${id}" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Add new</button>
@@ -1013,6 +1014,16 @@ async function loadAndRenderHistory(customerKey) {
     const history = await callAdmin("contact_history", { customer_key: customerKey });
     const byField = { email: [], mobile: [], whatsapp: [] };
     (history || []).forEach((h) => { if (byField[h.field]) byField[h.field].push(h); });
+    // Latest timestamp per field goes next to the LATEST value at top
+    const setLatestTs = (elId, list) => {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const newest = list[0];
+      el.innerHTML = newest ? `Updated ${esc(fmtDate(newest.changed_at))} ${esc(fmtTime(newest.changed_at))}` : "(initial value — never updated)";
+    };
+    setLatestTs("cuEmailLatestTs",    byField.email);
+    setLatestTs("cuMobileLatestTs",   byField.mobile);
+    setLatestTs("cuWhatsappLatestTs", byField.whatsapp);
     renderHistoryList("cuEmailHistory",    byField.email);
     renderHistoryList("cuMobileHistory",   byField.mobile);
     renderHistoryList("cuWhatsappHistory", byField.whatsapp);
