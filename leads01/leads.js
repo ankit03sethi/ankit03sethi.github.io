@@ -27,7 +27,8 @@ const FOLLOW_SUBS = [
   { id: "not_picked",      title: "Call not picked" },
   { id: "callback",        title: "Call me later" },
   { id: "interested",      title: "Interested" },
-  { id: "in_progress",     title: "In progress" },
+  { id: "in_progress",     title: "Send Quote" },
+  { id: "quotation_sent",  title: "Quote Sent" },
   { id: "lost",            title: "Lost" },
   { id: "never_visited",   title: "Never visited" },
   { id: "dont_call_again", title: "Don't call again" },
@@ -39,7 +40,8 @@ const TALK_STATUS_OPTIONS = [
   { value: "not_picked",      label: "Call not picked" },
   { value: "callback",        label: "Call me later" },
   { value: "interested",      label: "Interested" },
-  { value: "in_progress",     label: "In progress" },
+  { value: "in_progress",     label: "Send Quote" },
+  { value: "quotation_sent",  label: "Quote Sent" },
   { value: "lost",            label: "Lost" },
   { value: "never_visited",   label: "Never visited" },
   { value: "dont_call_again", label: "Don't call again" },
@@ -52,8 +54,9 @@ const TALK_STATUS_OPTIONS = [
 const STATUS_TRANSITIONS = {
   not_picked:      ["callback", "interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested"],
   callback:        ["interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested"],
-  interested:      ["in_progress", "lost"],
-  in_progress:     ["lost"],
+  interested:      ["in_progress", "quotation_sent", "lost"],
+  in_progress:     ["quotation_sent", "lost"],
+  quotation_sent:  ["won_offline", "lost"],
   lost:            [],
   never_visited:   [],
   dont_call_again: [],
@@ -391,6 +394,16 @@ function rowHtml(l, readOnly) {
   const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "—";
   const callBtn = phone ? `<a href="tel:+${waPhone}" class="call" data-action="call">Call</a>` : "";
   const waBtn   = phone ? `<a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" rel="noopener" class="whatsapp" data-action="wa">WhatsApp</a>` : "";
+  // Send Quote button - appears in Send Quote sub-tab; opens Quotations tab with prefilled data
+  const quotePrefill = new URLSearchParams({
+    new: "1",
+    email: l.email || "",
+    mobile: l.mobile || "",
+    service: l.service_name || l.service_type || "",
+    customer_key: l.customer_key || ""
+  }).toString();
+  const showQuoteBtn = activeTop === "follow" && activeSub === "in_progress";
+  const quoteBtn = showQuoteBtn ? `<button data-action="send-quote" data-prefill="${esc(quotePrefill)}" style="background:#7c3aed;color:#fff;padding:4px 10px;border-radius:4px;font-size:11.5px;font-weight:700;border:0;cursor:pointer;margin-left:4px;">📋 Send Quote</button>` : "";
 
   const remarksCell = renderRemarksCell(l, readOnly);
 
@@ -409,7 +422,7 @@ function rowHtml(l, readOnly) {
         <div>${esc(ageStr)} ago</div>
         <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
       </td>
-      <td><div class="row-actions">${callBtn}${waBtn}</div></td>
+      <td><div class="row-actions">${callBtn}${waBtn}${quoteBtn}</div></td>
       <td><span class="muted-small" style="font-weight:600;color:#0f172a;">${esc(statusLabel)}</span></td>
       <td>${remarksCell}</td>
     </tr>`;
@@ -435,7 +448,7 @@ function rowHtml(l, readOnly) {
       <div>${esc(ageStr)} ago</div>
       <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
     </td>
-    <td><div class="row-actions">${callBtn}${waBtn}</div></td>
+    <td><div class="row-actions">${callBtn}${waBtn}${quoteBtn}</div></td>
     <td>
       <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
     </td>
@@ -616,6 +629,14 @@ function wireRowHandlers() {
         errBox.textContent = "Save failed: " + err.message;
         errBox.style.display = "block";
       }
+      return;
+    }
+    if (action === "send-quote") {
+      const prefill = target.dataset.prefill || "";
+      // Switch to Quotations tab + load prefilled URL in iframe
+      switchTop("quotations");
+      const f = document.getElementById("quotationsFrame");
+      if (f) f.src = "/leads01/quotations/?" + prefill;
       return;
     }
     if (action === "save-status") {
