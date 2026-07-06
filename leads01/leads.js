@@ -13,6 +13,8 @@ const show = (el) => el && el.classList.remove("hidden");
 const hide = (el) => el && el.classList.add("hidden");
 
 const NEW_SUBS = [
+  { id: "manual_call",   title: "Call" },            // manual-add tab
+  { id: "manual_wa",     title: "WhatsApp" },        // manual-add tab
   { id: "lead_captured", title: "Lead captured" },
   { id: "otp_sent",      title: "OTP sent" },
   { id: "otp_verified",  title: "OTP verified" },
@@ -22,6 +24,8 @@ const NEW_SUBS = [
   { id: "payment",       title: "Payment" },
   { id: "tried_payment", title: "Tried payment" },
 ];
+// Sub-tabs that allow manual add (Add lead button + form)
+const MANUAL_ADD_SUBS = new Set(["manual_call", "manual_wa"]);
 
 const FOLLOW_SUBS = [
   { id: "not_picked",      title: "Call not picked" },
@@ -153,6 +157,8 @@ function bucketOf(lead) {
   return "new";
 }
 function newSubOf(lead) {
+  if (lead.manual_status === "manual_call") return "manual_call";
+  if (lead.manual_status === "manual_wa")   return "manual_wa";
   if (lead.manual_status === "callback") return "callback";
   if (lead.manual_status === "clicked_wa") return "click_to_wa";
   if (lead.manual_status === "clicked_call") return "click_to_call";
@@ -260,17 +266,102 @@ function renderSubTabs() {
 function renderPane() {
   // Render the SHELL (toolbar + rows container) only once per tab switch.
   // Filter input changes only re-render the rows, preserving input focus.
-  const needShell = !$("#filterBar") || !$("#rowsContainer");
+  const isManualAdd = activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
+  const needShell = !$("#filterBar") || !$("#rowsContainer") || (isManualAdd && !$("#manualAddBar")) || (!isManualAdd && $("#manualAddBar"));
   if (needShell) {
-    $("#paneStage").innerHTML = `<div id="filterBar"></div><div id="rowsContainer"></div>`;
+    const manualBarHtml = isManualAdd ? `<div id="manualAddBar"></div>` : "";
+    $("#paneStage").innerHTML = `<div id="filterBar"></div>${manualBarHtml}<div id="rowsContainer"></div>`;
     renderToolbarInto($("#filterBar"));
     wireToolbarHandlers();
+    if (isManualAdd) renderManualAddBar($("#manualAddBar"));
   } else {
     // Refresh the dropdown options but DO NOT replace the text input
     renderToolbarDropdownOnly();
   }
   renderRows();
   wireRowHandlers();
+}
+
+// Manual-add bar: Add lead button + inline form (Call / WhatsApp sub-tabs only)
+function renderManualAddBar(el) {
+  const type = activeSub === "manual_call" ? "call" : "wa";
+  const label = type === "call" ? "Call" : "WhatsApp";
+  el.innerHTML = `
+    <div class="manual-add-wrap" style="background:#f0f7ff;border:1px solid #cfe0ff;border-radius:6px;padding:10px 12px;margin:8px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:13px;color:#1e40af;font-weight:600;">
+          + Add a lead manually to <b>${label}</b> sub-tab
+          <div class="muted-small" style="font-weight:400;margin-top:2px;color:#475569;">Once saved it can't be deleted. Same status options as Lead captured.</div>
+        </div>
+        <button id="manualAddOpenBtn" data-type="${type}" style="background:#2563eb;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">+ Add lead</button>
+      </div>
+      <div id="manualAddForm" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px dashed #cfe0ff;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div><div class="muted-small" style="margin-bottom:3px;">Name (optional)</div><input id="manualAddName" type="text" placeholder="Customer name" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
+          <div><div class="muted-small" style="margin-bottom:3px;">Mobile</div><input id="manualAddMobile" type="tel" placeholder="10-digit mobile" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
+          <div><div class="muted-small" style="margin-bottom:3px;">Email (optional)</div><input id="manualAddEmail" type="email" placeholder="customer@email.com" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+          <button id="manualAddSaveBtn" data-type="${type}" style="background:#059669;color:#fff;padding:6px 14px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
+          <button id="manualAddCancelBtn" style="background:#e5e7eb;color:#111;padding:6px 12px;border-radius:4px;font-size:12.5px;border:0;cursor:pointer;">Cancel</button>
+          <div id="manualAddMsg" style="font-size:12px;flex:1;"></div>
+        </div>
+      </div>
+    </div>`;
+  wireManualAddHandlers();
+}
+
+function wireManualAddHandlers() {
+  const openBtn = $("#manualAddOpenBtn");
+  const form = $("#manualAddForm");
+  const saveBtn = $("#manualAddSaveBtn");
+  const cancelBtn = $("#manualAddCancelBtn");
+  const msg = $("#manualAddMsg");
+  if (!openBtn) return;
+
+  openBtn.onclick = () => {
+    form.classList.remove("hidden");
+    openBtn.style.display = "none";
+    $("#manualAddMobile").focus();
+    msg.textContent = ""; msg.style.color = "";
+  };
+  cancelBtn.onclick = () => {
+    form.classList.add("hidden");
+    openBtn.style.display = "";
+    ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    msg.textContent = "";
+  };
+  saveBtn.onclick = async () => {
+    const type = saveBtn.dataset.type;
+    const name = ($("#manualAddName").value || "").trim();
+    const mobile = ($("#manualAddMobile").value || "").replace(/\D/g, "");
+    const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
+    msg.textContent = ""; msg.style.color = "";
+    if (!mobile && !email) {
+      msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
+      return;
+    }
+    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+    try {
+      const res = await callAdmin("add_manual_lead", { type, name, mobile, email });
+      // Show success + any duplicate info
+      let dupMsg = "";
+      if (res.duplicates && res.duplicates.length > 0) {
+        const list = res.duplicates.slice(0, 3).map(d => `${d.service_name || d.service_type} (${d.email || d.mobile})`).join(", ");
+        dupMsg = ` Already exists in: ${list}`;
+      }
+      msg.style.color = "#059669";
+      msg.textContent = "Saved." + dupMsg;
+      ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      // Refresh pipeline so the new row appears
+      pipelineCache = await callAdmin("pipeline");
+      updateTopCounts();
+      renderActive();
+    } catch (err) {
+      msg.style.color = "#dc2626"; msg.textContent = "Save failed: " + err.message;
+      saveBtn.disabled = false; saveBtn.textContent = "Save lead";
+    }
+  };
 }
 
 function renderRows() {
