@@ -65,12 +65,26 @@
       <span class="big-count" id="topcnt_done">0</span>
       <span class="stage-title">Completed</span>
     </button>
+    <button class="tab top-tab" data-top="quotations">
+      <span class="big-count" style="color:#7c3aed;">📋</span>
+      <span class="stage-title">Quotations</span>
+    </button>
+    <button class="tab top-tab" data-top="invoices">
+      <span class="big-count" style="color:#16a34a;">💼</span>
+      <span class="stage-title">Invoices</span>
+    </button>
   </nav>
 
   <nav class="tabs sub-tabs" id="subTabs"></nav>
 
   <div class="panel">
     <div id="paneStage" class="pane"></div>
+    <div id="paneQuotations" class="pane hidden" style="padding:0;margin:0;">
+      <iframe id="quotationsFrame" src="about:blank" style="width:100%;height:calc(100vh - 260px);min-height:600px;border:0;border-radius:8px;background:#fff;"></iframe>
+    </div>
+    <div id="paneInvoices" class="pane hidden" style="padding:0;margin:0;">
+      <iframe id="invoicesFrame" src="about:blank" style="width:100%;height:calc(100vh - 260px);min-height:600px;border:0;border-radius:8px;background:#fff;"></iframe>
+    </div>
   </div>
 
   <p style="margin-top:18px;color:#94a3b8;font-size:11px;text-align:center;">
