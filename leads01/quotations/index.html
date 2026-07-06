@@ -436,12 +436,24 @@ function renderFilteredList() {
     return;
   }
   let html = `<table><thead><tr>
-    <th>Quote #</th><th>Customer</th><th>Total</th><th>Status</th><th>Valid Until</th><th>Created</th><th></th>
+    <th>Quote #</th><th>Customer</th><th>Actions</th><th>Total</th><th>Status</th><th>Valid Until</th><th>Created</th><th></th>
   </tr></thead><tbody>`;
   for (const q of qs) {
+    const phoneDigits = (q.customer_phone || "").replace(/\D/g, "");
+    const waFmt = phoneDigits.length === 10 ? "91" + phoneDigits : phoneDigits;
+    const waTxt = encodeURIComponent(`Hi ${q.customer_name || "there"}, this is from cursive regarding quote ${q.quote_number}.`);
+    const callBtn = phoneDigits ? `<a href="tel:+${(phoneDigits.length===10?"91":"")+phoneDigits}" onclick="event.stopPropagation();" style="display:inline-block;padding:3px 8px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">📞</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">📞</span>`;
+    const waBtn   = phoneDigits ? `<a href="https://wa.me/${waFmt}?text=${waTxt}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-block;padding:3px 8px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">💬</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">💬</span>`;
+    const emlBtn  = q.customer_email ? `<a href="mailto:${esc(q.customer_email)}?subject=${encodeURIComponent(`Quote ${q.quote_number}`)}" onclick="event.stopPropagation();" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;">✉️</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;">✉️</span>`;
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
       <td><b>${esc(q.quote_number)}</b></td>
-      <td>${esc(q.customer_name)}${q.customer_email?`<br><small style="color:#64748b;">${esc(q.customer_email)}</small>`:""}</td>
+      <td style="font-size:12.5px;line-height:1.4;">
+        <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
+        ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : ""}
+        ${q.customer_phone ? `<div style="color:#334155;">📱 ${esc(q.customer_phone)}</div>` : ""}
+        ${q.customer_gst ? `<div style="color:#64748b;font-size:11px;">GST: ${esc(q.customer_gst)}</div>` : ""}
+      </td>
+      <td>${callBtn}${waBtn}${emlBtn}</td>
       <td><b>${fmt(q.total_paise)}</b></td>
       <td><span class="status-badge st-${q.status}">${q.status.replace("_"," ")}</span></td>
       <td style="font-size:12px;color:#64748b;">${fmtDate(q.valid_until)}</td>
