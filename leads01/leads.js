@@ -630,9 +630,17 @@ function rowHtml(l, readOnly) {
 
   const statusValue = l.talk_status || "";
   const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "—";
-  const callBtn = phone ? `<a href="tel:+${(phone.length===10?"91":"")+phone}" style="display:inline-block;padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">📞 Call</a>` : "";
-  const waBtn   = waPhone ? `<a href="https://wa.me/${waPhoneFmt}?text=${waText}" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">💬 WhatsApp</a>` : "";
-  const emailBtn= latestEmail ? `<a href="mailto:${esc(latestEmail)}" style="display:inline-block;padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">✉️ Email</a>` : "";
+  // Contact-update data (used by fallback buttons when a value is missing)
+  const contactData = `data-customer-key="${cur}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}"`;
+  const callBtn = phone
+    ? `<a href="tel:+${(phone.length===10?"91":"")+phone}" style="display:inline-block;padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">📞 Call</a>`
+    : `<button data-action="edit-contact" ${contactData} title="No mobile yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:4px;">📞 Call</button>`;
+  const waBtn = waPhone
+    ? `<a href="https://wa.me/${waPhoneFmt}?text=${waText}" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">💬 WhatsApp</a>`
+    : `<button data-action="edit-contact" ${contactData} title="No WhatsApp yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:4px;">💬 WhatsApp</button>`;
+  const emailBtn = latestEmail
+    ? `<a href="mailto:${esc(latestEmail)}" style="display:inline-block;padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">✉️ Email</a>`
+    : `<button data-action="edit-contact" ${contactData} title="No email yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">✉️ Email</button>`;
 
   // Contact cell HTML: latest email + mobile + WhatsApp + Add contact button (opens add-only modal)
   const contactCell = `
@@ -921,17 +929,17 @@ function wireRowHandlers() {
   });
 }
 
-// Contact update modal — 3 fields, ADD-ONLY (current values are read-only, you can only add newer)
-function showContactUpdateModal(current) {
+// Contact update modal — 3 fields, ADD-ONLY, shows full history under each
+async function showContactUpdateModal(current) {
   document.getElementById("contactUpdateModalOverlay")?.remove();
   const overlay = document.createElement("div");
   overlay.id = "contactUpdateModalOverlay";
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;";
   const fieldRow = (label, icon, value, id, placeholder, hint) => `
     <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#f8fafc;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">${icon} ${label}</div>
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">${icon} ${label} <span style="color:#059669;">(latest)</span></div>
           <div style="font-size:14px;color:#0f172a;font-weight:600;word-break:break-all;">${esc(value) || `<span style="color:#94a3b8;font-weight:400;">(no ${label.toLowerCase()} yet)</span>`}</div>
           ${hint ? `<div class="muted-small" style="color:#64748b;font-size:11px;margin-top:2px;">${hint}</div>` : ""}
         </div>
@@ -941,11 +949,12 @@ function showContactUpdateModal(current) {
         <input id="${id}Input" type="text" placeholder="${placeholder}" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;"/>
         <button data-savefield="${id}" style="background:#059669;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
       </div>
+      <div id="${id}History" style="margin-top:8px;"></div>
     </div>`;
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:520px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.2);">
+    <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:560px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
       <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:4px;">Customer contact</div>
-      <div class="muted-small" style="margin-bottom:14px;color:#64748b;">Contact info is <b>add-only</b> — old values are always kept in history. Click <b>+ Add new</b> to add a newer value. Newer value is used for future Call / WhatsApp / Email.</div>
+      <div class="muted-small" style="margin-bottom:14px;color:#64748b;">Contact info is <b>add-only</b> — every old value is always kept in history below each field. Click <b>+ Add new</b> to save a newer value. Newer value is used for Call / WhatsApp / Email going forward.</div>
       ${fieldRow("Email",    "📧", current.email,    "cuEmail",    "customer@email.com",  "")}
       ${fieldRow("Mobile",   "📱", current.mobile,   "cuMobile",   "10-digit mobile",     "")}
       ${fieldRow("WhatsApp", "💬", current.whatsapp || current.mobile, "cuWhatsapp", "10-digit WhatsApp number", current.whatsapp ? "" : "Currently defaulting to mobile. Add here to use a separate WhatsApp number going forward.")}
@@ -965,8 +974,7 @@ function showContactUpdateModal(current) {
     document.getElementById(id + "Input")?.focus();
   }));
 
-  overlay.querySelectorAll("[data-savefield]").forEach(btn => btn.addEventListener("click", async () => {
-    const id = btn.dataset.savefield;
+  const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
     let raw = (input.value || "").trim();
     if (!raw) return;
@@ -979,16 +987,56 @@ function showContactUpdateModal(current) {
     btn.disabled = true; btn.textContent = "Saving...";
     try {
       await callAdmin("update_lead_contact", payload);
-      msg.style.color = "#059669"; msg.textContent = "Saved. Refreshing...";
+      msg.style.color = "#059669"; msg.textContent = "Saved. Reloading history...";
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
       renderActive();
-      setTimeout(cleanup, 500);
+      // Reload the modal's history section
+      await loadAndRenderHistory(current.customer_key);
+      input.value = "";
+      document.getElementById(id + "Wrap").classList.add("hidden");
+      btn.disabled = false; btn.textContent = "Save";
+      msg.textContent = "Saved. History updated below.";
     } catch (err) {
       msg.style.color = "#dc2626"; msg.textContent = "Save failed: " + err.message;
       btn.disabled = false; btn.textContent = "Save";
     }
-  }));
+  };
+  overlay.querySelectorAll("[data-savefield]").forEach(btn => btn.addEventListener("click", () => doSave(btn.dataset.savefield, btn)));
+
+  // Load and render history under each field
+  await loadAndRenderHistory(current.customer_key);
+}
+
+async function loadAndRenderHistory(customerKey) {
+  try {
+    const history = await callAdmin("contact_history", { customer_key: customerKey });
+    const byField = { email: [], mobile: [], whatsapp: [] };
+    (history || []).forEach((h) => { if (byField[h.field]) byField[h.field].push(h); });
+    renderHistoryList("cuEmailHistory",    byField.email);
+    renderHistoryList("cuMobileHistory",   byField.mobile);
+    renderHistoryList("cuWhatsappHistory", byField.whatsapp);
+  } catch (e) {
+    console.warn("history load failed:", e);
+  }
+}
+
+function renderHistoryList(elId, list) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!list || list.length === 0) { el.innerHTML = ""; return; }
+  const rows = list.map((h) => `
+    <div style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;display:flex;justify-content:space-between;gap:6px;">
+      <span style="color:#dc2626;text-decoration:line-through;word-break:break-all;">${esc(h.old_value || "(empty)")}</span>
+      <span style="color:#94a3b8;">→</span>
+      <span style="color:#059669;font-weight:600;word-break:break-all;">${esc(h.new_value || "(empty)")}</span>
+      <span style="color:#94a3b8;font-size:10.5px;white-space:nowrap;">${esc(fmtDate(h.changed_at))} ${esc(fmtTime(h.changed_at))}</span>
+    </div>`).join("");
+  el.innerHTML = `
+    <div style="background:#fff;border:1px dashed #cbd5e1;border-radius:5px;margin-top:6px;">
+      <div style="padding:4px 8px;font-size:11px;font-weight:700;color:#64748b;background:#f1f5f9;">📜 History (${list.length}) — read only, cannot be deleted</div>
+      ${rows}
+    </div>`;
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
