@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoices · Admin · Cursive</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <style>
+    body { background:#f8fafc; margin:0; color:#0f172a; font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
+    main { max-width:1200px; margin:0 auto; padding:20px; }
+    .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:18px; margin-bottom:14px; }
+    h1 { font-size:20px; margin:0; }
+    input, select { padding:8px 10px; border:1px solid #d0d7de; border-radius:6px; font-size:13px; }
+    button { padding:8px 14px; border-radius:6px; border:none; cursor:pointer; font-weight:600; font-size:13px; }
+    .b-primary { background:#1f6feb; color:#fff; }
+    .b-outline { background:#fff; color:#1f6feb; border:1px solid #1f6feb; }
+    .b-danger { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; padding:10px 8px; text-align:left; font-size:11px; color:#475467; text-transform:uppercase; letter-spacing:.4px; border-bottom:2px solid #e2e8f0; }
+    td { padding:12px 8px; font-size:13px; border-bottom:1px solid #f1f5f9; }
+    tr:hover td { background:#f8fafc; }
+    .toast { position:fixed; right:20px; bottom:20px; background:#16a34a; color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; z-index:200; }
+    .toast.err { background:#dc2626; }
+    .hidden { display:none !important; }
+    .email-chip { background:#f1f5f9; color:#475467; padding:5px 10px; border-radius:6px; font-size:12.5px; font-weight:600; }
+    .summary-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+    .summary-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px; }
+    .summary-card .lbl { font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700; letter-spacing:.4px; margin-bottom:4px; }
+    .summary-card .val { font-size:20px; font-weight:800; color:#0f172a; }
+    .summary-card.total .val { color:#1f6feb; }
+    @media (max-width:800px) { .summary-row { grid-template-columns:repeat(2,1fr); } }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" style="cursor:default;">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Invoices · Admin</div>
+    </div>
+  </div>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <a href="/admin/quotations/" class="b-outline" style="padding:7px 12px;border-radius:6px;font-weight:600;font-size:13px;text-decoration:none;">📋 Quotations</a>
+    <button id="signOutBtn" class="hidden b-danger" style="padding:7px 12px;">Logout</button>
+  </div>
+</header>
+
+<main>
+  <div id="loginPanel" class="panel hidden" style="max-width:400px;margin:60px auto;">
+    <h1 style="text-align:center;">🔒 Admin Login</h1>
+    <label style="display:block;font-size:12px;color:#475467;font-weight:700;margin:10px 0 4px;text-transform:uppercase;">Email</label>
+    <input id="loginEmail" type="text" placeholder="admin@cursive.world" style="width:100%;" />
+    <label style="display:block;font-size:12px;color:#475467;font-weight:700;margin:10px 0 4px;text-transform:uppercase;">Password</label>
+    <input id="loginPass" type="password" placeholder="••••••••" style="width:100%;" />
+    <div id="loginErr" style="color:#dc2626;font-size:12px;margin-top:8px;display:none;"></div>
+    <button id="loginBtn" class="b-primary" style="width:100%;margin-top:14px;padding:10px;">Sign in</button>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <h1>💼 Invoices (Accounting)</h1>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="searchBox" type="text" placeholder="Search invoice # / customer..." style="width:280px;" />
+          <select id="periodFilter" style="width:150px;">
+            <option value="all">All time</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="365">This year</option>
+          </select>
+        </div>
+      </div>
+      <div class="summary-row" id="summaryRow" style="margin-top:14px;">
+        <div class="summary-card"><div class="lbl">Total invoices</div><div class="val" id="sumCount">—</div></div>
+        <div class="summary-card total"><div class="lbl">Total collected</div><div class="val" id="sumTotal">—</div></div>
+        <div class="summary-card"><div class="lbl">GST collected</div><div class="val" id="sumGst">—</div></div>
+        <div class="summary-card"><div class="lbl">Subtotal (pre-GST)</div><div class="val" id="sumSub">—</div></div>
+      </div>
+      <div id="listWrap" style="margin-top:14px;"></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, storageKey:"pd_tracker_auth" }});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = p => "₹" + (Number(p)/100).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
+
+function toast(msg, isErr) { const t = document.createElement("div"); t.className="toast"+(isErr?" err":""); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500); }
+
+let _session = null;
+let _all = [];
+
+async function refresh() {
+  const { data:{ session } } = await sb.auth.getSession();
+  _session = session;
+  if (session) {
+    $("#loginPanel").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    $("#emailChip").textContent = session.user.email;
+    $("#emailChip").classList.remove("hidden");
+    $("#signOutBtn").classList.remove("hidden");
+    await load();
+  } else {
+    $("#loginPanel").classList.remove("hidden");
+    $("#app").classList.add("hidden");
+    $("#emailChip").classList.add("hidden");
+    $("#signOutBtn").classList.add("hidden");
+  }
+}
+
+$("#loginBtn").addEventListener("click", async () => {
+  const email = $("#loginEmail").value.trim();
+  const password = $("#loginPass").value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { $("#loginErr").textContent = error.message; $("#loginErr").style.display = "block"; return; }
+  $("#loginErr").style.display = "none";
+  await refresh();
+});
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refresh(); });
+$("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+
+async function callFn(name, body) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", "Authorization":"Bearer "+_session.access_token, "apikey":SUPABASE_ANON_KEY },
+    body: JSON.stringify(body || {}),
+  });
+  return await r.json();
+}
+
+async function load() {
+  $("#listWrap").innerHTML = `<div style="padding:20px;text-align:center;color:#94a3b8;">Loading...</div>`;
+  const j = await callFn("admin-invoices", { op:"list" });
+  if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error)}</div>`; return; }
+  _all = j.invoices || [];
+  render();
+}
+
+function filtered() {
+  const q = ($("#searchBox").value || "").trim().toLowerCase();
+  const period = $("#periodFilter").value;
+  const now = Date.now();
+  return _all.filter(inv => {
+    if (period !== "all") {
+      const days = Number(period);
+      const cutoff = now - days*86400000;
+      if (new Date(inv.created_at).getTime() < cutoff) return false;
+    }
+    if (!q) return true;
+    return (inv.invoice_number || "").toLowerCase().includes(q) ||
+           (inv.customer_name || "").toLowerCase().includes(q) ||
+           (inv.customer_email || "").toLowerCase().includes(q) ||
+           (inv.quote_number || "").toLowerCase().includes(q);
+  });
+}
+
+function render() {
+  const rows = filtered();
+  // Summary
+  let sub = 0, gst = 0, total = 0;
+  for (const inv of rows) { sub += Number(inv.subtotal_paise||0); gst += Number(inv.gst_paise||0); total += Number(inv.total_paise||0); }
+  $("#sumCount").textContent = rows.length;
+  $("#sumTotal").textContent = fmt(total);
+  $("#sumGst").textContent = fmt(gst);
+  $("#sumSub").textContent = fmt(sub);
+
+  if (rows.length === 0) { $("#listWrap").innerHTML = `<div style="padding:30px;text-align:center;color:#94a3b8;">No invoices found.</div>`; return; }
+  let html = `<table><thead><tr>
+    <th>Invoice #</th><th>Customer</th><th>Ref Quote</th><th>Total</th><th>Payment ID</th><th>Date</th><th>Emailed</th><th></th>
+  </tr></thead><tbody>`;
+  for (const inv of rows) {
+    html += `<tr>
+      <td><b>${esc(inv.invoice_number)}</b></td>
+      <td>${esc(inv.customer_name)}${inv.customer_email?`<br><small style="color:#64748b;">${esc(inv.customer_email)}</small>`:""}</td>
+      <td>${esc(inv.quote_number || "—")}</td>
+      <td><b>${fmt(inv.total_paise)}</b></td>
+      <td><code style="font-family:monospace;font-size:11px;color:#64748b;">${esc((inv.payment_id||"—").slice(0,18))}</code></td>
+      <td style="font-size:12px;color:#64748b;">${fmtDate(inv.created_at)}</td>
+      <td style="font-size:12px;color:${inv.emailed_at?"#16a34a":"#94a3b8"};">${inv.emailed_at?"✓ "+fmtDate(inv.emailed_at):"Not sent"}</td>
+      <td style="white-space:nowrap;">
+        <a href="/invoice/?t=${esc(inv.share_token)}" target="_blank" class="b-outline" style="padding:5px 10px;font-size:11.5px;border-radius:5px;text-decoration:none;">View</a>
+        <button class="b-primary email-btn" data-id="${inv.id}" style="padding:5px 10px;font-size:11.5px;margin-left:4px;">📧 Email</button>
+      </td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  $("#listWrap").innerHTML = html;
+  document.querySelectorAll(".email-btn").forEach(b => {
+    b.addEventListener("click", async () => {
+      const id = Number(b.dataset.id);
+      if (!confirm("Send invoice email to customer?")) return;
+      b.disabled = true; b.textContent = "Sending...";
+      const j = await callFn("admin-invoices", { op:"email", id });
+      if (j.ok) { toast("✓ Emailed"); await load(); }
+      else { toast(j.error || "Failed", true); b.disabled = false; b.textContent = "📧 Email"; }
+    });
+  });
+}
+
+$("#searchBox").addEventListener("input", render);
+$("#periodFilter").addEventListener("change", render);
+
+refresh();
+</script>
+
+</body></html>
