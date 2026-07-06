@@ -603,6 +603,20 @@
           regBtn.className = "btn btn-primary lead-submit lead-pay-btn";
           regBtn.innerHTML = '<span class="lead-pay-emoji">&#128274;</span> Register now to pay';
           regBtn.addEventListener("click", function () {
+            // Track "clicked pay" so lead lands in leads01 Payment sub-tab
+            try {
+              fetch("https://bttppihskbfmxwujyztj.supabase.co/functions/v1/lead-track-click", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: currentEmail,
+                  mobile: currentMobile,
+                  serviceType: currentServiceTag,
+                  channel: "payment"
+                }),
+                keepalive: true
+              }).catch(function(){});
+            } catch(_){}
             // Send to /home/ — pass ?service=TAG so the pay modal auto-opens
             // with wallet-first auto-debit (recharge + pay in one tap if short).
             // Maps our internal serviceTag values to the catalog tags wallet-pay-service knows.
@@ -711,6 +725,20 @@
       channel:      channel,
       origin:       window.location.pathname
     });
+    // Also mirror to Supabase lead_overrides so leads01 sees it instantly
+    try {
+      fetch("https://bttppihskbfmxwujyztj.supabase.co/functions/v1/lead-track-click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: currentEmail,
+          mobile: currentMobile,
+          serviceType: currentServiceTag,
+          channel: channel
+        }),
+        keepalive: true
+      }).catch(function(){});
+    } catch(_){}
   }
   var doneCall = document.getElementById("leadDoneCall");
   var doneWa   = document.getElementById("leadDoneWa");
