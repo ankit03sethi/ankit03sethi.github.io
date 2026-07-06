@@ -1025,31 +1025,40 @@ function renderHistoryList(elId, list) {
   const el = document.getElementById(elId);
   if (!el) return;
   if (!list || list.length === 0) { el.innerHTML = ""; return; }
-  // Build a flat list of every value ever seen for this field (old + new), deduped in order (newest first)
-  const seen = new Set();
-  const values = [];
-  list.forEach((h) => {
-    const v = (h.new_value || "").trim();
-    if (v && !seen.has(v)) { seen.add(v); values.push({ value: v, at: h.changed_at }); }
-  });
-  // Include the oldest old_value too (the value that existed before any change)
-  const last = list[list.length - 1];
-  if (last && last.old_value) {
-    const ov = String(last.old_value).trim();
-    if (ov && !seen.has(ov)) values.push({ value: ov, at: null });
-  }
-  if (values.length <= 1) { el.innerHTML = ""; return; } // nothing worth showing if only latest
 
-  // Skip the very first (=current latest, already shown above)
-  const older = values.slice(1);
-  const rows = older.map((v) => `
-    <div style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;display:flex;justify-content:space-between;gap:6px;">
-      <span style="color:#334155;font-weight:600;word-break:break-all;">${esc(v.value)}</span>
-      ${v.at ? `<span style="color:#94a3b8;font-size:10.5px;white-space:nowrap;">${esc(fmtDate(v.at))} ${esc(fmtTime(v.at))}</span>` : ""}
+  // list is DESC (newest change first). Build full value timeline ASC:
+  //   [ initial old_value (from oldest change, no timestamp),
+  //     new_value of oldest change (activated at its changed_at),
+  //     ... newer changes ]
+  const asc = list.slice().reverse();
+  const values = [];
+  const seen = new Set();
+  const oldest = asc[0];
+  if (oldest?.old_value && String(oldest.old_value).trim()) {
+    const v = String(oldest.old_value).trim();
+    values.push({ value: v, at: null });
+    seen.add(v);
+  }
+  asc.forEach((h) => {
+    const v = (h.new_value || "").trim();
+    if (!v) return;
+    if (!seen.has(v) || values[values.length - 1]?.value !== v) {
+      values.push({ value: v, at: h.changed_at });
+      seen.add(v);
+    }
+  });
+  // Reverse so newest is first
+  values.reverse();
+  if (values.length === 0) { el.innerHTML = ""; return; }
+
+  const rows = values.map((v, i) => `
+    <div style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;display:flex;justify-content:space-between;gap:6px;align-items:center;">
+      <span style="color:${i===0?"#059669":"#334155"};font-weight:600;word-break:break-all;">${esc(v.value)}${i===0?` <span style="font-size:10px;color:#059669;font-weight:700;">LATEST</span>`:""}</span>
+      ${v.at ? `<span style="color:#94a3b8;font-size:10.5px;white-space:nowrap;">${esc(fmtDate(v.at))} ${esc(fmtTime(v.at))}</span>` : `<span style="color:#94a3b8;font-size:10.5px;">(initial)</span>`}
     </div>`).join("");
   el.innerHTML = `
     <div style="background:#fff;border:1px dashed #cbd5e1;border-radius:5px;margin-top:6px;">
-      <div style="padding:4px 8px;font-size:11px;font-weight:700;color:#64748b;background:#f1f5f9;">📜 Previous values (${older.length}) — read only, cannot be deleted</div>
+      <div style="padding:4px 8px;font-size:11px;font-weight:700;color:#64748b;background:#f1f5f9;">📜 All values (${values.length}) — read only, cannot be deleted</div>
       ${rows}
     </div>`;
 }
