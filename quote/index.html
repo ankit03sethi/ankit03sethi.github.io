@@ -620,22 +620,29 @@ $("#printBtn").addEventListener("click", () => window.print());
 
 $("#pdfBtn").addEventListener("click", async () => {
   const area = $("#pdfArea");
-  area.innerHTML = $("#quoteDoc").outerHTML;
-  // Strip ribbon from PDF
-  const rib = area.querySelector(".ribbon"); if (rib) rib.remove();
-  // Source width slightly smaller than A4 (794px @ 96dpi) so nothing overflows the right edge
   const SRC_WIDTH = 760;
+  // Move pdf area onscreen momentarily so html2canvas uses correct layout width (mobile fix)
+  const clone = $("#quoteDoc").cloneNode(true);
+  const rib = clone.querySelector(".ribbon"); if (rib) rib.remove();
+  area.innerHTML = "";
+  area.appendChild(clone);
   area.style.width = SRC_WIDTH + "px";
-  // Force every element to break long words / URLs so nothing sticks out
-  area.querySelectorAll("*").forEach(el => {
+  area.style.left = "0";
+  area.style.top = "0";
+  area.style.zIndex = "-1";
+  area.style.opacity = "0";
+  area.style.pointerEvents = "none";
+  clone.style.width = SRC_WIDTH + "px";
+  clone.style.maxWidth = SRC_WIDTH + "px";
+  // Force every element to break words + explicit no overflow
+  clone.querySelectorAll("*").forEach(el => {
     el.style.wordBreak = "break-word";
     el.style.overflowWrap = "break-word";
     el.style.maxWidth = "100%";
   });
-  // Wait a tick for reflow so html2canvas measures the final layout
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise(r => setTimeout(r, 100));
   const opt = {
-    margin: [4, 4, 4, 4], // mm (~15px cushion)
+    margin: [4, 4, 4, 4],
     filename: `${_quote.quote_number}.pdf`,
     image: { type:"jpeg", quality:0.98 },
     html2canvas: {
@@ -647,11 +654,26 @@ $("#pdfBtn").addEventListener("click", async () => {
       width: SRC_WIDTH,
       scrollX: 0,
       scrollY: 0,
+      onclone: (doc) => {
+        // Ensure the cloned doc has our fixed width
+        const el = doc.getElementById("pdfArea");
+        if (el) { el.style.width = SRC_WIDTH + "px"; el.style.maxWidth = SRC_WIDTH + "px"; }
+      },
     },
     jsPDF: { unit:"mm", format:"a4", orientation:"portrait", compress:true },
     pagebreak: { mode:["css", "legacy"] }
   };
-  await html2pdf().from(area).set(opt).save();
+  try {
+    await html2pdf().from(area).set(opt).save();
+  } finally {
+    // Restore pdfArea offscreen
+    area.style.left = "-9999px";
+    area.style.top = "0";
+    area.style.zIndex = "";
+    area.style.opacity = "";
+    area.style.pointerEvents = "";
+    area.innerHTML = "";
+  }
 });
 
 $("#waBtn").addEventListener("click", () => {
