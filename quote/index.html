@@ -704,7 +704,7 @@ $("#waBtn").addEventListener("click", () => {
 // Show Accept & Pay only when quote is payable AND not superseded
 function updatePayButton() {
   const q = _quote; if (!q) return;
-  const payable = ["draft","sent","follow_up"].includes(q.status) && !_superseded_by;
+  const payable = ["draft","sent","follow_up","regenerated"].includes(q.status) && !_superseded_by;
   const btn = $("#acceptPayBtn");
   if (payable) {
     btn.style.display = "block";
