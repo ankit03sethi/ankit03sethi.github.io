@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice · Cursive World</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    :root { --brand-blue:#2456E6; --orange:#E9A550; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; }
+    * { box-sizing:border-box; }
+    body { background:#eef2f7; margin:0; color:var(--text); font-family:'Inter',system-ui,sans-serif; }
+    main { max-width:820px; margin:0 auto; padding:24px 16px; }
+    .doc { background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.08); margin-bottom:20px; max-width:100%; }
+    .doc * { max-width:100%; box-sizing:border-box; }
+    .top-band { background:var(--brand-blue); color:#fff; padding:24px 32px 20px; display:flex; justify-content:space-between; align-items:center; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .brand-row { display:flex; align-items:center; gap:14px; }
+    .brand-box { background:#fff; border-radius:10px; width:56px; height:56px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 10px rgba(0,0,0,.08); }
+    .brand-wordmark { font-family:'Dancing Script',cursive; font-size:44px; font-weight:700; line-height:1; color:#fff; }
+    .brand-wordmark sup { font-size:14px; font-weight:400; margin-left:2px; }
+    .brand-tag { font-size:12.5px; opacity:.92; margin-top:2px; font-weight:400; color:#fff; }
+    .doc-title { font-size:28px; font-weight:800; letter-spacing:2px; color:#fff; }
+    .paid-badge { display:inline-block; background:#16a34a; color:#fff; padding:5px 12px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:1px; margin-top:6px; }
+    .accent { height:6px; background:var(--orange); }
+    .meta { padding:20px 32px; display:grid; grid-template-columns:1fr 1fr; gap:18px; font-size:13px; }
+    .meta .label { color:var(--text); font-weight:700; margin-right:10px; }
+    .parties { padding:0 32px 22px; display:grid; grid-template-columns:1fr 1fr; gap:40px; }
+    .party h3 { color:var(--brand-blue); font-size:14px; font-weight:700; margin:0 0 8px; }
+    .party-name { font-size:15px; font-weight:700; margin-bottom:4px; }
+    .party-line { font-size:12.5px; color:var(--text); line-height:1.55; }
+    .items-wrap { padding:0 32px; }
+    table.items { width:100%; border-collapse:collapse; border:1px solid var(--border); }
+    .items thead th { background:var(--brand-blue); color:#fff; font-size:12px; font-weight:700; padding:10px 8px; text-align:left; letter-spacing:.3px; -webkit-print-color-adjust:exact; }
+    .items thead th.center { text-align:center; }
+    .items thead th.right { text-align:right; }
+    .items tbody td { padding:12px 8px; font-size:12.5px; border-bottom:1px solid var(--border); vertical-align:top; }
+    .items tbody tr:nth-child(even) td { background:#f8fafc; }
+    .col-num { width:36px; text-align:center; }
+    .col-qty { width:60px; text-align:center; }
+    .col-rate { width:90px; text-align:right; }
+    .col-amt { width:110px; text-align:right; font-weight:700; }
+    .item-name { font-weight:700; }
+    .item-desc { font-size:11.5px; color:var(--muted); margin-top:2px; }
+    .totals { padding:0 32px 8px; display:flex; justify-content:flex-end; margin-top:-1px; }
+    .totals-inner { min-width:340px; }
+    .totals-row { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:2px solid var(--brand-blue); font-size:13px; }
+    .totals-row .lbl { font-weight:700; color:var(--text); }
+    .totals-row .amt { font-weight:700; color:var(--text); }
+    .totals-row.grand { border-bottom:none; padding:14px 10px 6px; font-size:16px; }
+    .totals-row.grand .lbl { color:var(--brand-blue); font-weight:800; font-size:17px; }
+    .totals-row.grand .amt { color:var(--text); font-weight:800; font-size:20px; }
+    .payinfo { margin:14px 32px 0; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:12px 16px; font-size:13px; }
+    .payinfo b { color:#166534; }
+    .in-words { margin:14px 32px 0; background:#eff2fb; border-radius:4px; padding:10px 14px; font-size:12.5px; }
+    .thanks { padding:20px 32px 24px; font-size:12.5px; color:var(--muted); line-height:1.6; }
+    .accent-bottom { height:4px; background:var(--orange); }
+    .footer-band { background:var(--brand-blue); color:#fff; padding:10px 32px; text-align:center; font-size:11.5px; -webkit-print-color-adjust:exact; }
+    .footer-band span { opacity:.85; padding:0 4px; }
+    .actions { background:#fff; border-radius:8px; padding:16px; box-shadow:0 4px 20px rgba(0,0,0,.05); }
+    .actions .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn { padding:12px 18px; border-radius:6px; border:none; cursor:pointer; font-weight:700; font-size:14px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .b-primary { background:var(--brand-blue); color:#fff; }
+    .b-wa { background:#25D366; color:#fff; }
+    .b-outline { background:#fff; color:var(--brand-blue); border:1px solid var(--brand-blue); }
+    .card-msg { background:#fff; border-radius:8px; padding:60px 30px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,.05); }
+    .hidden { display:none !important; }
+    @media print { body{background:#fff;} main{padding:0;max-width:none;} .no-print{display:none!important;} .doc{box-shadow:none;border-radius:0;margin:0;} }
+    @media (max-width:640px) {
+      html, body { overflow-x:hidden; }
+      main { padding:12px 8px; }
+      .top-band { flex-direction:column; align-items:flex-start; gap:10px; padding:18px 16px 14px; }
+      .brand-box { width:44px; height:44px; }
+      .brand-wordmark { font-size:32px; }
+      .doc-title { font-size:22px; align-self:flex-end; }
+      .meta, .parties, .items-wrap, .totals, .thanks, .payinfo, .in-words, .footer-band { padding-left:16px; padding-right:16px; }
+      .payinfo, .in-words { margin-left:16px; margin-right:16px; }
+      .meta, .parties { grid-template-columns:1fr; gap:12px; }
+      table.items thead th { font-size:10px; padding:8px 4px; }
+      table.items tbody td { padding:10px 4px; font-size:11.5px; }
+      .totals-inner { min-width:auto; width:100%; }
+    }
+  </style>
+</head>
+<body>
+
+<main>
+  <div id="loading" class="card-msg"><div style="font-size:36px;">⏳</div><div style="color:var(--muted);margin-top:8px;">Loading invoice...</div></div>
+  <div id="errorPanel" class="card-msg hidden">
+    <div style="font-size:36px;">⚠️</div>
+    <h1 id="errorMsg" style="color:#dc2626;font-size:20px;margin-top:12px;">Invoice not found</h1>
+    <a href="/" class="btn b-primary" style="margin-top:14px;">Go to Cursive</a>
+  </div>
+
+  <div id="wrap" class="hidden">
+    <div class="doc" id="invDoc">
+      <div class="top-band">
+        <div class="brand-row">
+          <div class="brand-box">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2456E6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 17 9 11 13 15 21 6"/>
+              <polyline points="15 6 21 6 21 12"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+            <div class="brand-tag">India's seller toolkit</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="doc-title">INVOICE</div>
+          <div class="paid-badge">✓ PAID</div>
+        </div>
+      </div>
+      <div class="accent"></div>
+
+      <div class="meta">
+        <div><span class="label">Invoice No:</span> <span id="mInvNo"></span></div>
+        <div>
+          <div><span class="label">Date:</span> <span id="mDate"></span></div>
+          <div style="margin-top:4px;"><span class="label">Ref Quote:</span> <span id="mQuote"></span></div>
+        </div>
+      </div>
+
+      <div class="parties">
+        <div class="party">
+          <h3>FROM</h3>
+          <div class="party-name">Cursive World</div>
+          <div class="party-line">C-165, Hari Nagar, New Delhi - 110064</div>
+          <div class="party-line">WhatsApp: 9625 73 74 75</div>
+          <div class="party-line">Email: contact@cursive.world</div>
+          <div class="party-line">Web: www.cursive.world</div>
+        </div>
+        <div class="party">
+          <h3>BILL TO</h3>
+          <div class="party-name" id="cName"></div>
+          <div class="party-line" id="cEmail"></div>
+          <div class="party-line" id="cPhone"></div>
+          <div class="party-line" id="cGst"></div>
+          <div class="party-line" id="cAddress"></div>
+        </div>
+      </div>
+
+      <div class="items-wrap">
+        <table class="items">
+          <thead>
+            <tr>
+              <th class="col-num center">#</th>
+              <th>Item</th>
+              <th class="col-qty center">Qty</th>
+              <th class="col-rate right">Rate (₹)</th>
+              <th class="col-amt right">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="totals">
+        <div class="totals-inner">
+          <div class="totals-row"><span class="lbl">Subtotal</span><span class="amt" id="tSub">₹0</span></div>
+          <div class="totals-row hidden" id="tGstRow"><span class="lbl">GST</span><span class="amt" id="tGst">₹0</span></div>
+          <div class="totals-row hidden" id="tVolRow" style="color:#16a34a;"><span class="lbl" id="tVolLbl">Volume discount</span><span class="amt" id="tVol">-₹0</span></div>
+          <div class="totals-row grand"><span class="lbl">Grand Total</span><span class="amt" id="tTotal">₹0</span></div>
+        </div>
+      </div>
+
+      <div class="payinfo">
+        <b>Payment Details:</b>
+        <div style="margin-top:6px;">Payment ID: <code id="payId" style="font-family:monospace;font-size:11.5px;color:#64748b;"></code></div>
+        <div>Method: <span id="payMethod"></span></div>
+      </div>
+
+      <div class="in-words">
+        <b>Amount in Words:</b> <span id="tWords"></span>
+      </div>
+
+      <div class="thanks">
+        Thank you for choosing Cursive World. This is a computer-generated invoice and does not require a signature.<br>
+        For queries, reach us at <b>contact@cursive.world</b> or WhatsApp <b>9625 73 74 75</b>.
+      </div>
+
+      <div class="accent-bottom"></div>
+      <div class="footer-band">
+        <span>www.cursive.world</span>|<span>contact@cursive.world</span>|<span>WhatsApp: 9625 73 74 75</span>|<span>C-165, Hari Nagar, New Delhi - 110064</span>
+      </div>
+    </div>
+
+    <div class="actions no-print">
+      <div class="row">
+        <button id="pdfBtn" class="btn b-primary" style="flex:1;">📄 Download PDF</button>
+        <button id="waBtn" class="btn b-wa" style="flex:1;">💬 WhatsApp us</button>
+        <button id="printBtn" class="btn b-outline" style="flex:1;">🖨️ Print</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:760px;background:#fff;overflow:hidden;word-wrap:break-word;"></div>
+
+<script>
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+const WA_NUMBER = "919625737475";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtN = n => Number(n).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmt = p => "₹" + fmtN(p/100);
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" }) : "—";
+
+function numberToIndianWords(num) {
+  num = Math.floor(Math.abs(num));
+  if (num === 0) return "Zero";
+  const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function two(n){ if(n<20)return a[n]; return b[Math.floor(n/10)]+(n%10?'-'+a[n%10]:''); }
+  function three(n){ const h=Math.floor(n/100),r=n%100; return (h?a[h]+' Hundred'+(r?' ':''):'')+(r?two(r):''); }
+  const crore=Math.floor(num/10000000),lakh=Math.floor((num%10000000)/100000),thou=Math.floor((num%100000)/1000),rest=num%1000;
+  let out='';
+  if(crore)out+=three(crore)+' Crore ';
+  if(lakh)out+=two(lakh)+' Lakh ';
+  if(thou)out+=two(thou)+' Thousand ';
+  if(rest)out+=three(rest);
+  return out.trim();
+}
+
+let _inv = null;
+
+async function load() {
+  const token = (new URLSearchParams(location.search).get("t") || "").trim();
+  if (!token) { showErr("Missing invoice token"); return; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/invoice-public?t=${encodeURIComponent(token)}`, { headers:{ apikey:SUPABASE_ANON_KEY }});
+    const j = await r.json();
+    if (!j.ok) { showErr(j.error || "Invoice not found"); return; }
+    _inv = j.invoice;
+    render();
+  } catch (e) { showErr("Network error: " + e.message); }
+}
+
+function showErr(msg) {
+  $("#loading").classList.add("hidden");
+  $("#errorMsg").textContent = msg;
+  $("#errorPanel").classList.remove("hidden");
+}
+
+function render() {
+  const inv = _inv;
+  $("#loading").classList.add("hidden");
+  $("#wrap").classList.remove("hidden");
+  document.title = `Invoice ${inv.invoice_number} · Cursive World`;
+  $("#mInvNo").textContent = inv.invoice_number;
+  $("#mDate").textContent = fmtDate(inv.issued_at || inv.created_at);
+  $("#mQuote").textContent = inv.quote_number || "—";
+  $("#cName").textContent = inv.customer_name || "";
+  $("#cEmail").textContent = inv.customer_email ? "Email: " + inv.customer_email : "";
+  $("#cPhone").textContent = inv.customer_phone ? "Phone: " + inv.customer_phone : "";
+  $("#cGst").textContent = inv.customer_gst ? "GSTIN: " + inv.customer_gst : "";
+  $("#cAddress").textContent = inv.customer_address || "";
+
+  const items = Array.isArray(inv.line_items) ? inv.line_items : [];
+  let rows = "";
+  items.forEach((it, idx) => {
+    const name = it.item_type === "product" ? "Product: " + it.description : it.description;
+    rows += `<tr>
+      <td class="col-num">${idx + 1}</td>
+      <td><div class="item-name">${esc(name)}</div></td>
+      <td class="col-qty">${it.qty}</td>
+      <td class="col-rate">${fmtN(it.unit_price_paise/100)}</td>
+      <td class="col-amt">${fmtN(((it.total_paise||0)+(it.gst_paise||0))/100)}</td>
+    </tr>`;
+  });
+  $("#itemsBody").innerHTML = rows;
+
+  $("#tSub").textContent = fmt(inv.subtotal_paise);
+  if (inv.gst_paise > 0) { $("#tGstRow").classList.remove("hidden"); $("#tGst").textContent = fmt(inv.gst_paise); }
+  if (inv.volume_discount_paise > 0) {
+    $("#tVolRow").classList.remove("hidden");
+    $("#tVolLbl").textContent = `Volume discount (${Number(inv.volume_discount_percent)}%)`;
+    $("#tVol").textContent = "-" + fmt(inv.volume_discount_paise);
+  }
+  $("#tTotal").textContent = fmt(inv.total_paise);
+  $("#tWords").textContent = "Rupees " + numberToIndianWords(Math.round(inv.total_paise/100)) + " Only";
+  $("#payId").textContent = inv.payment_id || "—";
+  $("#payMethod").textContent = (inv.payment_method || "razorpay").toUpperCase();
+}
+
+$("#printBtn").addEventListener("click", () => window.print());
+
+$("#pdfBtn").addEventListener("click", async () => {
+  const area = $("#pdfArea");
+  area.innerHTML = $("#invDoc").outerHTML;
+  const SRC = 760;
+  area.style.width = SRC + "px";
+  area.querySelectorAll("*").forEach(el => { el.style.wordBreak = "break-word"; el.style.overflowWrap = "break-word"; el.style.maxWidth = "100%"; });
+  await new Promise(r => setTimeout(r, 50));
+  await html2pdf().from(area).set({
+    margin:[4,4,4,4],
+    filename:`${_inv.invoice_number}.pdf`,
+    image:{ type:"jpeg", quality:0.98 },
+    html2canvas:{ scale:2, useCORS:true, backgroundColor:"#ffffff", windowWidth:SRC, width:SRC, scrollX:0, scrollY:0 },
+    jsPDF:{ unit:"mm", format:"a4", orientation:"portrait", compress:true }
+  }).save();
+});
+
+$("#waBtn").addEventListener("click", () => {
+  const msg = `Hi Cursive World team, I have a question regarding invoice ${_inv.invoice_number}.\n\n`;
+  window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
+});
+
+load();
+</script>
+
+</body></html>
