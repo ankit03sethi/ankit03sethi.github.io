@@ -19,6 +19,7 @@ const NEW_SUBS = [
   { id: "callback",      title: "Callback" },
   { id: "click_to_call", title: "Click to Call" },
   { id: "click_to_wa",   title: "Click to WhatsApp" },
+  { id: "payment",       title: "Payment" },
   { id: "tried_payment", title: "Tried payment" },
 ];
 
@@ -152,6 +153,7 @@ function newSubOf(lead) {
   if (lead.manual_status === "callback") return "callback";
   if (lead.manual_status === "clicked_wa") return "click_to_wa";
   if (lead.manual_status === "clicked_call") return "click_to_call";
+  if (lead.manual_status === "clicked_pay") return "payment";
   if (lead.latest_event === "payment_initiated") return "tried_payment";
   if (lead.latest_event === "otp_verified")      return "otp_verified";
   if (lead.latest_event === "otp_sent")          return "otp_sent";
