@@ -27,7 +27,11 @@
       overflow:hidden;
       box-shadow:0 8px 40px rgba(0,0,0,.08);
       margin-bottom:20px;
+      max-width:100%;
+      word-wrap:break-word;
+      overflow-wrap:break-word;
     }
+    .quote-doc * { max-width:100%; box-sizing:border-box; }
 
     /* Top blue band */
     .top-band {
@@ -418,7 +422,7 @@
   </div>
 </main>
 
-<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:800px;background:#fff;overflow:hidden;"></div>
+<div id="pdfArea" style="position:fixed;left:-9999px;top:0;width:760px;background:#fff;overflow:hidden;word-wrap:break-word;"></div>
 
 <script type="module">
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -581,21 +585,30 @@ $("#pdfBtn").addEventListener("click", async () => {
   area.innerHTML = $("#quoteDoc").outerHTML;
   // Strip ribbon from PDF
   const rib = area.querySelector(".ribbon"); if (rib) rib.remove();
-  // A4 at 96dpi = 794x1123px. Use 800px source width so nothing is cut on the right.
-  const A4_WIDTH_PX = 800;
-  area.style.width = A4_WIDTH_PX + "px";
+  // Source width slightly smaller than A4 (794px @ 96dpi) so nothing overflows the right edge
+  const SRC_WIDTH = 760;
+  area.style.width = SRC_WIDTH + "px";
+  // Force every element to break long words / URLs so nothing sticks out
+  area.querySelectorAll("*").forEach(el => {
+    el.style.wordBreak = "break-word";
+    el.style.overflowWrap = "break-word";
+    el.style.maxWidth = "100%";
+  });
+  // Wait a tick for reflow so html2canvas measures the final layout
+  await new Promise(r => setTimeout(r, 50));
   const opt = {
-    margin: 0,
+    margin: [4, 4, 4, 4], // mm (~15px cushion)
     filename: `${_quote.quote_number}.pdf`,
     image: { type:"jpeg", quality:0.98 },
     html2canvas: {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
-      windowWidth: A4_WIDTH_PX,
+      logging: false,
+      windowWidth: SRC_WIDTH,
+      width: SRC_WIDTH,
       scrollX: 0,
       scrollY: 0,
-      width: A4_WIDTH_PX,
     },
     jsPDF: { unit:"mm", format:"a4", orientation:"portrait", compress:true },
     pagebreak: { mode:["css", "legacy"] }
