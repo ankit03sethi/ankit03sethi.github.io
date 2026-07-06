@@ -46,6 +46,7 @@
     .st-expired { background:#fee2e2; color:#b91c1c; }
     .st-cancelled { background:#f3f4f6; color:#6b7280; }
     .st-follow_up { background:#fef3c7; color:#92400e; }
+    .st-regenerated { background:#ede9fe; color:#6d28d9; font-weight:700; }
     .st-paid { background:#d1fae5; color:#065f46; font-weight:800; }
     .st-rejected { background:#fee2e2; color:#991b1b; font-weight:700; }
     .filter-tab {
@@ -116,6 +117,7 @@
         <button class="filter-tab" data-filter="draft">Draft</button>
         <button class="filter-tab" data-filter="sent">Sent</button>
         <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
+        <button class="filter-tab" data-filter="regenerated">🔄 Regenerated</button>
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
@@ -251,6 +253,11 @@
                 <div id="invoiceStatus" style="font-size:12.5px;color:#64748b;margin-bottom:8px;"></div>
                 <div id="invoiceActions"></div>
               </div>
+              <!-- History (previous versions) -->
+              <div id="historySection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;">
+                <div style="font-weight:800;color:#7c3aed;font-size:13px;margin-bottom:8px;">📚 Previous Versions</div>
+                <div id="historyList" style="font-size:12px;"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -351,9 +358,10 @@ function matchesFilter(q, f) {
   if (f === "all") return true;
   if (f === "draft") return q.status === "draft";
   // "Sent" = anything that has been sent (or moved further)
-  if (f === "sent") return ["sent","follow_up","accepted","paid"].includes(q.status);
+  if (f === "sent") return ["sent","follow_up","regenerated","accepted","paid"].includes(q.status);
   // "Follow Up" = sent quotes not yet accepted/paid — auto-includes sent
   if (f === "follow_up") return ["sent","follow_up"].includes(q.status);
+  if (f === "regenerated") return q.status === "regenerated";
   // "Accepted" = accepted or paid (paid implies accepted)
   if (f === "accepted") return ["accepted","paid"].includes(q.status);
   if (f === "paid") return q.status === "paid";
@@ -559,6 +567,44 @@ async function openQuote(id) {
   const j = await callFn("admin-quotations", { op:"get", id });
   if (!j.ok) { toast(j.error || "Not found", true); return; }
   openBuilder(j.quotation);
+  // Show previous versions history (if this quote has predecessors)
+  if (j.predecessors && j.predecessors.length > 0) {
+    let html = "";
+    for (const p of j.predecessors) {
+      html += `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:8px;background:#faf5ff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div><b>${esc(p.quote_number)}</b> <span class="status-badge st-${p.status}" style="margin-left:6px;">${p.status.replace("_"," ")}</span></div>
+          <div style="font-size:11px;color:#64748b;">${fmtDate(p.created_at)}</div>
+        </div>
+        <div style="font-size:12px;color:#475467;">Total: <b>${fmt(p.total_paise)}</b> · Subtotal: ${fmt(p.subtotal_paise)} · GST: ${fmt(p.gst_paise)}</div>
+        <button data-preview="${p.id}" style="margin-top:6px;padding:4px 10px;font-size:11px;background:#fff;color:#7c3aed;border:1px solid #7c3aed;border-radius:4px;cursor:pointer;">Show items →</button>
+        <div id="predItems_${p.id}" style="display:none;margin-top:8px;padding:8px;background:#fff;border-radius:4px;font-size:11.5px;"></div>
+      </div>`;
+    }
+    $("#historyList").innerHTML = html;
+    $("#historySection").style.display = "block";
+    // Wire preview buttons
+    document.querySelectorAll("[data-preview]").forEach(b => {
+      b.addEventListener("click", async () => {
+        const pid = Number(b.dataset.preview);
+        const container = document.getElementById("predItems_" + pid);
+        if (container.style.display === "block") { container.style.display = "none"; return; }
+        const rj = await callFn("admin-quotations", { op:"get_predecessor_items", id: pid });
+        if (rj.ok) {
+          let ihtml = "<table style='width:100%;font-size:11px;'><thead><tr><th style='text-align:left;padding:4px;'>Item</th><th style='text-align:center;padding:4px;'>Qty</th><th style='text-align:right;padding:4px;'>Unit</th><th style='text-align:right;padding:4px;'>Total</th></tr></thead><tbody>";
+          for (const it of (rj.items || [])) {
+            const total = (it.total_paise || 0) + (it.gst_paise || 0);
+            ihtml += `<tr><td style='padding:4px;'>${esc(it.description)}</td><td style='text-align:center;padding:4px;'>${it.qty}</td><td style='text-align:right;padding:4px;'>${fmt(it.unit_price_paise)}</td><td style='text-align:right;padding:4px;font-weight:600;'>${fmt(total)}</td></tr>`;
+          }
+          ihtml += "</tbody></table>";
+          container.innerHTML = ihtml;
+          container.style.display = "block";
+        }
+      });
+    });
+  } else {
+    $("#historySection").style.display = "none";
+  }
   // Show superseded banner if applicable
   if (j.superseded_by) {
     const banner = document.createElement("div");
