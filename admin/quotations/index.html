@@ -547,6 +547,8 @@ async function openQuote(id) {
   const j = await callFn("admin-quotations", { op:"get", id });
   if (!j.ok) { toast(j.error || "Not found", true); return; }
   openBuilder(j.quotation);
+  // Ensure catalog is loaded so we can refresh stale prices
+  if (!_catalog) await loadCatalogOptions();
   _items = (j.items || []).map(it => ({
     item_type: it.item_type,
     item_ref_id: it.item_ref_id,
@@ -558,6 +560,33 @@ async function openQuote(id) {
     hsn_code: it.hsn_code || "",
     discount_inr: it.discount_paise ? it.discount_paise / 100 : 0,
   }));
+  // Auto-refresh prices from current catalog (fixes stale prices from earlier saves)
+  if (_catalog) {
+    let changed = 0;
+    const changes = [];
+    for (const it of _items) {
+      let catPrice = null, catGst = null, matchLabel = "";
+      if (it.item_type === "service" && it.item_ref_key) {
+        const s = (_catalog.services || []).find(x => x.key === it.item_ref_key);
+        if (s) { catPrice = Number(s.price_inr); catGst = Number(s.gst_percent) || 18; matchLabel = s.name; }
+      } else if (it.item_type === "product" && it.item_ref_id) {
+        const p = (_catalog.products || []).find(x => x.id === Number(it.item_ref_id));
+        if (p) { catPrice = Number(p.price_inr); catGst = Number(p.effective_gst_percent) || 18; matchLabel = p.title; }
+      }
+      if (catPrice !== null && catPrice !== it.unit_price_inr) {
+        changes.push(`${it.description}: ₹${it.unit_price_inr} → ₹${catPrice}`);
+        it.unit_price_inr = catPrice;
+        changed++;
+      }
+      if (catGst !== null && catGst !== it.gst_percent) {
+        it.gst_percent = catGst;
+      }
+    }
+    if (changed > 0) {
+      toast(`Refreshed ${changed} price(s) from catalog. Click Save to persist.`);
+      console.log("Price changes:", changes);
+    }
+  }
   renderItems();
 }
 
