@@ -81,6 +81,42 @@ let remarkFilter = "";      // free-text contains filter
 let expandedRows = new Set(); // customer_keys with expanded remark history
 let remarksByKey = {};       // cache: customer_key -> [ {remark, created_at, created_by} ]
 
+// Date-range filter (applies to pipeline + total-paid chip + quotations iframe)
+let dateRange = { from: null, to: null, preset: "last30" };  // ISO strings or null
+
+function iso(d) { return d ? new Date(d).toISOString() : null; }
+function ymd(d) { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`; }
+function computePreset(preset) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  if (preset === "all")       return { from: null, to: null };
+  if (preset === "today")     return { from: iso(startOfToday), to: iso(endOfToday) };
+  if (preset === "yesterday") { const y = new Date(startOfToday.getTime() - 86400000); const yEnd = new Date(y.getTime() + 86399999); return { from: iso(y), to: iso(yEnd) }; }
+  if (preset === "last7")     return { from: iso(new Date(startOfToday.getTime() - 6 * 86400000)), to: iso(endOfToday) };
+  if (preset === "last30")    return { from: iso(new Date(startOfToday.getTime() - 29 * 86400000)), to: iso(endOfToday) };
+  if (preset === "thismonth") return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(endOfToday) };
+  if (preset === "lastmonth") {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return { from: iso(first), to: iso(last) };
+  }
+  return { from: null, to: null };
+}
+function withinRange(iso_ts) {
+  if (!iso_ts) return true;
+  const t = new Date(iso_ts).getTime();
+  if (dateRange.from && t < new Date(dateRange.from).getTime()) return false;
+  if (dateRange.to && t > new Date(dateRange.to).getTime()) return false;
+  return true;
+}
+function labelForRange() {
+  if (!dateRange.from && !dateRange.to) return "All time";
+  const f = dateRange.from ? new Date(dateRange.from).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "…";
+  const t = dateRange.to   ? new Date(dateRange.to  ).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "…";
+  return f === t ? f : `${f} → ${t}`;
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   $("#loginForm").addEventListener("submit", onLogin);
   $("#signOutBtn").addEventListener("click", onSignOut);
@@ -91,10 +127,58 @@ window.addEventListener("DOMContentLoaded", async () => {
     btn.addEventListener("click", () => switchTop(btn.dataset.top))
   );
 
+  wireDateRangeHandlers();
+
   const { data: { session } } = await sb.auth.getSession();
   if (session) bootDashboard();
   else { hide($("#dashView")); show($("#loginView")); }
 });
+
+function wireDateRangeHandlers() {
+  const preset = $("#dateRangePreset");
+  const from = $("#dateFrom");
+  const to = $("#dateTo");
+  const sep = $("#dateSep");
+  const apply = $("#dateApply");
+  if (!preset) return;
+
+  // Default = last30
+  const def = computePreset("last30");
+  dateRange = { from: def.from, to: def.to, preset: "last30" };
+
+  preset.addEventListener("change", async () => {
+    const v = preset.value;
+    if (v === "custom") {
+      from.style.display = "";
+      to.style.display = "";
+      sep.style.display = "";
+      apply.style.display = "";
+      const today = new Date();
+      const monthAgo = new Date(today.getTime() - 30 * 86400000);
+      if (!from.value) from.value = ymd(monthAgo);
+      if (!to.value)   to.value   = ymd(today);
+      return;
+    }
+    from.style.display = "none";
+    to.style.display = "none";
+    sep.style.display = "none";
+    apply.style.display = "none";
+    const r = computePreset(v);
+    dateRange = { from: r.from, to: r.to, preset: v };
+    $("#dateActiveRange").textContent = labelForRange();
+    await refreshAll();
+  });
+
+  apply.addEventListener("click", async () => {
+    if (!from.value || !to.value) { alert("Pick both dates"); return; }
+    const fromISO = iso(new Date(from.value + "T00:00:00"));
+    const toISO = iso(new Date(to.value + "T23:59:59.999"));
+    if (new Date(fromISO) > new Date(toISO)) { alert("From date must be before To date"); return; }
+    dateRange = { from: fromISO, to: toISO, preset: "custom" };
+    $("#dateActiveRange").textContent = labelForRange();
+    await refreshAll();
+  });
+}
 
 async function onLogin(e) {
   e.preventDefault();
@@ -146,10 +230,32 @@ async function refreshAll() {
   try {
     pipelineCache = await callAdmin("pipeline");
     $("#lastRefreshed").textContent = "Last refreshed " + new Date().toLocaleTimeString();
+    $("#dateActiveRange").textContent = labelForRange();
     updateTopCounts();
     renderActive();
+    refreshTotalPaid();
+    // Push date range into quotations iframe (if loaded)
+    const f = $("#quotationsFrame");
+    if (f && f.contentWindow) {
+      try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
+    }
   } catch (e) {
     $("#paneStage").innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`;
+  }
+}
+
+async function refreshTotalPaid() {
+  try {
+    const data = await callAdmin("total_paid", { from: dateRange.from, to: dateRange.to });
+    const total = Number(data?.total || 0);
+    const chip = $("#totalPaidChip");
+    if (chip) {
+      chip.textContent = "💰 ₹" + total.toLocaleString("en-IN");
+      chip.classList.remove("hidden");
+      chip.title = `Total paid by customers ${labelForRange()} (${data?.count || 0} payment${data?.count === 1 ? "" : "s"})`;
+    }
+  } catch (e) {
+    console.warn("total_paid fetch failed:", e);
   }
 }
 
@@ -181,13 +287,9 @@ function followSubOf(lead) {
 }
 
 function updateTopCounts() {
-  // Follow Ups top-tab count is the sum of ACTIONABLE sub-tabs only
-  // (Call not picked, Call me later, Interested, In progress).
-  // "Dead" buckets (not_interested, dont_call_again, never_visited) stay in
-  // the Follow Ups view but do not inflate the top number.
   const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress"]);
   const counts = { new: 0, follow: 0, done: 0 };
-  pipelineCache.forEach((l) => {
+  filteredPipeline().forEach((l) => {
     const b = bucketOf(l);
     if (b === "follow") {
       if (activeFollowSubs.has(followSubOf(l))) counts.follow += 1;
@@ -198,6 +300,12 @@ function updateTopCounts() {
   $("#topcnt_new").textContent    = counts.new;
   $("#topcnt_follow").textContent = counts.follow;
   $("#topcnt_done").textContent   = counts.done;
+}
+
+// Pipeline filtered by active date range (uses last_event_at)
+function filteredPipeline() {
+  if (!dateRange.from && !dateRange.to) return pipelineCache;
+  return pipelineCache.filter((l) => withinRange(l.last_event_at));
 }
 
 function switchTop(top) {
@@ -242,7 +350,7 @@ function renderSubTabs() {
   if (activeTop === "follow") subs = FOLLOW_SUBS;
   if (activeTop === "done")   subs = [{ id: "all", title: "All paid" }];
 
-  const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
+  const inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop);
   const counts = {};
   subs.forEach((s) => counts[s.id] = 0);
   inBucket.forEach((l) => {
@@ -372,7 +480,7 @@ function wireManualAddHandlers() {
 }
 
 function renderRows() {
-  const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
+  const inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop);
   let rows;
   if (activeTop === "new")    rows = inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
