@@ -236,7 +236,13 @@
                 <button id="markRejectedBtn" style="flex:1;background:#991b1b;color:#fff;padding:8px 14px;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">❌ Reject</button>
               </div>
               <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
+                <button id="recreateBtn" style="width:100%;background:#7c3aed;color:#fff;padding:9px 14px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🔄 Recreate as New Draft</button>
+              </div>
+              <div class="action-bar" style="border:0;padding:8px 0 0;margin:0;">
                 <button id="deleteBtn" class="b-danger" style="width:100%;">🗑️ Delete Quotation</button>
+              </div>
+              <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;text-align:center;line-height:1.5;">
+                <b>Recreate</b> keeps this quote as-is and creates a fresh draft with the same items — perfect if a customer asks for a revised offer.
               </div>
               <div style="font-size:12px;color:#64748b;margin-top:12px;text-align:center;">Share URL:<br><a id="shareUrlLink" href="#" target="_blank" style="color:#1f6feb;word-break:break-all;font-size:11.5px;"></a></div>
               <!-- Invoice section (shown only when quote is paid) -->
@@ -984,6 +990,24 @@ async function loadInvoiceForQuote(quoteId) {
     });
   }
 }
+
+$("#recreateBtn").addEventListener("click", async () => {
+  const q = _currentQuote; if (!q) return;
+  if (!confirm(`Recreate ${q.quote_number} as a new draft?\n\n• Original ${q.quote_number} stays UNCHANGED in history\n• A new quote (e.g. QT-2026-0002) will be created with the same customer + items\n• You can edit everything on the new draft and send fresh`)) return;
+  $("#recreateBtn").disabled = true;
+  $("#recreateBtn").textContent = "⏳ Recreating...";
+  try {
+    const j = await callFn("admin-quotations", { op:"duplicate", id:q.id });
+    if (j.ok) {
+      toast(`✓ Created ${j.quotation.quote_number} as fresh draft`);
+      // Open the new quote for editing
+      await openQuote(j.quotation.id);
+    } else toast(j.error || "Failed", true);
+  } finally {
+    $("#recreateBtn").disabled = false;
+    $("#recreateBtn").innerHTML = "🔄 Recreate as New Draft";
+  }
+});
 
 $("#deleteBtn").addEventListener("click", async () => {
   const q = _currentQuote; if (!q) return;
