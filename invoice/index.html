@@ -287,19 +287,43 @@ function render() {
 $("#printBtn").addEventListener("click", () => window.print());
 
 $("#pdfBtn").addEventListener("click", async () => {
-  const area = $("#pdfArea");
-  area.innerHTML = $("#invDoc").outerHTML;
-  const SRC = 760;
-  area.style.width = SRC + "px";
-  area.querySelectorAll("*").forEach(el => { el.style.wordBreak = "break-word"; el.style.overflowWrap = "break-word"; el.style.maxWidth = "100%"; });
-  await new Promise(r => setTimeout(r, 50));
-  await html2pdf().from(area).set({
-    margin:[4,4,4,4],
-    filename:`${_inv.invoice_number}.pdf`,
-    image:{ type:"jpeg", quality:0.98 },
-    html2canvas:{ scale:2, useCORS:true, backgroundColor:"#ffffff", windowWidth:SRC, width:SRC, scrollX:0, scrollY:0 },
-    jsPDF:{ unit:"mm", format:"a4", orientation:"portrait", compress:true }
-  }).save();
+  const SRC = 800;
+  const btn = $("#pdfBtn"); const orig = btn.innerHTML; btn.innerHTML = "⏳ Generating..."; btn.disabled = true;
+  try {
+    const container = document.createElement("div");
+    container.id = "pdfPrintArea";
+    container.style.cssText = `position:absolute;top:0;left:0;width:${SRC}px;min-width:${SRC}px;max-width:${SRC}px;background:#fff;z-index:-1;opacity:0.001;pointer-events:none;`;
+    const clone = $("#invDoc").cloneNode(true);
+    clone.style.width = SRC + "px"; clone.style.minWidth = SRC + "px"; clone.style.maxWidth = SRC + "px";
+    clone.style.borderRadius = "0"; clone.style.boxShadow = "none"; clone.style.margin = "0";
+    container.appendChild(clone);
+    document.body.appendChild(container);
+    await document.fonts?.ready?.catch(()=>{});
+    await new Promise(r => setTimeout(r, 200));
+    await html2pdf().from(container).set({
+      margin:[4,4,4,4],
+      filename:`${_inv.invoice_number}.pdf`,
+      image:{ type:"jpeg", quality:0.98 },
+      html2canvas:{
+        scale:2, useCORS:true, backgroundColor:"#ffffff",
+        windowWidth:SRC, width:SRC, scrollX:0, scrollY:0, foreignObjectRendering:false,
+        onclone: (doc) => {
+          doc.documentElement.style.width = SRC + "px"; doc.documentElement.style.minWidth = SRC + "px";
+          doc.body.style.width = SRC + "px"; doc.body.style.minWidth = SRC + "px";
+          doc.body.style.margin = "0"; doc.body.style.padding = "0"; doc.body.style.background = "#fff";
+          let meta = doc.querySelector('meta[name="viewport"]');
+          if (!meta) { meta = doc.createElement("meta"); meta.name = "viewport"; doc.head.appendChild(meta); }
+          meta.setAttribute("content", `width=${SRC}, initial-scale=1`);
+          const c = doc.getElementById("pdfPrintArea");
+          if (c) { c.style.width = SRC + "px"; c.style.minWidth = SRC + "px"; c.style.opacity = "1"; }
+          doc.querySelectorAll("*").forEach(el => { el.style.wordBreak = "break-word"; el.style.overflowWrap = "break-word"; });
+        }
+      },
+      jsPDF:{ unit:"mm", format:"a4", orientation:"portrait", compress:true }
+    }).save();
+    document.body.removeChild(container);
+  } catch (e) { alert("PDF failed: " + e.message); }
+  finally { btn.innerHTML = orig; btn.disabled = false; }
 });
 
 $("#waBtn").addEventListener("click", () => {
