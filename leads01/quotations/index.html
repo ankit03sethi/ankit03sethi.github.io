@@ -845,6 +845,8 @@ $("#saveBtn").addEventListener("click", async () => {
     items: _items.map(it => ({ ...it, discount_inr: Number(it.discount_inr || 0) })),
     valid_hours: validDays * 24,
     include_gst: true,
+    // Auto-link to lead so it moves to Quote Sent tab
+    lead_customer_key: window._prefill_customer_key || null,
   };
   $("#saveBtn").disabled = true;
   $("#saveBtn").textContent = "Saving...";
@@ -1108,8 +1110,54 @@ $("#deleteBtn").addEventListener("click", async () => {
   else toast(j.error || "Failed", true);
 });
 
+// ============ PREFILL FROM LEAD (URL params) ============
+async function tryPrefillFromUrl() {
+  const qp = new URLSearchParams(location.search);
+  if (qp.get("new") !== "1") return;
+  const email = qp.get("email") || "";
+  const mobile = qp.get("mobile") || "";
+  const service = qp.get("service") || "";
+  const customerKey = qp.get("customer_key") || "";
+  if (!email && !mobile) return;
+  // Wait until app + catalog are ready
+  await new Promise(r => {
+    const check = () => { if (_session && _catalog) r(); else setTimeout(check, 200); };
+    check();
+  });
+  openBuilder(null);
+  $("#custName").value = email ? email.split("@")[0] : (mobile || "Customer");
+  $("#custEmail").value = email;
+  $("#custPhone").value = mobile;
+  // Remember for backend auto-move
+  window._prefill_customer_key = customerKey;
+  window._prefill_service_name = service;
+  // If service tag matches a catalog service, auto-add it
+  if (service && _catalog) {
+    const serviceKey = service.toLowerCase().replace(/[^a-z]/g, "");
+    const svcMatch = (_catalog.services || []).find(s =>
+      s.name.toLowerCase().replace(/[^a-z]/g, "").includes(serviceKey) ||
+      s.key.toLowerCase().replace(/_/g, "").includes(serviceKey)
+    );
+    if (svcMatch) {
+      _items.push({
+        item_type: "service",
+        item_ref_key: svcMatch.key,
+        item_ref_id: null,
+        description: svcMatch.key.toUpperCase().replace(/_/g, "-"),
+        qty: 1,
+        unit_price_inr: svcMatch.price_inr,
+        gst_percent: svcMatch.gst_percent || 18,
+        hsn_code: "",
+        discount_inr: 0,
+      });
+      renderItems();
+    }
+  }
+  toast("✓ Customer data pre-filled from lead — review and save");
+}
+
 // ============ INIT ============
-refreshSession();
+refreshSession().then(() => tryPrefillFromUrl());
 </script>
 
 </body></html>
