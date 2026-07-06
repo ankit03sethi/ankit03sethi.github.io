@@ -561,17 +561,41 @@ async function openQuote(id) {
     discount_inr: it.discount_paise ? it.discount_paise / 100 : 0,
   }));
   // Auto-refresh prices from current catalog (fixes stale prices from earlier saves)
+  // Legacy key mapping: OLD service keys → CURRENT keys
+  const LEGACY_KEYS = {
+    "gst_registration": "gst",
+    "marketplace_setup": "platform_account",
+    "product_imaging": "imaging",
+    "product_listing": "listing",
+    "account_management": "service",
+    "business_launcher": "bl_growth",
+    "current_account": "platform_account",
+  };
   if (_catalog) {
     let changed = 0;
     const changes = [];
     for (const it of _items) {
-      let catPrice = null, catGst = null, matchLabel = "";
-      if (it.item_type === "service" && it.item_ref_key) {
-        const s = (_catalog.services || []).find(x => x.key === it.item_ref_key);
-        if (s) { catPrice = Number(s.price_inr); catGst = Number(s.gst_percent) || 18; matchLabel = s.name; }
+      let catPrice = null, catGst = null;
+      if (it.item_type === "service") {
+        // Try current key, then legacy key, then match by description
+        const currentKey = LEGACY_KEYS[it.item_ref_key] || it.item_ref_key;
+        let s = (_catalog.services || []).find(x => x.key === currentKey);
+        if (!s && it.description) {
+          const descLower = String(it.description).toLowerCase().replace(/[-_\s]/g, "");
+          s = (_catalog.services || []).find(x =>
+            descLower.includes(x.key.replace(/[-_\s]/g, "")) ||
+            x.name.toLowerCase().replace(/[-_\s()]/g, "").includes(descLower.slice(0, 6))
+          );
+        }
+        if (s) {
+          catPrice = Number(s.price_inr);
+          catGst = Number(s.gst_percent) || 18;
+          // Also fix legacy ref_key for future
+          it.item_ref_key = s.key;
+        }
       } else if (it.item_type === "product" && it.item_ref_id) {
         const p = (_catalog.products || []).find(x => x.id === Number(it.item_ref_id));
-        if (p) { catPrice = Number(p.price_inr); catGst = Number(p.effective_gst_percent) || 18; matchLabel = p.title; }
+        if (p) { catPrice = Number(p.price_inr); catGst = Number(p.effective_gst_percent) || 18; }
       }
       if (catPrice !== null && catPrice !== it.unit_price_inr) {
         changes.push(`${it.description}: ₹${it.unit_price_inr} → ₹${catPrice}`);
@@ -583,7 +607,7 @@ async function openQuote(id) {
       }
     }
     if (changed > 0) {
-      toast(`Refreshed ${changed} price(s) from catalog. Click Save to persist.`);
+      toast(`✓ Refreshed ${changed} price(s) from catalog. Click Save to persist.`);
       console.log("Price changes:", changes);
     }
   }
@@ -620,9 +644,9 @@ function renderItems() {
     const gstAmt = lineBase * gstPct / 100;
     const lineTotal = lineBase + gstAmt;
     const gstOpts = GST_OPTS.map(g => `<option value="${g}"${g===gstPct?" selected":""}>${g}%</option>`).join("");
-    // Lock unit price + GST for products and services (only custom is editable)
+    // GST locked for products and services (custom editable); Unit price ALWAYS editable so admin can override
     const isCustom = (it.item_type || "custom") === "custom";
-    const lockAttr = isCustom ? "" : "readonly";
+    const lockAttr = "";
     const disabledAttr = isCustom ? "" : "disabled";
     // Discount calc
     const discInr = Number(it.discount_inr || 0);
