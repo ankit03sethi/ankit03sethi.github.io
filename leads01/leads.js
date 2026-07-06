@@ -240,7 +240,7 @@ function renderSubTabs() {
   let subs = [];
   if (activeTop === "new")    subs = NEW_SUBS;
   if (activeTop === "follow") subs = FOLLOW_SUBS;
-  if (activeTop === "done")   subs = [{ id: "all", title: "All completed" }];
+  if (activeTop === "done")   subs = [{ id: "all", title: "All paid" }];
 
   const inBucket = pipelineCache.filter((l) => bucketOf(l) === activeTop);
   const counts = {};
