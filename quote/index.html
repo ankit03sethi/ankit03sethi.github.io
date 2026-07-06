@@ -619,60 +619,77 @@ function render() {
 $("#printBtn").addEventListener("click", () => window.print());
 
 $("#pdfBtn").addEventListener("click", async () => {
-  const area = $("#pdfArea");
-  const SRC_WIDTH = 760;
-  // Move pdf area onscreen momentarily so html2canvas uses correct layout width (mobile fix)
-  const clone = $("#quoteDoc").cloneNode(true);
-  const rib = clone.querySelector(".ribbon"); if (rib) rib.remove();
-  area.innerHTML = "";
-  area.appendChild(clone);
-  area.style.width = SRC_WIDTH + "px";
-  area.style.left = "0";
-  area.style.top = "0";
-  area.style.zIndex = "-1";
-  area.style.opacity = "0";
-  area.style.pointerEvents = "none";
-  clone.style.width = SRC_WIDTH + "px";
-  clone.style.maxWidth = SRC_WIDTH + "px";
-  // Force every element to break words + explicit no overflow
-  clone.querySelectorAll("*").forEach(el => {
-    el.style.wordBreak = "break-word";
-    el.style.overflowWrap = "break-word";
-    el.style.maxWidth = "100%";
-  });
-  await new Promise(r => setTimeout(r, 100));
-  const opt = {
-    margin: [4, 4, 4, 4],
-    filename: `${_quote.quote_number}.pdf`,
-    image: { type:"jpeg", quality:0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      windowWidth: SRC_WIDTH,
-      width: SRC_WIDTH,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (doc) => {
-        // Ensure the cloned doc has our fixed width
-        const el = doc.getElementById("pdfArea");
-        if (el) { el.style.width = SRC_WIDTH + "px"; el.style.maxWidth = SRC_WIDTH + "px"; }
-      },
-    },
-    jsPDF: { unit:"mm", format:"a4", orientation:"portrait", compress:true },
-    pagebreak: { mode:["css", "legacy"] }
-  };
+  const SRC_WIDTH = 800;
+  const btn = $("#pdfBtn"); const orig = btn.innerHTML; btn.innerHTML = "⏳ Generating PDF..."; btn.disabled = true;
   try {
-    await html2pdf().from(area).set(opt).save();
+    // Build a NEW isolated container onscreen with fixed width — bypasses mobile viewport
+    const container = document.createElement("div");
+    container.id = "pdfPrintArea";
+    container.style.cssText = `position:absolute;top:0;left:0;width:${SRC_WIDTH}px;min-width:${SRC_WIDTH}px;max-width:${SRC_WIDTH}px;background:#fff;z-index:-1;opacity:0.001;pointer-events:none;`;
+    const clone = $("#quoteDoc").cloneNode(true);
+    const rib = clone.querySelector(".ribbon"); if (rib) rib.remove();
+    clone.style.width = SRC_WIDTH + "px";
+    clone.style.minWidth = SRC_WIDTH + "px";
+    clone.style.maxWidth = SRC_WIDTH + "px";
+    clone.style.borderRadius = "0";
+    clone.style.boxShadow = "none";
+    clone.style.margin = "0";
+    container.appendChild(clone);
+    document.body.appendChild(container);
+    // Wait for reflow + fonts
+    await document.fonts?.ready?.catch(()=>{});
+    await new Promise(r => setTimeout(r, 200));
+
+    const opt = {
+      margin: [4, 4, 4, 4],
+      filename: `${_quote.quote_number}.pdf`,
+      image: { type:"jpeg", quality:0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: SRC_WIDTH,
+        width: SRC_WIDTH,
+        scrollX: 0,
+        scrollY: 0,
+        foreignObjectRendering: false,
+        onclone: (doc) => {
+          // Force viewport-independent width on the cloned document itself
+          doc.documentElement.style.width = SRC_WIDTH + "px";
+          doc.documentElement.style.minWidth = SRC_WIDTH + "px";
+          doc.body.style.width = SRC_WIDTH + "px";
+          doc.body.style.minWidth = SRC_WIDTH + "px";
+          doc.body.style.margin = "0";
+          doc.body.style.padding = "0";
+          doc.body.style.background = "#fff";
+          // Rewrite viewport meta to desktop width
+          let meta = doc.querySelector('meta[name="viewport"]');
+          if (!meta) { meta = doc.createElement("meta"); meta.name = "viewport"; doc.head.appendChild(meta); }
+          meta.setAttribute("content", `width=${SRC_WIDTH}, initial-scale=1`);
+          // Force our container + quote doc to full width
+          const c = doc.getElementById("pdfPrintArea");
+          if (c) { c.style.width = SRC_WIDTH + "px"; c.style.minWidth = SRC_WIDTH + "px"; c.style.maxWidth = SRC_WIDTH + "px"; c.style.opacity = "1"; }
+          const qd = doc.querySelector("#pdfPrintArea .quote-doc, #pdfPrintArea > div");
+          if (qd) { qd.style.width = SRC_WIDTH + "px"; qd.style.minWidth = SRC_WIDTH + "px"; qd.style.maxWidth = SRC_WIDTH + "px"; }
+          // Word-break everything to prevent overflow
+          doc.querySelectorAll("*").forEach(el => {
+            el.style.wordBreak = "break-word";
+            el.style.overflowWrap = "break-word";
+          });
+        },
+      },
+      jsPDF: { unit:"mm", format:"a4", orientation:"portrait", compress:true },
+      pagebreak: { mode:["css", "legacy"] }
+    };
+
+    await html2pdf().from(container).set(opt).save();
+    document.body.removeChild(container);
+  } catch (e) {
+    alert("PDF generation failed: " + e.message);
   } finally {
-    // Restore pdfArea offscreen
-    area.style.left = "-9999px";
-    area.style.top = "0";
-    area.style.zIndex = "";
-    area.style.opacity = "";
-    area.style.pointerEvents = "";
-    area.innerHTML = "";
+    btn.innerHTML = orig;
+    btn.disabled = false;
   }
 });
 
