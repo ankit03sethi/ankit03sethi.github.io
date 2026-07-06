@@ -429,6 +429,7 @@ function updateFilterCounts() {
 }
 
 // ============ ADD / UPDATE CONTACT MODAL (per-row) ============
+window.openContactEditor = openContactEditor; // expose to inline onclick (module scope isolation)
 async function openContactEditor(quoteId) {
   const q = _allQuotes.find(x => Number(x.id) === Number(quoteId));
   if (!q) { toast("Quote not found", true); return; }
@@ -597,9 +598,9 @@ function renderFilteredList() {
     const phoneDigits = (q.customer_phone || "").replace(/\D/g, "");
     const waFmt = phoneDigits.length === 10 ? "91" + phoneDigits : phoneDigits;
     const waTxt = encodeURIComponent(`Hi ${q.customer_name || "there"}, this is from cursive regarding quote ${q.quote_number}.`);
-    const callBtn = phoneDigits ? `<a href="tel:+${(phoneDigits.length===10?"91":"")+phoneDigits}" onclick="event.stopPropagation();" style="display:inline-block;padding:3px 8px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">📞</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">📞</span>`;
-    const waBtn   = phoneDigits ? `<a href="https://wa.me/${waFmt}?text=${waTxt}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-block;padding:3px 8px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">💬</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">💬</span>`;
-    const emlBtn  = q.customer_email ? `<a href="mailto:${esc(q.customer_email)}?subject=${encodeURIComponent(`Quote ${q.quote_number}`)}" onclick="event.stopPropagation();" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;">✉️</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;">✉️</span>`;
+    const callBtn = phoneDigits ? `<a href="tel:+${(phoneDigits.length===10?"91":"")+phoneDigits}" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">📞</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">📞</span>`;
+    const waBtn   = phoneDigits ? `<a href="https://wa.me/${waFmt}?text=${waTxt}" target="_blank" rel="noopener" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">💬</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">💬</span>`;
+    const emlBtn  = q.customer_email ? `<a href="mailto:${esc(q.customer_email)}?subject=${encodeURIComponent(`Quote ${q.quote_number}`)}" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;">✉️</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;">✉️</span>`;
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
       <td><b>${esc(q.quote_number)}</b></td>
       <td style="font-size:12.5px;line-height:1.4;">
@@ -607,7 +608,7 @@ function renderFilteredList() {
         ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
         ${q.customer_phone ? `<div style="color:#334155;">📱 ${esc(q.customer_phone)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no phone</div>`}
         ${q.customer_gst ? `<div style="color:#64748b;font-size:11px;">GST: ${esc(q.customer_gst)}</div>` : ""}
-        <button data-editcontact="${q.id}" onclick="event.stopPropagation();openContactEditor(${q.id})" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>
+        <button data-editcontact="${q.id}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>
       </td>
       <td>${callBtn}${waBtn}${emlBtn}</td>
       <td><b>${fmt(q.total_paise)}</b></td>
@@ -624,6 +625,17 @@ function renderFilteredList() {
   });
   $("#listWrap").querySelectorAll("tr[data-id]").forEach(r => {
     r.addEventListener("click", () => openQuote(Number(r.dataset.id)));
+  });
+  // Delegate: Add / Update contact button clicks
+  $("#listWrap").querySelectorAll("[data-editcontact]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openContactEditor(Number(btn.dataset.editcontact));
+    });
+  });
+  // Prevent Call/WhatsApp/Email anchor clicks from bubbling up to row-click (which opens the quote)
+  $("#listWrap").querySelectorAll("[data-nopropagate]").forEach(a => {
+    a.addEventListener("click", (e) => e.stopPropagation());
   });
 }
 
