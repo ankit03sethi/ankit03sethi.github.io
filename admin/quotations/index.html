@@ -559,6 +559,19 @@ async function openQuote(id) {
   const j = await callFn("admin-quotations", { op:"get", id });
   if (!j.ok) { toast(j.error || "Not found", true); return; }
   openBuilder(j.quotation);
+  // Show superseded banner if applicable
+  if (j.superseded_by) {
+    const banner = document.createElement("div");
+    banner.id = "supersededBanner";
+    banner.style.cssText = "background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;";
+    banner.innerHTML = `⚠️ <b>This quote was recreated as ${esc(j.superseded_by.quote_number)}.</b> The customer payment link on this old quote is DISABLED. <button style="background:transparent;color:#b91c1c;border:0;text-decoration:underline;cursor:pointer;font-size:13px;" onclick="openNewerQuote(${j.superseded_by.id})">Open newer version →</button>`;
+    const target = $("#builderView .panel:first-child");
+    if (target && !document.getElementById("supersededBanner")) target.parentNode.insertBefore(banner, target.nextSibling);
+  } else {
+    const existing = document.getElementById("supersededBanner");
+    if (existing) existing.remove();
+  }
+  window.openNewerQuote = (nid) => openQuote(nid);
   // Ensure catalog is loaded so we can refresh stale prices
   if (!_catalog) await loadCatalogOptions();
   _items = (j.items || []).map(it => ({
