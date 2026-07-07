@@ -911,6 +911,8 @@ function renderProductDetail(data) {
     wrap.querySelectorAll(".var-qty-wrap").forEach(w => {
       w.style.display = isDropship ? "none" : "flex";
     });
+    // Quick-set-qty bar visible only when per-item qty is meaningful (not dropship)
+    const aab = $("#applyAllBar"); if (aab) aab.style.display = isDropship ? "none" : "flex";
     // Cart summary visible for Purchase and Cat+Purchase
     const cs = $("#cartSummary"); if (cs) cs.style.display = isDropship ? "none" : "block";
     // Buttons: purchase mode shows Add to Cart / Buy Now
