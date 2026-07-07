@@ -1274,7 +1274,7 @@ async function handleDsCheckout(payNow) {
     console.log("[DS] cart response=", cj);
     if (!cj.ok) throw new Error(cj.error || "Cart save failed");
     if (!payNow) {
-      alert(`✓ Added to cart · Total ₹${dsInfo.total}\nOur team will contact you shortly.`);
+      // Silent success: just close the modal. Cart chip updates automatically.
       document.getElementById("dropshipModal").classList.add("hidden");
       return;
     }
