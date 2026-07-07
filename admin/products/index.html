@@ -255,8 +255,7 @@
     <h3 id="colorModalTitle" style="margin:0 0 16px;">Add color</h3>
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Title * <span style="font-weight:400;color:#64748b;">(shown to customer)</span></label>
     <input id="mColorName" placeholder="e.g. Deep Brown" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Hex code (optional — color swatch)</label>
-    <input id="mColorHex" placeholder="#8B4513" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+    <input id="mColorHex" type="hidden" value="" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product ID (shown to customer)</label>
     <input id="mColorCode" type="text" placeholder="e.g. WE-45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
 
@@ -840,15 +839,7 @@ function openColorDialog(id, type) {
   $("#mColorMrp").value = existing?.mrp_inr || "";
   $("#mColorGst").value = (existing?.gst_percent === null || existing?.gst_percent === undefined) ? "" : String(existing.gst_percent);
   $("#mColorHsn").value = existing?.hsn_code || "";
-  // Show hex input only for color type
-  const hexRow = $("#mColorHex").parentElement.querySelector("label");
-  if (_colorEditType === "color") {
-    $("#mColorHex").style.display = "";
-    if (hexRow) hexRow.style.display = "";
-  } else {
-    $("#mColorHex").style.display = "none";
-    if (hexRow) hexRow.style.display = "none";
-  }
+  // Hex code UI removed — value kept as hidden input to preserve existing DB rows unchanged
   _colorUploaded = (existing?.image_urls || []).slice();
   renderColorModalThumbs();
   $("#colorModal").classList.remove("hidden");
