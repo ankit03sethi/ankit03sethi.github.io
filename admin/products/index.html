@@ -177,6 +177,25 @@
           <input id="pPos" type="number" placeholder="100" />
         </div>
       </div>
+      <div class="row-2">
+        <div>
+          <label>GST % (default 18)</label>
+          <select id="pGst" style="width:100%;padding:7px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;">
+            <option value="">Use default (18%)</option>
+            <option value="0">0% (exempt)</option>
+            <option value="3">3%</option>
+            <option value="5">5%</option>
+            <option value="12">12%</option>
+            <option value="18">18%</option>
+            <option value="28">28%</option>
+          </select>
+        </div>
+        <div>
+          <label>HSN code (optional)</label>
+          <input id="pHsn" type="text" maxlength="20" placeholder="e.g. 6109" />
+        </div>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Variations can override GST/HSN per color/size. Leave blank to inherit from here.</div>
 
       <div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;">🧩 Variation types (multi-select)</div>
@@ -234,24 +253,48 @@
 <div id="colorModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:12px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
     <h3 id="colorModalTitle" style="margin:0 0 16px;">Add color</h3>
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Color name *</label>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Title * <span style="font-weight:400;color:#64748b;">(shown to customer)</span></label>
     <input id="mColorName" placeholder="e.g. Deep Brown" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Hex code (optional)</label>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Hex code (optional — color swatch)</label>
     <input id="mColorHex" placeholder="#8B4513" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product ID (shown to customer)</label>
     <input id="mColorCode" type="text" placeholder="e.g. WE-45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
-    <input id="mColorPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div>
-        <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Price ₹ (variation)</label>
-        <input id="mColorPrice" type="number" min="1" placeholder="Leave blank = use product price" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
+
+    <!-- 💰 Pricing / GST / HSN — placed near top so they're always visible -->
+    <div style="border:1.5px solid #dcfce7;background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:12.5px;color:#15803d;margin-bottom:8px;">💰 Pricing &amp; Tax <span style="font-weight:400;color:#64748b;">(leave blank = inherit from product)</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">Price ₹</label>
+          <input id="mColorPrice" type="number" min="1" placeholder="inherit" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">MRP ₹</label>
+          <input id="mColorMrp" type="number" min="1" placeholder="inherit" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" />
+        </div>
       </div>
-      <div>
-        <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">MRP ₹ (variation)</label>
-        <input id="mColorMrp" type="number" min="1" placeholder="Optional strike-through" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">GST %</label>
+          <select id="mColorGst" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <option value="">inherit</option>
+            <option value="0">0%</option>
+            <option value="3">3%</option>
+            <option value="5">5%</option>
+            <option value="12">12%</option>
+            <option value="18">18%</option>
+            <option value="28">28%</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">HSN code</label>
+          <input id="mColorHsn" type="text" maxlength="20" placeholder="e.g. 8517" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" />
+        </div>
       </div>
     </div>
+
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Position (sort)</label>
+    <input id="mColorPos" type="number" placeholder="100" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Video URL or upload (optional)</label>
     <div style="display:flex;gap:6px;margin-bottom:14px;">
       <input id="mColorVideo" type="url" placeholder="https://youtu.be/..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;" />
@@ -268,7 +311,7 @@
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button id="mColorCancel" class="b-outline">Cancel</button>
-      <button id="mColorSave" class="btn btn-primary">Save color</button>
+      <button id="mColorSave" class="btn btn-primary">Save variation</button>
     </div>
   </div>
 </div>
@@ -292,10 +335,44 @@
         <input type="radio" name="mDesignType" value="size" /> 📏 Size
       </label>
     </div>
-    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Name *</label>
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Title * <span style="font-weight:400;color:#64748b;">(shown to customer)</span></label>
     <input id="mDesignName" placeholder="e.g. Butterfly WE 45 / Red / Large" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product ID (shown to customer)</label>
     <input id="mDesignCode" placeholder="e.g. MZ-DP-BR-045" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
+
+    <!-- 💰 Pricing / GST / HSN for sub-variation -->
+    <div style="border:1.5px solid #dcfce7;background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:12.5px;color:#15803d;margin-bottom:8px;">💰 Pricing &amp; Tax <span style="font-weight:400;color:#64748b;">(leave blank = inherit)</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">Price ₹</label>
+          <input id="mDesignPrice" type="number" min="1" placeholder="inherit" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">MRP ₹</label>
+          <input id="mDesignMrp" type="number" min="1" placeholder="inherit" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">GST %</label>
+          <select id="mDesignGst" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <option value="">inherit</option>
+            <option value="0">0%</option>
+            <option value="3">3%</option>
+            <option value="5">5%</option>
+            <option value="12">12%</option>
+            <option value="18">18%</option>
+            <option value="28">28%</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:2px;">HSN code</label>
+          <input id="mDesignHsn" type="text" maxlength="20" placeholder="e.g. 8517" style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" />
+        </div>
+      </div>
+    </div>
+
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Internal SKU (optional)</label>
     <input id="mDesignSku" placeholder="Internal SKU" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Qty available</label>
@@ -541,6 +618,8 @@ function renderProdEdit() {
   renderProdThumbs();
   $("#pPrice").value = p.price_inr;
   $("#pMrp").value = p.mrp_inr;
+  $("#pGst").value = (p.gst_percent === null || p.gst_percent === undefined) ? "" : String(p.gst_percent);
+  $("#pHsn").value = p.hsn_code || "";
   $("#pQty").value = p.qty_available;
   $("#pPos").value = p.position;
   $("#pHero").checked = !!p.is_hero;
@@ -652,7 +731,7 @@ $("#catCancelEdit").addEventListener("click", (e) => { e.preventDefault(); $("#c
 $("#prodNewBtn").addEventListener("click", () => {
   _selectedProdId = null;
   $("#prodEdit").classList.remove("hidden");
-  ["#pTitle","#pBullets","#pDesc","#pVideo","#pCode","#pImages","#pPrice","#pMrp","#pQty","#pPos"].forEach(s => $(s).value = "");
+  ["#pTitle","#pBullets","#pDesc","#pVideo","#pCode","#pImages","#pPrice","#pMrp","#pQty","#pPos","#pGst","#pHsn"].forEach(s => $(s).value = "");
   _prodUploaded = [];
   syncProdImagesField();
   renderProdThumbs();
@@ -677,6 +756,8 @@ $("#pSave").addEventListener("click", async () => {
     image_urls: $("#pImages").value.split("\n").map(s => s.trim()).filter(Boolean),
     price_inr: Number($("#pPrice").value),
     mrp_inr: Number($("#pMrp").value),
+    gst_percent: $("#pGst").value === "" ? null : Number($("#pGst").value),
+    hsn_code: $("#pHsn").value.trim() || null,
     qty_available: Number($("#pQty").value) || 0,
     position: Number($("#pPos").value) || 100,
     is_hero: $("#pHero").checked,
@@ -757,6 +838,8 @@ function openColorDialog(id, type) {
   $("#mColorPos").value = existing?.position || 100;
   $("#mColorPrice").value = existing?.price_inr || "";
   $("#mColorMrp").value = existing?.mrp_inr || "";
+  $("#mColorGst").value = (existing?.gst_percent === null || existing?.gst_percent === undefined) ? "" : String(existing.gst_percent);
+  $("#mColorHsn").value = existing?.hsn_code || "";
   // Show hex input only for color type
   const hexRow = $("#mColorHex").parentElement.querySelector("label");
   if (_colorEditType === "color") {
@@ -825,6 +908,8 @@ $("#mColorSave").addEventListener("click", async () => {
     variation_type: _colorEditType,
     price_inr: $("#mColorPrice").value ? Number($("#mColorPrice").value) : null,
     mrp_inr: $("#mColorMrp").value ? Number($("#mColorMrp").value) : null,
+    gst_percent: $("#mColorGst").value === "" ? null : Number($("#mColorGst").value),
+    hsn_code: $("#mColorHsn").value.trim() || null,
   });
   if (j.ok) { toast("✓ Saved"); $("#colorModal").classList.add("hidden"); await loadAll(); }
   else toast(j.error, true);
@@ -881,6 +966,10 @@ function openDesignDialog(colorId, id) {
   $("#mDesignVideo").value = existing?.video_url || "";
   $("#mDesignQty").value = existing?.qty_available || 0;
   $("#mDesignPos").value = existing?.position || 100;
+  $("#mDesignPrice").value = existing?.price_inr || "";
+  $("#mDesignMrp").value = existing?.mrp_inr || "";
+  $("#mDesignGst").value = (existing?.gst_percent === null || existing?.gst_percent === undefined) ? "" : String(existing.gst_percent);
+  $("#mDesignHsn").value = existing?.hsn_code || "";
   _designUploaded = existing?.image_url || "";
   // Set variation type radio (default 'design')
   const existingType = existing?.variation_type || "design";
@@ -920,6 +1009,10 @@ $("#mDesignSave").addEventListener("click", async () => {
     qty_available: Number($("#mDesignQty").value) || 0,
     position: Number($("#mDesignPos").value) || 100,
     variation_type: chosenType,
+    price_inr: $("#mDesignPrice").value ? Number($("#mDesignPrice").value) : null,
+    mrp_inr:   $("#mDesignMrp").value ? Number($("#mDesignMrp").value) : null,
+    gst_percent: $("#mDesignGst").value === "" ? null : Number($("#mDesignGst").value),
+    hsn_code: $("#mDesignHsn").value.trim() || null,
   });
   if (j.ok) { toast("✓ Design saved"); $("#designModal").classList.add("hidden"); await loadAll(); }
   else toast(j.error, true);
