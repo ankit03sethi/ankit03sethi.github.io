@@ -713,10 +713,10 @@ function renderTable() {
     html += `<tr>
       <td><span class="platform-tag ${p.platform.toLowerCase()}">${esc(p.platform)}</span></td>
       <td><code>${esc(p.product_id)}</code></td>
-      <td class="price-cell">${p.price ? "₹" + p.price : "—"}</td>
-      <td class="rating-cell">${p.rating ? p.rating + " ★" : "—"}</td>
-      <td>${p.review_count ? p.review_count.toLocaleString() : "—"}</td>
-      <td>${esc(p.seller || "—")}</td>
+      <td class="price-cell">${p.price ? "₹" + p.price : (p.last_check_status === "multi_product" ? "<span style='color:#e67e22;font-weight:600' title='Search shows multiple products'>MP</span>" : (p.last_check_status === "not_found" ? "<span style='color:#c0392b;font-weight:600' title='Product not found on marketplace'>NA</span>" : "—"))}</td>
+      <td class="rating-cell">${p.rating ? p.rating + " ★" : (p.last_check_status === "multi_product" ? "<span style='color:#e67e22;font-weight:600'>MP</span>" : (p.last_check_status === "not_found" ? "<span style='color:#c0392b;font-weight:600'>NA</span>" : "—"))}</td>
+      <td>${p.review_count ? p.review_count.toLocaleString() : (p.last_check_status === "multi_product" ? "<span style='color:#e67e22;font-weight:600'>MP</span>" : (p.last_check_status === "not_found" ? "<span style='color:#c0392b;font-weight:600'>NA</span>" : "—"))}</td>
+      <td>${p.seller ? esc(p.seller) : (p.last_check_status === "multi_product" ? "<span style='color:#e67e22;font-weight:600'>MP</span>" : (p.last_check_status === "not_found" ? "<span style='color:#c0392b;font-weight:600'>NA</span>" : "—"))}</td>
       <td>${p.last_checked_at ? new Date(p.last_checked_at).toLocaleString() : "Pending"}</td>
       <td>${planPill(p)}</td>
       <td class="url-cell"><a href="${esc(p.product_url)}" target="_blank" rel="noopener">Open</a></td>
