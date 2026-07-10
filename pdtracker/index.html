@@ -170,7 +170,7 @@
     <div class="dash-actions">
       <a href="/pdtracker/upload.html" class="btn btn-primary-sm">+ Add new products</a>
       <a href="/pdtracker/update.html" class="btn btn-primary-sm" style="background:#fff;color:#1f6feb;border:1px solid #1f6feb;" title="Edit Seller Code / Seller Name for existing products (Platform & Product ID stay locked)">&#9998; Update data</a>
-      <a href="/pdtracker/install-extension.html" id="installExtBtn" class="btn btn-install-pulse hidden" title="Required for paid plans — your PC tracks your own products" style="padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;">Install extension</a>
+      <a href="https://github.com/ankit03sethi/pd-tracker-desktop-releases/releases/latest/download/Cursive.PD.Tracker.Setup.2.3.0.exe" id="installExtBtn" class="btn btn-install-pulse hidden" title="Required for paid plans — your PC tracks your own products" style="padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;" download>&#11015; Download Installer</a>
     </div>
   </div>
 
@@ -533,7 +533,7 @@ async function refreshDash() {
       $("#statusText").textContent = "Tracker active (free trial)";
     } else {
       $("#trackerStatus").className = "scraper-status offline";
-      $("#statusText").textContent = "Install extension";
+      $("#statusText").textContent = "Download tracker app";
     }
 
     if (total > 0) show($("#filterBar"));
