@@ -157,6 +157,7 @@
             <select id="filterService">
               <option value="">All services</option>
               <option value="pd_tracker">PD Tracker</option>
+              <option value="analyst">Cursive Analyst</option>
               <option value="business_launcher">Business Launcher</option>
               <option value="recharge">Recharge</option>
               <option value="referral">Referral</option>
@@ -191,6 +192,14 @@
             <div style="flex:1;min-width:0;">
               <div class="svc-name">PD Tracker</div>
               <div class="svc-desc">Marketplace tracking &middot; Reports</div>
+            </div>
+          </a>
+
+          <a class="svc-card" href="#" onclick="openAnalystService(); return false;">
+            <div class="svc-icon" style="background:#7c3aed;">&#128200;</div>
+            <div style="flex:1;min-width:0;">
+              <div class="svc-name">Cursive Analyst</div>
+              <div class="svc-desc">Orders / Returns / Payments / Stock &middot; &#8377;4999/30 days</div>
             </div>
           </a>
 
@@ -458,6 +467,7 @@ const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit",
 const SERVICE_LABEL = {
   // Core products
   pd_tracker: ["PD Tracker", "pill-pd"],
+  analyst: ["Cursive Analyst", "pill-pd"],
   business_launcher: ["Business Launcher", "pill-bl"],
   creators: ["Creators", "pill-cr"],
   // Money movement
@@ -1056,7 +1066,7 @@ function renderCartModal() {
   // Group services by service_tag so each service type has its own header (like catalog OPTION headers)
   const svcGroups = {};
   for (const it of cart) { (svcGroups[it.service_tag] = svcGroups[it.service_tag] || []).push(it); }
-  const svcColor = { gst: "#f97316", trademark: "#a855f7", udyam: "#10b981", iec: "#06b6d4", platform_account: "#ec4899", imaging: "#8b5cf6", website: "#10b981", listing: "#f59e0b", service: "#1f6feb", business_launcher: "#16a34a" };
+  const svcColor = { analyst: "#7c3aed", gst: "#f97316", trademark: "#a855f7", udyam: "#10b981", iec: "#06b6d4", platform_account: "#ec4899", imaging: "#8b5cf6", website: "#10b981", listing: "#f59e0b", service: "#1f6feb", business_launcher: "#16a34a" };
   let html = "";
   for (const tag of Object.keys(svcGroups)) {
     const items = svcGroups[tag];
@@ -1342,6 +1352,7 @@ $("#cartPayBtn").addEventListener("click", async () => {
 // SERVICE PAY MODAL — opens when a non-PD service card is clicked
 // =====================================================================
 const SVC_CATALOG = {
+  analyst:          { name: "Cursive Analyst (30 days)",          price: 4999 },
   gst:              { name: "GST Registration",                  price: 999  },
   trademark:        { name: "Trademark Registration",            price: 6999 },
   udyam:            { name: "Udyam (MSME) Certificate",          price: 999  },
@@ -1500,6 +1511,45 @@ function buildAMRows(platformList) {
     if (e.target.classList.contains("am-qty-input")) recalcSvcModal();
   });
 }
+
+// ---- Cursive Analyst gated entry (30-day subscription) ----
+window.openAnalystService = async function () {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      // Not signed in — send to login then bounce back to /analyst/ if valid
+      location.href = "/home/?return=%2Fanalyst%2F";
+      return;
+    }
+    // Look for a debit_service on the analyst tag within the last 30 days
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows, error } = await sb
+      .from("analytics_wallet_transactions")
+      .select("id, created_at, service_tag, type")
+      .eq("user_id", session.user.id)
+      .eq("type", "debit_service")
+      .eq("service_tag", "analyst")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) { console.warn("analyst check err", error); }
+    const activePurchase = rows && rows.length > 0;
+    if (activePurchase) {
+      // Compute days-left for a nicer nudge on the download page
+      const paidAt = new Date(rows[0].created_at);
+      const expiresAt = new Date(paidAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const daysLeft = Math.max(0, Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
+      location.href = "/analyst/?days=" + daysLeft;
+      return;
+    }
+    // No active subscription — open the buy modal
+    window.openServiceModal("analyst");
+  } catch (e) {
+    console.error("openAnalystService failed", e);
+    // Fallback — just open the buy modal
+    window.openServiceModal("analyst");
+  }
+};
 
 window.openServiceModal = async function (tag) {
   const cat = SVC_CATALOG[tag];
