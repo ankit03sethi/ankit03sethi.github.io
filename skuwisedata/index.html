@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
@@ -59,6 +60,22 @@
     .empty h3 { margin:0 0 8px; color:#0f172a; }
     .empty .empty-cta { display:inline-block; margin-top:12px; padding:10px 18px; background:#7c3aed; color:#fff; border-radius:8px; text-decoration:none; font-weight:700; }
 
+    /* Uploads section */
+    .up-list { padding:8px 8px 16px; }
+    .up-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background .1s; }
+    .up-item:last-child { border-bottom:none; }
+    .up-item:hover { background:#faf5ff; }
+    .up-left { display:flex; align-items:center; gap:14px; min-width:0; }
+    .up-icon { width:42px; height:42px; background:#f3e8ff; color:#7c3aed; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+    .up-name { font-size:15px; font-weight:700; color:#0f172a; }
+    .up-desc { font-size:12px; color:#64748b; margin-top:2px; }
+    .up-right { text-align:right; font-size:12px; color:#64748b; }
+    .up-right .stamp { color:#0f172a; font-weight:600; }
+    .up-right .stamp.none { color:#94a3b8; font-style:italic; font-weight:normal; }
+    .up-status { padding:12px 20px; background:#f0fdf4; border-top:1px solid #bbf7d0; font-size:13px; color:#166534; font-weight:600; display:none; }
+    .up-status.err { background:#fef2f2; border-top-color:#fecaca; color:#991b1b; }
+    .up-status.show { display:block; }
+
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
     #locker.show { display:flex; }
     .lock-card { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
@@ -93,38 +110,72 @@
   <p class="sub">Live from Supabase. Auto-refreshes as your Cursive Analyst desktop app uploads new CSVs.</p>
 </div>
 
-<div class="controls">
-  <span class="ctrl-lbl">Company</span>
-  <select id="companyPicker"><option value="">Loading&hellip;</option></select>
-  <button class="btn" id="reloadBtn">Reload</button>
-  <span id="lastLoadAt" style="font-size:12px; color:#94a3b8;"></span>
+<div class="tabs" id="mainTabs">
+  <div class="tab active" data-view="orders">Orders</div>
+  <div class="tab" data-view="returns">Returns</div>
+  <div class="tab" data-view="payments">Payments</div>
+  <div class="tab" data-view="stock">Stock</div>
+  <div class="tab" data-view="sku_master">SKU Master</div>
+  <div class="tab" data-view="uploads">Uploads</div>
 </div>
 
-<div class="tabs" id="kindTabs">
-  <div class="tab active" data-kind="orders">Orders</div>
-  <div class="tab" data-kind="returns">Returns</div>
-  <div class="tab" data-kind="payments">Payments</div>
-  <div class="tab" data-kind="stock">Stock</div>
-</div>
-
-<div class="platform-row" id="platformRow">
-  <div class="plat-chip active" data-p="">All platforms</div>
-  <div class="plat-chip" data-p="amazon">Amazon</div>
-  <div class="plat-chip" data-p="flipkart">Flipkart</div>
-  <div class="plat-chip" data-p="meesho">Meesho</div>
-  <div class="plat-chip" data-p="myntra">Myntra</div>
-  <div class="plat-chip" data-p="firstcry">FirstCry</div>
-</div>
-
-<div class="kpi-grid" id="kpis"></div>
-
-<div class="panel">
-  <div class="panel-head">
-    <span id="tableTitle">Latest rows</span>
-    <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
+<!-- Data view (orders/returns/payments/stock/sku_master) -->
+<div id="dataView">
+  <div class="controls">
+    <span class="ctrl-lbl">Company</span>
+    <select id="companyPicker"><option value="">Loading&hellip;</option></select>
+    <button class="btn" id="reloadBtn">Reload</button>
+    <span id="lastLoadAt" style="font-size:12px; color:#94a3b8;"></span>
   </div>
-  <div class="panel-body" id="tableWrap">
-    <div class="empty">Loading&hellip;</div>
+
+  <div class="platform-row" id="platformRow">
+    <div class="plat-chip active" data-p="">All platforms</div>
+    <div class="plat-chip" data-p="amazon">Amazon</div>
+    <div class="plat-chip" data-p="flipkart">Flipkart</div>
+    <div class="plat-chip" data-p="meesho">Meesho</div>
+    <div class="plat-chip" data-p="myntra">Myntra</div>
+    <div class="plat-chip" data-p="firstcry">FirstCry</div>
+  </div>
+
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span id="tableTitle">Latest rows</span>
+      <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
+    </div>
+    <div class="panel-body" id="tableWrap">
+      <div class="empty">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- Uploads view -->
+<div id="uploadsView" style="display:none;">
+  <div class="panel" style="margin-top:20px;">
+    <div class="panel-head">
+      <span>Uploads</span>
+      <span style="color:#94a3b8; font-weight:normal; font-size:12px;">Click an item to upload</span>
+    </div>
+    <div class="up-status" id="upStatus"></div>
+    <div class="up-list">
+
+      <label class="up-item" for="masterFileInput">
+        <div class="up-left">
+          <div class="up-icon">&#128193;</div>
+          <div>
+            <div class="up-name">Master SKU file</div>
+            <div class="up-desc">Upload the Excel/CSV that maps each platform SKU to your Master SKU + brand, category, HSN.</div>
+          </div>
+        </div>
+        <div class="up-right">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none" id="masterFileStamp">Never</div>
+        </div>
+      </label>
+      <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
+
+    </div>
   </div>
 </div>
 
@@ -146,13 +197,13 @@
   const $ = (s) => document.querySelector(s);
   const state = {
     session: null,
-    kind: "orders",          // orders | returns | payments | stock
-    platform: "",            // "" = all
+    view: "orders",         // orders | returns | payments | stock | sku_master | uploads
+    platform: "",
     company: "",
     companies: [],
   };
-  const DATE_COL = { orders: "order_date", returns: "return_date", payments: "payment_date", stock: "snapshot_date" };
-  const KIND_TABLE = { orders: "seller_orders", returns: "seller_returns", payments: "seller_payments", stock: "seller_stock" };
+  const DATE_COL = { orders: "order_date", returns: "return_date", payments: "payment_date", stock: "snapshot_date", sku_master: "updated_at" };
+  const KIND_TABLE = { orders: "seller_orders", returns: "seller_returns", payments: "seller_payments", stock: "seller_stock", sku_master: "seller_sku_master" };
 
   // ---- 0. Sign-in + subscription gate ----
   (async () => {
@@ -167,6 +218,7 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await loadCompanies();
+    await refreshMasterStamp();
     await refresh();
   })();
 
@@ -188,12 +240,22 @@
   }
 
   // ---- 2. Tabs + platform chips ----
-  document.getElementById("kindTabs").addEventListener("click", (e) => {
+  document.getElementById("mainTabs").addEventListener("click", (e) => {
     const t = e.target.closest(".tab"); if (!t) return;
-    document.querySelectorAll("#kindTabs .tab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll("#mainTabs .tab").forEach(x => x.classList.remove("active"));
     t.classList.add("active");
-    state.kind = t.dataset.kind;
-    refresh();
+    state.view = t.dataset.view;
+    if (state.view === "uploads") {
+      $("#dataView").style.display = "none";
+      $("#uploadsView").style.display = "";
+      refreshMasterStamp();
+    } else {
+      $("#dataView").style.display = "";
+      $("#uploadsView").style.display = "none";
+      // SKU Master doesn't need platform chips
+      $("#platformRow").style.display = state.view === "sku_master" ? "none" : "";
+      refresh();
+    }
   });
   document.getElementById("platformRow").addEventListener("click", (e) => {
     const c = e.target.closest(".plat-chip"); if (!c) return;
@@ -209,64 +271,75 @@
 
   // ---- 3. Fetch + render ----
   async function refresh() {
+    if (state.view === "uploads") return;
     $("#tableWrap").innerHTML = '<div class="empty">Loading&hellip;</div>';
     $("#kpis").innerHTML = "";
-    const table = KIND_TABLE[state.kind];
-    const dateCol = DATE_COL[state.kind];
+    const table = KIND_TABLE[state.view];
+    const dateCol = DATE_COL[state.view];
     let q = sb.from(table).select("*", { count: "exact" })
       .eq("user_id", state.session.user.id)
       .order(dateCol, { ascending: false, nullsFirst: false })
       .limit(200);
-    if (state.platform) q = q.eq("platform", state.platform);
-    if (state.company) q = q.eq("company_name", state.company);
+    if (state.view !== "sku_master" && state.platform) q = q.eq("platform", state.platform);
+    if (state.view !== "sku_master" && state.company) q = q.eq("company_name", state.company);
     const { data, count, error } = await q;
     if (error) { $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(error.message)}</div>`; return; }
 
     $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
     $("#rowCount").textContent = (count ?? 0) + " total rows";
-
-    // KPIs
     renderKpis(data || [], count ?? 0);
 
-    // Table
     if (!data || data.length === 0) {
-      $("#tableWrap").innerHTML = `
-        <div class="empty">
-          <h3>No ${state.kind} yet</h3>
-          <p>Install the Cursive Analyst app and start dropping marketplace CSVs into your SellerOps folders.</p>
-          <a class="empty-cta" href="/analyst/">Install Cursive Analyst</a>
-        </div>`;
+      if (state.view === "sku_master") {
+        $("#tableWrap").innerHTML = `
+          <div class="empty">
+            <h3>No SKU master data yet</h3>
+            <p>Go to <b>Uploads</b> and add your Master SKU file to enable cross-platform SKU roll-up.</p>
+          </div>`;
+      } else {
+        $("#tableWrap").innerHTML = `
+          <div class="empty">
+            <h3>No ${state.view} yet</h3>
+            <p>Install the Cursive Analyst app and drop marketplace CSVs into your SellerOps folders.</p>
+            <a class="empty-cta" href="/analyst/">Install Cursive Analyst</a>
+          </div>`;
+      }
       return;
     }
     $("#tableWrap").innerHTML = renderTable(data);
   }
 
   function renderKpis(rows, total) {
-    // Simple KPIs: total row count, distinct companies, distinct platforms, latest activity
+    const dc = DATE_COL[state.view];
     const companies = new Set(rows.map(r => r.company_name).filter(Boolean));
     const platforms = new Set(rows.map(r => r.platform).filter(Boolean));
-    const dc = DATE_COL[state.kind];
     const latestIso = rows.map(r => r[dc]).filter(Boolean).sort().pop();
     const latestStr = latestIso ? new Date(latestIso).toLocaleString("en-IN") : "—";
-    $("#kpis").innerHTML = `
-      <div class="kpi"><div class="label">Total rows</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div>
-      <div class="kpi"><div class="label">Companies in view</div><div class="value">${companies.size}</div><div class="foot">${[...companies].slice(0,3).join(", ") || "—"}</div></div>
-      <div class="kpi"><div class="label">Platforms in view</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div>
-      <div class="kpi"><div class="label">Latest ${state.kind === "stock" ? "snapshot" : state.kind.slice(0,-1)}</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div>
-    `;
+    if (state.view === "sku_master") {
+      $("#kpis").innerHTML = `
+        <div class="kpi"><div class="label">Total mappings</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div>
+        <div class="kpi"><div class="label">Platforms mapped</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div>
+        <div class="kpi"><div class="label">Latest update</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div>
+      `;
+    } else {
+      $("#kpis").innerHTML = `
+        <div class="kpi"><div class="label">Total rows</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div>
+        <div class="kpi"><div class="label">Companies in view</div><div class="value">${companies.size}</div><div class="foot">${[...companies].slice(0,3).join(", ") || "—"}</div></div>
+        <div class="kpi"><div class="label">Platforms in view</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div>
+        <div class="kpi"><div class="label">Latest ${state.view === "stock" ? "snapshot" : state.view.slice(0,-1)}</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div>
+      `;
+    }
   }
 
   function renderTable(rows) {
-    const dc = DATE_COL[state.kind];
-    // Collect a stable set of raw_data columns from first row (union across a few rows)
+    if (state.view === "sku_master") return renderSkuMasterTable(rows);
+    const dc = DATE_COL[state.view];
     const rawKeys = new Set();
-    rows.slice(0, 20).forEach(r => {
-      Object.keys(r.raw_data || {}).forEach(k => rawKeys.add(k));
-    });
-    const cols = Array.from(rawKeys).slice(0, 10); // show first 10 raw columns
+    rows.slice(0, 20).forEach(r => Object.keys(r.raw_data || {}).forEach(k => rawKeys.add(k)));
+    const cols = Array.from(rawKeys).slice(0, 10);
     const th = `
       <tr>
-        <th>${labelForDate(state.kind)}</th>
+        <th>${labelForDate(state.view)}</th>
         <th>Company</th><th>Platform</th>
         ${cols.map(c => `<th>${escapeHtml(c)}</th>`).join("")}
         <th>Source file</th>
@@ -282,8 +355,26 @@
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
   }
 
-  function labelForDate(kind) {
-    return { orders:"Order date", returns:"Return date", payments:"Payment date", stock:"Snapshot date" }[kind] || "Date";
+  function renderSkuMasterTable(rows) {
+    const th = `<tr><th>Platform</th><th>Seller SKU</th><th>Master SKU</th><th>Brand</th><th>Category</th><th>Sub Category</th><th>Color</th><th>Product</th><th>HSN</th><th>Updated</th></tr>`;
+    const tr = rows.map(r => `
+      <tr>
+        <td><b>${escapeHtml(r.platform || "—")}</b></td>
+        <td>${escapeHtml(r.seller_sku || "—")}</td>
+        <td><b>${escapeHtml(r.master_sku || "—")}</b></td>
+        <td>${escapeHtml(r.brand || "—")}</td>
+        <td>${escapeHtml(r.category || "—")}</td>
+        <td>${escapeHtml(r.sub_category || "—")}</td>
+        <td>${escapeHtml(r.color || "—")}</td>
+        <td>${escapeHtml(r.product || "—")}</td>
+        <td>${escapeHtml(r.hsn || "—")}</td>
+        <td class="muted">${escapeHtml(fmtDate(r.updated_at))}</td>
+      </tr>`).join("");
+    return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
+  }
+
+  function labelForDate(v) {
+    return { orders:"Order date", returns:"Return date", payments:"Payment date", stock:"Snapshot date", sku_master:"Updated" }[v] || "Date";
   }
   function fmtDate(iso) {
     if (!iso) return "—";
@@ -297,6 +388,162 @@
   }
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  // =====================================================================
+  // Uploads — Master SKU file
+  // =====================================================================
+  const PLATFORM_HEADERS = {
+    amazon:   ["amazon sku","amazon","amazonsku","amazon_sku","amazon seller sku","amz sku","amz","asin sku","amazon fsn"],
+    flipkart: ["flipkart sku","flipkart","flipkartsku","flipkart_sku","flipkart seller sku","fk sku","fk"],
+    meesho:   ["meesho sku","meesho","meeshosku","meesho_sku","meesho seller sku"],
+    myntra:   ["myntra sku","myntra","myntrasku","myntra_sku","myntra seller sku","myntra style id"],
+    firstcry: ["firstcry sku","firstcry","firstcrysku","firstcry_sku","first cry sku","firstcry seller sku"],
+  };
+  const MASTER_HEADERS = ["master sku","mastersku","master_sku","master","canonical sku","canonical_sku","sku master","sku_master"];
+  const FIELD_HEADERS = {
+    brand:        ["brand","brand name","brandname"],
+    category:     ["category","cat","product category","main category"],
+    sub_category: ["sub category","sub-category","subcategory","sub_category","sub cat"],
+    color:        ["color","colour","shade"],
+    product:      ["product","product name","title","description","product title"],
+    hsn:          ["hsn","hsn code","hsncode","hsn_code"],
+  };
+
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const matchHeader = (h, list) => list.some(x => norm(h) === norm(x));
+
+  document.getElementById("masterFileInput").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    setStatus("Reading " + f.name + " …", false);
+    try {
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (rows.length === 0) { setStatus("File is empty.", true); return; }
+
+      const headers = Object.keys(rows[0]);
+      const idx = detectHeaderMap(headers);
+      if (!idx.master) { setStatus("Could not find a 'Master SKU' column. Please rename that column to 'Master SKU' and try again.", true); return; }
+      const platformCols = Object.keys(idx.platforms);
+      if (platformCols.length === 0 && !idx.platformCol) {
+        setStatus("No platform SKU columns found (Amazon / Flipkart / Meesho / Myntra / FirstCry). Please label your platform SKU columns and try again.", true);
+        return;
+      }
+
+      // Build long-format upsert rows
+      const outRows = [];
+      const uid = state.session.user.id;
+      for (const r of rows) {
+        const master = String(r[idx.master] || "").trim();
+        if (!master) continue;
+        const fields = {
+          brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
+          category:     idx.fields.category     ? String(r[idx.fields.category]     || "").trim() : "",
+          sub_category: idx.fields.sub_category ? String(r[idx.fields.sub_category] || "").trim() : "",
+          color:        idx.fields.color        ? String(r[idx.fields.color]        || "").trim() : "",
+          product:      idx.fields.product      ? String(r[idx.fields.product]      || "").trim() : "",
+          hsn:          idx.fields.hsn          ? String(r[idx.fields.hsn]          || "").trim() : "",
+        };
+
+        if (idx.platformCol && idx.sellerSkuCol) {
+          // Long format detected: (Platform | Seller SKU | Master SKU | ...)
+          const plat = normalizePlatform(String(r[idx.platformCol] || "").trim());
+          const ssku = String(r[idx.sellerSkuCol] || "").trim();
+          if (plat && ssku) {
+            outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: r, source_file: f.name });
+          }
+        } else {
+          // Wide format: one platform SKU per column
+          for (const [plat, col] of Object.entries(idx.platforms)) {
+            const ssku = String(r[col] || "").trim();
+            if (!ssku) continue;
+            outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: r, source_file: f.name });
+          }
+        }
+      }
+      if (outRows.length === 0) { setStatus("Parsed 0 mappings. Check that platform SKU columns have values.", true); return; }
+
+      setStatus(`Uploading ${outRows.length} mappings …`, false);
+
+      // Chunked upsert (avoid body size limits)
+      const CHUNK = 400;
+      let done = 0;
+      for (let i = 0; i < outRows.length; i += CHUNK) {
+        const slice = outRows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: new Date().toISOString() }));
+        const { error } = await sb.from("seller_sku_master")
+          .upsert(slice, { onConflict: "user_id,platform,seller_sku" });
+        if (error) { setStatus("Upload error: " + error.message, true); return; }
+        done += slice.length;
+        setStatus(`Uploading … ${done} / ${outRows.length}`, false);
+      }
+      setStatus(`✅ Uploaded ${outRows.length} SKU mappings from ${f.name}.`, false);
+      await refreshMasterStamp();
+    } catch (err) {
+      console.error(err);
+      setStatus("Failed to parse file: " + (err.message || err), true);
+    } finally {
+      e.target.value = ""; // reset so re-selecting the same file fires the event
+    }
+  });
+
+  function detectHeaderMap(headers) {
+    const map = { master: null, platforms: {}, fields: {}, platformCol: null, sellerSkuCol: null };
+    for (const h of headers) {
+      if (!map.master && matchHeader(h, MASTER_HEADERS)) { map.master = h; continue; }
+      let matched = false;
+      for (const [plat, aliases] of Object.entries(PLATFORM_HEADERS)) {
+        if (matchHeader(h, aliases)) { map.platforms[plat] = h; matched = true; break; }
+      }
+      if (matched) continue;
+      for (const [field, aliases] of Object.entries(FIELD_HEADERS)) {
+        if (!map.fields[field] && matchHeader(h, aliases)) { map.fields[field] = h; matched = true; break; }
+      }
+      if (matched) continue;
+      // Long-format detection
+      if (!map.platformCol && ["platform","marketplace","site","channel"].some(x => norm(h) === x)) { map.platformCol = h; continue; }
+      if (!map.sellerSkuCol && ["seller sku","sellersku","platform sku","platformsku","sku","product sku"].some(x => norm(h) === x)) { map.sellerSkuCol = h; continue; }
+    }
+    return map;
+  }
+
+  function normalizePlatform(s) {
+    const n = norm(s);
+    if (!n) return "";
+    if (n.includes("amazon") || n.includes("amz")) return "amazon";
+    if (n.includes("flipkart") || n.includes("fk")) return "flipkart";
+    if (n.includes("meesho")) return "meesho";
+    if (n.includes("myntra")) return "myntra";
+    if (n.includes("first") || n.includes("cry")) return "firstcry";
+    return n;
+  }
+
+  function setStatus(msg, isError) {
+    const el = $("#upStatus");
+    el.textContent = msg;
+    el.classList.add("show");
+    el.classList.toggle("err", !!isError);
+  }
+
+  async function refreshMasterStamp() {
+    if (!state.session) return;
+    const { data, error } = await sb.from("seller_sku_master")
+      .select("updated_at,source_file")
+      .eq("user_id", state.session.user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    const el = $("#masterFileStamp");
+    if (error || !data || data.length === 0) {
+      el.textContent = "Never";
+      el.classList.add("none");
+      return;
+    }
+    const dt = new Date(data[0].updated_at);
+    el.classList.remove("none");
+    el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    if (data[0].source_file) el.title = data[0].source_file;
   }
 </script>
 
