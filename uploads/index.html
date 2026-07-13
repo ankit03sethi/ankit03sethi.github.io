@@ -85,19 +85,20 @@
     .co-add { padding:10px 16px; background:#eff6ff; color:#1f6feb; border:1px dashed #1f6feb; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; width:100%; text-align:center; }
     .co-add:hover { background:#dbeafe; }
 
-    .company-block { display:flex; align-items:center; gap:14px; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fafbfc; }
-    #ordersPickerList.reverse .company-block { flex-direction:row-reverse; }
-    #ordersPickerList.reverse .platform-grid { justify-content:flex-end; }
-    .company-block:last-child { margin-bottom:0; }
-    .company-name { flex:0 0 180px; font-size:14px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px; }
-    .company-name::before { content:"🏢"; font-size:15px; }
-    .platform-grid { flex:1; display:flex; gap:6px; flex-wrap:wrap; }
-    .plat-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:#fff; border:1px solid #e5e7eb; border-radius:999px; font-size:12px; font-weight:700; color:#0f172a; cursor:pointer; }
-    .plat-chip:hover { border-color:#1f6feb; background:#eff6ff; color:#1f6feb; }
-    .plat-chip .arr { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#1f6feb; color:#fff; font-size:11px; }
+    /* One row per (company, platform) — uniform, no company separators */
+    #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+    .combo-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:#fff; border-bottom:1px solid #f1f5f9; }
+    .combo-row:last-child { border-bottom:none; }
+    #ordersPickerList.reverse .combo-row { flex-direction:row-reverse; }
+    .combo-row .cell-company { flex:1; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
+    .combo-row .cell-company::before { content:"🏢"; font-size:15px; }
+    .combo-row .cell-platform { flex:1; font-size:14px; font-weight:600; color:#0f172a; display:flex; align-items:center; gap:6px; }
+    .combo-row .cell-platform::before { content:""; width:8px; height:8px; border-radius:50%; background:#1f6feb; }
+    .combo-row .cell-action { flex:0 0 auto; }
+    .combo-row .up-mini { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid #1f6feb; background:#1f6feb; color:#fff; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .combo-row .up-mini:hover { background:#1651a8; }
     @media (max-width: 600px) {
-      .company-block { flex-direction:column; align-items:stretch; }
-      .company-name { flex:none; }
+      .combo-row { flex-direction:column; align-items:stretch; gap:6px; }
     }
 
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
@@ -390,21 +391,23 @@
   });
   function renderOrdersPickerList(list) {
     const wrap = $("#ordersPickerList");
-    const html = list.map(c => {
+    // Flatten to one row per (company, platform)
+    const rows = [];
+    list.forEach(c => {
       const plats = PLATFORMS.filter(p => (c.platforms || []).includes(p));
-      const chips = plats.map(p => `
-        <button class="plat-chip" data-company="${escapeHtml(c.name)}" data-platform="${p}" title="Upload ${escapeHtml(PLAT_LABEL[p])} orders for ${escapeHtml(c.name)}">
-          <span>${escapeHtml(PLAT_LABEL[p])}</span>
-          <span class="arr">&#8593;</span>
-        </button>
-      `).join("");
-      return `<div class="company-block">
-        <div class="company-name">${escapeHtml(c.name)}</div>
-        <div class="platform-grid">${chips}</div>
-      </div>`;
-    }).join("");
+      plats.forEach((p, idx) => rows.push({ company: c.name, platform: p, first: idx === 0 }));
+    });
+    const html = rows.map(r => `
+      <div class="combo-row">
+        <div class="cell-company">${escapeHtml(r.company)}</div>
+        <div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>
+        <div class="cell-action">
+          <button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>
+        </div>
+      </div>
+    `).join("");
     wrap.innerHTML = html;
-    wrap.querySelectorAll(".plat-chip").forEach(btn => {
+    wrap.querySelectorAll(".up-mini").forEach(btn => {
       btn.addEventListener("click", () => {
         const company = btn.dataset.company;
         const platform = btn.dataset.platform;
