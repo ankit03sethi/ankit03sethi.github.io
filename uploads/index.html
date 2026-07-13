@@ -85,9 +85,20 @@
     .co-add { padding:10px 16px; background:#eff6ff; color:#1f6feb; border:1px dashed #1f6feb; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; width:100%; text-align:center; }
     .co-add:hover { background:#dbeafe; }
 
-    .picker-row { display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:8px; }
-    .picker-row label { font-size:13px; font-weight:600; color:#0f172a; min-width:80px; }
-    .picker-row select { font:inherit; padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; flex:1; }
+    .company-block { display:flex; align-items:center; gap:14px; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fafbfc; }
+    #ordersPickerList.reverse .company-block { flex-direction:row-reverse; }
+    #ordersPickerList.reverse .platform-grid { justify-content:flex-end; }
+    .company-block:last-child { margin-bottom:0; }
+    .company-name { flex:0 0 180px; font-size:14px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px; }
+    .company-name::before { content:"🏢"; font-size:15px; }
+    .platform-grid { flex:1; display:flex; gap:6px; flex-wrap:wrap; }
+    .plat-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:#fff; border:1px solid #e5e7eb; border-radius:999px; font-size:12px; font-weight:700; color:#0f172a; cursor:pointer; }
+    .plat-chip:hover { border-color:#1f6feb; background:#eff6ff; color:#1f6feb; }
+    .plat-chip .arr { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#1f6feb; color:#fff; font-size:11px; }
+    @media (max-width: 600px) {
+      .company-block { flex-direction:column; align-items:stretch; }
+      .company-name { flex:none; }
+    }
 
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
     #locker.show { display:flex; }
@@ -214,19 +225,34 @@
       <button class="x" id="ordersPickerClose">&times;</button>
     </div>
     <div class="modal-body">
-      <p style="margin:0 0 12px; color:#64748b; font-size:13px;">Pick which company and platform this file belongs to. Then choose a CSV/XLSX and it will be tagged automatically.</p>
-      <div class="picker-row">
-        <label>Company</label>
-        <select id="ordersCompanySel"></select>
+      <p style="margin:0 0 10px; color:#64748b; font-size:13px;">Pick a date (or date range), then click <b>Upload</b> next to a company &amp; platform. Your file will be tagged automatically.</p>
+
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <button class="btn date-mode-btn" data-mode="single" style="flex:1;">📅 Single date</button>
+        <button class="btn date-mode-btn" data-mode="range" style="flex:1;">📆 Date range</button>
       </div>
-      <div class="picker-row">
-        <label>Platform</label>
-        <select id="ordersPlatformSel"></select>
+      <div id="dateSingleBox" style="display:none; padding:10px 12px; background:#eff6ff; border:1px solid #dbeafe; border-radius:8px; margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:700; color:#1f6feb; display:block; margin-bottom:6px;">DATE</label>
+        <input type="date" id="dateSingle" style="font:inherit; padding:8px 10px; border:1px solid #dbeafe; border-radius:6px; width:100%;">
       </div>
+      <div id="dateRangeBox" style="display:none; padding:10px 12px; background:#eff6ff; border:1px solid #dbeafe; border-radius:8px; margin-bottom:14px;">
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;">
+            <label style="font-size:12px; font-weight:700; color:#1f6feb; display:block; margin-bottom:6px;">FROM</label>
+            <input type="date" id="dateFrom" style="font:inherit; padding:8px 10px; border:1px solid #dbeafe; border-radius:6px; width:100%;">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:12px; font-weight:700; color:#1f6feb; display:block; margin-bottom:6px;">TO</label>
+            <input type="date" id="dateTo" style="font:inherit; padding:8px 10px; border:1px solid #dbeafe; border-radius:6px; width:100%;">
+          </div>
+        </div>
+      </div>
+
+      <div id="ordersPickerList"></div>
     </div>
-    <div class="modal-foot">
-      <button class="btn" id="ordersPickerCancelBtn">Cancel</button>
-      <button class="btn primary" id="ordersPickerNextBtn">Pick file &rarr;</button>
+    <div class="modal-foot" style="justify-content:space-between;">
+      <button class="btn" id="reverseLayoutBtn" title="Swap company / platforms sides">&#8646; Reverse layout</button>
+      <button class="btn" id="ordersPickerCancelBtn">Close</button>
     </div>
   </div>
 </div>
@@ -357,32 +383,65 @@
 
   // ---- ORDERS CSV UPLOAD ----
   $("#ordersUploadBtn").addEventListener("click", () => {
-    // Populate company dropdown
-    const anyPlat = companies.filter(c => (c.platforms || []).length > 0);
-    if (anyPlat.length === 0) { alert("Add at least one company with platforms first."); return; }
-    const cs = $("#ordersCompanySel");
-    cs.innerHTML = anyPlat.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("");
-    updateOrdersPlatformDropdown();
-    cs.onchange = updateOrdersPlatformDropdown;
+    const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+    if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
+    renderOrdersPickerList(withPlats);
     $("#ordersPickerModal").classList.add("show");
   });
-  function updateOrdersPlatformDropdown() {
-    const name = $("#ordersCompanySel").value;
-    const c = companies.find(x => x.name === name);
-    const plats = (c && c.platforms) ? c.platforms : [];
-    $("#ordersPlatformSel").innerHTML = plats.map(p => `<option value="${p}">${escapeHtml(PLAT_LABEL[p] || p)}</option>`).join("");
+  function renderOrdersPickerList(list) {
+    const wrap = $("#ordersPickerList");
+    const html = list.map(c => {
+      const plats = PLATFORMS.filter(p => (c.platforms || []).includes(p));
+      const chips = plats.map(p => `
+        <button class="plat-chip" data-company="${escapeHtml(c.name)}" data-platform="${p}" title="Upload ${escapeHtml(PLAT_LABEL[p])} orders for ${escapeHtml(c.name)}">
+          <span>${escapeHtml(PLAT_LABEL[p])}</span>
+          <span class="arr">&#8593;</span>
+        </button>
+      `).join("");
+      return `<div class="company-block">
+        <div class="company-name">${escapeHtml(c.name)}</div>
+        <div class="platform-grid">${chips}</div>
+      </div>`;
+    }).join("");
+    wrap.innerHTML = html;
+    wrap.querySelectorAll(".plat-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const company = btn.dataset.company;
+        const platform = btn.dataset.platform;
+        $("#ordersPickerModal").classList.remove("show");
+        $("#ordersFileInput").dataset.company = company;
+        $("#ordersFileInput").dataset.platform = platform;
+        $("#ordersFileInput").click();
+      });
+    });
   }
   $("#ordersPickerClose").addEventListener("click", () => $("#ordersPickerModal").classList.remove("show"));
   $("#ordersPickerCancelBtn").addEventListener("click", () => $("#ordersPickerModal").classList.remove("show"));
-  $("#ordersPickerNextBtn").addEventListener("click", () => {
-    const company = $("#ordersCompanySel").value;
-    const platform = $("#ordersPlatformSel").value;
-    if (!company || !platform) { alert("Pick company + platform first."); return; }
-    $("#ordersPickerModal").classList.remove("show");
-    // Stash for the file input handler
-    $("#ordersFileInput").dataset.company = company;
-    $("#ordersFileInput").dataset.platform = platform;
-    $("#ordersFileInput").click();
+  $("#reverseLayoutBtn").addEventListener("click", () => {
+    const list = $("#ordersPickerList");
+    list.classList.toggle("reverse");
+    // Remember user preference
+    try { localStorage.setItem("uploads_reverse", list.classList.contains("reverse") ? "1" : "0"); } catch(_) {}
+  });
+  // Restore preference on load
+  try { if (localStorage.getItem("uploads_reverse") === "1") $("#ordersPickerList").classList.add("reverse"); } catch(_) {}
+
+  // Date mode toggle: Single date vs Date range
+  let dateMode = null; // null | "single" | "range"
+  document.querySelectorAll(".date-mode-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      const mode = b.dataset.mode;
+      dateMode = (dateMode === mode) ? null : mode;
+      // Update button visuals
+      document.querySelectorAll(".date-mode-btn").forEach(x => {
+        const on = x.dataset.mode === dateMode;
+        x.style.background = on ? "#1f6feb" : "#fff";
+        x.style.color      = on ? "#fff"    : "#0f172a";
+        x.style.borderColor= on ? "#1f6feb" : "#e5e7eb";
+      });
+      $("#dateSingleBox").style.display = (dateMode === "single") ? "" : "none";
+      $("#dateRangeBox").style.display  = (dateMode === "range")  ? "" : "none";
+    });
   });
   $("#ordersFileInput").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
@@ -396,17 +455,36 @@
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
       if (rows.length === 0) { setStatus("File is empty.", true); return; }
       const uid = session.user.id;
-      // Try to detect an order date column; else leave null
+      // Resolve chosen date/range from modal state
+      let overrideDate = null, dateFrom = null, dateTo = null;
+      if (dateMode === "single") {
+        const v = ($("#dateSingle").value || "").trim();
+        if (v) overrideDate = new Date(v + "T00:00:00Z").toISOString();
+      } else if (dateMode === "range") {
+        const a = ($("#dateFrom").value || "").trim();
+        const b = ($("#dateTo").value || "").trim();
+        if (a) dateFrom = new Date(a + "T00:00:00Z").toISOString();
+        if (b) dateTo   = new Date(b + "T00:00:00Z").toISOString();
+      }
+      // Try to detect an order date column from the file; else fall back
       const dateCol = detectDateColumn(Object.keys(rows[0]), ["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"]);
-      const payload = rows.map(r => ({
-        user_id: uid,
-        year: dateCol ? parseYear(r[dateCol]) : null,
-        order_date: dateCol ? parseDate(r[dateCol]) : null,
-        company_name: company,
-        platform: platform,
-        source_file: f.name,
-        raw_data: r,
-      }));
+      const payload = rows.map(r => {
+        const csvDate = dateCol ? parseDate(r[dateCol]) : null;
+        const finalDate = overrideDate || csvDate || dateFrom || null;
+        const rawWithMeta = { ...r };
+        if (overrideDate) rawWithMeta.__file_date = overrideDate;
+        if (dateFrom)     rawWithMeta.__file_date_from = dateFrom;
+        if (dateTo)       rawWithMeta.__file_date_to   = dateTo;
+        return {
+          user_id: uid,
+          year: finalDate ? new Date(finalDate).getFullYear() : null,
+          order_date: finalDate,
+          company_name: company,
+          platform: platform,
+          source_file: f.name,
+          raw_data: rawWithMeta,
+        };
+      });
       setStatus(`Uploading ${payload.length} orders …`, false);
       const CHUNK = 400;
       let done = 0;
