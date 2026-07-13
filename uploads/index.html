@@ -85,6 +85,13 @@
     .co-add { padding:10px 16px; background:#eff6ff; color:#1f6feb; border:1px dashed #1f6feb; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; width:100%; text-align:center; }
     .co-add:hover { background:#dbeafe; }
 
+    /* Filter chips */
+    .filter-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+    .filter-row .flt-label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; margin-right:4px; }
+    .flt-chip { padding:5px 12px; font-size:12px; font-weight:700; border-radius:999px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; color:#0f172a; }
+    .flt-chip:hover { border-color:#1f6feb; color:#1f6feb; }
+    .flt-chip.on { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+
     /* One row per (company, platform) — uniform, no company separators */
     #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
     .combo-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:#fff; border-bottom:1px solid #f1f5f9; }
@@ -248,6 +255,9 @@
         </div>
       </div>
 
+      <div class="filter-row" id="companyFilterRow"><span class="flt-label">Company</span></div>
+      <div class="filter-row" id="platformFilterRow"><span class="flt-label">Platform</span></div>
+
       <div id="ordersPickerList"></div>
     </div>
     <div class="modal-foot" style="justify-content:space-between;">
@@ -382,21 +392,65 @@
   });
 
   // ---- ORDERS CSV UPLOAD ----
+  let ordersFilterCompany = "";  // "" = All
+  let ordersFilterPlatform = ""; // "" = All
+
   $("#ordersUploadBtn").addEventListener("click", () => {
     const withPlats = companies.filter(c => (c.platforms || []).length > 0);
     if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
+    ordersFilterCompany = ""; ordersFilterPlatform = "";
+    buildFilterChips(withPlats);
     renderOrdersPickerList(withPlats);
     $("#ordersPickerModal").classList.add("show");
   });
+
+  function buildFilterChips(list) {
+    const uniqPlats = new Set();
+    list.forEach(c => (c.platforms || []).forEach(p => uniqPlats.add(p)));
+    // Company chips
+    const cRow = $("#companyFilterRow");
+    cRow.querySelectorAll(".flt-chip").forEach(x => x.remove());
+    const cAll = mkChip("All", "", ordersFilterCompany === "");
+    cAll.addEventListener("click", () => { ordersFilterCompany = ""; buildFilterChips(list); renderOrdersPickerList(list); });
+    cRow.appendChild(cAll);
+    list.forEach(c => {
+      const chip = mkChip(c.name, c.name, ordersFilterCompany === c.name);
+      chip.addEventListener("click", () => { ordersFilterCompany = c.name; buildFilterChips(list); renderOrdersPickerList(list); });
+      cRow.appendChild(chip);
+    });
+    // Platform chips
+    const pRow = $("#platformFilterRow");
+    pRow.querySelectorAll(".flt-chip").forEach(x => x.remove());
+    const pAll = mkChip("All", "", ordersFilterPlatform === "");
+    pAll.addEventListener("click", () => { ordersFilterPlatform = ""; buildFilterChips(list); renderOrdersPickerList(list); });
+    pRow.appendChild(pAll);
+    PLATFORMS.filter(p => uniqPlats.has(p)).forEach(p => {
+      const chip = mkChip(PLAT_LABEL[p], p, ordersFilterPlatform === p);
+      chip.addEventListener("click", () => { ordersFilterPlatform = p; buildFilterChips(list); renderOrdersPickerList(list); });
+      pRow.appendChild(chip);
+    });
+  }
+  function mkChip(label, value, on) {
+    const b = document.createElement("button");
+    b.className = "flt-chip" + (on ? " on" : "");
+    b.type = "button";
+    b.dataset.val = value;
+    b.textContent = label;
+    return b;
+  }
   function renderOrdersPickerList(list) {
     const wrap = $("#ordersPickerList");
     const reversed = wrap.classList.contains("reverse");
 
-    // Flatten to one row per (company, platform)
+    // Flatten to one row per (company, platform), apply active filters
     const rows = [];
     list.forEach(c => {
+      if (ordersFilterCompany && c.name !== ordersFilterCompany) return;
       const plats = PLATFORMS.filter(p => (c.platforms || []).includes(p));
-      plats.forEach(p => rows.push({ company: c.name, platform: p }));
+      plats.forEach(p => {
+        if (ordersFilterPlatform && p !== ordersFilterPlatform) return;
+        rows.push({ company: c.name, platform: p });
+      });
     });
 
     // Sort: default groups by company then platform; reverse groups by platform then company
@@ -413,6 +467,11 @@
         (companyOrder[a.company] - companyOrder[b.company]) ||
         (platOrder[a.platform] - platOrder[b.platform])
       );
+    }
+
+    if (rows.length === 0) {
+      wrap.innerHTML = `<div style="padding:24px; text-align:center; color:#64748b; font-size:13px;">No matches for this filter. Clear filters or add companies with the selected platform.</div>`;
+      return;
     }
 
     // In reverse mode, platform cell shows first (left)
