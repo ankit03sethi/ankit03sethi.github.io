@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Uploads — Cursive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    a { color: inherit; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding: 14px 28px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:10; }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
+    .brand-box { width:40px; height:40px; background:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+    .brand-wordmark { font-family:'Dancing Script', cursive; font-size:22px; color:#0f172a; line-height:1; }
+    .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
+    .topbar-right { display:flex; align-items:center; gap:14px; font-size:13px; }
+    .email-chip { color:#64748b; }
+    .btn-link { color:#1f6feb; text-decoration:none; font-weight:600; }
+
+    .hero { padding:28px 28px 8px; }
+    .hero h1 { margin:0 0 4px; font-size:24px; font-weight:800; }
+    .hero .sub { color:#64748b; font-size:14px; margin:0; }
+
+    .panel { background:#fff; border:1px solid #e5e7eb; border-radius:12px; margin:16px 28px 24px; overflow:hidden; max-width:1100px; }
+    .panel-head { padding:12px 16px; border-bottom:1px solid #e5e7eb; font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:space-between; }
+
+    .up-list { padding:8px 8px 16px; }
+    .up-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid #f1f5f9; }
+    .up-item:last-child { border-bottom:none; }
+    .up-left { display:flex; align-items:center; gap:14px; min-width:0; }
+    .up-icon { width:42px; height:42px; background:#dbeafe; color:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+    .up-name { font-size:15px; font-weight:700; color:#0f172a; }
+    .up-desc { font-size:12px; color:#64748b; margin-top:2px; }
+    .up-right { display:flex; align-items:center; gap:16px; }
+    .up-stamp-box { text-align:right; font-size:12px; color:#64748b; }
+    .up-stamp-box .stamp { color:#0f172a; font-weight:600; }
+    .up-stamp-box .stamp.none { color:#94a3b8; font-style:italic; font-weight:normal; }
+    .up-actions { display:flex; gap:8px; }
+    .up-btn { font: inherit; padding:8px 14px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:#0f172a; white-space:nowrap; }
+    .up-btn:hover { background:#eff6ff; border-color:#1f6feb; color:#1f6feb; }
+    .up-btn.primary { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .up-btn.primary:hover { background:#1651a8; color:#fff; }
+    .up-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .up-status { padding:12px 20px; background:#f0fdf4; border-top:1px solid #bbf7d0; font-size:13px; color:#166534; font-weight:600; display:none; }
+    .up-status.err { background:#fef2f2; border-top-color:#fecaca; color:#991b1b; }
+    .up-status.show { display:block; }
+
+    @media (max-width: 720px) {
+      .up-item { flex-direction:column; align-items:stretch; }
+      .up-right { flex-direction:column; align-items:stretch; gap:10px; }
+      .up-actions { justify-content:stretch; }
+      .up-actions .up-btn { flex:1; }
+    }
+
+    #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
+    #locker.show { display:flex; }
+    .lock-card { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
+    .lock-card h3 { margin:0 0 8px; }
+    .lock-card p { color:#64748b; font-size:14px; margin:0 0 16px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/home/" class="brand">
+    <div class="brand-box">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst</div>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <span class="email-chip" id="emailChip"></span>
+    <a class="btn-link" href="/skuwisedata/">SKU Wise Data</a>
+    <a class="btn-link" href="/analyst/">Install app</a>
+    <a class="btn-link" href="/home/">Home</a>
+  </div>
+</header>
+
+<div class="hero">
+  <h1>Uploads</h1>
+  <p class="sub">Files you upload here power the SKU-level roll-ups on the SKU Wise Data dashboard.</p>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <span>Available uploads</span>
+    <span style="color:#94a3b8; font-weight:normal; font-size:12px;">Click an item to upload</span>
+  </div>
+  <div class="up-status" id="upStatus"></div>
+  <div class="up-list">
+
+    <div class="up-item">
+      <div class="up-left">
+        <div class="up-icon">&#128193;</div>
+        <div>
+          <div class="up-name">Master SKU file</div>
+          <div class="up-desc">Maps each platform SKU to your Master SKU + brand, category, HSN.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none" id="masterFileStamp">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn" id="masterSampleBtn" title="Download a blank template with dropdowns">&#128196; Sample</button>
+          <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
+          <button class="up-btn primary" id="masterUploadBtn">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+    <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
+
+  </div>
+</div>
+
+<div id="locker">
+  <div class="lock-card">
+    <h3>Cursive Analyst subscription required</h3>
+    <p>Uploads on this page power the SKU Wise Data dashboard.<br>Subscribe once and use them without limits.</p>
+    <a class="empty-cta" style="display:inline-block; padding:10px 20px; background:#1f6feb; color:#fff; border-radius:8px; text-decoration:none; font-weight:700;" href="/home/?service=analyst">Subscribe &#8377;4999 / 30 days</a>
+  </div>
+</div>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+  const $ = (s) => document.querySelector(s);
+  let session = null;
+
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    if (!data.session) { location.href = "/home/?return=%2Fuploads%2F"; return; }
+    session = data.session;
+    $("#emailChip").textContent = session.user.email;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await sb.from("analytics_wallet_transactions")
+      .select("id").eq("user_id", session.user.id)
+      .eq("type", "debit_service").eq("service_tag", "analyst")
+      .gte("created_at", since).limit(1);
+    if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
+    await refreshMasterStamp();
+  })();
+
+  // Sample button → downloads pre-built .xlsx with header, dropdowns, auto S.NO
+  $("#masterSampleBtn").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = "/skuwisedata/master_sku_sample.xlsx";
+    a.download = "Master SKU Sample.xlsx";
+    document.body.appendChild(a); a.click(); a.remove();
+    setStatus("Sample template downloading. Open it, fill your SKUs (dropdowns will guide you), then upload it back.", false);
+  });
+
+  // Download button → exports current mappings as wide-format .xlsx
+  $("#masterDownloadBtn").addEventListener("click", async () => {
+    const btn = $("#masterDownloadBtn");
+    btn.disabled = true; btn.textContent = "Preparing…";
+    try {
+      const all = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await sb.from("seller_sku_master")
+          .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at, raw_data")
+          .eq("user_id", session.user.id)
+          .order("master_sku", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) { setStatus("Download error: " + error.message, true); return; }
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+      }
+      if (all.length === 0) { setStatus("Nothing to download yet — upload a Master SKU file first.", true); return; }
+
+      // Round-trip export in the SAME shape as the sample (24 cols)
+      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price"];
+      const rows = all.map((r, i) => {
+        const rd = r.raw_data || {};
+        return [
+          i + 1,
+          rd["Date"] ?? "",
+          rd["Listed By"] ?? "",
+          rd["Company"] ?? "",
+          titleCase(r.platform || rd["Platform"] || ""),
+          r.brand || rd["Brand"] || "",
+          rd["Vertical"] ?? "",
+          rd["Non Returnable"] ?? "",
+          rd["Type"] ?? "",
+          r.category || rd["Category"] || "",
+          r.sub_category || rd["Sub Category"] || "",
+          r.product || rd["Product"] || "",
+          r.color || rd["Color"] || "",
+          rd["ASIN"] ?? "",
+          rd["Other Listing Id"] ?? rd["Other Listind Id"] ?? "",
+          r.seller_sku || rd["SKU"] || "",
+          r.master_sku || rd["Master Sku"] || "",
+          rd["COP"] ?? "",
+          r.hsn || rd["HSN"] || "",
+          rd["Tax %"] ?? "",
+          rd["Packaging"] ?? "",
+          rd["Final COP"] ?? "",
+          rd["Expected Settlement"] ?? "",
+          rd["Selling Price"] ?? "",
+        ];
+      });
+      const aoa = [HEADERS, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = HEADERS.map(h => ({ wch: Math.max(12, h.length + 2) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Master SKU");
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `master_sku_${stamp}.xlsx`);
+      setStatus(`Downloaded ${all.length} rows.`, false);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "&#11015; Download";
+    }
+  });
+
+  function titleCase(s) { return String(s).replace(/\b\w/g, c => c.toUpperCase()); }
+
+  // Upload button → triggers hidden file input
+  $("#masterUploadBtn").addEventListener("click", () => $("#masterFileInput").click());
+
+  const PLATFORM_HEADERS = {
+    amazon:   ["amazon sku","amazon","amazonsku","amazon_sku","amazon seller sku","amz sku","amz","asin sku","amazon fsn"],
+    flipkart: ["flipkart sku","flipkart","flipkartsku","flipkart_sku","flipkart seller sku","fk sku","fk"],
+    meesho:   ["meesho sku","meesho","meeshosku","meesho_sku","meesho seller sku"],
+    myntra:   ["myntra sku","myntra","myntrasku","myntra_sku","myntra seller sku","myntra style id"],
+    firstcry: ["firstcry sku","firstcry","firstcrysku","firstcry_sku","first cry sku","firstcry seller sku"],
+  };
+  const MASTER_HEADERS = ["master sku","mastersku","master_sku","master","canonical sku","canonical_sku","sku master","sku_master"];
+  const FIELD_HEADERS = {
+    brand:        ["brand","brand name","brandname"],
+    category:     ["category","cat","product category","main category"],
+    sub_category: ["sub category","sub-category","subcategory","sub_category","sub cat"],
+    color:        ["color","colour","shade"],
+    product:      ["product","product name","title","description","product title"],
+    hsn:          ["hsn","hsn code","hsncode","hsn_code"],
+  };
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const matchHeader = (h, list) => list.some(x => norm(h) === norm(x));
+
+  $("#masterFileInput").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    setStatus("Reading " + f.name + " …", false);
+    try {
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (rows.length === 0) { setStatus("File is empty.", true); return; }
+      const headers = Object.keys(rows[0]);
+      const idx = detectHeaderMap(headers);
+      if (!idx.master) { setStatus("Could not find a 'Master Sku' column.", true); return; }
+      if (Object.keys(idx.platforms).length === 0 && !(idx.platformCol && idx.sellerSkuCol)) {
+        setStatus("No platform SKU columns found. Add either per-platform SKU columns or a Platform + SKU pair.", true); return;
+      }
+      const outRows = [];
+      const uid = session.user.id;
+      for (const r of rows) {
+        const master = String(r[idx.master] || "").trim(); if (!master) continue;
+        const fields = {
+          brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
+          category:     idx.fields.category     ? String(r[idx.fields.category]     || "").trim() : "",
+          sub_category: idx.fields.sub_category ? String(r[idx.fields.sub_category] || "").trim() : "",
+          color:        idx.fields.color        ? String(r[idx.fields.color]        || "").trim() : "",
+          product:      idx.fields.product      ? String(r[idx.fields.product]      || "").trim() : "",
+          hsn:          idx.fields.hsn          ? String(r[idx.fields.hsn]          || "").trim() : "",
+        };
+        if (idx.platformCol && idx.sellerSkuCol) {
+          const plat = normalizePlatform(String(r[idx.platformCol] || "").trim());
+          const ssku = String(r[idx.sellerSkuCol] || "").trim();
+          if (plat && ssku) outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: r, source_file: f.name });
+        } else {
+          for (const [plat, col] of Object.entries(idx.platforms)) {
+            const ssku = String(r[col] || "").trim(); if (!ssku) continue;
+            outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: r, source_file: f.name });
+          }
+        }
+      }
+      if (outRows.length === 0) { setStatus("Parsed 0 mappings. Check that SKU columns have values.", true); return; }
+      setStatus(`Uploading ${outRows.length} mappings …`, false);
+      const CHUNK = 400;
+      let done = 0;
+      for (let i = 0; i < outRows.length; i += CHUNK) {
+        const slice = outRows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: new Date().toISOString() }));
+        const { error } = await sb.from("seller_sku_master")
+          .upsert(slice, { onConflict: "user_id,platform,seller_sku" });
+        if (error) { setStatus("Upload error: " + error.message, true); return; }
+        done += slice.length;
+        setStatus(`Uploading … ${done} / ${outRows.length}`, false);
+      }
+      setStatus(`✅ Uploaded ${outRows.length} SKU mappings from ${f.name}.`, false);
+      await refreshMasterStamp();
+    } catch (err) {
+      console.error(err);
+      setStatus("Failed to parse file: " + (err.message || err), true);
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  function detectHeaderMap(headers) {
+    const map = { master: null, platforms: {}, fields: {}, platformCol: null, sellerSkuCol: null };
+    for (const h of headers) {
+      if (!map.master && matchHeader(h, MASTER_HEADERS)) { map.master = h; continue; }
+      let matched = false;
+      for (const [plat, aliases] of Object.entries(PLATFORM_HEADERS)) {
+        if (matchHeader(h, aliases)) { map.platforms[plat] = h; matched = true; break; }
+      }
+      if (matched) continue;
+      for (const [field, aliases] of Object.entries(FIELD_HEADERS)) {
+        if (!map.fields[field] && matchHeader(h, aliases)) { map.fields[field] = h; matched = true; break; }
+      }
+      if (matched) continue;
+      if (!map.platformCol && ["platform","marketplace","site","channel"].some(x => norm(h) === x)) { map.platformCol = h; continue; }
+      if (!map.sellerSkuCol && ["seller sku","sellersku","platform sku","platformsku","sku","product sku"].some(x => norm(h) === x)) { map.sellerSkuCol = h; continue; }
+    }
+    return map;
+  }
+  function normalizePlatform(s) {
+    const n = norm(s); if (!n) return "";
+    if (n.includes("amazon") || n.includes("amz")) return "amazon";
+    if (n.includes("flipkart") || n.includes("fk")) return "flipkart";
+    if (n.includes("meesho")) return "meesho";
+    if (n.includes("myntra")) return "myntra";
+    if (n.includes("first") || n.includes("cry")) return "firstcry";
+    return n;
+  }
+  function setStatus(msg, isError) {
+    const el = $("#upStatus");
+    el.textContent = msg;
+    el.classList.add("show");
+    el.classList.toggle("err", !!isError);
+  }
+  async function refreshMasterStamp() {
+    if (!session) return;
+    const { data, error } = await sb.from("seller_sku_master")
+      .select("updated_at,source_file")
+      .eq("user_id", session.user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    const el = $("#masterFileStamp");
+    if (error || !data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); return; }
+    const dt = new Date(data[0].updated_at);
+    el.classList.remove("none");
+    el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    if (data[0].source_file) el.title = data[0].source_file;
+  }
+</script>
+
+</body>
+</html>
