@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Cursive Analyst — install</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%237c3aed'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding: 16px 32px; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+    .brand-box { width:44px; height:44px; background:#7c3aed; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+    .brand-wordmark { font-family:'Dancing Script', cursive; font-size:24px; color:#0f172a; line-height:1; }
+    .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
+    .back-link { color:#7c3aed; text-decoration:none; font-size:14px; font-weight:600; }
+    .hero { text-align:center; padding:48px 20px 20px; }
+    .hero h1 { font-size:34px; margin:0 0 10px; font-weight:800; color:#0f172a; }
+    .hero .sub { color:#64748b; font-size:17px; margin:0 0 8px; }
+    .version-chip { display:inline-block; background:#f3e8ff; color:#7c3aed; font-size:13px; font-weight:700; padding:4px 12px; border-radius:999px; margin-top:6px; }
+    .dl-container { max-width:620px; margin:20px auto 0; padding:0 20px; }
+    .dl-card { background:linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%); color:#fff; border-radius:20px; padding:36px 28px; text-align:center; box-shadow:0 12px 32px rgba(124,58,237,.25); }
+    .dl-card h2 { margin:0 0 8px; font-size:23px; font-weight:800; }
+    .dl-card p { margin:0 0 20px; opacity:.9; font-size:14px; }
+    .dl-btn { display:inline-flex; align-items:center; gap:10px; background:#fff; color:#7c3aed; padding:16px 36px; border-radius:12px; font-size:17px; font-weight:800; text-decoration:none; transition:transform .1s, box-shadow .1s; }
+    .dl-btn:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.2); }
+    .size-note { font-size:12px; opacity:.75; margin-top:12px; }
+    .steps { max-width:620px; margin:36px auto; background:#fff; border-radius:16px; padding:28px; border:1px solid #e5e7eb; }
+    .steps h3 { margin:0 0 22px; font-size:18px; font-weight:800; color:#0f172a; }
+    .step-row { display:flex; gap:14px; padding:14px 0; border-bottom:1px solid #f1f5f9; }
+    .step-row:last-child { border-bottom:none; }
+    .step-num { flex:0 0 32px; height:32px; background:#7c3aed; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; }
+    .step-content b { font-size:14px; color:#0f172a; }
+    .step-content .step-sub { color:#64748b; font-size:13px; margin-top:4px; line-height:1.5; }
+    .step-content code { background:#f3e8ff; color:#5b21b6; padding:2px 6px; border-radius:4px; font-size:12px; }
+    .info-card { max-width:620px; margin:0 auto 36px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:20px 22px; }
+    .info-card h4 { margin:0 0 8px; color:#166534; font-size:15px; font-weight:800; }
+    .info-card p { margin:0; color:#166534; font-size:13px; line-height:1.6; }
+    .support { text-align:center; margin:20px auto 40px; font-size:13px; color:#64748b; }
+    .support a { color:#7c3aed; font-weight:700; text-decoration:none; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+  <a href="/skuwise/" class="back-link">Open SKU Wise dashboard &rarr;</a>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Cursive Analyst</h1>
+    <p class="sub">Auto-syncs your marketplace orders, returns, payments &amp; stock to your dashboard.</p>
+    <div class="version-chip">Windows &middot; v1.0.0</div>
+  </div>
+
+  <div class="dl-container">
+    <div class="dl-card">
+      <h2>Download Installer</h2>
+      <p>~85 MB &middot; Works on Windows 10 &amp; 11</p>
+      <a class="dl-btn" href="https://github.com/ankit03sethi/cursive-analyst-releases/releases/latest/download/Cursive-Analyst-Setup-1.0.0.exe" download>
+        <span style="font-size:22px;">&#11015;</span>
+        <span>Download for Windows</span>
+      </a>
+      <div class="size-note">Sign into cursive.world first, then click to download.</div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <h3>How it works</h3>
+    <div class="step-row">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <b>Install &amp; sign in</b>
+        <div class="step-sub">Double-click the installer. Silent install (~10 sec). Sign in with your cursive.world email. App runs in system tray, invisible otherwise.</div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <b>App auto-creates a folder per company</b>
+        <div class="step-sub">The app reads your company list from cursive.world and creates <code>C:\Users\&lt;you&gt;\SellerOps\&lt;CompanyName&gt;\</code> for each one.</div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <b>Point each Chrome profile to its company folder</b>
+        <div class="step-sub">One-time: in each Chrome profile Settings &rarr; Downloads &rarr; set Location to the matching <code>SellerOps\&lt;Company&gt;\</code> folder. Takes 30 seconds per profile.</div>
+      </div>
+    </div>
+    <div class="step-row">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <b>Just download files &mdash; done</b>
+        <div class="step-sub">Click Download on Amazon / Flipkart / Meesho / FirstCry / Myntra seller panels. Files auto-flow to Cursive Analyst, get tagged with company + platform, appear in your SKU Wise dashboard within seconds.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-card">
+    <h4>&#10004; Zero maintenance</h4>
+    <p>
+      &bull; Runs invisibly in system tray, auto-starts with Windows.<br>
+      &bull; When we ship an update, it auto-installs silently.<br>
+      &bull; Never touches your Chrome logins or marketplace accounts.<br>
+      &bull; Adds a new company later? Add on cursive.world; folder appears automatically.
+    </p>
+  </div>
+
+  <div class="support">
+    Need help? WhatsApp <a href="https://wa.me/919625737475?text=Hi%2C%20please%20help%20me%20install%20Cursive%20Analyst">+91 96257 37475</a>
+    &middot; Email <a href="mailto:contact@cursive.world">contact@cursive.world</a>
+  </div>
+</main>
+
+<!-- Subscription gate — checks that the signed-in user has a valid 30-day Cursive Analyst purchase.
+     If not, bounces them to /home so they can pay. -->
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      location.href = "/home/?return=%2Fanalyst%2F";
+      return;
+    }
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await sb
+      .from("analytics_wallet_transactions")
+      .select("id, created_at")
+      .eq("user_id", session.user.id)
+      .eq("type", "debit_service")
+      .eq("service_tag", "analyst")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (!rows || rows.length === 0) {
+      // No active subscription — send to home page to buy
+      location.href = "/home/?service=analyst";
+      return;
+    }
+    const paidAt = new Date(rows[0].created_at);
+    const expiresAt = new Date(paidAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const daysLeft = Math.max(0, Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
+    // Show a small "subscription active" chip near the top
+    const chip = document.createElement("div");
+    chip.style.cssText = "max-width:620px;margin:0 auto 12px;padding:8px 14px;background:#dcfce7;color:#166534;border-radius:10px;font-size:13px;font-weight:700;text-align:center;border:1px solid #86efac;";
+    chip.innerHTML = "&#10004; Subscription active &middot; " + daysLeft + " day" + (daysLeft === 1 ? "" : "s") + " left";
+    const hero = document.querySelector(".hero");
+    if (hero && hero.parentNode) hero.parentNode.insertBefore(chip, hero.nextSibling);
+  })();
+</script>
+
+</body>
+</html>
