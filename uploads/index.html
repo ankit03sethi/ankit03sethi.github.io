@@ -85,12 +85,12 @@
     .co-add { padding:10px 16px; background:#eff6ff; color:#1f6feb; border:1px dashed #1f6feb; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; width:100%; text-align:center; }
     .co-add:hover { background:#dbeafe; }
 
-    /* Filter chips */
-    .filter-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
-    .filter-row .flt-label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; margin-right:4px; }
-    .flt-chip { padding:5px 12px; font-size:12px; font-weight:700; border-radius:999px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; color:#0f172a; }
-    .flt-chip:hover { border-color:#1f6feb; color:#1f6feb; }
-    .flt-chip.on { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    /* Filter dropdowns */
+    .filter-bar { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+    .filter-bar .flt-group { display:flex; align-items:center; gap:6px; }
+    .filter-bar .flt-label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+    .filter-bar .flt-select { font:inherit; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; font-size:13px; color:#0f172a; cursor:pointer; min-width:170px; }
+    .filter-bar .flt-select:focus { outline:none; border-color:#1f6feb; }
 
     /* One row per (company, platform) — uniform, no company separators */
     #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
@@ -255,8 +255,16 @@
         </div>
       </div>
 
-      <div class="filter-row" id="companyFilterRow"><span class="flt-label">Company</span></div>
-      <div class="filter-row" id="platformFilterRow"><span class="flt-label">Platform</span></div>
+      <div class="filter-bar">
+        <div class="flt-group">
+          <span class="flt-label">Company</span>
+          <select class="flt-select" id="companyFilterSel"><option value="">All companies</option></select>
+        </div>
+        <div class="flt-group">
+          <span class="flt-label">Platform</span>
+          <select class="flt-select" id="platformFilterSel"><option value="">All platforms</option></select>
+        </div>
+      </div>
 
       <div id="ordersPickerList"></div>
     </div>
@@ -407,36 +415,18 @@
   function buildFilterChips(list) {
     const uniqPlats = new Set();
     list.forEach(c => (c.platforms || []).forEach(p => uniqPlats.add(p)));
-    // Company chips
-    const cRow = $("#companyFilterRow");
-    cRow.querySelectorAll(".flt-chip").forEach(x => x.remove());
-    const cAll = mkChip("All", "", ordersFilterCompany === "");
-    cAll.addEventListener("click", () => { ordersFilterCompany = ""; buildFilterChips(list); renderOrdersPickerList(list); });
-    cRow.appendChild(cAll);
-    list.forEach(c => {
-      const chip = mkChip(c.name, c.name, ordersFilterCompany === c.name);
-      chip.addEventListener("click", () => { ordersFilterCompany = c.name; buildFilterChips(list); renderOrdersPickerList(list); });
-      cRow.appendChild(chip);
-    });
-    // Platform chips
-    const pRow = $("#platformFilterRow");
-    pRow.querySelectorAll(".flt-chip").forEach(x => x.remove());
-    const pAll = mkChip("All", "", ordersFilterPlatform === "");
-    pAll.addEventListener("click", () => { ordersFilterPlatform = ""; buildFilterChips(list); renderOrdersPickerList(list); });
-    pRow.appendChild(pAll);
-    PLATFORMS.filter(p => uniqPlats.has(p)).forEach(p => {
-      const chip = mkChip(PLAT_LABEL[p], p, ordersFilterPlatform === p);
-      chip.addEventListener("click", () => { ordersFilterPlatform = p; buildFilterChips(list); renderOrdersPickerList(list); });
-      pRow.appendChild(chip);
-    });
-  }
-  function mkChip(label, value, on) {
-    const b = document.createElement("button");
-    b.className = "flt-chip" + (on ? " on" : "");
-    b.type = "button";
-    b.dataset.val = value;
-    b.textContent = label;
-    return b;
+    // Company dropdown
+    const cSel = $("#companyFilterSel");
+    cSel.innerHTML = `<option value="">All companies</option>` +
+      list.map(c => `<option value="${escapeHtml(c.name)}"${ordersFilterCompany === c.name ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+    cSel.onchange = () => { ordersFilterCompany = cSel.value; renderOrdersPickerList(list); };
+    // Platform dropdown
+    const pSel = $("#platformFilterSel");
+    pSel.innerHTML = `<option value="">All platforms</option>` +
+      PLATFORMS.filter(p => uniqPlats.has(p))
+               .map(p => `<option value="${p}"${ordersFilterPlatform === p ? " selected" : ""}>${escapeHtml(PLAT_LABEL[p])}</option>`)
+               .join("");
+    pSel.onchange = () => { ordersFilterPlatform = pSel.value; renderOrdersPickerList(list); };
   }
   function renderOrdersPickerList(list) {
     const wrap = $("#ordersPickerList");
