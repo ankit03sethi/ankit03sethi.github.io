@@ -252,6 +252,10 @@
   const PLAT_LABEL = { amazon:"Amazon", flipkart:"Flipkart", meesho:"Meesho", myntra:"Myntra", firstcry:"FirstCry" };
   let companies = []; // [{ id, name, platforms:[] }]
 
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
   (async () => {
     const { data } = await sb.auth.getSession();
     if (!data.session) { location.href = "/home/?return=%2Fuploads%2F"; return; }
