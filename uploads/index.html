@@ -58,6 +58,37 @@
       .up-actions .up-btn { flex:1; }
     }
 
+    .top-actions { padding: 16px 28px 0; display:flex; gap:10px; flex-wrap:wrap; }
+    .top-actions .btn { font: inherit; padding:10px 16px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:13px; font-weight:700; color:#0f172a; display:inline-flex; align-items:center; gap:8px; }
+    .top-actions .btn.primary { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .top-actions .btn:hover { border-color:#1f6feb; color:#1f6feb; background:#eff6ff; }
+    .top-actions .btn.primary:hover { background:#1651a8; color:#fff; }
+
+    /* Modal */
+    .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:60; display:none; align-items:center; justify-content:center; padding:20px; }
+    .modal-bg.show { display:flex; }
+    .modal { background:#fff; max-width:640px; width:100%; border-radius:16px; overflow:hidden; max-height:90vh; display:flex; flex-direction:column; }
+    .modal-head { padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+    .modal-head h3 { margin:0; font-size:18px; }
+    .modal-head .x { cursor:pointer; background:none; border:none; font-size:24px; color:#64748b; line-height:1; }
+    .modal-body { padding:16px 20px; overflow:auto; flex:1; }
+    .modal-foot { padding:12px 20px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:8px; }
+
+    .co-row { display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:8px; flex-wrap:wrap; }
+    .co-row input[type="text"] { font:inherit; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; min-width:160px; flex:1; }
+    .co-row .plats { display:flex; gap:6px; flex-wrap:wrap; }
+    .co-plat { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:999px; font-size:12px; font-weight:600; color:#64748b; cursor:pointer; user-select:none; }
+    .co-plat input { margin:0; accent-color:#1f6feb; }
+    .co-plat.on { background:#eff6ff; border-color:#1f6feb; color:#1f6feb; }
+    .co-del { background:transparent; border:none; color:#dc2626; cursor:pointer; font-size:18px; padding:4px 8px; }
+    .co-del:hover { background:#fef2f2; border-radius:6px; }
+    .co-add { padding:10px 16px; background:#eff6ff; color:#1f6feb; border:1px dashed #1f6feb; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; width:100%; text-align:center; }
+    .co-add:hover { background:#dbeafe; }
+
+    .picker-row { display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:8px; }
+    .picker-row label { font-size:13px; font-weight:600; color:#0f172a; min-width:80px; }
+    .picker-row select { font:inherit; padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; flex:1; }
+
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
     #locker.show { display:flex; }
     .lock-card { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
@@ -93,7 +124,11 @@
   </div>
 </header>
 
-<div class="panel" style="margin-top:20px;">
+<div class="top-actions">
+  <button class="btn primary" id="openCompaniesBtn">&#127970; Companies <span id="companiesCount" style="font-weight:600; opacity:.8;"></span></button>
+</div>
+
+<div class="panel" style="margin-top:16px;">
   <div class="up-status" id="upStatus"></div>
   <div class="up-list">
 
@@ -119,6 +154,80 @@
     </div>
     <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
+    <div class="up-item" id="ordersRow" style="display:none;">
+      <div class="up-left">
+        <div class="up-icon">&#128179;</div>
+        <div>
+          <div class="up-name">Orders CSV</div>
+          <div class="up-desc">Upload marketplace order CSVs for one of your companies &amp; platforms.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none" id="ordersFileStamp">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary" id="ordersUploadBtn">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+    <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt" style="display:none;" />
+
+    <div class="up-item" id="ordersHint" style="display:none;">
+      <div class="up-left">
+        <div class="up-icon" style="background:#fef9c3; color:#a16207;">&#9888;&#65039;</div>
+        <div>
+          <div class="up-name">Add a company first</div>
+          <div class="up-desc">Click <b>Companies</b> above, add at least one company with its platforms, then Orders CSV upload will appear here.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- COMPANIES MODAL -->
+<div class="modal-bg" id="companiesModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Companies</h3>
+      <button class="x" id="companiesClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px; color:#64748b; font-size:13px;">Add each of your companies and tick the platforms it sells on. The Cursive Analyst desktop app will auto-create a folder for each company on your PC.</p>
+      <div id="companiesList"></div>
+      <button class="co-add" id="companiesAddBtn">+ Add another company</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="companiesCancelBtn">Cancel</button>
+      <button class="btn primary" id="companiesSaveBtn">Save companies</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORDERS UPLOAD PICKER MODAL -->
+<div class="modal-bg" id="ordersPickerModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Upload Orders CSV</h3>
+      <button class="x" id="ordersPickerClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px; color:#64748b; font-size:13px;">Pick which company and platform this file belongs to. Then choose a CSV/XLSX and it will be tagged automatically.</p>
+      <div class="picker-row">
+        <label>Company</label>
+        <select id="ordersCompanySel"></select>
+      </div>
+      <div class="picker-row">
+        <label>Platform</label>
+        <select id="ordersPlatformSel"></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="ordersPickerCancelBtn">Cancel</button>
+      <button class="btn primary" id="ordersPickerNextBtn">Pick file &rarr;</button>
+    </div>
   </div>
 </div>
 
@@ -139,6 +248,10 @@
   const $ = (s) => document.querySelector(s);
   let session = null;
 
+  const PLATFORMS = ["amazon","flipkart","meesho","myntra","firstcry"];
+  const PLAT_LABEL = { amazon:"Amazon", flipkart:"Flipkart", meesho:"Meesho", myntra:"Myntra", firstcry:"FirstCry" };
+  let companies = []; // [{ id, name, platforms:[] }]
+
   (async () => {
     const { data } = await sb.auth.getSession();
     if (!data.session) { location.href = "/home/?return=%2Fuploads%2F"; return; }
@@ -151,7 +264,203 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await refreshMasterStamp();
+    await loadCompanies();
+    await refreshOrdersStamp();
   })();
+
+  // ---- COMPANIES ----
+  async function loadCompanies() {
+    const { data, error } = await sb.from("seller_companies")
+      .select("id, name, platforms").eq("user_id", session.user.id).order("name");
+    if (error) { console.warn(error); return; }
+    companies = (data || []).map(c => ({ id: c.id, name: c.name, platforms: c.platforms || [] }));
+    $("#companiesCount").textContent = companies.length ? "(" + companies.length + ")" : "";
+    // Toggle orders row visibility
+    const anyPlat = companies.some(c => (c.platforms || []).length > 0);
+    $("#ordersRow").style.display  = anyPlat ? "" : "none";
+    $("#ordersHint").style.display = anyPlat ? "none" : "";
+  }
+
+  function renderCompaniesList() {
+    const wrap = $("#companiesList");
+    wrap.innerHTML = "";
+    // Draft copy so edits happen only on Save
+    if (!renderCompaniesList._draft) renderCompaniesList._draft = deepClone(companies);
+    const draft = renderCompaniesList._draft;
+    draft.forEach((c, i) => wrap.appendChild(buildCompanyRow(c, i)));
+  }
+  function buildCompanyRow(c, i) {
+    const row = document.createElement("div");
+    row.className = "co-row";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text"; nameInput.placeholder = "Company name"; nameInput.value = c.name || "";
+    nameInput.addEventListener("input", () => { c.name = nameInput.value; });
+    row.appendChild(nameInput);
+    const plats = document.createElement("div"); plats.className = "plats";
+    for (const p of PLATFORMS) {
+      const lbl = document.createElement("label");
+      lbl.className = "co-plat" + ((c.platforms || []).includes(p) ? " on" : "");
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = (c.platforms || []).includes(p);
+      cb.addEventListener("change", () => {
+        const set = new Set(c.platforms || []);
+        if (cb.checked) set.add(p); else set.delete(p);
+        c.platforms = [...set];
+        lbl.classList.toggle("on", cb.checked);
+      });
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(" " + PLAT_LABEL[p]));
+      plats.appendChild(lbl);
+    }
+    row.appendChild(plats);
+    const del = document.createElement("button"); del.className = "co-del"; del.type = "button"; del.textContent = "✕"; del.title = "Remove";
+    del.addEventListener("click", () => {
+      const draft = renderCompaniesList._draft;
+      draft.splice(i, 1);
+      renderCompaniesList();
+    });
+    row.appendChild(del);
+    return row;
+  }
+  function deepClone(x) { return JSON.parse(JSON.stringify(x)); }
+
+  $("#openCompaniesBtn").addEventListener("click", () => {
+    renderCompaniesList._draft = deepClone(companies);
+    if (renderCompaniesList._draft.length === 0) renderCompaniesList._draft.push({ name: "", platforms: [] });
+    renderCompaniesList();
+    $("#companiesModal").classList.add("show");
+  });
+  $("#companiesClose").addEventListener("click", () => $("#companiesModal").classList.remove("show"));
+  $("#companiesCancelBtn").addEventListener("click", () => $("#companiesModal").classList.remove("show"));
+  $("#companiesAddBtn").addEventListener("click", () => {
+    renderCompaniesList._draft.push({ name: "", platforms: [] });
+    renderCompaniesList();
+  });
+  $("#companiesSaveBtn").addEventListener("click", async () => {
+    const draft = (renderCompaniesList._draft || []).filter(c => (c.name || "").trim());
+    const uid = session.user.id;
+    // Wipe old and re-insert (simple + safe since we always work off draft)
+    const { error: delErr } = await sb.from("seller_companies").delete().eq("user_id", uid);
+    if (delErr) { alert("Save failed: " + delErr.message); return; }
+    if (draft.length > 0) {
+      const payload = draft.map(c => ({ user_id: uid, name: c.name.trim(), platforms: (c.platforms || []) }));
+      const { error: insErr } = await sb.from("seller_companies").insert(payload);
+      if (insErr) { alert("Save failed: " + insErr.message); return; }
+    }
+    $("#companiesModal").classList.remove("show");
+    await loadCompanies();
+    setStatus("Companies saved. Cursive Analyst desktop app will pick up the changes within 5 minutes.", false);
+  });
+
+  // ---- ORDERS CSV UPLOAD ----
+  $("#ordersUploadBtn").addEventListener("click", () => {
+    // Populate company dropdown
+    const anyPlat = companies.filter(c => (c.platforms || []).length > 0);
+    if (anyPlat.length === 0) { alert("Add at least one company with platforms first."); return; }
+    const cs = $("#ordersCompanySel");
+    cs.innerHTML = anyPlat.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("");
+    updateOrdersPlatformDropdown();
+    cs.onchange = updateOrdersPlatformDropdown;
+    $("#ordersPickerModal").classList.add("show");
+  });
+  function updateOrdersPlatformDropdown() {
+    const name = $("#ordersCompanySel").value;
+    const c = companies.find(x => x.name === name);
+    const plats = (c && c.platforms) ? c.platforms : [];
+    $("#ordersPlatformSel").innerHTML = plats.map(p => `<option value="${p}">${escapeHtml(PLAT_LABEL[p] || p)}</option>`).join("");
+  }
+  $("#ordersPickerClose").addEventListener("click", () => $("#ordersPickerModal").classList.remove("show"));
+  $("#ordersPickerCancelBtn").addEventListener("click", () => $("#ordersPickerModal").classList.remove("show"));
+  $("#ordersPickerNextBtn").addEventListener("click", () => {
+    const company = $("#ordersCompanySel").value;
+    const platform = $("#ordersPlatformSel").value;
+    if (!company || !platform) { alert("Pick company + platform first."); return; }
+    $("#ordersPickerModal").classList.remove("show");
+    // Stash for the file input handler
+    $("#ordersFileInput").dataset.company = company;
+    $("#ordersFileInput").dataset.platform = platform;
+    $("#ordersFileInput").click();
+  });
+  $("#ordersFileInput").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const company = e.target.dataset.company;
+    const platform = e.target.dataset.platform;
+    setStatus("Reading " + f.name + " …", false);
+    try {
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (rows.length === 0) { setStatus("File is empty.", true); return; }
+      const uid = session.user.id;
+      // Try to detect an order date column; else leave null
+      const dateCol = detectDateColumn(Object.keys(rows[0]), ["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"]);
+      const payload = rows.map(r => ({
+        user_id: uid,
+        year: dateCol ? parseYear(r[dateCol]) : null,
+        order_date: dateCol ? parseDate(r[dateCol]) : null,
+        company_name: company,
+        platform: platform,
+        source_file: f.name,
+        raw_data: r,
+      }));
+      setStatus(`Uploading ${payload.length} orders …`, false);
+      const CHUNK = 400;
+      let done = 0;
+      for (let i = 0; i < payload.length; i += CHUNK) {
+        const slice = payload.slice(i, i + CHUNK);
+        const { error } = await sb.from("seller_orders").insert(slice);
+        if (error) { setStatus("Upload error: " + error.message, true); return; }
+        done += slice.length;
+        setStatus(`Uploading … ${done} / ${payload.length}`, false);
+      }
+      setStatus(`✅ Uploaded ${payload.length} orders (${PLAT_LABEL[platform]} · ${company}) from ${f.name}.`, false);
+      await refreshOrdersStamp();
+    } catch (err) {
+      console.error(err);
+      setStatus("Failed to parse file: " + (err.message || err), true);
+    } finally {
+      e.target.value = "";
+      delete e.target.dataset.company;
+      delete e.target.dataset.platform;
+    }
+  });
+
+  function detectDateColumn(headers, candidates) {
+    for (const h of headers) {
+      const n = norm(h);
+      if (candidates.some(c => n === norm(c))) return h;
+    }
+    return null;
+  }
+  function parseDate(v) {
+    if (!v) return null;
+    if (v instanceof Date) return v.toISOString();
+    const s = String(v).trim();
+    if (!s) return null;
+    // Try ISO / IST formats
+    const iso = new Date(s);
+    if (!isNaN(iso)) return iso.toISOString();
+    return null;
+  }
+  function parseYear(v) {
+    const d = parseDate(v);
+    return d ? new Date(d).getFullYear() : null;
+  }
+
+  async function refreshOrdersStamp() {
+    if (!session) return;
+    const { data } = await sb.from("seller_orders")
+      .select("pushed_at, source_file, company_name, platform")
+      .eq("user_id", session.user.id)
+      .order("pushed_at", { ascending: false })
+      .limit(1);
+    const el = $("#ordersFileStamp");
+    if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); return; }
+    const dt = new Date(data[0].pushed_at);
+    el.classList.remove("none");
+    el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    el.title = (data[0].company_name || "") + " · " + (PLAT_LABEL[data[0].platform] || data[0].platform || "") + (data[0].source_file ? "\n" + data[0].source_file : "");
+  }
 
   // Sample button → downloads pre-built .xlsx with header, dropdowns, auto S.NO
   $("#masterSampleBtn").addEventListener("click", () => {
