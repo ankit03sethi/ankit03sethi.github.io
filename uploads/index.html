@@ -89,7 +89,6 @@
     #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
     .combo-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:#fff; border-bottom:1px solid #f1f5f9; }
     .combo-row:last-child { border-bottom:none; }
-    #ordersPickerList.reverse .combo-row { flex-direction:row-reverse; }
     .combo-row .cell-company { flex:1; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
     .combo-row .cell-company::before { content:"🏢"; font-size:15px; }
     .combo-row .cell-platform { flex:1; font-size:14px; font-weight:600; color:#0f172a; display:flex; align-items:center; gap:6px; }
@@ -391,21 +390,40 @@
   });
   function renderOrdersPickerList(list) {
     const wrap = $("#ordersPickerList");
+    const reversed = wrap.classList.contains("reverse");
+
     // Flatten to one row per (company, platform)
     const rows = [];
     list.forEach(c => {
       const plats = PLATFORMS.filter(p => (c.platforms || []).includes(p));
-      plats.forEach((p, idx) => rows.push({ company: c.name, platform: p, first: idx === 0 }));
+      plats.forEach(p => rows.push({ company: c.name, platform: p }));
     });
-    const html = rows.map(r => `
-      <div class="combo-row">
-        <div class="cell-company">${escapeHtml(r.company)}</div>
-        <div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>
-        <div class="cell-action">
+
+    // Sort: default groups by company then platform; reverse groups by platform then company
+    if (reversed) {
+      const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
+      rows.sort((a, b) =>
+        (platOrder[a.platform] - platOrder[b.platform]) ||
+        a.company.localeCompare(b.company)
+      );
+    } else {
+      const companyOrder = Object.fromEntries(list.map((c, i) => [c.name, i]));
+      const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
+      rows.sort((a, b) =>
+        (companyOrder[a.company] - companyOrder[b.company]) ||
+        (platOrder[a.platform] - platOrder[b.platform])
+      );
+    }
+
+    // In reverse mode, platform cell shows first (left)
+    const html = rows.map(r => {
+      const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
+      const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>`;
+      const actionCell = `<div class="cell-action">
           <button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>
-        </div>
-      </div>
-    `).join("");
+        </div>`;
+      return `<div class="combo-row">${reversed ? platformCell + companyCell : companyCell + platformCell}${actionCell}</div>`;
+    }).join("");
     wrap.innerHTML = html;
     wrap.querySelectorAll(".up-mini").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -423,8 +441,10 @@
   $("#reverseLayoutBtn").addEventListener("click", () => {
     const list = $("#ordersPickerList");
     list.classList.toggle("reverse");
-    // Remember user preference
     try { localStorage.setItem("uploads_reverse", list.classList.contains("reverse") ? "1" : "0"); } catch(_) {}
+    // Re-render so the grouping actually changes (Company-first vs Platform-first)
+    const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+    if (withPlats.length > 0) renderOrdersPickerList(withPlats);
   });
   // Restore preference on load
   try { if (localStorage.getItem("uploads_reverse") === "1") $("#ordersPickerList").classList.add("reverse"); } catch(_) {}
