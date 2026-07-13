@@ -16,12 +16,12 @@
     a { color: inherit; }
     .topbar { display:flex; align-items:center; justify-content:space-between; padding: 14px 28px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:10; }
     .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
-    .brand-box { width:40px; height:40px; background:#7c3aed; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+    .brand-box { width:40px; height:40px; background:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; }
     .brand-wordmark { font-family:'Dancing Script', cursive; font-size:22px; color:#0f172a; line-height:1; }
     .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
     .topbar-right { display:flex; align-items:center; gap:14px; font-size:13px; }
     .email-chip { color:#64748b; }
-    .btn-link { color:#7c3aed; text-decoration:none; font-weight:600; }
+    .btn-link { color:#1f6feb; text-decoration:none; font-weight:600; }
 
     .hero { padding:28px 28px 8px; }
     .hero h1 { margin:0 0 4px; font-size:24px; font-weight:800; }
@@ -30,13 +30,13 @@
     .controls { display:flex; align-items:center; gap:12px; padding:14px 28px 6px; flex-wrap:wrap; }
     .ctrl-lbl { font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
     select, button.btn { font: inherit; padding:8px 12px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
-    button.btn.primary { background:#7c3aed; color:#fff; border-color:#7c3aed; font-weight:700; }
-    button.btn.primary:hover { background:#6d28d9; }
+    button.btn.primary { background:#1f6feb; color:#fff; border-color:#1f6feb; font-weight:700; }
+    button.btn.primary:hover { background:#1651a8; }
 
     .tabs { display:flex; gap:4px; padding:14px 28px 0; border-bottom:1px solid #e5e7eb; overflow-x:auto; }
     .tab { padding:10px 16px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
     .tab:hover { color:#0f172a; }
-    .tab.active { color:#7c3aed; border-bottom-color:#7c3aed; }
+    .tab.active { color:#1f6feb; border-bottom-color:#1f6feb; }
 
     .platform-row { display:flex; gap:6px; padding:12px 28px 0; flex-wrap:wrap; }
     .plat-chip { padding:6px 12px; font-size:12px; font-weight:700; border-radius:999px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; color:#0f172a; }
@@ -54,27 +54,41 @@
     table.data { width:100%; border-collapse:collapse; font-size:13px; }
     table.data th, table.data td { padding:9px 12px; text-align:left; border-bottom:1px solid #f1f5f9; }
     table.data thead th { background:#f8fafc; color:#64748b; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.5px; position:sticky; top:0; }
-    table.data tbody tr:hover { background:#faf5ff; }
+    table.data tbody tr:hover { background:#eff6ff; }
     .muted { color:#94a3b8; font-style:italic; }
     .empty { padding:36px 20px; text-align:center; color:#64748b; }
     .empty h3 { margin:0 0 8px; color:#0f172a; }
-    .empty .empty-cta { display:inline-block; margin-top:12px; padding:10px 18px; background:#7c3aed; color:#fff; border-radius:8px; text-decoration:none; font-weight:700; }
+    .empty .empty-cta { display:inline-block; margin-top:12px; padding:10px 18px; background:#1f6feb; color:#fff; border-radius:8px; text-decoration:none; font-weight:700; }
 
     /* Uploads section */
     .up-list { padding:8px 8px 16px; }
-    .up-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background .1s; }
+    .up-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid #f1f5f9; }
     .up-item:last-child { border-bottom:none; }
-    .up-item:hover { background:#faf5ff; }
     .up-left { display:flex; align-items:center; gap:14px; min-width:0; }
-    .up-icon { width:42px; height:42px; background:#f3e8ff; color:#7c3aed; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+    .up-icon { width:42px; height:42px; background:#dbeafe; color:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
     .up-name { font-size:15px; font-weight:700; color:#0f172a; }
     .up-desc { font-size:12px; color:#64748b; margin-top:2px; }
-    .up-right { text-align:right; font-size:12px; color:#64748b; }
-    .up-right .stamp { color:#0f172a; font-weight:600; }
-    .up-right .stamp.none { color:#94a3b8; font-style:italic; font-weight:normal; }
+    .up-right { display:flex; align-items:center; gap:16px; }
+    .up-stamp-box { text-align:right; font-size:12px; color:#64748b; }
+    .up-stamp-box .stamp { color:#0f172a; font-weight:600; }
+    .up-stamp-box .stamp.none { color:#94a3b8; font-style:italic; font-weight:normal; }
+    .up-actions { display:flex; gap:8px; }
+    .up-btn { font: inherit; padding:8px 14px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:#0f172a; white-space:nowrap; }
+    .up-btn:hover { background:#eff6ff; border-color:#1f6feb; color:#1f6feb; }
+    .up-btn.primary { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .up-btn.primary:hover { background:#1651a8; color:#fff; }
+    .up-btn.ghost { background:transparent; border-color:#cbd5e1; color:#475569; }
+    .up-btn.ghost:hover { border-color:#1f6feb; color:#1f6feb; background:#eff6ff; }
+    .up-btn:disabled { opacity:.5; cursor:not-allowed; }
     .up-status { padding:12px 20px; background:#f0fdf4; border-top:1px solid #bbf7d0; font-size:13px; color:#166534; font-weight:600; display:none; }
     .up-status.err { background:#fef2f2; border-top-color:#fecaca; color:#991b1b; }
     .up-status.show { display:block; }
+    @media (max-width: 720px) {
+      .up-item { flex-direction:column; align-items:stretch; }
+      .up-right { flex-direction:column; align-items:stretch; gap:10px; }
+      .up-actions { justify-content:stretch; }
+      .up-actions .up-btn { flex:1; }
+    }
 
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
     #locker.show { display:flex; }
@@ -160,19 +174,26 @@
     <div class="up-status" id="upStatus"></div>
     <div class="up-list">
 
-      <label class="up-item" for="masterFileInput">
+      <div class="up-item">
         <div class="up-left">
           <div class="up-icon">&#128193;</div>
           <div>
             <div class="up-name">Master SKU file</div>
-            <div class="up-desc">Upload the Excel/CSV that maps each platform SKU to your Master SKU + brand, category, HSN.</div>
+            <div class="up-desc">Maps each platform SKU to your Master SKU + brand, category, HSN.</div>
           </div>
         </div>
         <div class="up-right">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
-          <div class="stamp none" id="masterFileStamp">Never</div>
+          <div class="up-stamp-box">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+            <div class="stamp none" id="masterFileStamp">Never</div>
+          </div>
+          <div class="up-actions">
+            <button class="up-btn ghost" id="masterSampleBtn" title="Download a blank template with example rows">&#128196; Sample</button>
+            <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
+            <button class="up-btn primary" id="masterUploadBtn">&#8593; Upload</button>
+          </div>
         </div>
-      </label>
+      </div>
       <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
     </div>
@@ -184,7 +205,7 @@
   <div class="lock-card">
     <h3>Cursive Analyst subscription required</h3>
     <p>This dashboard reads data uploaded by the Cursive Analyst desktop app.<br>Subscribe once, install the app, and your marketplace data flows here automatically.</p>
-    <a class="empty-cta" style="display:inline-block; padding:10px 20px; background:#7c3aed; color:#fff; border-radius:8px; text-decoration:none; font-weight:700;" href="/home/?service=analyst">Subscribe &#8377;4999 / 30 days</a>
+    <a class="empty-cta" style="display:inline-block; padding:10px 20px; background:#1f6feb; color:#fff; border-radius:8px; text-decoration:none; font-weight:700;" href="/home/?service=analyst">Subscribe &#8377;4999 / 30 days</a>
   </div>
 </div>
 
@@ -412,6 +433,81 @@
 
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
   const matchHeader = (h, list) => list.some(x => norm(h) === norm(x));
+
+  // Upload button → triggers hidden file input
+  document.getElementById("masterUploadBtn").addEventListener("click", () => {
+    document.getElementById("masterFileInput").click();
+  });
+
+  // Sample button → downloads the pre-built .xlsx with header, dropdowns and auto S.NO
+  document.getElementById("masterSampleBtn").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = "/skuwisedata/master_sku_sample.xlsx";
+    a.download = "Master SKU Sample.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setStatus("Sample template downloading. Open it, fill your SKUs (dropdowns will guide you), then upload it back.", false);
+  });
+
+  // Download button → exports current mappings as wide-format xlsx
+  document.getElementById("masterDownloadBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("masterDownloadBtn");
+    btn.disabled = true;
+    btn.textContent = "Preparing…";
+    try {
+      // Pull ALL mappings for user (chunk if many)
+      const all = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await sb.from("seller_sku_master")
+          .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at")
+          .eq("user_id", state.session.user.id)
+          .order("master_sku", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) { setStatus("Download error: " + error.message, true); return; }
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+      }
+      if (all.length === 0) {
+        setStatus("Nothing to download yet — upload a Master SKU file first.", true);
+        return;
+      }
+      // Reshape long → wide: one row per master_sku with each platform SKU in its own column
+      const byMaster = new Map();
+      for (const r of all) {
+        if (!byMaster.has(r.master_sku)) {
+          byMaster.set(r.master_sku, {
+            "Master SKU": r.master_sku || "",
+            "Amazon SKU": "", "Flipkart SKU": "", "Meesho SKU": "", "Myntra SKU": "", "FirstCry SKU": "",
+            "Brand": r.brand || "", "Category": r.category || "", "Sub Category": r.sub_category || "",
+            "Color": r.color || "", "Product": r.product || "", "HSN": r.hsn || "",
+          });
+        }
+        const row = byMaster.get(r.master_sku);
+        const platCol = { amazon:"Amazon SKU", flipkart:"Flipkart SKU", meesho:"Meesho SKU", myntra:"Myntra SKU", firstcry:"FirstCry SKU" }[r.platform];
+        if (platCol) row[platCol] = r.seller_sku || "";
+        // Fill descriptive fields if missing (in case only one platform row had them)
+        for (const [k, src] of Object.entries({ "Brand":"brand","Category":"category","Sub Category":"sub_category","Color":"color","Product":"product","HSN":"hsn" })) {
+          if (!row[k] && r[src]) row[k] = r[src];
+        }
+      }
+      const wideRows = Array.from(byMaster.values());
+      const headers = ["Master SKU","Amazon SKU","Flipkart SKU","Meesho SKU","Myntra SKU","FirstCry SKU","Brand","Category","Sub Category","Color","Product","HSN"];
+      const aoa = [headers, ...wideRows.map(r => headers.map(h => r[h]))];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = headers.map(h => ({ wch: Math.max(14, h.length + 2) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Master SKU");
+      const stamp = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `master_sku_${stamp}.xlsx`);
+      setStatus(`Downloaded ${wideRows.length} master SKUs (${all.length} platform mappings).`, false);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "&#11015; Download";
+    }
+  });
 
   document.getElementById("masterFileInput").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
