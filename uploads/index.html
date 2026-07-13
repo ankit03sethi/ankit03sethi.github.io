@@ -68,7 +68,11 @@
 <body>
 
 <header class="topbar">
-  <a href="/home/" class="brand">
+  <div style="display:flex; align-items:center; gap:14px;">
+    <a href="/analyst/" title="Back" style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:10px; background:#eff6ff; color:#1f6feb; border:1px solid #dbeafe; text-decoration:none;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <a href="/home/" class="brand">
     <div class="brand-box">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 17 9 11 13 15 21 6"/>
@@ -80,6 +84,7 @@
       <div class="nav-sub">Uploads &middot; Cursive Analyst</div>
     </div>
   </a>
+  </div>
   <div class="topbar-right">
     <span class="email-chip" id="emailChip"></span>
     <a class="btn-link" href="/skuwisedata/">SKU Wise Data</a>
@@ -88,16 +93,7 @@
   </div>
 </header>
 
-<div class="hero">
-  <h1>Uploads</h1>
-  <p class="sub">Files you upload here power the SKU-level roll-ups on the SKU Wise Data dashboard.</p>
-</div>
-
-<div class="panel">
-  <div class="panel-head">
-    <span>Available uploads</span>
-    <span style="color:#94a3b8; font-weight:normal; font-size:12px;">Click an item to upload</span>
-  </div>
+<div class="panel" style="margin-top:20px;">
   <div class="up-status" id="upStatus"></div>
   <div class="up-list">
 
@@ -116,8 +112,8 @@
         </div>
         <div class="up-actions">
           <button class="up-btn" id="masterSampleBtn" title="Download a blank template with dropdowns">&#128196; Sample</button>
-          <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
           <button class="up-btn primary" id="masterUploadBtn">&#8593; Upload</button>
+          <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
         </div>
       </div>
     </div>
