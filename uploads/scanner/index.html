@@ -326,22 +326,46 @@
 
   $("#stopBtn").addEventListener("click", () => stopScanner());
 
-  // ---- Barcode index (any raw_data field value) ----
+  // ---- Barcode index (shipping-label fields only, per platform) ----
+  // These are the fields that appear as scannable barcodes on the physical shipping label.
+  // Order IDs / invoice numbers are ignored — packers scan the label, not the order.
+  const TRACKING_FIELDS = [
+    // Flipkart
+    "tracking id", "tracking-id", "trackingid",
+    // Meesho
+    "awb no", "awb number", "awbno", "awb",
+    "sub order no", "suborderno", "sub_order_no",
+    // Amazon
+    "tracking number", "amazon-order-id ship-track",
+    // Myntra
+    "waybill", "waybill number", "airway bill",
+    // FirstCry
+    "awb no.", "awb code",
+    // Generic
+    "tracking", "shipment tracking", "shipment id",
+  ];
+  const norm = (s) => String(s || "").trim().toLowerCase();
+
   function buildBarcodeIndex() {
     const map = new Map();
     for (const row of state.orders) {
       const rd = row.raw_data || {};
+      let indexed = false;
+      // Only iterate the TRACKING fields
       for (const [k, v] of Object.entries(rd)) {
         if (v === null || v === undefined) continue;
+        if (!TRACKING_FIELDS.includes(norm(k))) continue;
         const s = String(v).trim();
-        if (!s || s.length < 4) continue; // skip short values
-        if (/^__/.test(k)) continue; // skip our meta keys
+        if (!s || s.length < 4) continue;
         const key = s.toLowerCase();
-        // First occurrence wins (deterministic)
-        if (!map.has(key)) map.set(key, { row, field: k, value: s });
+        if (!map.has(key)) { map.set(key, { row, field: k, value: s }); indexed = true; }
       }
+      // Row had no tracking field at all → skip silently (won't be scannable)
+      if (!indexed) row._noTracking = true;
     }
     state.barcodeIndex = map;
+    const missing = state.orders.filter(r => r._noTracking).length;
+    if (missing > 0) console.warn(`${missing} rows have no Tracking ID field — not scannable.`);
   }
 
   // ---- Scanner ----
