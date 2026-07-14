@@ -69,14 +69,14 @@
   <div class="hero">
     <h1>Cursive Analyst</h1>
     <p class="sub">Auto-syncs your marketplace orders, returns, payments &amp; stock to your dashboard.</p>
-    <div class="version-chip">Windows &middot; v1.0.0</div>
+    <div class="version-chip" id="verChip">Windows &middot; latest</div>
   </div>
 
   <div class="dl-container">
     <div class="dl-card">
       <h2>Download Installer</h2>
       <p>~85 MB &middot; Works on Windows 10 &amp; 11</p>
-      <a class="dl-btn" href="https://github.com/ankit03sethi/cursive-analyst-releases/releases/latest/download/Cursive-Analyst-Setup-1.0.0.exe" download>
+      <a class="dl-btn" id="dlBtn" href="https://github.com/ankit03sethi/cursive-analyst-releases/releases/latest" download>
         <span style="font-size:22px;">&#11015;</span>
         <span>Download for Windows</span>
       </a>
@@ -134,6 +134,20 @@
 
 <!-- Subscription gate — checks that the signed-in user has a valid 30-day Cursive Analyst purchase.
      If not, bounces them to /home so they can pay. -->
+<script>
+  // Fetch the latest release info from GitHub so version + download link update automatically
+  fetch("https://api.github.com/repos/ankit03sethi/cursive-analyst-releases/releases/latest")
+    .then(r => r.ok ? r.json() : null)
+    .then(rel => {
+      if (!rel) return;
+      const ver = (rel.tag_name || "").replace(/^v/, "");
+      if (ver) document.getElementById("verChip").innerHTML = "Windows &middot; v" + ver;
+      const exe = (rel.assets || []).find(a => /\.exe$/i.test(a.name));
+      if (exe) document.getElementById("dlBtn").href = exe.browser_download_url;
+    })
+    .catch(() => { /* silent — fallback to /latest URL */ });
+</script>
+
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
