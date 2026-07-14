@@ -9,8 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/[email protected]/umd/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/[email protected]"></script>
+  <script src="https://unpkg.com/[email protected]/html5-qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
@@ -54,10 +53,9 @@
     .kpi.tot .val { color:#1f6feb; }
 
     /* Scanner */
-    .video-wrap { position:relative; width:100%; max-width:520px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000; aspect-ratio: 4/3; }
-    #reader { width:100%; height:100%; object-fit:cover; display:block; }
-    .scan-overlay { position:absolute; inset:0; pointer-events:none; }
-    .scan-frame { position:absolute; top:5%; left:5%; right:5%; bottom:5%; border:3px solid #1f6feb; border-radius:8px; }
+    .video-wrap { position:relative; width:100%; max-width:520px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000; }
+    #reader { border-radius:12px; }
+    #reader video { border-radius:12px; }
     .result-card { padding:16px; border-radius:12px; text-align:center; margin-bottom:12px; font-weight:800; font-size:18px; display:none; }
     .result-card.show { display:block; }
     .result-card.ok        { background:#dcfce7; color:#166534; border:2px solid #86efac; }
@@ -209,9 +207,8 @@
       <div class="result-card" id="resultCard"></div>
 
       <div class="video-wrap">
-        <video id="reader" playsinline muted></video>
-        <div class="scan-overlay"><div class="scan-frame"></div></div>
-        <div id="scanMode" style="position:absolute; top:6px; left:6px; padding:3px 8px; background:rgba(0,0,0,.6); color:#fff; font-size:10px; font-weight:600; border-radius:4px; pointer-events:none;">Starting…</div>
+        <div id="reader" style="width:100%; height:100%;"></div>
+        <div id="scanMode" style="position:absolute; top:6px; left:6px; padding:3px 8px; background:rgba(0,0,0,.6); color:#fff; font-size:10px; font-weight:600; border-radius:4px; pointer-events:none; z-index:5;">Starting…</div>
       </div>
 
       <div class="manual-row">
@@ -389,95 +386,75 @@
   }
 
   // ---- Scanner ----
-  // Scanner: tries native BarcodeDetector first (iOS 17+ Safari, all Chrome mobile — fast + accurate),
-  // falls back to ZXing library if native API is missing.
+  // Scanner: html5-qrcode with native BarcodeDetector optimization when available
   async function startScanner() {
     if (state.scanner) return;
-    const videoEl = document.getElementById("reader");
+    const modeEl = document.getElementById("scanMode");
     try {
-      // 1) Explicit camera permission — reliable prompt across browsers
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
+      if (!window.Html5Qrcode) {
+        if (modeEl) modeEl.textContent = "Scanner library missing";
+        throw new Error("Html5Qrcode library did not load");
+      }
+      // Full format list — Flipkart labels use Code 128, Amazon uses Code 39, QR for manifests
+      const formats = [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.PDF_417,
+        Html5QrcodeSupportedFormats.AZTEC,
+      ];
+      const reader = new Html5Qrcode("reader", {
+        formatsToSupport: formats,
+        useBarCodeDetectorIfSupported: true,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        verbose: false,
+      });
+      state.scanner = reader;
+      state.mode = ("BarcodeDetector" in window) ? "Native" : "ZXing (js)";
+      if (modeEl) modeEl.textContent = state.mode + " · starting";
+      let scans = 0;
+      const cfg = {
+        fps: 15,
+        qrbox: (vw, vh) => ({ width: Math.floor(vw * 0.9), height: Math.floor(vh * 0.7) }),
+        aspectRatio: 1.333,
+        disableFlip: false,
+        videoConstraints: {
           facingMode: { ideal: "environment" },
           width:  { ideal: 1920 },
-          height: { ideal: 1080 }
+          height: { ideal: 1080 },
         },
-        audio: false
-      });
-      videoEl.srcObject = stream;
-      videoEl.setAttribute("playsinline", "true");
-      await videoEl.play();
-      state.videoStream = stream;
-      state.scanner = true;
-
-      const modeEl = document.getElementById("scanMode");
-      let scans = 0;
-      const bump = () => { scans++; if (modeEl) modeEl.textContent = state.mode + " · " + scans + " frames"; };
-
-      // 2) Prefer native BarcodeDetector (iOS Safari 17+, Chrome, Edge)
-      if ("BarcodeDetector" in window) {
-        try {
-          const supported = await BarcodeDetector.getSupportedFormats();
-          state.mode = "Native (" + supported.length + " formats)";
-          if (modeEl) modeEl.textContent = state.mode;
-          const detector = new BarcodeDetector({ formats: supported });
-          state.scanLoop = true;
-          (async function loop() {
-            while (state.scanLoop) {
-              try {
-                const codes = await detector.detect(videoEl);
-                bump();
-                if (codes && codes.length) handleScan(codes[0].rawValue);
-              } catch (e) { console.warn("native detect err", e); }
-              await new Promise(r => setTimeout(r, 150));
-            }
-          })();
-          return;
-        } catch (e) { console.warn("Native BarcodeDetector setup failed:", e); }
-      }
-
-      // 3) Fallback: ZXing library (try both globals)
-      const ZLib = window.ZXingBrowser || window.ZXing || window.ZXingLibrary;
-      if (ZLib && ZLib.BrowserMultiFormatReader) {
-        state.mode = "ZXing";
-        if (modeEl) modeEl.textContent = state.mode;
-        const reader = new ZLib.BrowserMultiFormatReader();
-        state.zxingReader = reader;
-        state.scannerControls = await reader.decodeFromVideoElement(videoEl, (result) => {
-          bump();
-          if (result) handleScan(typeof result === "string" ? result : result.getText());
-        });
-        return;
-      }
-
-      // 4) No decoder available
-      state.mode = "No decoder";
-      if (modeEl) modeEl.textContent = "No scanner available — manual only";
-      const rc = document.getElementById("resultCard");
-      rc.className = "result-card show not_found";
-      rc.innerHTML = "Your browser can't scan barcodes automatically<span class=\"sub\">Please use the manual input below. Or update your browser to the latest version.</span>";
+      };
+      await reader.start(
+        { facingMode: "environment" },
+        cfg,
+        (text) => { scans++; if (modeEl) modeEl.textContent = state.mode + " · scan " + scans; handleScan(text); },
+        () => {} // ignore per-frame errors
+      );
+      if (modeEl) modeEl.textContent = state.mode + " · ready";
     } catch (err) {
       console.error("Scanner start failed:", err);
+      if (modeEl) modeEl.textContent = "Camera error";
       const rc = document.getElementById("resultCard");
       rc.className = "result-card show not_found";
       const msg = (err && err.name === "NotAllowedError")
         ? "Camera permission denied. Enable camera for cursive.world in browser settings, then reload."
-        : "Camera unavailable: " + (err.message || err);
+        : (err.message || String(err));
       rc.innerHTML = "Camera problem — use manual input below<span class=\"sub\">" + escapeHtml(msg) + "</span>";
       state.scanner = null;
     }
   }
   function stopScanner() {
-    state.scanLoop = false;
-    if (state.scannerControls) { try { state.scannerControls.stop(); } catch(_) {} state.scannerControls = null; }
-    state.zxingReader = null;
+    if (!state.scanner) return;
+    try { state.scanner.stop().then(() => state.scanner.clear()).catch(() => {}); } catch(_) {}
     state.scanner = null;
-    const videoEl = document.getElementById("reader");
-    if (state.videoStream) {
-      try { state.videoStream.getTracks().forEach(t => t.stop()); } catch(_) {}
-      state.videoStream = null;
-    }
-    if (videoEl) videoEl.srcObject = null;
   }
 
   let _lastScan = { text:"", at:0 };
