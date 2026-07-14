@@ -1336,3 +1336,20 @@
   }
   function setStatus(msg, isError) {
     const el = $("#upStatus");
+     
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.display = msg ? "block" : "none";
+    if (isError) {
+      el.style.background   = "#fef2f2";
+      el.style.borderTop    = "1px solid #fecaca";
+      el.style.color        = "#991b1b";
+    } else {
+      el.style.background   = "#f0fdf4";
+      el.style.borderTop    = "1px solid #bbf7d0";
+      el.style.color        = "#166534";
+    }
+  }
+</script>
+</body>
+</html>
