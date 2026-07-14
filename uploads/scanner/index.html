@@ -179,15 +179,8 @@
   <div id="scanArea" style="display:none;">
 
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-        <div>
-          <span class="badge-packer">Packer #<span id="packerBadge">?</span></span>
-          <span class="badge-checker" style="margin-left:6px;">Checker #<span id="checkerBadge">?</span></span>
-        </div>
-        <div style="display:flex; gap:6px;">
-          <button class="btn" id="changePersonBtn" style="padding:6px 12px; font-size:12px;">Change people</button>
-          <button class="btn danger" id="stopBtn" style="padding:6px 12px; font-size:12px;">Stop</button>
-        </div>
+      <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:8px;">
+        <button class="btn danger" id="stopBtn" style="padding:6px 12px; font-size:12px;">Stop camera</button>
       </div>
 
       <div class="kpi-grid">
@@ -226,24 +219,6 @@
       </div>
     </div>
 
-  </div>
-</div>
-
-<!-- Packer overlay -->
-<div class="overlay" id="packerOverlay">
-  <div class="oc">
-    <h3>Pick Packer</h3>
-    <p>Who is packing this order? Tap a number.</p>
-    <div class="person-tabs" style="justify-content:center;" id="packerTabs"></div>
-  </div>
-</div>
-
-<!-- Checker overlay -->
-<div class="overlay" id="checkerOverlay">
-  <div class="oc">
-    <h3>Pick Checker</h3>
-    <p>Who is checking? Tap a number.</p>
-    <div class="person-tabs" style="justify-content:center;" id="checkerTabs"></div>
   </div>
 </div>
 
@@ -288,8 +263,6 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await loadCompanies();
-    buildPersonTabs("packerTabs", "packer");
-    buildPersonTabs("checkerTabs", "checker");
   })();
 
   async function loadCompanies() {
@@ -299,33 +272,6 @@
     const sel = $("#companySel");
     sel.innerHTML = "<option value=''>All companies</option>" +
       state.companies.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  }
-
-  // ---- Person tabs (1..7) ----
-  function buildPersonTabs(containerId, role) {
-    const c = document.getElementById(containerId);
-    c.innerHTML = "";
-    for (let i = 1; i <= 7; i++) {
-      const b = document.createElement("button");
-      b.className = "p-chip " + role;
-      b.type = "button";
-      b.textContent = String(i);
-      b.addEventListener("click", () => {
-        if (role === "packer") {
-          state.packer = i;
-          $("#packerBadge").textContent = i;
-          $("#packerOverlay").classList.remove("show");
-          if (!state.checker) $("#checkerOverlay").classList.add("show");
-          else startScanner();
-        } else {
-          state.checker = i;
-          $("#checkerBadge").textContent = i;
-          $("#checkerOverlay").classList.remove("show");
-          startScanner();
-        }
-      });
-      c.appendChild(b);
-    }
   }
 
   // ---- Load orders ----
@@ -359,8 +305,8 @@
       $("#resetBtn").style.display = "inline-block";
       $("#scanArea").style.display = "block";
       refreshCounters();
-      // Ask for packer first
-      $("#packerOverlay").classList.add("show");
+      // Start camera straight away
+      startScanner();
     } catch (e) {
       $("#loadInfo").textContent = "Load error: " + (e.message || e);
       btn.disabled = false; btn.textContent = "Load orders →";
@@ -371,8 +317,6 @@
     stopScanner();
     state.orders = []; state.barcodeIndex = null; state.scanned.clear();
     state.counts = { ok:0, nf:0, dup:0 };
-    state.packer = null; state.checker = null;
-    $("#packerBadge").textContent = "?"; $("#checkerBadge").textContent = "?";
     $("#setupCard").style.opacity = "1"; $("#setupCard").style.pointerEvents = "auto";
     $("#scanArea").style.display = "none";
     $("#resetBtn").style.display = "none";
@@ -381,7 +325,6 @@
   });
 
   $("#stopBtn").addEventListener("click", () => stopScanner());
-  $("#changePersonBtn").addEventListener("click", () => { $("#packerOverlay").classList.add("show"); });
 
   // ---- Barcode index (any raw_data field value) ----
   function buildBarcodeIndex() {
