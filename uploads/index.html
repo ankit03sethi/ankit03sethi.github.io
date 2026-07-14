@@ -158,9 +158,63 @@
     <span>SKU Wise Data</span>
     <button class="btn" id="closeSkuWiseBtn" style="padding:4px 10px; font-size:12px;">Back to Uploads</button>
   </div>
-  <div id="skuWiseBody" style="padding:20px; text-align:center; color:#64748b;">
-    <p style="margin:0 0 12px; font-size:14px;">Coming soon — we'll build this out step by step.</p>
-    <p style="margin:0; font-size:12px;">Loaded rows: <b id="skuWiseCount">—</b></p>
+  <div id="skuWiseBody" style="padding:16px;">
+    <!-- Quick action row -->
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+      <a class="btn" href="/uploads/scanner/" style="text-decoration:none;">&#128241; Open Scanner</a>
+      <div style="align-self:center; margin-left:auto; color:#64748b; font-size:12px;">
+        Total mappings: <b id="skuWiseCount">—</b>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-bottom:14px;">
+      <div>
+        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Company</label>
+        <select id="swCompanySel" style="width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px;"><option value="">All</option></select>
+      </div>
+      <div>
+        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Platform</label>
+        <select id="swPlatformSel" style="width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px;">
+          <option value="">All</option>
+          <option value="amazon">Amazon</option>
+          <option value="flipkart">Flipkart</option>
+          <option value="meesho">Meesho</option>
+          <option value="myntra">Myntra</option>
+          <option value="firstcry">FirstCry</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Brand</label>
+        <select id="swBrandSel" style="width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px;"><option value="">All</option></select>
+      </div>
+      <div>
+        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Category</label>
+        <select id="swCategorySel" style="width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px;"><option value="">All</option></select>
+      </div>
+      <div style="align-self:end;">
+        <input id="swSearch" type="text" placeholder="Search SKU or product…" style="width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px;">
+      </div>
+    </div>
+
+    <!-- Results table -->
+    <div style="border:1px solid #e5e7eb; border-radius:10px; overflow:auto; max-height:60vh;">
+      <table id="swTable" style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead style="background:#f8fafc; position:sticky; top:0;">
+          <tr>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Master SKU</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Platform SKU</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Platform</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Company</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Brand</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Category</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Product</th>
+          </tr>
+        </thead>
+        <tbody id="swTbody"><tr><td colspan="7" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="swFooter" style="text-align:center; color:#64748b; font-size:12px; margin-top:8px;"></div>
   </div>
 </div>
 
@@ -928,13 +982,96 @@
     const sw = document.getElementById("skuWisePanel");
     if (up) up.style.display = "none";
     if (sw) sw.style.display = "";
-    // Fetch total mapping count for header
+    await loadSkuWiseData();
+  });
+
+  // Auto-open SKU Wise panel if URL is /uploads/#skuwise
+  if (location.hash === "#skuwise") {
+    setTimeout(() => {
+      try { document.getElementById("openSkuWiseBtn").click(); } catch(_) {}
+    }, 800);
+  }
+
+  // SKU Wise Data — loads all mappings for the user, populates filters + table
+  let _swAll = [];
+  async function loadSkuWiseData() {
+    const tbody = document.getElementById("swTbody");
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr>`;
+    document.getElementById("skuWiseCount").textContent = "…";
     try {
-      const { count, error } = await sb.from("seller_sku_master")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", session.user.id);
-      document.getElementById("skuWiseCount").textContent = error ? "error" : (count ?? 0).toLocaleString();
-    } catch (_) { document.getElementById("skuWiseCount").textContent = "\u2014"; }
+      const rows = [];
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await sb.from("seller_sku_master")
+          .select("master_sku, seller_sku, platform, company_name, brand, category, sub_category, color, product, hsn, asin")
+          .eq("user_id", session.user.id)
+          .order("master_sku", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        rows.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      _swAll = rows;
+      document.getElementById("skuWiseCount").textContent = rows.length.toLocaleString();
+      populateSwFilters(rows);
+      renderSwTable();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#dc2626;">Error: ${escapeHtml(err.message || String(err))}</td></tr>`;
+    }
+  }
+  function populateSwFilters(rows) {
+    const uniq = (arr, key) => [...new Set(arr.map(r => r[key]).filter(v => v && String(v).trim()))].sort();
+    const fill = (id, values) => {
+      const sel = document.getElementById(id);
+      const cur = sel.value;
+      sel.innerHTML = `<option value="">All</option>` + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+      if (values.includes(cur)) sel.value = cur;
+    };
+    fill("swCompanySel",  uniq(rows, "company_name"));
+    fill("swBrandSel",    uniq(rows, "brand"));
+    fill("swCategorySel", uniq(rows, "category"));
+  }
+  function renderSwTable() {
+    const co = document.getElementById("swCompanySel").value.toLowerCase();
+    const pl = document.getElementById("swPlatformSel").value.toLowerCase();
+    const br = document.getElementById("swBrandSel").value.toLowerCase();
+    const ca = document.getElementById("swCategorySel").value.toLowerCase();
+    const q  = document.getElementById("swSearch").value.trim().toLowerCase();
+    const filtered = _swAll.filter(r => {
+      if (co && (r.company_name || "").toLowerCase() !== co) return false;
+      if (pl && (r.platform || "").toLowerCase() !== pl) return false;
+      if (br && (r.brand || "").toLowerCase() !== br) return false;
+      if (ca && (r.category || "").toLowerCase() !== ca) return false;
+      if (q) {
+        const hay = [r.master_sku, r.seller_sku, r.product, r.asin].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    const capped = filtered.slice(0, 500);
+    const tbody = document.getElementById("swTbody");
+    if (capped.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#94a3b8;">No rows match the filter.</td></tr>`;
+    } else {
+      tbody.innerHTML = capped.map(r => `<tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:8px 10px; font-weight:700;">${escapeHtml(r.master_sku || "")}</td>
+        <td style="padding:8px 10px; font-family:monospace; font-size:12px;">${escapeHtml(r.seller_sku || "")}</td>
+        <td style="padding:8px 10px;">${escapeHtml(r.platform || "")}</td>
+        <td style="padding:8px 10px;">${escapeHtml(r.company_name || "")}</td>
+        <td style="padding:8px 10px;">${escapeHtml(r.brand || "")}</td>
+        <td style="padding:8px 10px;">${escapeHtml(r.category || "")}</td>
+        <td style="padding:8px 10px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.product || "")}</td>
+      </tr>`).join("");
+    }
+    document.getElementById("swFooter").textContent = `${filtered.length.toLocaleString()} rows match${filtered.length > 500 ? " (showing first 500)" : ""}`;
+  }
+  // Re-render on any filter change
+  ["swCompanySel","swPlatformSel","swBrandSel","swCategorySel","swSearch"].forEach(id => {
+    document.addEventListener("input", (e) => { if (e.target && e.target.id === id) renderSwTable(); });
+    document.addEventListener("change", (e) => { if (e.target && e.target.id === id) renderSwTable(); });
   });
   document.getElementById("closeSkuWiseBtn").addEventListener("click", () => {
     const up = document.getElementById("uploadsPanel");
