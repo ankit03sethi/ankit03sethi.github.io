@@ -929,9 +929,11 @@
       }
       const outRows = [];
       const uid = session.user.id;
+      let skippedNoMaster = 0;
       // Preserve every cell as-is (empty ones kept) — the original file structure is stored intact
       for (const r of rows) {
-        const master = String(r[idx.master] || "").trim(); if (!master) continue;
+        const master = String(r[idx.master] || "").trim();
+        if (!master) { skippedNoMaster++; continue; }
         const raw = r; // full row, empties preserved
         const fields = {
           brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
@@ -973,9 +975,14 @@
       window._skuStagedFileName = f.name;
       window._skuStagedDropped = droppedDupes;
       window._skuStagedUid = uid;
+      window._skuStagedTotalRaw = rows.length; // header excluded by SheetJS
+      window._skuStagedSkippedNoMaster = skippedNoMaster;
       document.getElementById("skuModeSummary").innerHTML =
-        "Parsed <b>" + uniqRows.length + "</b> unique mappings from <b>" + escapeHtml(f.name) + "</b>" +
-        (droppedDupes ? " (" + droppedDupes + " in-file duplicates skipped)" : "") + ". Pick how to save:";
+        "File has <b>" + rows.length + "</b> data rows (excluding header).<br>" +
+        "&nbsp;&nbsp;&#8226; <b>" + uniqRows.length + "</b> valid unique mappings" +
+        (droppedDupes ? "<br>&nbsp;&nbsp;&#8226; <b>" + droppedDupes + "</b> in-file duplicates removed" : "") +
+        (skippedNoMaster ? "<br>&nbsp;&nbsp;&#8226; <b>" + skippedNoMaster + "</b> rows had no Master SKU (skipped)" : "") +
+        "<br><br>Pick how to save:";
       document.getElementById("skuModeModal").classList.add("show");
       setStatus("Ready — pick a save mode in the popup.", false);
     } catch (err) {
@@ -1004,7 +1011,39 @@
     const rows = window._skuStagedRows || [];
     const uid = window._skuStagedUid;
     const fName = window._skuStagedFileName || "file";
+    const totalRaw = window._skuStagedTotalRaw || 0;
+    const dupes = window._skuStagedDropped || 0;
+    const skippedNoMaster = window._skuStagedSkippedNoMaster || 0;
     if (rows.length === 0 || !uid) { setStatus("No parsed rows in memory. Re-select the file.", true); return; }
+
+    // Fetch existing composite keys for this user so we can classify edited vs new
+    setStatus("Checking existing records \u2026", false);
+    const existingKeys = new Set();
+    {
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: keyRows, error } = await sb.from("seller_sku_master")
+          .select("company_name,platform,seller_sku_norm,asin")
+          .eq("user_id", uid)
+          .range(from, from + PAGE - 1);
+        if (error) break;
+        if (!keyRows || keyRows.length === 0) break;
+        for (const kr of keyRows) {
+          existingKeys.add((kr.company_name || "") + "|" + (kr.platform || "") + "|" + (kr.seller_sku_norm || "") + "|" + (kr.asin || ""));
+        }
+        if (keyRows.length < PAGE) break;
+        from += PAGE;
+      }
+    }
+    const normSkuLocal = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    let edited = 0, added = 0;
+    for (const r of rows) {
+      const k = (r.company_name || "") + "|" + r.platform + "|" + normSkuLocal(r.seller_sku) + "|" + (r.asin || "");
+      if (existingKeys.has(k)) edited++; else added++;
+    }
+    // For replace mode, everything is effectively "new" after wipe
+    if (mode === "replace") { edited = 0; added = rows.length; }
 
     if (mode === "replace") {
       setStatus(`Removing old rows before saving ${rows.length} new mappings …`, false);
@@ -1039,10 +1078,15 @@
       }
       setStatus(`Uploading … ${done}/${rows.length}${failed ? " (" + failed + " failed)" : ""}`, false);
     }
-    const verb = mode === "replace" ? "Replaced with" : "Merged";
+    const total = totalRaw;
+    const verb = mode === "replace" ? "Replaced" : "Merged";
+    // Cap edited/added by actually-successful rows so the sub-numbers stay consistent when there are failures.
+    const doneRatio = rows.length ? (done / rows.length) : 0;
+    const editedDone = Math.round(edited * doneRatio);
+    const addedDone  = Math.round(added  * doneRatio);
     const msg = failed
-      ? `⚠ ${verb} ${done} of ${rows.length} (${failed} rows failed — retry to fix)`
-      : `✅ ${verb} ${done} SKU mappings from ${fName}.`;
+      ? `⚠ ${verb} ${done}/${rows.length} (${failed} failed) · File total: ${total} rows = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)`
+      : `✅ ${verb} from ${fName} · File total: ${total} rows = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates removed + ${skippedNoMaster} skipped(no master SKU)`;
     setStatus(msg, failed > 0);
     await refreshMasterStamp();
     // Clear staged so accidental double-clicks don't re-run
