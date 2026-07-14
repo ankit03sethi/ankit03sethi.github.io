@@ -154,28 +154,6 @@
   <div class="up-status" id="upStatus"></div>
   <div class="up-list">
 
-    <div class="up-item">
-      <div class="up-left">
-        <div class="up-icon">&#128193;</div>
-        <div>
-          <div class="up-name">Master SKU file</div>
-          <div class="up-desc">Maps each platform SKU to your Master SKU + brand, category, HSN.</div>
-        </div>
-      </div>
-      <div class="up-right">
-        <div class="up-stamp-box">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
-          <div class="stamp none" id="masterFileStamp">Never</div>
-        </div>
-        <div class="up-actions">
-          <button class="up-btn" id="masterSampleBtn" title="Download a blank template with dropdowns">&#11015; Sample Template</button>
-          <button class="up-btn primary" id="masterUploadBtn">&#8593; Upload</button>
-          <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
-        </div>
-      </div>
-    </div>
-    <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
-
     <div class="up-item kind-row" data-kind="orders" style="display:none;">
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
@@ -195,25 +173,6 @@
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="orders_file" style="display:none;">
-      <div class="up-left">
-        <div class="up-icon" style="background:#e0e7ff; color:#4338ca;">&#128193;</div>
-        <div>
-          <div class="up-name">Orders File</div>
-          <div class="up-desc">Consolidated / master orders XLSX (any format) per company &amp; platform.</div>
-        </div>
-      </div>
-      <div class="up-right">
-        <div class="up-stamp-box">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
-          <div class="stamp none kind-stamp" data-kind="orders_file">Never</div>
-        </div>
-        <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="orders_file">&#8593; Upload</button>
-        </div>
-      </div>
-    </div>
-
     <div class="up-item kind-row" data-kind="manifest" style="display:none;">
       <div class="up-left">
         <div class="up-icon" style="background:#fce7f3; color:#ec4899;">&#128230;</div>
@@ -229,6 +188,25 @@
         </div>
         <div class="up-actions">
           <button class="up-btn primary kind-upload-btn" data-kind="manifest">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="up-item kind-row" data-kind="orders_file" style="display:none;">
+      <div class="up-left">
+        <div class="up-icon" style="background:#e0e7ff; color:#4338ca;">&#128193;</div>
+        <div>
+          <div class="up-name">Orders File</div>
+          <div class="up-desc">Consolidated / master orders XLSX (any format) per company &amp; platform.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none kind-stamp" data-kind="orders_file">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary kind-upload-btn" data-kind="orders_file">&#8593; Upload</button>
         </div>
       </div>
     </div>
@@ -271,6 +249,28 @@
       </div>
     </div>
     <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt" style="display:none;" />
+
+    <div class="up-item">
+      <div class="up-left">
+        <div class="up-icon">&#128193;</div>
+        <div>
+          <div class="up-name">Master SKU file</div>
+          <div class="up-desc">Maps each platform SKU to your Master SKU + brand, category, HSN.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none" id="masterFileStamp">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn" id="masterSampleBtn" title="Download a blank template with dropdowns">&#11015; Sample Template</button>
+          <button class="up-btn primary" id="masterUploadBtn">&#8593; Upload</button>
+          <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
+        </div>
+      </div>
+    </div>
+    <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
     <div class="up-item kind-hint" id="ordersHint" style="display:none;">
       <div class="up-left">
