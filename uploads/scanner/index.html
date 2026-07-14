@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
@@ -53,8 +53,10 @@
     .kpi.tot .val { color:#1f6feb; }
 
     /* Scanner */
-    #reader { width:100%; max-width:520px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000; }
-    #reader video { border-radius:12px; }
+    .video-wrap { position:relative; width:100%; max-width:520px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000; aspect-ratio: 4/3; }
+    #reader { width:100%; height:100%; object-fit:cover; display:block; }
+    .scan-overlay { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+    .scan-frame { width:90%; height:35%; border:3px solid #1f6feb; border-radius:8px; box-shadow: 0 0 0 9999px rgba(0,0,0,.35); }
     .result-card { padding:16px; border-radius:12px; text-align:center; margin-bottom:12px; font-weight:800; font-size:18px; display:none; }
     .result-card.show { display:block; }
     .result-card.ok        { background:#dcfce7; color:#166534; border:2px solid #86efac; }
@@ -205,7 +207,10 @@
 
       <div class="result-card" id="resultCard"></div>
 
-      <div id="reader"></div>
+      <div class="video-wrap">
+        <video id="reader" playsinline muted></video>
+        <div class="scan-overlay"><div class="scan-frame"></div></div>
+      </div>
 
       <div class="manual-row">
         <input type="text" id="manualInput" placeholder="Or type/paste barcode here &amp; hit Enter" autocomplete="off">
@@ -382,47 +387,41 @@
   }
 
   // ---- Scanner ----
-  function startScanner() {
+  // ZXing scanner — much better 1D barcode (Code 128, Code 39) support on mobile than html5-qrcode
+  async function startScanner() {
     if (state.scanner) return;
-    // Enable ALL barcode formats (1D + 2D). Flipkart labels use Code 128; Amazon uses Code 39.
-    const formats = [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.CODE_93,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.ITF,
-      Html5QrcodeSupportedFormats.CODABAR,
-      Html5QrcodeSupportedFormats.QR_CODE,
-      Html5QrcodeSupportedFormats.DATA_MATRIX,
-      Html5QrcodeSupportedFormats.PDF_417,
-    ];
-    const reader = new Html5Qrcode("reader", { formatsToSupport: formats, verbose: false });
-    state.scanner = reader;
-    // Big scan box — fills 95% of camera view (works for both QR and 1D barcodes)
-    const qrbox = (vw, vh) => {
-      const w = Math.floor(vw * 0.95);
-      const h = Math.floor(vh * 0.75);
-      return { width: w, height: h };
-    };
-    reader.start({ facingMode: "environment" },
-      { fps: 15, qrbox },
-      (text) => handleScan(text),
-      () => {}
-    ).catch(err => {
+    try {
+      const { BrowserMultiFormatReader } = window.ZXingBrowser;
+      const reader = new BrowserMultiFormatReader();
+      state.scanner = reader;
+      // Pick rear camera
+      const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+      const rear = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+      const deviceId = rear ? rear.deviceId : undefined;
+      const videoEl = document.getElementById("reader");
+      state.scannerControls = await reader.decodeFromVideoDevice(
+        deviceId, videoEl,
+        (result, err, controls) => {
+          if (result) handleScan(result.getText());
+          // ignore per-frame decode errors
+        }
+      );
+    } catch (err) {
       console.error(err);
       const rc = document.getElementById("resultCard");
       rc.className = "result-card show not_found";
-      rc.innerHTML = "Camera blocked — use manual input below<span class=\"sub\">Enable camera permission for cursive.world in your browser settings.</span>";
+      rc.innerHTML = "Camera blocked or unavailable — use manual input below<span class=\"sub\">Enable camera permission for cursive.world in your browser settings.</span>";
       state.scanner = null;
-    });
+    }
   }
   function stopScanner() {
-    if (!state.scanner) return;
-    try { state.scanner.stop().then(() => state.scanner.clear()); } catch(_) {}
+    if (state.scannerControls) { try { state.scannerControls.stop(); } catch(_) {} state.scannerControls = null; }
     state.scanner = null;
+    const videoEl = document.getElementById("reader");
+    if (videoEl && videoEl.srcObject) {
+      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch(_) {}
+      videoEl.srcObject = null;
+    }
   }
 
   let _lastScan = { text:"", at:0 };
