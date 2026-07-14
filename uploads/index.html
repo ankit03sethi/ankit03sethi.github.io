@@ -164,7 +164,7 @@
   </div>
 </div>
 
-<div class="panel" style="margin-top:16px;">
+<div class="panel" id="uploadsPanel" style="margin-top:16px;">
   <div class="up-status" id="upStatus"></div>
   <div class="up-list">
 
@@ -924,26 +924,23 @@
 
   // SKU Wise Data tab toggle
   document.getElementById("openSkuWiseBtn").addEventListener("click", async () => {
-    document.querySelector(".panel").parentNode; // no-op reference
-    document.getElementById("skuWisePanel").style.display = "";
-    // Hide the uploads main panel while SKU Wise is open
-    const uploadsPanel = document.querySelector(".panel:not(#skuWisePanel):not(#companiesModal .modal)");
-    if (uploadsPanel && uploadsPanel.id !== "skuWisePanel") uploadsPanel.style.display = "none";
+    const up = document.getElementById("uploadsPanel");
+    const sw = document.getElementById("skuWisePanel");
+    if (up) up.style.display = "none";
+    if (sw) sw.style.display = "";
     // Fetch total mapping count for header
     try {
       const { count, error } = await sb.from("seller_sku_master")
         .select("id", { count: "exact", head: true })
         .eq("user_id", session.user.id);
       document.getElementById("skuWiseCount").textContent = error ? "error" : (count ?? 0).toLocaleString();
-    } catch (_) { document.getElementById("skuWiseCount").textContent = "—"; }
+    } catch (_) { document.getElementById("skuWiseCount").textContent = "\u2014"; }
   });
   document.getElementById("closeSkuWiseBtn").addEventListener("click", () => {
-    document.getElementById("skuWisePanel").style.display = "none";
-    // Restore the uploads panel
-    const panels = document.querySelectorAll(".panel");
-    for (const p of panels) {
-      if (p.id !== "skuWisePanel") p.style.display = "";
-    }
+    const up = document.getElementById("uploadsPanel");
+    const sw = document.getElementById("skuWisePanel");
+    if (sw) sw.style.display = "none";
+    if (up) up.style.display = "";
   });
 
   const PLATFORM_HEADERS = {
@@ -1202,4 +1199,3 @@
   }
   function setStatus(msg, isError) {
     const el = $("#upStatus");
-    if (!el) retur
