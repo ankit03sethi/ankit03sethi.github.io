@@ -341,7 +341,19 @@
     sel.innerHTML = "<option value=''>All couriers</option>" +
       list.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   }
-  document.getElementById("platformSel").addEventListener("change", updateCourierOptions);
+  document.getElementById("platformSel").addEventListener("change", () => { updateCourierOptions(); triggerAutoLoad(); });
+
+  // Auto-load when any filter changes (debounced 350ms so rapid changes coalesce)
+  let _autoLoadTimer = null;
+  function triggerAutoLoad() {
+    if (!state.session) return;
+    if (_autoLoadTimer) clearTimeout(_autoLoadTimer);
+    _autoLoadTimer = setTimeout(() => document.getElementById("loadBtn").click(), 350);
+  }
+  ["companySel","courierSel","dateFrom","dateTo"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", triggerAutoLoad);
+  });
 
   // ---- Load orders ----
   $("#loadBtn").addEventListener("click", async () => {
@@ -382,14 +394,11 @@
         btn.disabled = false; btn.textContent = "Load orders →";
         return;
       }
-      $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable values).`;
-      $("#setupCard").style.opacity = ".6";
-      $("#setupCard").style.pointerEvents = "none";
-      $("#resetBtn").style.display = "inline-block";
+      $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable).`;
       $("#scanArea").style.display = "block";
       refreshCounters();
-      // Start camera straight away
-      startScanner();
+      // Start camera straight away (only first time)
+      if (!state.scanner) startScanner();
     } catch (e) {
       $("#loadInfo").textContent = "Load error: " + (e.message || e);
       btn.disabled = false; btn.textContent = "Load orders →";
