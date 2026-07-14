@@ -102,21 +102,30 @@
     .lock-card { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
 
     @media (max-width: 620px) {
-      .container { padding: 12px; }
-      .card { padding: 12px; margin-bottom: 10px; }
-      .topbar { padding: 10px 12px; }
+      html, body { overflow-x: hidden; width: 100%; }
+      .container { padding: 8px; max-width: 100%; }
+      .card { padding: 10px; margin-bottom: 8px; border-radius: 10px; }
+      .topbar { padding: 8px 12px; }
       .brand-wordmark { font-size: 18px; }
       .nav-sub { display: none; }
       .email-chip { display: none; }
-      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .kpi { padding: 10px; }
-      .kpi .val { font-size: 20px; }
-      .lists { grid-template-columns: 1fr; }
-      #reader { max-width: 100% !important; }
-      #reader video { max-height: 60vh !important; object-fit: cover; }
-      .result-card { padding: 12px; font-size: 15px; }
-      .setup h2 { font-size: 17px; }
-      .field-row { flex-direction: column; }
+      .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 0; margin: 0 0 8px; }
+      .kpi { padding: 8px 4px; border-radius: 8px; }
+      .kpi .lbl { font-size: 9px; }
+      .kpi .val { font-size: 18px; margin-top: 0; }
+      .lists { grid-template-columns: 1fr; gap: 8px; }
+      .video-wrap { max-width: 100%; aspect-ratio: 4/3; }
+      .result-card { padding: 10px; font-size: 14px; margin-bottom: 8px; }
+      .setup h2 { font-size: 16px; margin-bottom: 2px; }
+      .setup .sub { display: none; }
+      .field-row { flex-direction: row; gap: 6px; }
+      .field { flex: 1 1 0; min-width: 0; margin-bottom: 6px; }
+      .field label { font-size: 9px; }
+      .field select, .field input[type="date"] { padding: 7px 8px; font-size: 13px; }
+      .btn { padding: 8px 12px; font-size: 13px; }
+      .btn-back { width: 30px; height: 30px; }
+      .manual-row { margin-top: 8px; gap: 6px; }
+      .manual-row input { font-size: 14px; padding: 8px 10px; }
     }
   </style>
 </head>
