@@ -180,7 +180,7 @@
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
         <div>
-          <div class="up-name">Orders File</div>
+          <div class="up-name">Orders CSV</div>
           <div class="up-desc">Marketplace order CSVs / XLSX per company &amp; platform.</div>
         </div>
       </div>
@@ -191,6 +191,25 @@
         </div>
         <div class="up-actions">
           <button class="up-btn primary kind-upload-btn" data-kind="orders">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="up-item kind-row" data-kind="manifest" style="display:none;">
+      <div class="up-left">
+        <div class="up-icon" style="background:#fce7f3; color:#ec4899;">&#128230;</div>
+        <div>
+          <div class="up-name">Orders Manifest</div>
+          <div class="up-desc">Meesho manifest / dispatch file &mdash; adds order rows with a manifest tag.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none kind-stamp" data-kind="manifest">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary kind-upload-btn" data-kind="manifest">&#8593; Upload</button>
         </div>
       </div>
     </div>
@@ -443,15 +462,16 @@
 
   // ---- MULTI-KIND UPLOADS: Orders / Returns / Payments ----
   const KIND_CFG = {
-    orders:   { title:"Upload Orders File",   table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
-    returns:  { title:"Upload Returns File",  table:"seller_returns",  dateCol:"return_date",  dateAliases:["return date","return-date","returndate","date","rto date","cancel date","reverse date"] },
-    payments: { title:"Upload Payments File", table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
+    orders:   { title:"Upload Orders CSV",           table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
+    manifest: { title:"Upload Orders Manifest (Meesho)", table:"seller_orders", dateCol:"order_date", dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
+    returns:  { title:"Upload Returns File",         table:"seller_returns",  dateCol:"return_date",  dateAliases:["return date","return-date","returndate","date","rto date","cancel date","reverse date"] },
+    payments: { title:"Upload Payments File",        table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
   };
   let currentKind = "orders";
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
-  const stagedUploads = { orders: {}, returns: {}, payments: {} };
+  const stagedUploads = { orders: {}, manifest: {}, returns: {}, payments: {} };
 
   document.querySelectorAll(".kind-upload-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -468,8 +488,9 @@
   });
 
   function buildFilterChips(list) {
+    const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
     const uniqPlats = new Set();
-    list.forEach(c => (c.platforms || []).forEach(p => uniqPlats.add(p)));
+    list.forEach(c => (c.platforms || []).forEach(p => { if (kindPlats.includes(p)) uniqPlats.add(p); }));
     // Company dropdown
     const cSel = $("#companyFilterSel");
     cSel.innerHTML = `<option value="">All companies</option>` +
@@ -487,11 +508,12 @@
     const wrap = $("#ordersPickerList");
     const reversed = wrap.classList.contains("reverse");
 
-    // Flatten to one row per (company, platform), apply active filters
+    // Flatten to one row per (company, platform), apply active filters + kind-restricted platforms
+    const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
     const rows = [];
     list.forEach(c => {
       if (ordersFilterCompany && c.name !== ordersFilterCompany) return;
-      const plats = PLATFORMS.filter(p => (c.platforms || []).includes(p));
+      const plats = kindPlats.filter(p => (c.platforms || []).includes(p));
       plats.forEach(p => {
         if (ordersFilterPlatform && p !== ordersFilterPlatform) return;
         rows.push({ company: c.name, platform: p });
@@ -651,6 +673,7 @@
         const csvDate = s.dateCol ? parseDate(r[s.dateCol]) : null;
         const finalDate = s.overrideDate || csvDate || s.dateFrom || null;
         const rawWithMeta = { ...r };
+        if (cfg.tag)        rawWithMeta.__file_tag = cfg.tag;
         if (s.overrideDate) rawWithMeta.__file_date = s.overrideDate;
         if (s.dateFrom)     rawWithMeta.__file_date_from = s.dateFrom;
         if (s.dateTo)       rawWithMeta.__file_date_to   = s.dateTo;
@@ -708,12 +731,16 @@
   async function refreshStamps() {
     if (!session) return;
     for (const kind of Object.keys(KIND_CFG)) {
-      const table = KIND_CFG[kind].table;
-      const { data } = await sb.from(table)
-        .select("pushed_at, source_file, company_name, platform")
+      const cfg = KIND_CFG[kind];
+      let q = sb.from(cfg.table)
+        .select("pushed_at, source_file, company_name, platform, raw_data")
         .eq("user_id", session.user.id)
         .order("pushed_at", { ascending: false })
         .limit(1);
+      // If this kind has a tag, filter to only rows with that tag; otherwise exclude any tagged rows
+      if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
+      else         q = q.is("raw_data->>__file_tag", null);
+      const { data } = await q;
       const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
       if (!el) continue;
       if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); el.title = ""; continue; }
