@@ -180,6 +180,12 @@
           <option value="firstcry">FirstCry</option>
         </select>
       </div>
+      <div class="field">
+        <label>Courier Partner</label>
+        <select id="courierSel">
+          <option value="">All couriers</option>
+        </select>
+      </div>
     </div>
     <div class="field-row">
       <div class="field">
@@ -289,6 +295,12 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await loadCompanies();
+    // Default: today's date in both fields → auto-load today's orders
+    const today = new Date().toISOString().slice(0, 10);
+    $("#dateFrom").value = today;
+    $("#dateTo").value   = today;
+    // Auto-click Load so the user doesn't have to
+    document.getElementById("loadBtn").click();
   })();
 
   async function loadCompanies() {
@@ -298,7 +310,38 @@
     const sel = $("#companySel");
     sel.innerHTML = "<option value=''>All companies</option>" +
       state.companies.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+    // Populate courier list based on current platform
+    updateCourierOptions();
   }
+
+  // Per-platform courier options + Tracking-ID prefix mapping (used to filter after Load)
+  const COURIERS_BY_PLATFORM = {
+    "":         [], // "All" → no courier filter
+    flipkart:   [{ id:"ekart", name:"Ekart",       prefixes:["FMPP","FMPC","FMPR","FMPF","FMFC","FMFR"] },
+                 { id:"delhivery", name:"Delhivery", prefixes:["DL","SF"] },
+                 { id:"bluedart", name:"Blue Dart", prefixes:["BD"] }],
+    amazon:     [{ id:"amazon-shipping", name:"Amazon Shipping", prefixes:["TBA"] },
+                 { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
+                 { id:"bluedart", name:"Blue Dart", prefixes:["BD"] }],
+    meesho:     [{ id:"valmo", name:"Valmo",     prefixes:["V"] },
+                 { id:"shadowfax", name:"Shadowfax", prefixes:["SF"] },
+                 { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
+                 { id:"xpressbees", name:"XpressBees", prefixes:["XB"] },
+                 { id:"ecomexpress", name:"Ecom Express", prefixes:["EE","EX"] }],
+    myntra:     [{ id:"myntra-jeeves", name:"Myntra Jeeves", prefixes:["MJ","MY"] },
+                 { id:"ekart", name:"Ekart", prefixes:["FMPP","FMPR"] }],
+    firstcry:   [{ id:"firstcry-express", name:"FirstCry Express", prefixes:["FC"] },
+                 { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
+                 { id:"bluedart", name:"Blue Dart", prefixes:["BD"] }],
+  };
+  function updateCourierOptions() {
+    const platform = $("#platformSel").value;
+    const list = COURIERS_BY_PLATFORM[platform] || [];
+    const sel = $("#courierSel");
+    sel.innerHTML = "<option value=''>All couriers</option>" +
+      list.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  }
+  document.getElementById("platformSel").addEventListener("change", updateCourierOptions);
 
   // ---- Load orders ----
   $("#loadBtn").addEventListener("click", async () => {
@@ -318,7 +361,21 @@
       if (to)   q = q.lte("order_date", to   + "T23:59:59Z");
       const { data, error } = await q;
       if (error) throw error;
-      state.orders = data || [];
+      let orders = data || [];
+      // Apply courier filter — restrict to rows whose Tracking ID starts with one of the courier prefixes
+      const courierId = $("#courierSel").value;
+      if (courierId && platform) {
+        const cfg = (COURIERS_BY_PLATFORM[platform] || []).find(c => c.id === courierId);
+        if (cfg && cfg.prefixes && cfg.prefixes.length) {
+          const upperPrefixes = cfg.prefixes.map(p => p.toUpperCase());
+          orders = orders.filter(r => {
+            const rd = r.raw_data || {};
+            const tid = String(rd["Tracking ID"] || rd["Tracking Id"] || rd["AWB No"] || rd["AWB"] || rd["Waybill"] || rd["Tracking Number"] || "").toUpperCase();
+            return upperPrefixes.some(p => tid.startsWith(p));
+          });
+        }
+      }
+      state.orders = orders;
       buildBarcodeIndex();
       if (state.orders.length === 0) {
         $("#loadInfo").textContent = "No orders match the filter. Adjust and try again.";
