@@ -471,8 +471,12 @@
     fillList("listDup", dupList.slice(-50).reverse(), v => escapeHtml(v.match?.value || v.value));
     fillList("listRem", remaining.slice(0, 50), r => {
       const rd = r.raw_data || {};
-      // Prefer a compact identifier
-      const id = rd["Sub Order No"] || rd["Order Id"] || rd["Order ID"] || rd["AWB No"] || rd["awb"] || rd["Tracking Id"] || Object.values(rd)[0] || "?";
+      // Show the Tracking ID / AWB (what the packer will scan). Fall back only if truly missing.
+      const id =
+        rd["Tracking ID"] || rd["Tracking Id"] || rd["tracking id"] ||
+        rd["AWB No"] || rd["AWB Number"] || rd["AWB"] || rd["AWB No."] || rd["AWB Code"] ||
+        rd["Sub Order No"] || rd["Waybill"] || rd["Tracking Number"] ||
+        "—";
       return `<b>${escapeHtml(String(id))}</b> <span style="color:#64748b;">· ${escapeHtml(r.platform || "")} · ${escapeHtml(r.company_name || "")}</span>`;
     });
     $("#cntOk").textContent  = okList.length;
