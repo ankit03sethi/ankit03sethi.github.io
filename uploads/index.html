@@ -930,10 +930,11 @@
       const outRows = [];
       const uid = session.user.id;
       let skippedNoMaster = 0;
+      const skippedRows = [];  // rows that had no Master SKU — kept for the report
       // Preserve every cell as-is (empty ones kept) — the original file structure is stored intact
       for (const r of rows) {
         const master = String(r[idx.master] || "").trim();
-        if (!master) { skippedNoMaster++; continue; }
+        if (!master) { skippedNoMaster++; skippedRows.push(r); continue; }
         const raw = r; // full row, empties preserved
         const fields = {
           brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
@@ -963,9 +964,10 @@
       const normSku = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
       const seen = new Set();
       const uniqRows = [];
+      const dupeRows = [];  // rows that were removed as duplicates — kept for the report
       for (const r of outRows) {
         const k = (r.company_name || "") + "|" + r.platform + "|" + normSku(r.seller_sku) + "|" + (r.asin || "");
-        if (seen.has(k)) continue;
+        if (seen.has(k)) { dupeRows.push(r.raw_data); continue; }
         seen.add(k); uniqRows.push(r);
       }
       const droppedDupes = outRows.length - uniqRows.length;
@@ -977,6 +979,8 @@
       window._skuStagedUid = uid;
       window._skuStagedTotalRaw = rows.length; // header excluded by SheetJS
       window._skuStagedSkippedNoMaster = skippedNoMaster;
+      window._skuStagedSkippedRows = skippedRows;
+      window._skuStagedDupeRows = dupeRows;
       document.getElementById("skuModeSummary").innerHTML =
         "File has <b>" + rows.length + "</b> data rows (excluding header).<br>" +
         "&nbsp;&nbsp;&#8226; <b>" + uniqRows.length + "</b> valid unique mappings" +
@@ -1076,7 +1080,7 @@
         failed += slice.length;
         console.warn("network error", netErr);
       }
-      setStatus(`Uploading … ${done}/${rows.length}${failed ? " (" + failed + " failed)" : ""}`, false);
+      setStatus(`Uploading ${done}/${rows.length} (file total ${totalRaw} rows)${failed ? " · " + failed + " failed" : ""}`, false);
     }
     const total = totalRaw;
     const verb = mode === "replace" ? "Replaced" : "Merged";
@@ -1084,10 +1088,43 @@
     const doneRatio = rows.length ? (done / rows.length) : 0;
     const editedDone = Math.round(edited * doneRatio);
     const addedDone  = Math.round(added  * doneRatio);
+    const dupeRows = window._skuStagedDupeRows || [];
+    const skippedRowList = window._skuStagedSkippedRows || [];
+    let extra = "";
+    if ((dupeRows.length + skippedRowList.length) > 0) {
+      extra = ` — <a href='#' id='dlSkuReport' style='color:inherit; text-decoration:underline; font-weight:800;'>Download report of skipped/duplicate rows</a>`;
+    }
     const msg = failed
-      ? `⚠ ${verb} ${done}/${rows.length} (${failed} failed) · File total: ${total} rows = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)`
-      : `✅ ${verb} from ${fName} · File total: ${total} rows = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates removed + ${skippedNoMaster} skipped(no master SKU)`;
+      ? `⚠ ${verb} ${done}/${rows.length} (${failed} failed) · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)${extra}`
+      : `✅ ${verb} from ${fName} · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates removed + ${skippedNoMaster} skipped(no master SKU)${extra}`;
     setStatus(msg, failed > 0);
+    // Use innerHTML so the download link renders as a real anchor
+    { const el = document.getElementById("upStatus"); if (el) el.innerHTML = msg; }
+    const dlBtn = document.getElementById("dlSkuReport");
+    if (dlBtn) {
+      dlBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        try {
+          const wb = XLSX.utils.book_new();
+          if (dupeRows.length) {
+            const ws = XLSX.utils.json_to_sheet(dupeRows);
+            XLSX.utils.book_append_sheet(wb, ws, "Duplicates removed");
+          }
+          if (skippedRowList.length) {
+            const ws = XLSX.utils.json_to_sheet(skippedRowList);
+            XLSX.utils.book_append_sheet(wb, ws, "No Master SKU");
+          }
+          if (wb.SheetNames.length === 0) {
+            const ws = XLSX.utils.aoa_to_sheet([["No skipped or duplicate rows."]]);
+            XLSX.utils.book_append_sheet(wb, ws, "Nothing to report");
+          }
+          const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+          XLSX.writeFile(wb, `master-sku-report-${stamp}.xlsx`);
+        } catch (err) {
+          alert("Could not build report: " + err.message);
+        }
+      });
+    }
     await refreshMasterStamp();
     // Clear staged so accidental double-clicks don't re-run
     window._skuStagedRows = null;
