@@ -64,14 +64,6 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><polyline points="6 9 12 3 18 9"/><path d="M4 21h16"/></svg>
       <span>Upload</span>
     </a>
-    <a href="/uploads/scanner/" class="back-link" style="display:inline-flex; align-items:center; gap:6px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="11" y1="8" x2="11" y2="16"/><line x1="15" y1="8" x2="15" y2="16"/><line x1="19" y1="8" x2="19" y2="16"/></svg>
-      <span>Scanner</span>
-    </a>
-    <a href="/uploads/#skuwise" class="back-link" style="display:inline-flex; align-items:center; gap:6px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
-      <span>SKU Wise Data</span>
-    </a>
     <a id="dlBtn" href="https://github.com/ankit03sethi/cursive-analyst-releases/releases/latest" download style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:#1f6feb; color:#fff; border-radius:8px; text-decoration:none; font-size:14px; font-weight:800;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span>Download</span>
@@ -79,70 +71,33 @@
   </div>
 </header>
 
-<main>
-  <div class="hero">
-    <h1>Cursive Analyst</h1>
-    <p class="sub">Auto-syncs your marketplace orders, returns, payments &amp; stock to your dashboard.</p>
-    <div class="version-chip" id="verChip">Windows &middot; latest</div>
-  </div>
+<main style="max-width:900px; margin:0 auto; padding:60px 20px;">
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px;">
 
-  <div class="dl-container">
-    <div class="dl-card">
-      <h2>Download Installer</h2>
-      <p>~85 MB &middot; Works on Windows 10 &amp; 11</p>
-      <a class="dl-btn" id="dlBtn" href="https://github.com/ankit03sethi/cursive-analyst-releases/releases/latest" download>
-        <span style="font-size:22px;">&#11015;</span>
-        <span>Download for Windows</span>
-      </a>
-      <div class="size-note">Sign into cursive.world first, then click to download.</div>
-    </div>
-  </div>
+    <a href="/uploads/scanner/" style="text-decoration:none; color:inherit;">
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:20px; padding:40px 28px; text-align:center; box-shadow:0 6px 24px rgba(15,23,42,.06); transition:transform .12s, box-shadow .12s; cursor:pointer;"
+           onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 32px rgba(31,111,235,.18)';"
+           onmouseout="this.style.transform=''; this.style.boxShadow='0 6px 24px rgba(15,23,42,.06)';">
+        <div style="width:80px; height:80px; background:#eff6ff; color:#1f6feb; border-radius:20px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="11" y1="8" x2="11" y2="16"/><line x1="15" y1="8" x2="15" y2="16"/><line x1="19" y1="8" x2="19" y2="16"/></svg>
+        </div>
+        <h2 style="margin:0 0 6px; font-size:22px; font-weight:800;">Scanner</h2>
+        <p style="margin:0; color:#64748b; font-size:14px;">Scan shipping-label barcodes &amp; track packed orders</p>
+      </div>
+    </a>
 
-  <div class="steps">
-    <h3>How it works</h3>
-    <div class="step-row">
-      <div class="step-num">1</div>
-      <div class="step-content">
-        <b>Install &amp; sign in</b>
-        <div class="step-sub">Double-click the installer. Silent install (~10 sec). Sign in with your cursive.world email. App runs in system tray, invisible otherwise.</div>
+    <a href="/uploads/#skuwise" style="text-decoration:none; color:inherit;">
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:20px; padding:40px 28px; text-align:center; box-shadow:0 6px 24px rgba(15,23,42,.06); transition:transform .12s, box-shadow .12s; cursor:pointer;"
+           onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 32px rgba(31,111,235,.18)';"
+           onmouseout="this.style.transform=''; this.style.boxShadow='0 6px 24px rgba(15,23,42,.06)';">
+        <div style="width:80px; height:80px; background:#eff6ff; color:#1f6feb; border-radius:20px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
+        </div>
+        <h2 style="margin:0 0 6px; font-size:22px; font-weight:800;">SKU Wise Data</h2>
+        <p style="margin:0; color:#64748b; font-size:14px;">Browse master SKUs, orders, returns &amp; payments</p>
       </div>
-    </div>
-    <div class="step-row">
-      <div class="step-num">2</div>
-      <div class="step-content">
-        <b>App auto-creates a folder per company</b>
-        <div class="step-sub">The app reads your company list from cursive.world and creates <code>C:\Users\&lt;you&gt;\SellerOps\&lt;CompanyName&gt;\</code> for each one.</div>
-      </div>
-    </div>
-    <div class="step-row">
-      <div class="step-num">3</div>
-      <div class="step-content">
-        <b>Point each Chrome profile to its company folder</b>
-        <div class="step-sub">One-time: in each Chrome profile Settings &rarr; Downloads &rarr; set Location to the matching <code>SellerOps\&lt;Company&gt;\</code> folder. Takes 30 seconds per profile.</div>
-      </div>
-    </div>
-    <div class="step-row">
-      <div class="step-num">4</div>
-      <div class="step-content">
-        <b>Just download files &mdash; done</b>
-        <div class="step-sub">Click Download on Amazon / Flipkart / Meesho / FirstCry / Myntra seller panels. Files auto-flow to Cursive Analyst, get tagged with company + platform, appear in your SKU Wise dashboard within seconds.</div>
-      </div>
-    </div>
-  </div>
+    </a>
 
-  <div class="info-card">
-    <h4>&#10004; Zero maintenance</h4>
-    <p>
-      &bull; Runs invisibly in system tray, auto-starts with Windows.<br>
-      &bull; When we ship an update, it auto-installs silently.<br>
-      &bull; Never touches your Chrome logins or marketplace accounts.<br>
-      &bull; Adds a new company later? Add on cursive.world; folder appears automatically.
-    </p>
-  </div>
-
-  <div class="support">
-    Need help? WhatsApp <a href="https://wa.me/919625737475?text=Hi%2C%20please%20help%20me%20install%20Cursive%20Analyst">+91 96257 37475</a>
-    &middot; Email <a href="mailto:contact@cursive.world">contact@cursive.world</a>
   </div>
 </main>
 
@@ -190,16 +145,4 @@
       return;
     }
     const paidAt = new Date(rows[0].created_at);
-    const expiresAt = new Date(paidAt.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const daysLeft = Math.max(0, Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
-    // Show a small "subscription active" chip near the top
-    const chip = document.createElement("div");
-    chip.style.cssText = "max-width:620px;margin:0 auto 12px;padding:8px 14px;background:#dcfce7;color:#166534;border-radius:10px;font-size:13px;font-weight:700;text-align:center;border:1px solid #86efac;";
-    chip.innerHTML = "&#10004; Subscription active &middot; " + daysLeft + " day" + (daysLeft === 1 ? "" : "s") + " left";
-    const hero = document.querySelector(".hero");
-    if (hero && hero.parentNode) hero.parentNode.insertBefore(chip, hero.nextSibling);
-  })();
-</script>
-
-</body>
-</html>
+    const expiresAt = new Date(paidAt.getTime()
