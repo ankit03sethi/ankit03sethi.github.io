@@ -140,7 +140,6 @@
   </div>
   <div class="topbar-right">
     <span class="email-chip" id="emailChip"></span>
-    <a class="btn-link" href="/skuwisedata/">SKU Wise Data</a>
     <a class="btn-link" href="/analyst/">Install app</a>
     <a class="btn-link" href="/home/">Home</a>
   </div>
@@ -459,6 +458,42 @@
     <a class="empty-cta" style="display:inline-block; padding:10px 20px; background:#1f6feb; color:#fff; border-radius:8px; text-decoration:none; font-weight:700;" href="/home/?service=analyst">Subscribe &#8377;4999 / 30 days</a>
   </div>
 </div>
+
+<!-- DIAGNOSTIC: catches any JS error and paints it in-page so we can see it -->
+<div id="jsErrBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999; padding:10px 16px; background:#fef2f2; color:#991b1b; border-bottom:2px solid #dc2626; font-family:monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; max-height:40vh; overflow:auto;"></div>
+<script>
+  // Global error capture — runs BEFORE the module so we see even parse errors from other scripts
+  (function () {
+    function show(msg) {
+      var b = document.getElementById("jsErrBanner");
+      if (!b) return;
+      b.style.display = "block";
+      b.textContent = "JS ERROR (screenshot this): " + msg;
+    }
+    window.addEventListener("error", function (e) {
+      show((e.message || "unknown") + " @ " + (e.filename || "?") + ":" + (e.lineno || "?"));
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      var r = e.reason;
+      show("Unhandled promise: " + (r && r.message ? r.message : String(r)));
+    });
+    // Defensive Companies click — opens modal even if the module never runs
+    document.addEventListener("DOMContentLoaded", function () {
+      var btn = document.getElementById("openCompaniesBtn");
+      var modal = document.getElementById("companiesModal");
+      if (btn && modal) {
+        btn.addEventListener("click", function () {
+          // Only fire if the module hasn't already attached its own handler that works
+          if (!modal.classList.contains("show")) modal.classList.add("show");
+        }, { once: false });
+      }
+      var closeBtn = document.getElementById("companiesClose");
+      var cancelBtn = document.getElementById("companiesCancelBtn");
+      if (closeBtn) closeBtn.addEventListener("click", function () { modal && modal.classList.remove("show"); });
+      if (cancelBtn) cancelBtn.addEventListener("click", function () { modal && modal.classList.remove("show"); });
+    });
+  })();
+</script>
 
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -1358,18 +1393,17 @@
   }
   function setStatus(msg, isError) {
     const el = $("#upStatus");
-     
     if (!el) return;
     el.textContent = msg || "";
     el.style.display = msg ? "block" : "none";
     if (isError) {
-      el.style.background   = "#fef2f2";
-      el.style.borderTop    = "1px solid #fecaca";
-      el.style.color        = "#991b1b";
+      el.style.background = "#fef2f2";
+      el.style.borderTop  = "1px solid #fecaca";
+      el.style.color      = "#991b1b";
     } else {
-      el.style.background   = "#f0fdf4";
-      el.style.borderTop    = "1px solid #bbf7d0";
-      el.style.color        = "#166534";
+      el.style.background = "#f0fdf4";
+      el.style.borderTop  = "1px solid #bbf7d0";
+      el.style.color      = "#166534";
     }
   }
 </script>
