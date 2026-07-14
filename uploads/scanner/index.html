@@ -342,7 +342,7 @@
     // FirstCry
     "awb no.", "awb code",
     // Generic
-    "tracking", "shipment tracking", "shipment id",
+    "tracking", "shipment tracking",
   ];
   const norm = (s) => String(s || "").trim().toLowerCase();
 
@@ -377,7 +377,13 @@
       { fps: 10, qrbox: { width: 260, height: 140 } },
       (text) => handleScan(text),
       () => {}
-    ).catch(err => { console.error(err); alert("Camera error: " + err); });
+    ).catch(err => {
+      console.error(err);
+      const rc = document.getElementById("resultCard");
+      rc.className = "result-card show not_found";
+      rc.innerHTML = "Camera blocked — use manual input below<span class=\"sub\">Click the camera icon in Chrome's address bar → Allow → reload.</span>";
+      state.scanner = null;
+    });
   }
   function stopScanner() {
     if (!state.scanner) return;
