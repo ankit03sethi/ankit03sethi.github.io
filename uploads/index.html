@@ -103,6 +103,10 @@
     .combo-row .cell-action { flex:0 0 auto; }
     .combo-row .up-mini { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid #1f6feb; background:#1f6feb; color:#fff; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .combo-row .up-mini:hover { background:#1651a8; }
+    .combo-row.staged { background:#f0fdf4; }
+    .combo-row .staged-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:#dcfce7; color:#166534; font-size:12px; font-weight:700; }
+    .combo-row .staged-name { color:#64748b; font-size:11px; font-weight:600; margin-left:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; display:inline-block; }
+    .combo-row .up-remove { background:transparent; border:none; color:#dc2626; font-size:16px; cursor:pointer; margin-left:6px; }
     @media (max-width: 600px) {
       .combo-row { flex-direction:column; align-items:stretch; gap:6px; }
     }
@@ -270,7 +274,7 @@
     </div>
     <div class="modal-foot" style="justify-content:space-between;">
       <button class="btn" id="reverseLayoutBtn" title="Swap company / platforms sides">&#8646; Reverse layout</button>
-      <button class="btn" id="ordersPickerCancelBtn">Close</button>
+      <button class="btn primary" id="ordersSaveAllBtn" disabled title="Upload staged files first">&#10004; Save <span id="ordersSaveCount"></span></button>
     </div>
   </div>
 </div>
@@ -409,6 +413,7 @@
     ordersFilterCompany = ""; ordersFilterPlatform = "";
     buildFilterChips(withPlats);
     renderOrdersPickerList(withPlats);
+    updateSaveButton();
     $("#ordersPickerModal").classList.add("show");
   });
 
@@ -466,27 +471,53 @@
 
     // In reverse mode, platform cell shows first (left)
     const html = rows.map(r => {
+      const key = r.company + "::" + r.platform;
+      const staged = stagedUploads[key];
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
       const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>`;
-      const actionCell = `<div class="cell-action">
-          <button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>
-        </div>`;
-      return `<div class="combo-row">${reversed ? platformCell + companyCell : companyCell + platformCell}${actionCell}</div>`;
+      let actionInner;
+      if (staged) {
+        actionInner = `<span class="staged-badge">&#10004; ${staged.rows.length} rows staged</span>
+          <span class="staged-name" title="${escapeHtml(staged.fileName)}">${escapeHtml(staged.fileName)}</span>
+          <button class="up-remove" data-key="${escapeHtml(key)}" title="Remove staged file">&times;</button>`;
+      } else {
+        actionInner = `<button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>`;
+      }
+      const actionCell = `<div class="cell-action" style="display:flex; align-items:center;">${actionInner}</div>`;
+      return `<div class="combo-row${staged ? ' staged' : ''}">${reversed ? platformCell + companyCell : companyCell + platformCell}${actionCell}</div>`;
     }).join("");
     wrap.innerHTML = html;
     wrap.querySelectorAll(".up-mini").forEach(btn => {
       btn.addEventListener("click", () => {
         const company = btn.dataset.company;
         const platform = btn.dataset.platform;
-        $("#ordersPickerModal").classList.remove("show");
         $("#ordersFileInput").dataset.company = company;
         $("#ordersFileInput").dataset.platform = platform;
         $("#ordersFileInput").click();
       });
     });
+    wrap.querySelectorAll(".up-remove").forEach(btn => {
+      btn.addEventListener("click", () => {
+        delete stagedUploads[btn.dataset.key];
+        const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+        renderOrdersPickerList(withPlats);
+        updateSaveButton();
+      });
+    });
+  }
+
+  // Staged uploads live in memory until user clicks Save
+  const stagedUploads = {}; // key: "company::platform" → { fileName, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol }
+
+  function updateSaveButton() {
+    const btn = $("#ordersSaveAllBtn");
+    const cnt = $("#ordersSaveCount");
+    const n = Object.keys(stagedUploads).length;
+    btn.disabled = n === 0;
+    cnt.textContent = n > 0 ? "(" + n + " file" + (n === 1 ? "" : "s") + ")" : "";
+    btn.title = n === 0 ? "Upload staged files first" : "Push all staged files to Supabase";
   }
   $("#ordersPickerClose").addEventListener("click", () => $("#ordersPickerModal").classList.remove("show"));
-  $("#ordersPickerCancelBtn").addEventListener("click", () => $("#ordersPickerModal").classList.remove("show"));
   $("#reverseLayoutBtn").addEventListener("click", () => {
     const list = $("#ordersPickerList");
     list.classList.toggle("reverse");
@@ -515,6 +546,7 @@
       $("#dateRangeBox").style.display  = (dateMode === "range")  ? "" : "none";
     });
   });
+  // Parse & STAGE the file locally — does not push to Supabase yet
   $("#ordersFileInput").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const company = e.target.dataset.company;
@@ -526,8 +558,7 @@
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
       if (rows.length === 0) { setStatus("File is empty.", true); return; }
-      const uid = session.user.id;
-      // Resolve chosen date/range from modal state
+      // Snapshot the modal's date choice now (so it locks with this file)
       let overrideDate = null, dateFrom = null, dateTo = null;
       if (dateMode === "single") {
         const v = ($("#dateSingle").value || "").trim();
@@ -538,37 +569,13 @@
         if (a) dateFrom = new Date(a + "T00:00:00Z").toISOString();
         if (b) dateTo   = new Date(b + "T00:00:00Z").toISOString();
       }
-      // Try to detect an order date column from the file; else fall back
       const dateCol = detectDateColumn(Object.keys(rows[0]), ["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"]);
-      const payload = rows.map(r => {
-        const csvDate = dateCol ? parseDate(r[dateCol]) : null;
-        const finalDate = overrideDate || csvDate || dateFrom || null;
-        const rawWithMeta = { ...r };
-        if (overrideDate) rawWithMeta.__file_date = overrideDate;
-        if (dateFrom)     rawWithMeta.__file_date_from = dateFrom;
-        if (dateTo)       rawWithMeta.__file_date_to   = dateTo;
-        return {
-          user_id: uid,
-          year: finalDate ? new Date(finalDate).getFullYear() : null,
-          order_date: finalDate,
-          company_name: company,
-          platform: platform,
-          source_file: f.name,
-          raw_data: rawWithMeta,
-        };
-      });
-      setStatus(`Uploading ${payload.length} orders …`, false);
-      const CHUNK = 400;
-      let done = 0;
-      for (let i = 0; i < payload.length; i += CHUNK) {
-        const slice = payload.slice(i, i + CHUNK);
-        const { error } = await sb.from("seller_orders").insert(slice);
-        if (error) { setStatus("Upload error: " + error.message, true); return; }
-        done += slice.length;
-        setStatus(`Uploading … ${done} / ${payload.length}`, false);
-      }
-      setStatus(`✅ Uploaded ${payload.length} orders (${PLAT_LABEL[platform]} · ${company}) from ${f.name}.`, false);
-      await refreshOrdersStamp();
+      const key = company + "::" + platform;
+      stagedUploads[key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol };
+      setStatus(`✅ Staged ${rows.length} rows from ${f.name} for ${PLAT_LABEL[platform]} · ${company}. Click Save when ready.`, false);
+      const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+      renderOrdersPickerList(withPlats);
+      updateSaveButton();
     } catch (err) {
       console.error(err);
       setStatus("Failed to parse file: " + (err.message || err), true);
@@ -577,6 +584,51 @@
       delete e.target.dataset.company;
       delete e.target.dataset.platform;
     }
+  });
+
+  // Save button — pushes all staged uploads to Supabase in sequence
+  $("#ordersSaveAllBtn").addEventListener("click", async () => {
+    const keys = Object.keys(stagedUploads);
+    if (keys.length === 0) return;
+    const btn = $("#ordersSaveAllBtn");
+    btn.disabled = true;
+    const uid = session.user.id;
+    let totalInserted = 0, filesDone = 0;
+    for (const k of keys) {
+      const s = stagedUploads[k];
+      const payload = s.rows.map(r => {
+        const csvDate = s.dateCol ? parseDate(r[s.dateCol]) : null;
+        const finalDate = s.overrideDate || csvDate || s.dateFrom || null;
+        const rawWithMeta = { ...r };
+        if (s.overrideDate) rawWithMeta.__file_date = s.overrideDate;
+        if (s.dateFrom)     rawWithMeta.__file_date_from = s.dateFrom;
+        if (s.dateTo)       rawWithMeta.__file_date_to   = s.dateTo;
+        return {
+          user_id: uid,
+          year: finalDate ? new Date(finalDate).getFullYear() : null,
+          order_date: finalDate,
+          company_name: s.company,
+          platform: s.platform,
+          source_file: s.fileName,
+          raw_data: rawWithMeta,
+        };
+      });
+      setStatus(`Saving ${s.fileName} (${payload.length} rows) — ${filesDone + 1}/${keys.length} …`, false);
+      const CHUNK = 400;
+      for (let i = 0; i < payload.length; i += CHUNK) {
+        const slice = payload.slice(i, i + CHUNK);
+        const { error } = await sb.from("seller_orders").insert(slice);
+        if (error) { setStatus(`Save error on ${s.fileName}: ${error.message}`, true); btn.disabled = false; return; }
+      }
+      totalInserted += payload.length;
+      filesDone++;
+      delete stagedUploads[k];
+    }
+    setStatus(`✅ Saved ${totalInserted} rows from ${filesDone} file${filesDone === 1 ? "" : "s"} to Supabase.`, false);
+    const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+    renderOrdersPickerList(withPlats);
+    updateSaveButton();
+    await refreshOrdersStamp();
   });
 
   function detectDateColumn(headers, candidates) {
