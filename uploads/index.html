@@ -176,27 +176,65 @@
     </div>
     <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
-    <div class="up-item" id="ordersRow" style="display:none;">
+    <div class="up-item kind-row" data-kind="orders" style="display:none;">
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
         <div>
-          <div class="up-name">Orders CSV</div>
-          <div class="up-desc">Upload marketplace order CSVs for one of your companies &amp; platforms.</div>
+          <div class="up-name">Orders File</div>
+          <div class="up-desc">Marketplace order CSVs / XLSX per company &amp; platform.</div>
         </div>
       </div>
       <div class="up-right">
         <div class="up-stamp-box">
           <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
-          <div class="stamp none" id="ordersFileStamp">Never</div>
+          <div class="stamp none kind-stamp" data-kind="orders">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary" id="ordersUploadBtn">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="orders">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="up-item kind-row" data-kind="returns" style="display:none;">
+      <div class="up-left">
+        <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#8618;</div>
+        <div>
+          <div class="up-name">Returns File</div>
+          <div class="up-desc">Marketplace return / RTO / cancellation reports.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none kind-stamp" data-kind="returns">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary kind-upload-btn" data-kind="returns">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="up-item kind-row" data-kind="payments" style="display:none;">
+      <div class="up-left">
+        <div class="up-icon" style="background:#dcfce7; color:#166534;">&#128176;</div>
+        <div>
+          <div class="up-name">Payments File</div>
+          <div class="up-desc">Marketplace settlement / payment reports.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none kind-stamp" data-kind="payments">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary kind-upload-btn" data-kind="payments">&#8593; Upload</button>
         </div>
       </div>
     </div>
     <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt" style="display:none;" />
 
-    <div class="up-item" id="ordersHint" style="display:none;">
+    <div class="up-item kind-hint" id="ordersHint" style="display:none;">
       <div class="up-left">
         <div class="up-icon" style="background:#fef9c3; color:#a16207;">&#9888;&#65039;</div>
         <div>
@@ -232,7 +270,7 @@
 <div class="modal-bg" id="ordersPickerModal">
   <div class="modal">
     <div class="modal-head">
-      <h3>Upload Orders CSV</h3>
+      <h3 id="ordersPickerTitle">Upload Orders File</h3>
       <button class="x" id="ordersPickerClose">&times;</button>
     </div>
     <div class="modal-body">
@@ -327,9 +365,9 @@
     if (error) { console.warn(error); return; }
     companies = (data || []).map(c => ({ id: c.id, name: c.name, platforms: c.platforms || [] }));
     $("#companiesCount").textContent = companies.length ? "(" + companies.length + ")" : "";
-    // Toggle orders row visibility
+    // Toggle all 3 kind rows visibility
     const anyPlat = companies.some(c => (c.platforms || []).length > 0);
-    $("#ordersRow").style.display  = anyPlat ? "" : "none";
+    document.querySelectorAll(".kind-row").forEach(r => { r.style.display = anyPlat ? "" : "none"; });
     $("#ordersHint").style.display = anyPlat ? "none" : "";
   }
 
@@ -403,18 +441,30 @@
     setStatus("Companies saved. Cursive Analyst desktop app will pick up the changes within 5 minutes.", false);
   });
 
-  // ---- ORDERS CSV UPLOAD ----
-  let ordersFilterCompany = "";  // "" = All
-  let ordersFilterPlatform = ""; // "" = All
+  // ---- MULTI-KIND UPLOADS: Orders / Returns / Payments ----
+  const KIND_CFG = {
+    orders:   { title:"Upload Orders File",   table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
+    returns:  { title:"Upload Returns File",  table:"seller_returns",  dateCol:"return_date",  dateAliases:["return date","return-date","returndate","date","rto date","cancel date","reverse date"] },
+    payments: { title:"Upload Payments File", table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
+  };
+  let currentKind = "orders";
+  let ordersFilterCompany = "";
+  let ordersFilterPlatform = "";
+  // stagedUploads keyed by kind → { "company::platform": {...} }
+  const stagedUploads = { orders: {}, returns: {}, payments: {} };
 
-  $("#ordersUploadBtn").addEventListener("click", () => {
-    const withPlats = companies.filter(c => (c.platforms || []).length > 0);
-    if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
-    ordersFilterCompany = ""; ordersFilterPlatform = "";
-    buildFilterChips(withPlats);
-    renderOrdersPickerList(withPlats);
-    updateSaveButton();
-    $("#ordersPickerModal").classList.add("show");
+  document.querySelectorAll(".kind-upload-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentKind = btn.dataset.kind;
+      const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+      if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
+      ordersFilterCompany = ""; ordersFilterPlatform = "";
+      $("#ordersPickerTitle").textContent = KIND_CFG[currentKind].title;
+      buildFilterChips(withPlats);
+      renderOrdersPickerList(withPlats);
+      updateSaveButton();
+      $("#ordersPickerModal").classList.add("show");
+    });
   });
 
   function buildFilterChips(list) {
@@ -470,9 +520,10 @@
     }
 
     // In reverse mode, platform cell shows first (left)
+    const bucket = stagedUploads[currentKind];
     const html = rows.map(r => {
       const key = r.company + "::" + r.platform;
-      const staged = stagedUploads[key];
+      const staged = bucket[key];
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
       const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>`;
       let actionInner;
@@ -498,7 +549,7 @@
     });
     wrap.querySelectorAll(".up-remove").forEach(btn => {
       btn.addEventListener("click", () => {
-        delete stagedUploads[btn.dataset.key];
+        delete stagedUploads[currentKind][btn.dataset.key];
         const withPlats = companies.filter(c => (c.platforms || []).length > 0);
         renderOrdersPickerList(withPlats);
         updateSaveButton();
@@ -506,13 +557,10 @@
     });
   }
 
-  // Staged uploads live in memory until user clicks Save
-  const stagedUploads = {}; // key: "company::platform" → { fileName, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol }
-
   function updateSaveButton() {
     const btn = $("#ordersSaveAllBtn");
     const cnt = $("#ordersSaveCount");
-    const n = Object.keys(stagedUploads).length;
+    const n = Object.keys(stagedUploads[currentKind] || {}).length;
     btn.disabled = n === 0;
     cnt.textContent = n > 0 ? "(" + n + " file" + (n === 1 ? "" : "s") + ")" : "";
     btn.title = n === 0 ? "Upload staged files first" : "Push all staged files to Supabase";
@@ -569,9 +617,10 @@
         if (a) dateFrom = new Date(a + "T00:00:00Z").toISOString();
         if (b) dateTo   = new Date(b + "T00:00:00Z").toISOString();
       }
-      const dateCol = detectDateColumn(Object.keys(rows[0]), ["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"]);
+      const cfg = KIND_CFG[currentKind];
+      const dateCol = detectDateColumn(Object.keys(rows[0]), cfg.dateAliases);
       const key = company + "::" + platform;
-      stagedUploads[key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol };
+      stagedUploads[currentKind][key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol, kind: currentKind };
       setStatus(`✅ Staged ${rows.length} rows from ${f.name} for ${PLAT_LABEL[platform]} · ${company}. Click Save when ready.`, false);
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       renderOrdersPickerList(withPlats);
@@ -586,16 +635,18 @@
     }
   });
 
-  // Save button — pushes all staged uploads to Supabase in sequence
+  // Save button — pushes all staged uploads (of current kind) to Supabase in sequence
   $("#ordersSaveAllBtn").addEventListener("click", async () => {
-    const keys = Object.keys(stagedUploads);
+    const bucket = stagedUploads[currentKind];
+    const keys = Object.keys(bucket);
     if (keys.length === 0) return;
+    const cfg = KIND_CFG[currentKind];
     const btn = $("#ordersSaveAllBtn");
     btn.disabled = true;
     const uid = session.user.id;
     let totalInserted = 0, filesDone = 0;
     for (const k of keys) {
-      const s = stagedUploads[k];
+      const s = bucket[k];
       const payload = s.rows.map(r => {
         const csvDate = s.dateCol ? parseDate(r[s.dateCol]) : null;
         const finalDate = s.overrideDate || csvDate || s.dateFrom || null;
@@ -603,32 +654,33 @@
         if (s.overrideDate) rawWithMeta.__file_date = s.overrideDate;
         if (s.dateFrom)     rawWithMeta.__file_date_from = s.dateFrom;
         if (s.dateTo)       rawWithMeta.__file_date_to   = s.dateTo;
-        return {
+        const row = {
           user_id: uid,
           year: finalDate ? new Date(finalDate).getFullYear() : null,
-          order_date: finalDate,
           company_name: s.company,
           platform: s.platform,
           source_file: s.fileName,
           raw_data: rawWithMeta,
         };
+        row[cfg.dateCol] = finalDate; // order_date | return_date | payment_date
+        return row;
       });
       setStatus(`Saving ${s.fileName} (${payload.length} rows) — ${filesDone + 1}/${keys.length} …`, false);
       const CHUNK = 400;
       for (let i = 0; i < payload.length; i += CHUNK) {
         const slice = payload.slice(i, i + CHUNK);
-        const { error } = await sb.from("seller_orders").insert(slice);
+        const { error } = await sb.from(cfg.table).insert(slice);
         if (error) { setStatus(`Save error on ${s.fileName}: ${error.message}`, true); btn.disabled = false; return; }
       }
       totalInserted += payload.length;
       filesDone++;
-      delete stagedUploads[k];
+      delete bucket[k];
     }
     setStatus(`✅ Saved ${totalInserted} rows from ${filesDone} file${filesDone === 1 ? "" : "s"} to Supabase.`, false);
     const withPlats = companies.filter(c => (c.platforms || []).length > 0);
     renderOrdersPickerList(withPlats);
     updateSaveButton();
-    await refreshOrdersStamp();
+    await refreshStamps();
   });
 
   function detectDateColumn(headers, candidates) {
@@ -653,20 +705,26 @@
     return d ? new Date(d).getFullYear() : null;
   }
 
-  async function refreshOrdersStamp() {
+  async function refreshStamps() {
     if (!session) return;
-    const { data } = await sb.from("seller_orders")
-      .select("pushed_at, source_file, company_name, platform")
-      .eq("user_id", session.user.id)
-      .order("pushed_at", { ascending: false })
-      .limit(1);
-    const el = $("#ordersFileStamp");
-    if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); return; }
-    const dt = new Date(data[0].pushed_at);
-    el.classList.remove("none");
-    el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-    el.title = (data[0].company_name || "") + " · " + (PLAT_LABEL[data[0].platform] || data[0].platform || "") + (data[0].source_file ? "\n" + data[0].source_file : "");
+    for (const kind of Object.keys(KIND_CFG)) {
+      const table = KIND_CFG[kind].table;
+      const { data } = await sb.from(table)
+        .select("pushed_at, source_file, company_name, platform")
+        .eq("user_id", session.user.id)
+        .order("pushed_at", { ascending: false })
+        .limit(1);
+      const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
+      if (!el) continue;
+      if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); el.title = ""; continue; }
+      const dt = new Date(data[0].pushed_at);
+      el.classList.remove("none");
+      el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+      el.title = (data[0].company_name || "") + " · " + (PLAT_LABEL[data[0].platform] || data[0].platform || "") + (data[0].source_file ? "\n" + data[0].source_file : "");
+    }
   }
+  // Back-compat alias
+  const refreshOrdersStamp = refreshStamps;
 
   // Sample button → downloads pre-built .xlsx with header, dropdowns, auto S.NO
   $("#masterSampleBtn").addEventListener("click", () => {
