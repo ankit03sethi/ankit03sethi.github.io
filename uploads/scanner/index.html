@@ -101,8 +101,21 @@
     .lock-card { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
 
     @media (max-width: 620px) {
-      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .container { padding: 12px; }
+      .card { padding: 12px; margin-bottom: 10px; }
+      .topbar { padding: 10px 12px; }
+      .brand-wordmark { font-size: 18px; }
+      .nav-sub { display: none; }
+      .email-chip { display: none; }
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .kpi { padding: 10px; }
+      .kpi .val { font-size: 20px; }
       .lists { grid-template-columns: 1fr; }
+      #reader { max-width: 100% !important; }
+      #reader video { max-height: 60vh !important; object-fit: cover; }
+      .result-card { padding: 12px; font-size: 15px; }
+      .setup h2 { font-size: 17px; }
+      .field-row { flex-direction: column; }
     }
   </style>
 </head>
@@ -432,10 +445,38 @@
   });
 
   function processBarcode(barcode) {
-    const key = barcode.trim().toLowerCase();
-    if (!key) return;
-    const already = state.scanned.get(key);
-    const match = state.barcodeIndex.get(key);
+    const raw = barcode.trim();
+    if (!raw) return;
+    const key = raw.toLowerCase();
+    // 1) Exact key match
+    let match = state.barcodeIndex.get(key);
+    let matchKey = key;
+    // 2) If not found, try substring — scanner sometimes reads with extra prefix/suffix chars
+    if (!match) {
+      for (const [k, entry] of state.barcodeIndex) {
+        if (key.includes(k) || k.includes(key)) {
+          match = entry;
+          matchKey = k;
+          break;
+        }
+      }
+    }
+    // 3) If still not found, try digits-only compare (some barcodes read with control chars)
+    if (!match) {
+      const digitsKey = key.replace(/[^a-z0-9]/g, "");
+      if (digitsKey.length >= 6) {
+        for (const [k, entry] of state.barcodeIndex) {
+          const kd = k.replace(/[^a-z0-9]/g, "");
+          if (kd === digitsKey || kd.includes(digitsKey) || digitsKey.includes(kd)) {
+            match = entry;
+            matchKey = k;
+            break;
+          }
+        }
+      }
+    }
+
+    const already = state.scanned.get(matchKey);
     let status;
     if (match && !already) {
       status = "ok"; state.counts.ok++;
@@ -446,10 +487,10 @@
     } else {
       status = "nf_dup"; state.counts.dup++;
     }
-    state.scanned.set(key, { status, at: Date.now(), value: barcode, match });
-    showResult(status, barcode, match);
+    state.scanned.set(matchKey, { status, at: Date.now(), value: raw, match });
+    showResult(status, raw, match);
     refreshCounters();
-    saveScanEvent(barcode, status, match);
+    saveScanEvent(raw, status, match);
   }
 
   function showResult(status, barcode, match) {
