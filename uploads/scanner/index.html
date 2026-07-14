@@ -371,17 +371,38 @@
   // ---- Scanner ----
   function startScanner() {
     if (state.scanner) return;
-    const reader = new Html5Qrcode("reader");
+    // Enable ALL barcode formats (1D + 2D). Flipkart labels use Code 128; Amazon uses Code 39.
+    const formats = [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_93,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODABAR,
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.DATA_MATRIX,
+      Html5QrcodeSupportedFormats.PDF_417,
+    ];
+    const reader = new Html5Qrcode("reader", { formatsToSupport: formats, verbose: false });
     state.scanner = reader;
+    // Wide qrbox for 1D barcodes (they're horizontal)
+    const qrbox = (vw, vh) => {
+      const w = Math.min(Math.floor(vw * 0.85), 480);
+      const h = Math.min(Math.floor(vh * 0.35), 180);
+      return { width: w, height: h };
+    };
     reader.start({ facingMode: "environment" },
-      { fps: 10, qrbox: { width: 260, height: 140 } },
+      { fps: 15, qrbox, aspectRatio: 1.777 },
       (text) => handleScan(text),
       () => {}
     ).catch(err => {
       console.error(err);
       const rc = document.getElementById("resultCard");
       rc.className = "result-card show not_found";
-      rc.innerHTML = "Camera blocked — use manual input below<span class=\"sub\">Click the camera icon in Chrome's address bar → Allow → reload.</span>";
+      rc.innerHTML = "Camera blocked — use manual input below<span class=\"sub\">Enable camera permission for cursive.world in your browser settings.</span>";
       state.scanner = null;
     });
   }
@@ -448,37 +469,30 @@
     $("#kpiOk").textContent  = state.counts.ok;
     $("#kpiNF").textContent  = state.counts.nf;
     $("#kpiDup").textContent = state.counts.dup;
-    const totalToPack = state.barcodeIndex ? state.barcodeIndex.size : 0;
-    // Remaining = unique OK-matched values still not scanned
+
+    // Every entry in barcodeIndex is a UNIQUE tracking id (dedupe key = lowercased tracking value)
+    // Remaining = tracking ids that haven't been scanned OK yet
     const scannedOkKeys = new Set();
     for (const [k, v] of state.scanned) if (v.status === "ok") scannedOkKeys.add(k);
-    // Every distinct row that has at least one field NOT yet scanned → still remaining
-    // Simpler for user: distinct rows not yet touched by any OK scan
-    const rowsWithOk = new Set();
-    for (const [k, v] of state.scanned) if (v.status === "ok" && v.match) rowsWithOk.add(v.match.row.id);
-    const remaining = state.orders.filter(r => !rowsWithOk.has(r.id));
+    const remaining = [];
+    for (const [key, entry] of state.barcodeIndex) {
+      if (!scannedOkKeys.has(key)) remaining.push(entry);
+    }
     $("#kpiRem").textContent = remaining.length;
 
-    // Lists
+    // Lists — Scanned/NF/Dup already dedupe by scanning behaviour (Map keyed by barcode)
     const okList = [], nfList = [], dupList = [];
     for (const [k, v] of state.scanned) {
       if (v.status === "ok")             okList.push(v);
       else if (v.status === "not_found") nfList.push(v);
       else                                dupList.push(v);
     }
-    fillList("listOk",  okList.slice(-50).reverse(),  v => `<b>${escapeHtml(v.match?.value || v.value)}</b> <span style="color:#64748b;">· ${escapeHtml(v.match?.field || "")}</span>`);
+    fillList("listOk",  okList.slice(-50).reverse(),  v => `<b>${escapeHtml(v.match?.value || v.value)}</b> <span style="color:#64748b;">· ${escapeHtml(v.match?.row?.company_name || "")} · ${escapeHtml(v.match?.row?.platform || "")}</span>`);
     fillList("listNF",  nfList.slice(-50).reverse(),  v => escapeHtml(v.value));
     fillList("listDup", dupList.slice(-50).reverse(), v => escapeHtml(v.match?.value || v.value));
-    fillList("listRem", remaining.slice(0, 50), r => {
-      const rd = r.raw_data || {};
-      // Show the Tracking ID / AWB (what the packer will scan). Fall back only if truly missing.
-      const id =
-        rd["Tracking ID"] || rd["Tracking Id"] || rd["tracking id"] ||
-        rd["AWB No"] || rd["AWB Number"] || rd["AWB"] || rd["AWB No."] || rd["AWB Code"] ||
-        rd["Sub Order No"] || rd["Waybill"] || rd["Tracking Number"] ||
-        "—";
-      return `<b>${escapeHtml(String(id))}</b> <span style="color:#64748b;">· ${escapeHtml(r.platform || "")} · ${escapeHtml(r.company_name || "")}</span>`;
-    });
+    fillList("listRem", remaining.slice(0, 50), entry =>
+      `<b>${escapeHtml(entry.value)}</b> <span style="color:#64748b;">· ${escapeHtml(entry.row.platform || "")} · ${escapeHtml(entry.row.company_name || "")}</span>`
+    );
     $("#cntOk").textContent  = okList.length;
     $("#cntNF").textContent  = nfList.length;
     $("#cntDup").textContent = dupList.length;
