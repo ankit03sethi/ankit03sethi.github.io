@@ -286,6 +286,35 @@
   </div>
 </div>
 
+<!-- MASTER SKU UPLOAD MODE MODAL -->
+<div class="modal-bg" id="skuModeModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>How to save this Master SKU file?</h3>
+      <button class="x" id="skuModeClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 14px; color:#64748b; font-size:13px;" id="skuModeSummary">Parsed <b>0</b> rows.</p>
+
+      <button class="up-item" id="skuModeReplace" type="button" style="width:100%; text-align:left; border:1px solid #fecaca; background:#fef2f2; padding:14px; border-radius:12px; margin-bottom:10px; cursor:pointer; display:flex; gap:12px; align-items:flex-start;">
+        <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#128465;</div>
+        <div>
+          <div class="up-name">Delete all old data + save this file</div>
+          <div class="up-desc" style="color:#7f1d1d;">Wipes every existing Master SKU row for your account. This file becomes the only source of truth. Deleted rows in the file will be removed.</div>
+        </div>
+      </button>
+
+      <button class="up-item" id="skuModeMerge" type="button" style="width:100%; text-align:left; border:1px solid #bbf7d0; background:#f0fdf4; padding:14px; border-radius:12px; cursor:pointer; display:flex; gap:12px; align-items:flex-start;">
+        <div class="up-icon" style="background:#dcfce7; color:#166534;">&#43;</div>
+        <div>
+          <div class="up-name">Only add new data (update edited rows)</div>
+          <div class="up-desc" style="color:#166534;">Edited rows in the file overwrite existing ones. New rows get added. Nothing is deleted from what's already saved.</div>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- COMPANIES MODAL -->
 <div class="modal-bg" id="companiesModal">
   <div class="modal">
@@ -868,6 +897,8 @@
     color:        ["color","colour","shade"],
     product:      ["product","product name","title","description","product title"],
     hsn:          ["hsn","hsn code","hsncode","hsn_code"],
+    company_name: ["company","company name","company_name"],
+    asin:         ["asin","other listing id","other listind id","fsn","other listing"],
   };
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
   const matchHeader = (h, list) => list.some(x => norm(h) === norm(x));
@@ -909,6 +940,8 @@
           color:        idx.fields.color        ? String(r[idx.fields.color]        || "").trim() : "",
           product:      idx.fields.product      ? String(r[idx.fields.product]      || "").trim() : "",
           hsn:          idx.fields.hsn          ? String(r[idx.fields.hsn]          || "").trim() : "",
+          company_name: idx.fields.company_name ? String(r[idx.fields.company_name] || "").trim() : "",
+          asin:         idx.fields.asin         ? String(r[idx.fields.asin]         || "").trim() : "",
         };
         if (idx.platformCol && idx.sellerSkuCol) {
           const plat = normalizePlatform(String(r[idx.platformCol] || "").trim());
@@ -923,44 +956,28 @@
       }
       if (outRows.length === 0) { setStatus("Parsed 0 mappings. Check that Master SKU + SKU columns have values.", true); return; }
 
-      // In-batch dedupe on (platform, seller_sku) — the unique index will reject dupes otherwise
+      // In-file dedupe on composite key (company + platform + normalized-SKU + ASIN)
+      // Space/hyphen/case ignored in SKU comparison — matches DB unique index
+      const normSku = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
       const seen = new Set();
       const uniqRows = [];
       for (const r of outRows) {
-        const k = r.platform + "" + r.seller_sku;
+        const k = (r.company_name || "") + "|" + r.platform + "|" + normSku(r.seller_sku) + "|" + (r.asin || "");
         if (seen.has(k)) continue;
         seen.add(k); uniqRows.push(r);
       }
       const droppedDupes = outRows.length - uniqRows.length;
 
-      setStatus(`Uploading ${uniqRows.length} mappings (${droppedDupes} in-file duplicates skipped) …`, false);
-      const CHUNK = 75; // small chunks — preserves full raw_data per row without payload timeouts
-      let done = 0, failed = 0;
-      const nowIso = new Date().toISOString();
-      for (let i = 0; i < uniqRows.length; i += CHUNK) {
-        const slice = uniqRows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: nowIso }));
-        try {
-          const { error } = await sb.from("seller_sku_master")
-            .upsert(slice, { onConflict: "user_id,platform,seller_sku" });
-          if (error) {
-            failed += slice.length;
-            console.warn("chunk error", i, error);
-            setStatus(`Chunk error at ${i}: ${error.message}. Continuing …`, true);
-          } else {
-            done += slice.length;
-          }
-        } catch (netErr) {
-          failed += slice.length;
-          console.warn("network error", netErr);
-        }
-        // Update progress every chunk
-        setStatus(`Uploading … ${done}/${uniqRows.length}${failed ? " (" + failed + " failed)" : ""}`, false);
-      }
-      const msg = failed
-        ? `⚠ Uploaded ${done} of ${uniqRows.length} (${failed} rows failed — retry to fix)`
-        : `✅ Uploaded ${done} SKU mappings from ${f.name}.`;
-      setStatus(msg, failed > 0);
-      await refreshMasterStamp();
+      // Stash parsed rows and open the mode chooser modal
+      window._skuStagedRows = uniqRows;
+      window._skuStagedFileName = f.name;
+      window._skuStagedDropped = droppedDupes;
+      window._skuStagedUid = uid;
+      document.getElementById("skuModeSummary").innerHTML =
+        "Parsed <b>" + uniqRows.length + "</b> unique mappings from <b>" + escapeHtml(f.name) + "</b>" +
+        (droppedDupes ? " (" + droppedDupes + " in-file duplicates skipped)" : "") + ". Pick how to save:";
+      document.getElementById("skuModeModal").classList.add("show");
+      setStatus("Ready — pick a save mode in the popup.", false);
     } catch (err) {
       console.error(err);
       setStatus("Failed to parse file: " + (err.message || err), true);
@@ -968,6 +985,69 @@
       e.target.value = "";
     }
   });
+
+  // ---- Mode chooser wiring ----
+  const skuMode = {
+    close: () => document.getElementById("skuModeModal").classList.remove("show"),
+  };
+  document.getElementById("skuModeClose").addEventListener("click", skuMode.close);
+  document.getElementById("skuModeReplace").addEventListener("click", async () => {
+    skuMode.close();
+    await saveMasterSku("replace");
+  });
+  document.getElementById("skuModeMerge").addEventListener("click", async () => {
+    skuMode.close();
+    await saveMasterSku("merge");
+  });
+
+  async function saveMasterSku(mode) {
+    const rows = window._skuStagedRows || [];
+    const uid = window._skuStagedUid;
+    const fName = window._skuStagedFileName || "file";
+    if (rows.length === 0 || !uid) { setStatus("No parsed rows in memory. Re-select the file.", true); return; }
+
+    if (mode === "replace") {
+      setStatus(`Removing old rows before saving ${rows.length} new mappings …`, false);
+      const delRes = await sb.from("seller_sku_master").delete().eq("user_id", uid);
+      if (delRes.error) { setStatus("Could not clear old rows: " + delRes.error.message, true); return; }
+    }
+
+    const CHUNK = 75;
+    let done = 0, failed = 0;
+    const nowIso = new Date().toISOString();
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const slice = rows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: nowIso }));
+      try {
+        let res;
+        if (mode === "replace") {
+          res = await sb.from("seller_sku_master").insert(slice);
+        } else {
+          // merge: upsert on composite key — updates existing, inserts new
+          res = await sb.from("seller_sku_master")
+            .upsert(slice, { onConflict: "user_id,company_name,platform,seller_sku_norm,asin" });
+        }
+        if (res.error) {
+          failed += slice.length;
+          console.warn("chunk error", i, res.error);
+          setStatus(`Chunk error at ${i}: ${res.error.message}. Continuing …`, true);
+        } else {
+          done += slice.length;
+        }
+      } catch (netErr) {
+        failed += slice.length;
+        console.warn("network error", netErr);
+      }
+      setStatus(`Uploading … ${done}/${rows.length}${failed ? " (" + failed + " failed)" : ""}`, false);
+    }
+    const verb = mode === "replace" ? "Replaced with" : "Merged";
+    const msg = failed
+      ? `⚠ ${verb} ${done} of ${rows.length} (${failed} rows failed — retry to fix)`
+      : `✅ ${verb} ${done} SKU mappings from ${fName}.`;
+    setStatus(msg, failed > 0);
+    await refreshMasterStamp();
+    // Clear staged so accidental double-clicks don't re-run
+    window._skuStagedRows = null;
+  }
 
   function detectHeaderMap(headers) {
     const map = { master: null, platforms: {}, fields: {}, platformCol: null, sellerSkuCol: null };
@@ -998,6 +1078,7 @@
   }
   function setStatus(msg, isError) {
     const el = $("#upStatus");
+    if (!el) return;
     el.textContent = msg;
     el.classList.add("show");
     el.classList.toggle("err", !!isError);
@@ -1010,7 +1091,10 @@
       .order("updated_at", { ascending: false })
       .limit(1);
     const el = $("#masterFileStamp");
-    if (error || !data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); return; }
+    if (!el) return;
+    if (error || !data || data.length === 0) {
+      el.textContent = "Never"; el.classList.add("none"); return;
+    }
     const dt = new Date(data[0].updated_at);
     el.classList.remove("none");
     el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
