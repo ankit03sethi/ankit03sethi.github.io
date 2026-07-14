@@ -148,8 +148,7 @@
 
 <div class="top-actions">
   <button class="btn primary" id="openCompaniesBtn">&#127970; Companies <span id="companiesCount" style="font-weight:600; opacity:.8;"></span></button>
-  <a class="btn" href="/uploads/scanner/" style="text-decoration:none;">&#128241; Open Scanner</a>
-  <button class="btn" id="openSkuWiseBtn">&#128202; SKU Wise Data</button>
+  <button class="btn" id="openSkuWiseBtn" style="display:none;">&#128202; SKU Wise Data</button>
 </div>
 
 <!-- SKU Wise Data panel (hidden by default; toggled by the top button) -->
@@ -501,9 +500,10 @@
     if (error) { console.warn(error); return; }
     companies = (data || []).map(c => ({ id: c.id, name: c.name, platforms: c.platforms || [] }));
     $("#companiesCount").textContent = companies.length ? "(" + companies.length + ")" : "";
-    // Toggle all 3 kind rows visibility
+    // Always show all upload rows so customer sees what's available.
+    // If no companies with platforms yet, show the hint too.
     const anyPlat = companies.some(c => (c.platforms || []).length > 0);
-    document.querySelectorAll(".kind-row").forEach(r => { r.style.display = anyPlat ? "" : "none"; });
+    document.querySelectorAll(".kind-row").forEach(r => { r.style.display = ""; });
     $("#ordersHint").style.display = anyPlat ? "none" : "";
   }
 
