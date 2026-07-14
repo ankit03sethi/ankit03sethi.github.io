@@ -873,19 +873,28 @@
   const matchHeader = (h, list) => list.some(x => norm(h) === norm(x));
 
   $("#masterFileInput").addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0]; if (!f) return;
-    setStatus("Reading " + f.name + " …", false);
+    const f = e.target.files && e.target.files[0];
+    if (!f) { setStatus("No file selected.", true); return; }
+    setStatus("Reading " + f.name + " (" + Math.round(f.size/1024) + " KB) …", false);
     try {
+      if (typeof XLSX === "undefined") {
+        setStatus("Spreadsheet library not loaded — check internet connection and refresh.", true);
+        return;
+      }
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
+      if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
+        setStatus("Could not read any sheets from " + f.name, true); return;
+      }
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      if (rows.length === 0) { setStatus("File is empty.", true); return; }
+      if (rows.length === 0) { setStatus("File is empty (no data rows found in first sheet).", true); return; }
       const headers = Object.keys(rows[0]);
+      setStatus("Parsing " + rows.length + " rows from " + f.name + " (columns: " + headers.slice(0, 6).join(", ") + (headers.length > 6 ? "…" : "") + ")", false);
       const idx = detectHeaderMap(headers);
-      if (!idx.master) { setStatus("Could not find a 'Master Sku' column.", true); return; }
+      if (!idx.master) { setStatus("Could not find a 'Master Sku' column. Detected columns: " + headers.join(", "), true); return; }
       if (Object.keys(idx.platforms).length === 0 && !(idx.platformCol && idx.sellerSkuCol)) {
-        setStatus("No platform SKU columns found. Add either per-platform SKU columns or a Platform + SKU pair.", true); return;
+        setStatus("No platform SKU columns found. Detected: " + headers.join(", "), true); return;
       }
       const outRows = [];
       const uid = session.user.id;
