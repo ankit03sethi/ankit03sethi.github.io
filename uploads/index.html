@@ -221,7 +221,7 @@
   <div class="up-status" id="upStatus"></div>
   <div class="up-list">
 
-    <div class="up-item kind-row" data-kind="orders" style="display:none;">
+    <div class="up-item kind-row" data-kind="orders">
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
         <div>
@@ -240,7 +240,7 @@
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="manifest" style="display:none;">
+    <div class="up-item kind-row" data-kind="manifest">
       <div class="up-left">
         <div class="up-icon" style="background:#fce7f3; color:#ec4899;">&#128230;</div>
         <div>
@@ -259,7 +259,7 @@
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="orders_file" style="display:none;">
+    <div class="up-item kind-row" data-kind="orders_file">
       <div class="up-left">
         <div class="up-icon" style="background:#e0e7ff; color:#4338ca;">&#128193;</div>
         <div>
@@ -278,7 +278,7 @@
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="returns" style="display:none;">
+    <div class="up-item kind-row" data-kind="returns">
       <div class="up-left">
         <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#8618;</div>
         <div>
@@ -297,7 +297,7 @@
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="payments" style="display:none;">
+    <div class="up-item kind-row" data-kind="payments">
       <div class="up-left">
         <div class="up-icon" style="background:#dcfce7; color:#166534;">&#128176;</div>
         <div>
@@ -844,6 +844,28 @@
   function parseYear(v) {
     const d = parseDate(v);
     return d ? new Date(d).getFullYear() : null;
+  }
+
+  async function refreshMasterStamp() {
+    if (!session) return;
+    const el = document.getElementById("masterFileStamp");
+    if (!el) return;
+    try {
+      const { data, error } = await sb.from("seller_sku_master")
+        .select("updated_at, created_at")
+        .eq("user_id", session.user.id)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+      if (error) { el.textContent = "Never"; el.classList.add("none"); return; }
+      if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); return; }
+      const ts = data[0].updated_at || data[0].created_at;
+      if (!ts) { el.textContent = "Never"; el.classList.add("none"); return; }
+      el.classList.remove("none");
+      el.textContent = new Date(ts).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    } catch (e) {
+      console.warn("refreshMasterStamp err:", e);
+      el.textContent = "Never"; el.classList.add("none");
+    }
   }
 
   async function refreshStamps() {
