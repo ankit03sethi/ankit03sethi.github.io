@@ -401,14 +401,14 @@
     ];
     const reader = new Html5Qrcode("reader", { formatsToSupport: formats, verbose: false });
     state.scanner = reader;
-    // Wide qrbox for 1D barcodes (they're horizontal)
+    // Big scan box — fills 95% of camera view (works for both QR and 1D barcodes)
     const qrbox = (vw, vh) => {
-      const w = Math.min(Math.floor(vw * 0.85), 480);
-      const h = Math.min(Math.floor(vh * 0.35), 180);
+      const w = Math.floor(vw * 0.95);
+      const h = Math.floor(vh * 0.75);
       return { width: w, height: h };
     };
     reader.start({ facingMode: "environment" },
-      { fps: 15, qrbox, aspectRatio: 1.777 },
+      { fps: 15, qrbox },
       (text) => handleScan(text),
       () => {}
     ).catch(err => {
@@ -473,6 +473,34 @@
             break;
           }
         }
+      }
+    }
+    // 4) Meesho / Flipkart manifest QR / pipe-separated payloads — extract candidate IDs and try each
+    if (!match && (raw.includes("|") || raw.length > 30)) {
+      // Split on common delimiters and hunt for long-ish alphanumeric tokens
+      const tokens = raw.split(/[|,;/\\\s]+/).filter(t => t && t.length >= 6);
+      // Pull out platform-specific tracking patterns
+      const fmpp = raw.match(/FM[A-Z]{2}\d{6,}/gi) || [];      // Flipkart: FMPP, FMFC, FMFR, FMFA...
+      const awb  = raw.match(/[A-Z]{2,4}\d{9,15}/g) || [];      // Amazon/generic tracking
+      // Also pull out any 8+ digit numeric runs (Sub Order No etc.)
+      const numericRuns = raw.match(/\d{8,}/g) || [];
+      const candidates = [...new Set([...fmpp, ...awb, ...tokens, ...numericRuns].map(t => t.toLowerCase().replace(/[^a-z0-9]/g, "")))];
+      for (const cand of candidates) {
+        if (state.barcodeIndex.has(cand)) {
+          match = state.barcodeIndex.get(cand);
+          matchKey = cand;
+          break;
+        }
+        // substring against known keys
+        for (const [k, entry] of state.barcodeIndex) {
+          const kd = k.replace(/[^a-z0-9]/g, "");
+          if (kd === cand || kd.includes(cand) || cand.includes(kd)) {
+            match = entry;
+            matchKey = k;
+            break;
+          }
+        }
+        if (match) break;
       }
     }
 
