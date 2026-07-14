@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <script src="https://unpkg.com/@zxing/[email protected]/umd/index.min.js"></script>
-  <script src="https://unpkg.com/@zxing/[email protected]/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/[email protected]/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/[email protected]"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
@@ -211,6 +211,7 @@
       <div class="video-wrap">
         <video id="reader" playsinline muted></video>
         <div class="scan-overlay"><div class="scan-frame"></div></div>
+        <div id="scanMode" style="position:absolute; top:6px; left:6px; padding:3px 8px; background:rgba(0,0,0,.6); color:#fff; font-size:10px; font-weight:600; border-radius:4px; pointer-events:none;">Starting…</div>
       </div>
 
       <div class="manual-row">
@@ -409,36 +410,49 @@
       state.videoStream = stream;
       state.scanner = true;
 
-      // 2) Prefer native BarcodeDetector when available (iOS Safari 17+, Chrome, Edge)
+      const modeEl = document.getElementById("scanMode");
+      let scans = 0;
+      const bump = () => { scans++; if (modeEl) modeEl.textContent = state.mode + " · " + scans + " frames"; };
+
+      // 2) Prefer native BarcodeDetector (iOS Safari 17+, Chrome, Edge)
       if ("BarcodeDetector" in window) {
-        const detector = new BarcodeDetector({
-          formats: ["code_128","code_39","code_93","ean_13","ean_8","upc_a","upc_e","itf","codabar","qr_code","data_matrix","pdf417","aztec"]
-        });
-        state.scanLoop = true;
-        (async function loop() {
-          while (state.scanLoop) {
-            try {
-              const codes = await detector.detect(videoEl);
-              if (codes && codes.length) handleScan(codes[0].rawValue);
-            } catch (_) {}
-            await new Promise(r => setTimeout(r, 120));
-          }
-        })();
-        return;
+        try {
+          const supported = await BarcodeDetector.getSupportedFormats();
+          state.mode = "Native (" + supported.length + " formats)";
+          if (modeEl) modeEl.textContent = state.mode;
+          const detector = new BarcodeDetector({ formats: supported });
+          state.scanLoop = true;
+          (async function loop() {
+            while (state.scanLoop) {
+              try {
+                const codes = await detector.detect(videoEl);
+                bump();
+                if (codes && codes.length) handleScan(codes[0].rawValue);
+              } catch (e) { console.warn("native detect err", e); }
+              await new Promise(r => setTimeout(r, 150));
+            }
+          })();
+          return;
+        } catch (e) { console.warn("Native BarcodeDetector setup failed:", e); }
       }
 
-      // 3) Fallback: ZXing library
-      const ZLib = window.ZXing || window.ZXingBrowser;
-      if (ZLib && (ZLib.BrowserMultiFormatReader)) {
+      // 3) Fallback: ZXing library (try both globals)
+      const ZLib = window.ZXingBrowser || window.ZXing || window.ZXingLibrary;
+      if (ZLib && ZLib.BrowserMultiFormatReader) {
+        state.mode = "ZXing";
+        if (modeEl) modeEl.textContent = state.mode;
         const reader = new ZLib.BrowserMultiFormatReader();
         state.zxingReader = reader;
         state.scannerControls = await reader.decodeFromVideoElement(videoEl, (result) => {
+          bump();
           if (result) handleScan(typeof result === "string" ? result : result.getText());
         });
         return;
       }
 
-      // 4) No decoder available — camera shows preview but can't scan; manual input still works
+      // 4) No decoder available
+      state.mode = "No decoder";
+      if (modeEl) modeEl.textContent = "No scanner available — manual only";
       const rc = document.getElementById("resultCard");
       rc.className = "result-card show not_found";
       rc.innerHTML = "Your browser can't scan barcodes automatically<span class=\"sub\">Please use the manual input below. Or update your browser to the latest version.</span>";
