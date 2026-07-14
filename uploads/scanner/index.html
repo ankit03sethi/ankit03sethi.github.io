@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Order Scanner — Cursive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    a { color: inherit; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding: 14px 20px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:10; }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
+    .brand-box { width:40px; height:40px; background:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+    .brand-wordmark { font-family:'Dancing Script', cursive; font-size:22px; color:#0f172a; line-height:1; }
+    .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
+    .btn-back { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:10px; background:#eff6ff; color:#1f6feb; border:1px solid #dbeafe; text-decoration:none; }
+    .topbar-right { display:flex; align-items:center; gap:12px; font-size:13px; }
+    .email-chip { color:#64748b; font-size:12px; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; margin-bottom:14px; }
+
+    /* Setup panel */
+    .setup h2 { margin:0 0 4px; font-size:20px; font-weight:800; }
+    .setup .sub { color:#64748b; font-size:13px; margin:0 0 14px; }
+    .field { display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+    .field label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+    .field select, .field input[type="date"], .field input[type="text"] { font:inherit; padding:9px 12px; border:1px solid #e5e7eb; border-radius:8px; }
+    .field-row { display:flex; gap:10px; flex-wrap:wrap; }
+    .field-row .field { flex:1 1 200px; }
+    .btn { font:inherit; padding:10px 18px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:14px; font-weight:700; color:#0f172a; }
+    .btn:hover { background:#eff6ff; border-color:#1f6feb; color:#1f6feb; }
+    .btn.primary { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .btn.primary:hover { background:#1651a8; color:#fff; }
+    .btn.danger { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+    .btn.danger:hover { background:#fecaca; color:#7f1d1d; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+
+    /* Kpi grid */
+    .kpi-grid { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; margin-bottom:14px; }
+    .kpi { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; text-align:center; }
+    .kpi .lbl { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+    .kpi .val { font-size:22px; font-weight:800; margin-top:2px; }
+    .kpi.ok  .val { color:#16a34a; }
+    .kpi.nf  .val { color:#dc2626; }
+    .kpi.dup .val { color:#d97706; }
+    .kpi.tot .val { color:#1f6feb; }
+
+    /* Scanner */
+    #reader { width:100%; max-width:520px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000; }
+    #reader video { border-radius:12px; }
+    .result-card { padding:16px; border-radius:12px; text-align:center; margin-bottom:12px; font-weight:800; font-size:18px; display:none; }
+    .result-card.show { display:block; }
+    .result-card.ok        { background:#dcfce7; color:#166534; border:2px solid #86efac; }
+    .result-card.not_found { background:#fee2e2; color:#991b1b; border:2px solid #fecaca; }
+    .result-card.duplicate { background:#fef3c7; color:#78350f; border:2px solid #fde68a; }
+    .result-card.nf_dup    { background:#fee2e2; color:#7f1d1d; border:2px dashed #dc2626; }
+    .result-card .sub { display:block; font-size:12px; font-weight:600; opacity:.85; margin-top:4px; }
+
+    .manual-row { display:flex; gap:8px; margin-top:12px; }
+    .manual-row input { flex:1; font:inherit; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; font-size:15px; }
+
+    /* Person tabs */
+    .person-tabs { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+    .p-chip { padding:8px 14px; border-radius:10px; border:2px solid #e5e7eb; background:#fff; cursor:pointer; font-weight:800; font-size:14px; min-width:44px; text-align:center; }
+    .p-chip.packer.on   { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .p-chip.checker.on  { background:#8b5cf6; color:#fff; border-color:#8b5cf6; }
+    .badge-packer  { background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+    .badge-checker { background:#ede9fe; color:#6d28d9; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+
+    /* Lists */
+    .lists { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; }
+    .lists .list { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px; }
+    .lists .list h4 { margin:0 0 6px; font-size:12px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.5px; display:flex; justify-content:space-between; }
+    .lists .list h4 .cnt { color:#0f172a; }
+    .lists .list ul { list-style:none; padding:0; margin:0; max-height:180px; overflow:auto; font-size:12px; }
+    .lists .list li { padding:6px 8px; border-bottom:1px solid #f1f5f9; color:#0f172a; word-break:break-all; }
+    .lists .list li:last-child { border-bottom:none; }
+    .lists .list.remaining h4 { color:#1f6feb; }
+    .lists .list.scanned   h4 { color:#16a34a; }
+    .lists .list.notfound  h4 { color:#dc2626; }
+    .lists .list.dup       h4 { color:#d97706; }
+
+    /* Full-screen overlay for person selection */
+    .overlay { position:fixed; inset:0; background:rgba(15,23,42,.7); z-index:60; display:none; align-items:center; justify-content:center; padding:20px; }
+    .overlay.show { display:flex; }
+    .overlay .oc { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
+    .overlay .oc h3 { margin:0 0 8px; font-size:20px; }
+    .overlay .oc p { color:#64748b; font-size:13px; margin:0 0 18px; }
+    .overlay .p-chip { min-width:56px; padding:14px 0; font-size:18px; }
+
+    /* Locker */
+    #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
+    #locker.show { display:flex; }
+    .lock-card { background:#fff; max-width:420px; width:100%; border-radius:16px; padding:28px; text-align:center; }
+
+    @media (max-width: 620px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .lists { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <a href="/uploads/" class="btn-back" title="Back to Uploads">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <a href="/home/" class="brand">
+      <div class="brand-box">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2"/>
+          <line x1="7" y1="8" x2="7" y2="16"/>
+          <line x1="10" y1="8" x2="10" y2="16"/>
+          <line x1="13" y1="8" x2="13" y2="16"/>
+          <line x1="16" y1="8" x2="16" y2="16"/>
+          <line x1="19" y1="8" x2="19" y2="16"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+        <div class="nav-sub">Order Scanner &middot; Cursive Analyst</div>
+      </div>
+    </a>
+  </div>
+  <div class="topbar-right">
+    <span class="email-chip" id="emailChip"></span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- SETUP -->
+  <div class="card setup" id="setupCard">
+    <h2>Load orders to pack</h2>
+    <p class="sub">Filter which orders you'll scan against. The scanner matches barcodes to <b>any field</b> in the loaded rows.</p>
+    <div class="field-row">
+      <div class="field">
+        <label>Company</label>
+        <select id="companySel"><option value="">All companies</option></select>
+      </div>
+      <div class="field">
+        <label>Platform</label>
+        <select id="platformSel">
+          <option value="">All platforms</option>
+          <option value="amazon">Amazon</option>
+          <option value="flipkart">Flipkart</option>
+          <option value="meesho">Meesho</option>
+          <option value="myntra">Myntra</option>
+          <option value="firstcry">FirstCry</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>From date</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div class="field">
+        <label>To date</label>
+        <input type="date" id="dateTo">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
+      <button class="btn primary" id="loadBtn">Load orders &rarr;</button>
+      <button class="btn" id="resetBtn" style="display:none;">Change filter</button>
+      <span id="loadInfo" style="align-self:center; font-size:13px; color:#64748b;"></span>
+    </div>
+  </div>
+
+  <!-- SCANNER + LISTS (hidden until loaded) -->
+  <div id="scanArea" style="display:none;">
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <div>
+          <span class="badge-packer">Packer #<span id="packerBadge">?</span></span>
+          <span class="badge-checker" style="margin-left:6px;">Checker #<span id="checkerBadge">?</span></span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" id="changePersonBtn" style="padding:6px 12px; font-size:12px;">Change people</button>
+          <button class="btn danger" id="stopBtn" style="padding:6px 12px; font-size:12px;">Stop</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi ok"><div class="lbl">Successful</div><div class="val" id="kpiOk">0</div></div>
+        <div class="kpi nf"><div class="lbl">Not Found</div><div class="val" id="kpiNF">0</div></div>
+        <div class="kpi dup"><div class="lbl">Duplicates</div><div class="val" id="kpiDup">0</div></div>
+        <div class="kpi tot"><div class="lbl">Remaining</div><div class="val" id="kpiRem">0</div></div>
+      </div>
+
+      <div class="result-card" id="resultCard"></div>
+
+      <div id="reader"></div>
+
+      <div class="manual-row">
+        <input type="text" id="manualInput" placeholder="Or type/paste barcode here &amp; hit Enter" autocomplete="off">
+        <button class="btn primary" id="manualBtn">Submit</button>
+      </div>
+    </div>
+
+    <div class="lists">
+      <div class="list scanned">
+        <h4><span>Scanned OK</span><span class="cnt" id="cntOk">0</span></h4>
+        <ul id="listOk"></ul>
+      </div>
+      <div class="list remaining">
+        <h4><span>Remaining</span><span class="cnt" id="cntRem">0</span></h4>
+        <ul id="listRem"></ul>
+      </div>
+      <div class="list notfound">
+        <h4><span>Not Found</span><span class="cnt" id="cntNF">0</span></h4>
+        <ul id="listNF"></ul>
+      </div>
+      <div class="list dup">
+        <h4><span>Duplicates</span><span class="cnt" id="cntDup">0</span></h4>
+        <ul id="listDup"></ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Packer overlay -->
+<div class="overlay" id="packerOverlay">
+  <div class="oc">
+    <h3>Pick Packer</h3>
+    <p>Who is packing this order? Tap a number.</p>
+    <div class="person-tabs" style="justify-content:center;" id="packerTabs"></div>
+  </div>
+</div>
+
+<!-- Checker overlay -->
+<div class="overlay" id="checkerOverlay">
+  <div class="oc">
+    <h3>Pick Checker</h3>
+    <p>Who is checking? Tap a number.</p>
+    <div class="person-tabs" style="justify-content:center;" id="checkerTabs"></div>
+  </div>
+</div>
+
+<!-- Subscription locker -->
+<div id="locker">
+  <div class="lock-card">
+    <h3>Cursive Analyst subscription required</h3>
+    <p style="color:#64748b; font-size:14px; margin-bottom:16px;">Subscribe once and use the scanner without limits.</p>
+    <a class="btn primary" style="display:inline-block; text-decoration:none;" href="/home/?service=analyst">Subscribe &#8377;4999 / 30 days</a>
+  </div>
+</div>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0dHBwaWhza2JmbXh3dWp5enRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk2OTksImV4cCI6MjA5NTI3NTY5OX0.HVy2iOv9t4u6vA2TaMolp2GOrvi-5m9pLW1lXKCnEl8";
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+  const $ = (s) => document.querySelector(s);
+  const state = {
+    session: null,
+    companies: [],
+    orders: [],           // loaded seller_orders rows
+    barcodeIndex: null,   // Map<lowercasedBarcode, {row, field, value}>
+    scanned: new Map(),   // barcode → {status, at}
+    counts: { ok:0, nf:0, dup:0 },
+    packer: null,
+    checker: null,
+    scanner: null,
+  };
+
+  // ---- 0. Sign-in + subscription gate ----
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "/home/?return=%2Fuploads%2Fscanner%2F"; return; }
+    state.session = session;
+    $("#emailChip").textContent = session.user.email;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await sb.from("analytics_wallet_transactions")
+      .select("id").eq("user_id", session.user.id)
+      .eq("type", "debit_service").eq("service_tag", "analyst")
+      .gte("created_at", since).limit(1);
+    if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
+    await loadCompanies();
+    buildPersonTabs("packerTabs", "packer");
+    buildPersonTabs("checkerTabs", "checker");
+  })();
+
+  async function loadCompanies() {
+    const { data } = await sb.from("seller_companies")
+      .select("name").eq("user_id", state.session.user.id).order("name");
+    state.companies = (data || []).map(c => c.name);
+    const sel = $("#companySel");
+    sel.innerHTML = "<option value=''>All companies</option>" +
+      state.companies.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  }
+
+  // ---- Person tabs (1..7) ----
+  function buildPersonTabs(containerId, role) {
+    const c = document.getElementById(containerId);
+    c.innerHTML = "";
+    for (let i = 1; i <= 7; i++) {
+      const b = document.createElement("button");
+      b.className = "p-chip " + role;
+      b.type = "button";
+      b.textContent = String(i);
+      b.addEventListener("click", () => {
+        if (role === "packer") {
+          state.packer = i;
+          $("#packerBadge").textContent = i;
+          $("#packerOverlay").classList.remove("show");
+          if (!state.checker) $("#checkerOverlay").classList.add("show");
+          else startScanner();
+        } else {
+          state.checker = i;
+          $("#checkerBadge").textContent = i;
+          $("#checkerOverlay").classList.remove("show");
+          startScanner();
+        }
+      });
+      c.appendChild(b);
+    }
+  }
+
+  // ---- Load orders ----
+  $("#loadBtn").addEventListener("click", async () => {
+    const btn = $("#loadBtn");
+    btn.disabled = true; btn.textContent = "Loading…";
+    try {
+      const company = $("#companySel").value;
+      const platform = $("#platformSel").value;
+      const from = $("#dateFrom").value;
+      const to = $("#dateTo").value;
+      let q = sb.from("seller_orders").select("id, order_date, company_name, platform, raw_data")
+        .eq("user_id", state.session.user.id)
+        .limit(5000);
+      if (company)  q = q.eq("company_name", company);
+      if (platform) q = q.eq("platform", platform);
+      if (from) q = q.gte("order_date", from + "T00:00:00Z");
+      if (to)   q = q.lte("order_date", to   + "T23:59:59Z");
+      const { data, error } = await q;
+      if (error) throw error;
+      state.orders = data || [];
+      buildBarcodeIndex();
+      if (state.orders.length === 0) {
+        $("#loadInfo").textContent = "No orders match the filter. Adjust and try again.";
+        btn.disabled = false; btn.textContent = "Load orders →";
+        return;
+      }
+      $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable values).`;
+      $("#setupCard").style.opacity = ".6";
+      $("#setupCard").style.pointerEvents = "none";
+      $("#resetBtn").style.display = "inline-block";
+      $("#scanArea").style.display = "block";
+      refreshCounters();
+      // Ask for packer first
+      $("#packerOverlay").classList.add("show");
+    } catch (e) {
+      $("#loadInfo").textContent = "Load error: " + (e.message || e);
+      btn.disabled = false; btn.textContent = "Load orders →";
+    }
+  });
+
+  $("#resetBtn").addEventListener("click", () => {
+    stopScanner();
+    state.orders = []; state.barcodeIndex = null; state.scanned.clear();
+    state.counts = { ok:0, nf:0, dup:0 };
+    state.packer = null; state.checker = null;
+    $("#packerBadge").textContent = "?"; $("#checkerBadge").textContent = "?";
+    $("#setupCard").style.opacity = "1"; $("#setupCard").style.pointerEvents = "auto";
+    $("#scanArea").style.display = "none";
+    $("#resetBtn").style.display = "none";
+    $("#loadInfo").textContent = "";
+    $("#loadBtn").disabled = false; $("#loadBtn").textContent = "Load orders →";
+  });
+
+  $("#stopBtn").addEventListener("click", () => stopScanner());
+  $("#changePersonBtn").addEventListener("click", () => { $("#packerOverlay").classList.add("show"); });
+
+  // ---- Barcode index (any raw_data field value) ----
+  function buildBarcodeIndex() {
+    const map = new Map();
+    for (const row of state.orders) {
+      const rd = row.raw_data || {};
+      for (const [k, v] of Object.entries(rd)) {
+        if (v === null || v === undefined) continue;
+        const s = String(v).trim();
+        if (!s || s.length < 4) continue; // skip short values
+        if (/^__/.test(k)) continue; // skip our meta keys
+        const key = s.toLowerCase();
+        // First occurrence wins (deterministic)
+        if (!map.has(key)) map.set(key, { row, field: k, value: s });
+      }
+    }
+    state.barcodeIndex = map;
+  }
+
+  // ---- Scanner ----
+  function startScanner() {
+    if (state.scanner) return;
+    const reader = new Html5Qrcode("reader");
+    state.scanner = reader;
+    reader.start({ facingMode: "environment" },
+      { fps: 10, qrbox: { width: 260, height: 140 } },
+      (text) => handleScan(text),
+      () => {}
+    ).catch(err => { console.error(err); alert("Camera error: " + err); });
+  }
+  function stopScanner() {
+    if (!state.scanner) return;
+    try { state.scanner.stop().then(() => state.scanner.clear()); } catch(_) {}
+    state.scanner = null;
+  }
+
+  let _lastScan = { text:"", at:0 };
+  function handleScan(text) {
+    const now = Date.now();
+    // Debounce identical rapid scans (< 800ms)
+    if (text === _lastScan.text && (now - _lastScan.at) < 800) return;
+    _lastScan = { text, at: now };
+    processBarcode(text);
+  }
+
+  $("#manualBtn").addEventListener("click", () => {
+    const v = $("#manualInput").value.trim();
+    if (!v) return;
+    processBarcode(v);
+    $("#manualInput").value = "";
+  });
+  $("#manualInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#manualBtn").click();
+  });
+
+  function processBarcode(barcode) {
+    const key = barcode.trim().toLowerCase();
+    if (!key) return;
+    const already = state.scanned.get(key);
+    const match = state.barcodeIndex.get(key);
+    let status;
+    if (match && !already) {
+      status = "ok"; state.counts.ok++;
+    } else if (match && already) {
+      status = "duplicate"; state.counts.dup++;
+    } else if (!match && !already) {
+      status = "not_found"; state.counts.nf++;
+    } else {
+      status = "nf_dup"; state.counts.dup++;
+    }
+    state.scanned.set(key, { status, at: Date.now(), value: barcode, match });
+    showResult(status, barcode, match);
+    refreshCounters();
+    saveScanEvent(barcode, status, match);
+  }
+
+  function showResult(status, barcode, match) {
+    const card = $("#resultCard");
+    card.className = "result-card show " + status;
+    let title, sub = "";
+    if (status === "ok")        { title = "✅ OK";           sub = `${match.field}: ${match.value}${match.row.company_name ? " · " + match.row.company_name : ""}`; }
+    if (status === "duplicate") { title = "⚠ Duplicate";     sub = `Already scanned: ${match.field}: ${match.value}`; }
+    if (status === "not_found") { title = "✕ Not Found";     sub = `Barcode: ${barcode}`; }
+    if (status === "nf_dup")    { title = "✕ NF-Duplicate";  sub = `Barcode: ${barcode}`; }
+    card.innerHTML = `${title}<span class="sub">${escapeHtml(sub)}</span>`;
+    // Auto-hide OK after 2s so next scan feels responsive
+    if (status === "ok") setTimeout(() => { if (card.classList.contains("ok")) card.classList.remove("show"); }, 1600);
+  }
+
+  function refreshCounters() {
+    $("#kpiOk").textContent  = state.counts.ok;
+    $("#kpiNF").textContent  = state.counts.nf;
+    $("#kpiDup").textContent = state.counts.dup;
+    const totalToPack = state.barcodeIndex ? state.barcodeIndex.size : 0;
+    // Remaining = unique OK-matched values still not scanned
+    const scannedOkKeys = new Set();
+    for (const [k, v] of state.scanned) if (v.status === "ok") scannedOkKeys.add(k);
+    // Every distinct row that has at least one field NOT yet scanned → still remaining
+    // Simpler for user: distinct rows not yet touched by any OK scan
+    const rowsWithOk = new Set();
+    for (const [k, v] of state.scanned) if (v.status === "ok" && v.match) rowsWithOk.add(v.match.row.id);
+    const remaining = state.orders.filter(r => !rowsWithOk.has(r.id));
+    $("#kpiRem").textContent = remaining.length;
+
+    // Lists
+    const okList = [], nfList = [], dupList = [];
+    for (const [k, v] of state.scanned) {
+      if (v.status === "ok")             okList.push(v);
+      else if (v.status === "not_found") nfList.push(v);
+      else                                dupList.push(v);
+    }
+    fillList("listOk",  okList.slice(-50).reverse(),  v => `<b>${escapeHtml(v.match?.value || v.value)}</b> <span style="color:#64748b;">· ${escapeHtml(v.match?.field || "")}</span>`);
+    fillList("listNF",  nfList.slice(-50).reverse(),  v => escapeHtml(v.value));
+    fillList("listDup", dupList.slice(-50).reverse(), v => escapeHtml(v.match?.value || v.value));
+    fillList("listRem", remaining.slice(0, 50), r => {
+      const rd = r.raw_data || {};
+      // Prefer a compact identifier
+      const id = rd["Sub Order No"] || rd["Order Id"] || rd["Order ID"] || rd["AWB No"] || rd["awb"] || rd["Tracking Id"] || Object.values(rd)[0] || "?";
+      return `<b>${escapeHtml(String(id))}</b> <span style="color:#64748b;">· ${escapeHtml(r.platform || "")} · ${escapeHtml(r.company_name || "")}</span>`;
+    });
+    $("#cntOk").textContent  = okList.length;
+    $("#cntNF").textContent  = nfList.length;
+    $("#cntDup").textContent = dupList.length;
+    $("#cntRem").textContent = remaining.length;
+  }
+
+  function fillList(id, arr, fmt) {
+    const el = document.getElementById(id);
+    el.innerHTML = arr.map(x => `<li>${fmt(x)}</li>`).join("");
+  }
+
+  async function saveScanEvent(barcode, status, match) {
+    try {
+      await sb.from("scan_events").insert({
+        user_id: state.session.user.id,
+        barcode: barcode,
+        status: status,
+        order_row_id: match ? match.row.id : null,
+        company_name: match ? match.row.company_name : null,
+        platform:     match ? match.row.platform     : null,
+        matched_field: match ? match.field : null,
+        matched_value: match ? match.value : null,
+        packer: state.packer,
+        checker: state.checker,
+      });
+    } catch (e) { console.warn("scan_events insert failed", e); }
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+</script>
+
+</body>
+</html>
