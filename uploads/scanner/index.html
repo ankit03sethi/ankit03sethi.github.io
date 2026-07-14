@@ -390,27 +390,37 @@
   // ZXing scanner — much better 1D barcode (Code 128, Code 39) support on mobile than html5-qrcode
   async function startScanner() {
     if (state.scanner) return;
+    const videoEl = document.getElementById("reader");
     try {
+      // 1) Explicitly request camera → triggers browser permission prompt reliably
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+      videoEl.srcObject = stream;
+      videoEl.setAttribute("playsinline", "true");
+      await videoEl.play();
+
+      // 2) Point ZXing at the already-playing video element
       const { BrowserMultiFormatReader } = window.ZXingBrowser;
       const reader = new BrowserMultiFormatReader();
       state.scanner = reader;
-      // Pick rear camera
-      const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-      const rear = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
-      const deviceId = rear ? rear.deviceId : undefined;
-      const videoEl = document.getElementById("reader");
-      state.scannerControls = await reader.decodeFromVideoDevice(
-        deviceId, videoEl,
-        (result, err, controls) => {
-          if (result) handleScan(result.getText());
-          // ignore per-frame decode errors
-        }
-      );
+      state.videoStream = stream;
+      state.scannerControls = await reader.decodeFromVideoElement(videoEl, (result) => {
+        if (result) handleScan(result.getText());
+      });
     } catch (err) {
-      console.error(err);
+      console.error("Scanner start failed:", err);
       const rc = document.getElementById("resultCard");
       rc.className = "result-card show not_found";
-      rc.innerHTML = "Camera blocked or unavailable — use manual input below<span class=\"sub\">Enable camera permission for cursive.world in your browser settings.</span>";
+      const msg = (err && err.name === "NotAllowedError")
+        ? "Camera permission denied. In your browser settings enable camera for cursive.world, then reload."
+        : "Camera unavailable: " + (err.message || err);
+      rc.innerHTML = "Camera problem — use manual input below<span class=\"sub\">" + escapeHtml(msg) + "</span>";
       state.scanner = null;
     }
   }
@@ -418,10 +428,11 @@
     if (state.scannerControls) { try { state.scannerControls.stop(); } catch(_) {} state.scannerControls = null; }
     state.scanner = null;
     const videoEl = document.getElementById("reader");
-    if (videoEl && videoEl.srcObject) {
-      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch(_) {}
-      videoEl.srcObject = null;
+    if (state.videoStream) {
+      try { state.videoStream.getTracks().forEach(t => t.stop()); } catch(_) {}
+      state.videoStream = null;
     }
+    if (videoEl) videoEl.srcObject = null;
   }
 
   let _lastScan = { text:"", at:0 };
