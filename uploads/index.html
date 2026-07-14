@@ -898,8 +898,10 @@
       }
       const outRows = [];
       const uid = session.user.id;
+      // Preserve every cell as-is (empty ones kept) — the original file structure is stored intact
       for (const r of rows) {
         const master = String(r[idx.master] || "").trim(); if (!master) continue;
+        const raw = r; // full row, empties preserved
         const fields = {
           brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
           category:     idx.fields.category     ? String(r[idx.fields.category]     || "").trim() : "",
@@ -911,27 +913,53 @@
         if (idx.platformCol && idx.sellerSkuCol) {
           const plat = normalizePlatform(String(r[idx.platformCol] || "").trim());
           const ssku = String(r[idx.sellerSkuCol] || "").trim();
-          if (plat && ssku) outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: r, source_file: f.name });
+          if (plat && ssku) outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: raw, source_file: f.name });
         } else {
           for (const [plat, col] of Object.entries(idx.platforms)) {
             const ssku = String(r[col] || "").trim(); if (!ssku) continue;
-            outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: r, source_file: f.name });
+            outRows.push({ user_id: uid, platform: plat, seller_sku: ssku, master_sku: master, ...fields, raw_data: raw, source_file: f.name });
           }
         }
       }
-      if (outRows.length === 0) { setStatus("Parsed 0 mappings. Check that SKU columns have values.", true); return; }
-      setStatus(`Uploading ${outRows.length} mappings …`, false);
-      const CHUNK = 400;
-      let done = 0;
-      for (let i = 0; i < outRows.length; i += CHUNK) {
-        const slice = outRows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: new Date().toISOString() }));
-        const { error } = await sb.from("seller_sku_master")
-          .upsert(slice, { onConflict: "user_id,platform,seller_sku" });
-        if (error) { setStatus("Upload error: " + error.message, true); return; }
-        done += slice.length;
-        setStatus(`Uploading … ${done} / ${outRows.length}`, false);
+      if (outRows.length === 0) { setStatus("Parsed 0 mappings. Check that Master SKU + SKU columns have values.", true); return; }
+
+      // In-batch dedupe on (platform, seller_sku) — the unique index will reject dupes otherwise
+      const seen = new Set();
+      const uniqRows = [];
+      for (const r of outRows) {
+        const k = r.platform + "" + r.seller_sku;
+        if (seen.has(k)) continue;
+        seen.add(k); uniqRows.push(r);
       }
-      setStatus(`✅ Uploaded ${outRows.length} SKU mappings from ${f.name}.`, false);
+      const droppedDupes = outRows.length - uniqRows.length;
+
+      setStatus(`Uploading ${uniqRows.length} mappings (${droppedDupes} in-file duplicates skipped) …`, false);
+      const CHUNK = 75; // small chunks — preserves full raw_data per row without payload timeouts
+      let done = 0, failed = 0;
+      const nowIso = new Date().toISOString();
+      for (let i = 0; i < uniqRows.length; i += CHUNK) {
+        const slice = uniqRows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: nowIso }));
+        try {
+          const { error } = await sb.from("seller_sku_master")
+            .upsert(slice, { onConflict: "user_id,platform,seller_sku" });
+          if (error) {
+            failed += slice.length;
+            console.warn("chunk error", i, error);
+            setStatus(`Chunk error at ${i}: ${error.message}. Continuing …`, true);
+          } else {
+            done += slice.length;
+          }
+        } catch (netErr) {
+          failed += slice.length;
+          console.warn("network error", netErr);
+        }
+        // Update progress every chunk
+        setStatus(`Uploading … ${done}/${uniqRows.length}${failed ? " (" + failed + " failed)" : ""}`, false);
+      }
+      const msg = failed
+        ? `⚠ Uploaded ${done} of ${uniqRows.length} (${failed} rows failed — retry to fix)`
+        : `✅ Uploaded ${done} SKU mappings from ${f.name}.`;
+      setStatus(msg, failed > 0);
       await refreshMasterStamp();
     } catch (err) {
       console.error(err);
