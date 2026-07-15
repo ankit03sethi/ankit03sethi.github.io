@@ -125,11 +125,11 @@
 </div>
 
 <div class="tabs" id="mainTabs">
-  <div class="tab active" data-view="orders">Orders</div>
+  <div class="tab active" data-view="sku_master">SKU Master</div>
+  <div class="tab" data-view="orders">Orders</div>
   <div class="tab" data-view="returns">Returns</div>
   <div class="tab" data-view="payments">Payments</div>
   <div class="tab" data-view="stock">Stock</div>
-  <div class="tab" data-view="sku_master">SKU Master</div>
   <div class="tab" data-view="uploads">Uploads</div>
 </div>
 
@@ -218,7 +218,7 @@
   const $ = (s) => document.querySelector(s);
   const state = {
     session: null,
-    view: "orders",         // orders | returns | payments | stock | sku_master | uploads
+    view: "sku_master",     // orders | returns | payments | stock | sku_master | uploads
     platform: "",
     company: "",
     companies: [],
