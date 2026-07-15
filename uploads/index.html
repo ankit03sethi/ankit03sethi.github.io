@@ -477,6 +477,13 @@
       var r = e.reason;
       show("Unhandled promise: " + (r && r.message ? r.message : String(r)));
     });
+    // Kill the 2-second flash when landing on /uploads/#skuwise —
+    // hide uploads panel immediately so the SKU wise panel takes over cleanly
+    if (location.hash === "#skuwise") {
+      var s = document.createElement("style");
+      s.textContent = "#uploadsPanel{display:none !important;} #skuWisePanel{display:block !important;}";
+      document.head.appendChild(s);
+    }
     // Defensive Companies click — opens modal even if the module never runs
     document.addEventListener("DOMContentLoaded", function () {
       var btn = document.getElementById("openCompaniesBtn");
