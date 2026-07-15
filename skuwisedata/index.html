@@ -377,18 +377,51 @@
   }
 
   function renderSkuMasterTable(rows) {
-    const th = `<tr><th>Platform</th><th>Seller SKU</th><th>Master SKU</th><th>Brand</th><th>Category</th><th>Sub Category</th><th>Color</th><th>Product</th><th>HSN</th><th>Updated</th></tr>`;
+    // Collect every column from the ORIGINAL uploaded file (raw_data JSON), in first-seen order.
+    // This shows the exact headers the customer used in their master SKU Excel/CSV file.
+    const seen = new Set();
+    const cols = [];
+    for (const r of rows.slice(0, 50)) {
+      const rd = r.raw_data || {};
+      for (const k of Object.keys(rd)) {
+        if (!seen.has(k)) { seen.add(k); cols.push(k); }
+      }
+    }
+    // Fallback: if raw_data is empty, show the parsed DB columns
+    if (cols.length === 0) {
+      const th = `<tr><th>Platform</th><th>Company</th><th>Seller SKU</th><th>Master SKU</th><th>Brand</th><th>Category</th><th>Sub Category</th><th>Color</th><th>Product</th><th>HSN</th><th>ASIN</th><th>Updated</th></tr>`;
+      const tr = rows.map(r => `
+        <tr>
+          <td><b>${escapeHtml(r.platform || "—")}</b></td>
+          <td>${escapeHtml(r.company_name || "—")}</td>
+          <td>${escapeHtml(r.seller_sku || "—")}</td>
+          <td><b>${escapeHtml(r.master_sku || "—")}</b></td>
+          <td>${escapeHtml(r.brand || "—")}</td>
+          <td>${escapeHtml(r.category || "—")}</td>
+          <td>${escapeHtml(r.sub_category || "—")}</td>
+          <td>${escapeHtml(r.color || "—")}</td>
+          <td>${escapeHtml(r.product || "—")}</td>
+          <td>${escapeHtml(r.hsn || "—")}</td>
+          <td>${escapeHtml(r.asin || "—")}</td>
+          <td class="muted">${escapeHtml(fmtDate(r.updated_at))}</td>
+        </tr>`).join("");
+      return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
+    }
+    // Dynamic columns from the original file. Leading anchor columns: Master SKU + Platform + Company.
+    const th = `
+      <tr>
+        <th>Master SKU</th>
+        <th>Platform</th>
+        <th>Company</th>
+        ${cols.map(c => `<th>${escapeHtml(c)}</th>`).join("")}
+        <th>Updated</th>
+      </tr>`;
     const tr = rows.map(r => `
       <tr>
-        <td><b>${escapeHtml(r.platform || "—")}</b></td>
-        <td>${escapeHtml(r.seller_sku || "—")}</td>
         <td><b>${escapeHtml(r.master_sku || "—")}</b></td>
-        <td>${escapeHtml(r.brand || "—")}</td>
-        <td>${escapeHtml(r.category || "—")}</td>
-        <td>${escapeHtml(r.sub_category || "—")}</td>
-        <td>${escapeHtml(r.color || "—")}</td>
-        <td>${escapeHtml(r.product || "—")}</td>
-        <td>${escapeHtml(r.hsn || "—")}</td>
+        <td><b>${escapeHtml(r.platform || "—")}</b></td>
+        <td>${escapeHtml(r.company_name || "—")}</td>
+        ${cols.map(c => `<td>${escapeHtml(safeCell((r.raw_data || {})[c]))}</td>`).join("")}
         <td class="muted">${escapeHtml(fmtDate(r.updated_at))}</td>
       </tr>`).join("");
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
