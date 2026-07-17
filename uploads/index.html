@@ -195,21 +195,11 @@
       </div>
     </div>
 
-    <!-- Results table -->
-    <div style="border:1px solid #e5e7eb; border-radius:10px; overflow:auto; max-height:60vh;">
-      <table id="swTable" style="width:100%; border-collapse:collapse; font-size:13px;">
-        <thead style="background:#f8fafc; position:sticky; top:0;">
-          <tr>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Master SKU</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Platform SKU</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Platform</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Company</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Brand</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Category</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Product</th>
-          </tr>
-        </thead>
-        <tbody id="swTbody"><tr><td colspan="7" style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+    <!-- Results table — scrolls both horizontally (24 columns) and vertically -->
+    <div style="border:1px solid #e5e7eb; border-radius:10px; overflow:auto; max-height:65vh;">
+      <table id="swTable" style="border-collapse:collapse; font-size:13px; white-space:nowrap; min-width:100%;">
+        <thead id="swThead" style="background:#f8fafc; position:sticky; top:0; z-index:2;"></thead>
+        <tbody id="swTbody"><tr><td style="padding:20px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
       </table>
     </div>
     <div id="swFooter" style="text-align:center; color:#64748b; font-size:12px; margin-top:8px;"></div>
@@ -1068,7 +1058,7 @@
       let from = 0;
       while (true) {
         const { data, error } = await sb.from("seller_sku_master")
-          .select("master_sku, seller_sku, platform, company_name, brand, category, sub_category, color, product, hsn, asin")
+          .select("master_sku, seller_sku, platform, company_name, brand, category, sub_category, color, product, hsn, asin, raw_data, created_at, updated_at")
           .eq("user_id", session.user.id)
           .order("master_sku", { ascending: true })
           .range(from, from + PAGE - 1);
@@ -1098,7 +1088,45 @@
     fill("swBrandSel",    uniq(rows, "brand"));
     fill("swCategorySel", uniq(rows, "category"));
   }
+  // Columns EXACTLY match the Master SKU sample file order + headers
+  const SW_COLS = [
+    "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
+    "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku",
+    "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price"
+  ];
+  function swCell(r, i, col) {
+    const rd = r.raw_data || {};
+    // Prefer the ORIGINAL uploaded value (verbatim from the file); fall back to parsed DB columns
+    if (Object.prototype.hasOwnProperty.call(rd, col)) {
+      const v = rd[col];
+      if (v === null || v === undefined || v === "") return "—";
+      if (typeof v === "object") return JSON.stringify(v).slice(0, 60);
+      return String(v);
+    }
+    switch (col) {
+      case "S.NO":         return String(i + 1);
+      case "Date":         return r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "—";
+      case "Company":      return r.company_name || "—";
+      case "Platform":     return r.platform || "—";
+      case "Brand":        return r.brand || "—";
+      case "Category":     return r.category || "—";
+      case "Sub Category": return r.sub_category || "—";
+      case "Product":      return r.product || "—";
+      case "Color":        return r.color || "—";
+      case "ASIN":         return r.asin || "—";
+      case "SKU":          return r.seller_sku || "—";
+      case "Master Sku":   return r.master_sku || "—";
+      case "HSN":          return r.hsn || "—";
+      default:             return "—";
+    }
+  }
   function renderSwTable() {
+    // Paint the header ONCE per render (fast; only 24 <th> cells)
+    const thead = document.getElementById("swThead");
+    thead.innerHTML = "<tr>" + SW_COLS.map(c =>
+      `<th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; font-weight:800; color:#334155;">${escapeHtml(c)}</th>`
+    ).join("") + "</tr>";
+
     const co = document.getElementById("swCompanySel").value.toLowerCase();
     const pl = document.getElementById("swPlatformSel").value.toLowerCase();
     const br = document.getElementById("swBrandSel").value.toLowerCase();
@@ -1118,17 +1146,16 @@
     const capped = filtered.slice(0, 500);
     const tbody = document.getElementById("swTbody");
     if (capped.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#94a3b8;">No rows match the filter.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${SW_COLS.length}" style="padding:20px; text-align:center; color:#94a3b8;">No rows match the filter.</td></tr>`;
     } else {
-      tbody.innerHTML = capped.map(r => `<tr style="border-bottom:1px solid #f1f5f9;">
-        <td style="padding:8px 10px; font-weight:700;">${escapeHtml(r.master_sku || "")}</td>
-        <td style="padding:8px 10px; font-family:monospace; font-size:12px;">${escapeHtml(r.seller_sku || "")}</td>
-        <td style="padding:8px 10px;">${escapeHtml(r.platform || "")}</td>
-        <td style="padding:8px 10px;">${escapeHtml(r.company_name || "")}</td>
-        <td style="padding:8px 10px;">${escapeHtml(r.brand || "")}</td>
-        <td style="padding:8px 10px;">${escapeHtml(r.category || "")}</td>
-        <td style="padding:8px 10px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.product || "")}</td>
-      </tr>`).join("");
+      tbody.innerHTML = capped.map((r, i) => "<tr style='border-bottom:1px solid #f1f5f9;'>" +
+        SW_COLS.map(c => {
+          const v = swCell(r, i, c);
+          const bold = (c === "Master Sku" || c === "SKU") ? "font-weight:700;" : "";
+          const mono = (c === "SKU" || c === "ASIN" || c === "Other Listing Id") ? "font-family:monospace; font-size:12px;" : "";
+          return `<td style="padding:8px 12px; ${bold} ${mono}">${escapeHtml(v)}</td>`;
+        }).join("") + "</tr>"
+      ).join("");
     }
     document.getElementById("swFooter").textContent = `${filtered.length.toLocaleString()} rows match${filtered.length > 500 ? " (showing first 500)" : ""}`;
   }
