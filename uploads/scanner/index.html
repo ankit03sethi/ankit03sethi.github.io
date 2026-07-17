@@ -369,16 +369,29 @@
       //   uploaded before 4PM IST  → dispatch_date = today
       //   uploaded 4PM-11:59PM IST → dispatch_date = tomorrow
       // Falls back to order_date for old rows that don't have dispatch_date yet.
-      let q = sb.from("seller_orders").select("id, order_date, dispatch_date, company_name, platform, raw_data")
-        .eq("user_id", state.session.user.id)
-        .limit(5000);
-      if (company)  q = q.eq("company_name", company);
-      if (platform) q = q.eq("platform", platform);
-      if (from) q = q.gte("dispatch_date", from);
-      if (to)   q = q.lte("dispatch_date", to);
-      const { data, error } = await q;
-      if (error) throw error;
-      let orders = data || [];
+      //
+      // Paginate — Supabase PostgREST caps each response at 1000 rows even if you .limit(5000).
+      // Fetch in chunks of 1000 until we get an empty page (or hit a hard safety cap of 20k).
+      let orders = [];
+      const PAGE = 1000, HARD_CAP = 20000;
+      let from_i = 0;
+      while (from_i < HARD_CAP) {
+        let q = sb.from("seller_orders").select("id, order_date, dispatch_date, company_name, platform, raw_data")
+          .eq("user_id", state.session.user.id)
+          .range(from_i, from_i + PAGE - 1);
+        if (company)  q = q.eq("company_name", company);
+        if (platform) q = q.eq("platform", platform);
+        if (from) q = q.gte("dispatch_date", from);
+        if (to)   q = q.lte("dispatch_date", to);
+        // Live progress: show "Loading 1000, 2000…" so user knows it's still working
+        btn.textContent = `Loading ${orders.length ? orders.length : ""}…`;
+        const { data, error } = await q;
+        if (error) throw error;
+        const chunk = data || [];
+        orders.push(...chunk);
+        if (chunk.length < PAGE) break;
+        from_i += PAGE;
+      }
       // Apply courier filter — restrict to rows whose Tracking ID starts with one of the courier prefixes
       const courierId = $("#courierSel").value;
       if (courierId && platform) {
@@ -402,6 +415,8 @@
       $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable).`;
       $("#scanArea").style.display = "block";
       refreshCounters();
+      // Reset button so user can re-load (e.g. after changing filters)
+      btn.disabled = false; btn.textContent = "Load orders →";
       // Start camera straight away (only first time)
       if (!state.scanner) startScanner();
     } catch (e) {
