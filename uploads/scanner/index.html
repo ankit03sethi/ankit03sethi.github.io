@@ -364,13 +364,18 @@
       const platform = $("#platformSel").value;
       const from = $("#dateFrom").value;
       const to = $("#dateTo").value;
-      let q = sb.from("seller_orders").select("id, order_date, company_name, platform, raw_data")
+      // Scanner filters by dispatch_date (WHEN the seller packs these), not order_date.
+      // dispatch_date is set by the desktop watcher based on upload time:
+      //   uploaded before 4PM IST  → dispatch_date = today
+      //   uploaded 4PM-11:59PM IST → dispatch_date = tomorrow
+      // Falls back to order_date for old rows that don't have dispatch_date yet.
+      let q = sb.from("seller_orders").select("id, order_date, dispatch_date, company_name, platform, raw_data")
         .eq("user_id", state.session.user.id)
         .limit(5000);
       if (company)  q = q.eq("company_name", company);
       if (platform) q = q.eq("platform", platform);
-      if (from) q = q.gte("order_date", from + "T00:00:00Z");
-      if (to)   q = q.lte("order_date", to   + "T23:59:59Z");
+      if (from) q = q.gte("dispatch_date", from);
+      if (to)   q = q.lte("dispatch_date", to);
       const { data, error } = await q;
       if (error) throw error;
       let orders = data || [];
