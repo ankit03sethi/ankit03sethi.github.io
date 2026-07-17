@@ -104,7 +104,29 @@
 <!-- Subscription gate — checks that the signed-in user has a valid 30-day Cursive Analyst purchase.
      If not, bounces them to /home so they can pay. -->
 <script>
-  // Fetch the latest release info from GitHub so version + download link update automatically
+  // Hardcoded LAST-KNOWN-GOOD .exe URL. Even if the GitHub API is slow, blocked, or rate-limited,
+  // the user never gets dumped on the GitHub release page — they get a real .exe download.
+  const HARDCODED_EXE = "https://github.com/ankit03sethi/cursive-analyst-releases/releases/download/v1.0.1/Cursive-Analyst-Setup-1.0.1.exe";
+  let _resolvedExe = HARDCODED_EXE;
+
+  // Set the anchor href immediately so a fast click still downloads a real .exe (never GitHub page).
+  const _dlBtn = document.getElementById("dlBtn");
+  if (_dlBtn) {
+    _dlBtn.href = HARDCODED_EXE;
+    _dlBtn.setAttribute("download", "");
+    _dlBtn.addEventListener("click", (e) => {
+      // Force the browser to treat it as a file download, never as a navigation to a page
+      e.preventDefault();
+      const a = document.createElement("a");
+      a.href = _resolvedExe;
+      a.setAttribute("download", "");
+      a.rel = "noopener";
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+
+  // Try to upgrade the URL to the LATEST release. If this fails (rate limit / offline),
+  // the hardcoded v1.0.1 above still works — user gets a valid .exe either way.
   fetch("https://api.github.com/repos/ankit03sethi/cursive-analyst-releases/releases/latest")
     .then(r => r.ok ? r.json() : null)
     .then(rel => {
@@ -112,9 +134,12 @@
       const ver = (rel.tag_name || "").replace(/^v/, "");
       if (ver) document.getElementById("verChip").innerHTML = "Windows &middot; v" + ver;
       const exe = (rel.assets || []).find(a => /\.exe$/i.test(a.name));
-      if (exe) document.getElementById("dlBtn").href = exe.browser_download_url;
+      if (exe && exe.browser_download_url) {
+        _resolvedExe = exe.browser_download_url;
+        if (_dlBtn) _dlBtn.href = exe.browser_download_url;
+      }
     })
-    .catch(() => { /* silent — fallback to /latest URL */ });
+    .catch(() => { /* silent — hardcoded fallback still works */ });
 </script>
 
 <script type="module">
