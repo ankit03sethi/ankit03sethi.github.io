@@ -441,22 +441,28 @@
   // ---- Barcode index (shipping-label fields only, per platform) ----
   // These are the fields that appear as scannable barcodes on the physical shipping label.
   // Order IDs / invoice numbers are ignored — packers scan the label, not the order.
+  // Normalized (lowercase, punctuation stripped, single-spaced) list of scannable
+  // shipping-label barcode fields across platforms.
   const TRACKING_FIELDS = [
-    // Flipkart
-    "tracking id", "tracking-id", "trackingid",
-    // Meesho
-    "awb no", "awb number", "awbno", "awb",
-    "sub order no", "suborderno", "sub_order_no",
+    // Flipkart, Myntra (Tracking_id, Tracking-id, Tracking id all normalize the same)
+    "tracking id", "trackingid",
+    // Meesho, Firstcry
+    "awb no", "awb number", "awbno", "awb", "awb code",
+    "sub order no", "suborderno",
     // Amazon
-    "tracking number", "amazon-order-id ship-track",
-    // Myntra
+    "tracking number", "amazon order id ship track",
+    // Myntra also uses waybill on some templates
     "waybill", "waybill number", "airway bill",
-    // FirstCry
-    "awb no.", "awb code",
     // Generic
     "tracking", "shipment tracking",
   ];
-  const norm = (s) => String(s || "").trim().toLowerCase();
+  // Normalize: lowercase, strip _ - . , /, collapse whitespace. So "Tracking_id",
+  // "tracking-id", "Tracking.Id", "Tracking Id" all match "tracking id".
+  const norm = (s) => String(s || "")
+    .toLowerCase()
+    .replace(/[_\-./,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   function buildBarcodeIndex() {
     const map = new Map();
