@@ -41,6 +41,8 @@
     .up-stamp-box { text-align:right; font-size:12px; color:#64748b; }
     .up-stamp-box .stamp { color:#0f172a; font-weight:600; }
     .up-stamp-box .stamp.none { color:#94a3b8; font-style:italic; font-weight:normal; }
+    .up-stamp-box .stamp .who { display:block; color:#1f6feb; font-weight:700; font-size:12px; margin-bottom:2px; }
+    .up-stamp-box .stamp .when { display:block; color:#0f172a; font-weight:600; font-size:12px; }
     .up-actions { display:flex; gap:8px; }
     .up-btn { font: inherit; padding:8px 14px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:#0f172a; white-space:nowrap; }
     .up-btn:hover { background:#eff6ff; border-color:#1f6feb; color:#1f6feb; }
@@ -94,6 +96,10 @@
 
     /* One row per (company, platform) — uniform, no company separators */
     #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+    .cell-lastup { font-size:11px; line-height:1.15; text-align:right; min-width:96px; }
+    .cell-lastup .lu-lbl { display:block; color:#94a3b8; text-transform:uppercase; letter-spacing:.4px; font-size:10px; font-weight:700; }
+    .cell-lastup .lu-val { display:block; color:#1f6feb; font-weight:700; font-size:12px; white-space:nowrap; }
+    .cell-lastup.none .lu-val { color:#cbd5e1; font-style:italic; font-weight:normal; }
     .combo-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:#fff; border-bottom:1px solid #f1f5f9; }
     .combo-row:last-child { border-bottom:none; }
     .combo-row .cell-company { flex:1; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
@@ -622,18 +628,45 @@
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
   const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, payments: {} };
+  // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
+  let pickerLastByCombo = {};
+
+  // Load the latest pushed_at per (company, platform) for the given kind. Used to
+  // annotate each combo row so packers can see when that combo was last updated.
+  async function loadPickerLastMap(kind) {
+    pickerLastByCombo = {};
+    if (!session) return;
+    const cfg = KIND_CFG[kind];
+    try {
+      let q = sb.from(cfg.table)
+        .select("company_name, platform, pushed_at")
+        .eq("user_id", session.user.id)
+        .order("pushed_at", { ascending: false })
+        .limit(2000);
+      if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
+      else         q = q.is("raw_data->>__file_tag", null);
+      const { data } = await q;
+      (data || []).forEach(r => {
+        const key = (r.company_name || "") + "::" + (r.platform || "");
+        // Since ordered desc, first hit wins
+        if (!pickerLastByCombo[key]) pickerLastByCombo[key] = r.pushed_at;
+      });
+    } catch (e) { console.warn("loadPickerLastMap err:", e); }
+  }
 
   document.querySelectorAll(".kind-upload-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       currentKind = btn.dataset.kind;
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
       ordersFilterCompany = ""; ordersFilterPlatform = "";
       $("#ordersPickerTitle").textContent = KIND_CFG[currentKind].title;
       buildFilterChips(withPlats);
-      renderOrdersPickerList(withPlats);
+      renderOrdersPickerList(withPlats);           // initial render (no stamps yet)
       updateSaveButton();
       $("#ordersPickerModal").classList.add("show");
+      // Load stamps in background then re-render — non-blocking so modal opens instantly
+      loadPickerLastMap(currentKind).then(() => renderOrdersPickerList(withPlats));
     });
   });
 
@@ -693,9 +726,20 @@
 
     // In reverse mode, platform cell shows first (left)
     const bucket = stagedUploads[currentKind];
+    // Format a "last uploaded" timestamp for a company+platform combo — dd Mon, HH:MM
+    const fmtLast = (iso) => {
+      if (!iso) return "";
+      try {
+        return new Date(iso).toLocaleString("en-IN", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+      } catch { return ""; }
+    };
     const html = rows.map(r => {
       const key = r.company + "::" + r.platform;
       const staged = bucket[key];
+      const lastIso = pickerLastByCombo[key];
+      const stampHtml = lastIso
+        ? `<div class="cell-lastup" title="Last uploaded ${escapeHtml(new Date(lastIso).toLocaleString('en-IN'))}"><span class="lu-lbl">Last</span> <span class="lu-val">${escapeHtml(fmtLast(lastIso))}</span></div>`
+        : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span></div>`;
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
       const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>`;
       let actionInner;
@@ -706,7 +750,7 @@
       } else {
         actionInner = `<button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>`;
       }
-      const actionCell = `<div class="cell-action" style="display:flex; align-items:center;">${actionInner}</div>`;
+      const actionCell = `<div class="cell-action" style="display:flex; align-items:center; gap:10px;">${stampHtml}${actionInner}</div>`;
       return `<div class="combo-row${staged ? ' staged' : ''}">${reversed ? platformCell + companyCell : companyCell + platformCell}${actionCell}</div>`;
     }).join("");
     wrap.innerHTML = html;
@@ -916,10 +960,17 @@
       const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
       if (!el) continue;
       if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); el.title = ""; continue; }
-      const dt = new Date(data[0].pushed_at);
+      const row = data[0];
+      const dt = new Date(row.pushed_at);
+      const when = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+      const company = row.company_name || "";
+      const platform = PLAT_LABEL[row.platform] || row.platform || "";
+      const who = [company, platform].filter(Boolean).join(" · ");
       el.classList.remove("none");
-      el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-      el.title = (data[0].company_name || "") + " · " + (PLAT_LABEL[data[0].platform] || data[0].platform || "") + (data[0].source_file ? "\n" + data[0].source_file : "");
+      // Render company · platform on top, then the timestamp beneath it
+      el.innerHTML = (who ? `<span class="who">${escapeHtml(who)}</span>` : "")
+                   + `<span class="when">${escapeHtml(when)}</span>`;
+      el.title = who + (row.source_file ? "\n" + row.source_file : "");
     }
   }
   // Back-compat alias
