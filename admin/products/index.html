@@ -103,7 +103,10 @@
 <main id="app" class="hidden">
   <!-- Left column: categories -->
   <aside class="panel">
-    <h2>📂 Categories</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center;">
+      <span>📂 Categories</span>
+      <button id="catNewBtn" class="b-outline" style="font-size:12px; padding:6px 10px;">➕ New</button>
+    </h2>
     <div id="catList"></div>
     <div class="subsection">
       <h3>Add / edit category</h3>
@@ -538,13 +541,46 @@ function renderCats() {
   }
   el.innerHTML = _state.categories.map(c => {
     const count = _state.products.filter(p => p.category_id === c.id).length;
-    return `<div class="cat-item ${_selectedCatId === c.id ? 'active' : ''}" data-id="${c.id}">
-      <span>${esc(c.name)}${!c.is_active ? " <small>(inactive)</small>" : ""}</span>
+    return `<div class="cat-item ${_selectedCatId === c.id ? 'active' : ''}" data-id="${c.id}" style="display:flex; align-items:center; gap:8px;">
+      <span style="flex:1;">${esc(c.name)}${!c.is_active ? " <small>(inactive)</small>" : ""}</span>
       <span class="count">${count}</span>
+      <button class="cat-del" data-del="${c.id}" title="Delete this category"
+        style="background:transparent; border:none; color:#dc2626; font-size:16px; cursor:pointer; padding:2px 6px; line-height:1; border-radius:4px;">×</button>
     </div>`;
   }).join("");
+  // Row click selects category, but the × button gets its own handler that
+  // doesn't bubble up (so the row doesn't get selected when deleting).
   el.querySelectorAll(".cat-item").forEach(el => {
-    el.addEventListener("click", () => selectCategory(Number(el.dataset.id)));
+    el.addEventListener("click", (e) => {
+      if (e.target.closest(".cat-del")) return; // delete handler owns this
+      selectCategory(Number(el.dataset.id));
+    });
+  });
+  el.querySelectorAll(".cat-del").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = Number(btn.dataset.del);
+      const cat = _state.categories.find(c => c.id === id);
+      const prodCount = _state.products.filter(p => p.category_id === id).length;
+      const msg = prodCount > 0
+        ? `Delete "${cat.name}" AND its ${prodCount} product${prodCount === 1 ? "" : "s"}?\n\nThis cannot be undone.`
+        : `Delete "${cat.name}"?`;
+      if (!confirm(msg)) return;
+      const j = await call("delete_category", { id });
+      if (j.ok) {
+        toast("✓ Deleted");
+        if (_selectedCatId === id) { _selectedCatId = null; _selectedProdId = null; }
+        // Clear the edit form if the deleted cat was loaded there
+        const editId = $("#catEditId").querySelector("span").textContent;
+        if (editId && Number(editId) === id) {
+          $("#catName").value = ""; $("#catSlug").value = ""; $("#catPos").value = "";
+          $("#catEditId").classList.add("hidden");
+        }
+        await loadAll();
+      } else {
+        toast(j.error || "Delete failed", true);
+      }
+    });
   });
 }
 
@@ -726,6 +762,16 @@ $("#catSave").addEventListener("click", async () => {
   else toast(j.error, true);
 });
 $("#catCancelEdit").addEventListener("click", (e) => { e.preventDefault(); $("#catName").value=""; $("#catSlug").value=""; $("#catPos").value=""; $("#catEditId").classList.add("hidden"); });
+
+// ➕ New category button — clears the edit form and focuses the Name field so
+// the user can type a new category immediately (no need to click a category first).
+$("#catNewBtn").addEventListener("click", () => {
+  $("#catName").value = "";
+  $("#catSlug").value = "";
+  $("#catPos").value = "";
+  $("#catEditId").classList.add("hidden");
+  $("#catName").focus();
+});
 
 $("#prodNewBtn").addEventListener("click", () => {
   _selectedProdId = null;
