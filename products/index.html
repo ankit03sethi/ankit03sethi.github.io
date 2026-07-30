@@ -707,27 +707,40 @@ function renderProductDetail(data) {
   // Store colors globally for design switching
   _catalogGrid._colors = colors;
 
-  // Wire up main image thumbnails
-  wrap.querySelectorAll("#detailThumbs .detail-thumb").forEach(t => {
-    t.addEventListener("click", () => {
-      $("#detailMainImg").style.backgroundImage = `url('${t.dataset.src}')`;
-      wrap.querySelectorAll("#detailThumbs .detail-thumb").forEach(x => x.classList.remove("active"));
-      t.classList.add("active");
+  // (Re)builds the thumbnail strip below the main image. Called once at first
+  // render with the hero images, and again whenever a variation is clicked so
+  // its own image set replaces the hero's.
+  function paintGallery(imageList) {
+    const clean = (imageList || []).filter(Boolean);
+    const list = clean.length ? clean : (imgs[0] ? [imgs[0]] : []);
+    $("#detailMainImg").style.backgroundImage = list[0] ? `url('${list[0]}')` : "";
+    const thumbsWrap = $("#detailThumbs");
+    thumbsWrap.innerHTML = list.map((u, i) =>
+      `<div class="detail-thumb ${i===0?'active':''}" style="background-image:url('${esc(u)}')" data-src="${esc(u)}"></div>`
+    ).join("");
+    // Rewire thumbnail clicks after each rebuild
+    thumbsWrap.querySelectorAll(".detail-thumb").forEach(t => {
+      t.addEventListener("click", () => {
+        $("#detailMainImg").style.backgroundImage = `url('${t.dataset.src}')`;
+        thumbsWrap.querySelectorAll(".detail-thumb").forEach(x => x.classList.remove("active"));
+        t.classList.add("active");
+      });
     });
-  });
+  }
 
-  // When customer clicks a variation row (signed-in OR anon view), swap the
-  // main product image to that variation's own image so they see what they're
-  // choosing instead of the hero. Falls back to hero image_urls[0] if the
-  // variation has none. Works in both purchase and cataloging modes.
-  const heroImg = imgs[0] || "";
+  // Initial thumbnail wire — starts with hero product's images
+  paintGallery(imgs);
+
+  // Clicking a variation row (signed-in OR anon) swaps BOTH the main image
+  // AND the thumbnail strip to that variation's own images. Falls back to
+  // hero images if the variation has none.
   wrap.querySelectorAll(".var-row").forEach(row => {
     row.addEventListener("click", () => {
       const cid = Number(row.dataset.cid);
       const clr = colors.find(c => c.id === cid);
-      const src = (clr && clr.image_urls && clr.image_urls[0]) || heroImg;
-      if (src) $("#detailMainImg").style.backgroundImage = `url('${src}')`;
-      // Highlight the clicked row so the user sees which one drives the image
+      const varImgs = (clr && Array.isArray(clr.image_urls)) ? clr.image_urls.filter(Boolean) : [];
+      paintGallery(varImgs.length ? varImgs : imgs);
+      // Highlight the clicked row so the user sees which one drives the gallery
       wrap.querySelectorAll(".var-row").forEach(r => r.style.background = "#fff");
       row.style.background = "#eff6ff";
     });
