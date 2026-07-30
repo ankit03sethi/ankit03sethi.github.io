@@ -647,20 +647,26 @@ function renderProductDetail(data) {
               <span id="applyErr" style="color:#dc2626;font-size:11px;font-weight:600;display:none;"></span>
             </div>
             <div id="varList" style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
-              ${colors.map(c => `
-                <label class="var-row" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:2px 10px;background:#fff;display:flex;align-items:center;gap:7px;cursor:pointer;min-height:32px;">
+              ${colors.map(c => {
+                // Variation row layout: [checkbox] [small thumb] [short_title (fallback name)] [qty stepper]
+                const firstImg = (c.image_urls && c.image_urls[0]) || (p.image_urls && p.image_urls[0]) || "";
+                const shortLabel = (c.short_title && String(c.short_title).trim()) || c.name;
+                return `
+                <label class="var-row" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:4px 10px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;">
                   <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
-                  ${c.hex_code ? `<span style="width:16px;height:16px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : ''}
+                  ${firstImg
+                    ? `<span style="width:36px;height:36px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc center/cover no-repeat url('${esc(firstImg)}');flex-shrink:0;"></span>`
+                    : (c.hex_code ? `<span style="width:20px;height:20px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : '')}
                   <div style="flex:1;min-width:0;line-height:1.2;">
-                    <div style="font-weight:600;font-size:12.5px;color:#0f172a;">${esc(c.name)}${c.product_code ? ` <span style="font-size:10.5px;color:#1f6feb;font-weight:600;">· ${esc(c.product_code)}</span>` : ''}</div>
+                    <div style="font-weight:700;font-size:13px;color:#0f172a;">${esc(shortLabel)}${c.product_code ? ` <span style="font-size:10.5px;color:#1f6feb;font-weight:600;">· ${esc(c.product_code)}</span>` : ''}</div>
                   </div>
                   <div class="var-qty-wrap" data-cid="${c.id}" style="display:flex;align-items:center;gap:0;">
                     <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
                     <input class="var-qty" data-cid="${c.id}" type="number" min="10" step="5" value="10" style="width:36px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
                     <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
                   </div>
-                </label>
-              `).join("")}
+                </label>`;
+              }).join("")}
             </div>
             <div id="designsWrap"></div>
           </div>

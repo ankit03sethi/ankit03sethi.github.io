@@ -138,6 +138,9 @@
       <label>Title *</label>
       <input id="pTitle" type="text" placeholder="e.g. Cotton Round Neck T-Shirt" />
 
+      <label>Short title <span style="color:#94a3b8;font-weight:400;font-size:11px;">— compact label shown in the variation list on /products (e.g., "Blue 0"). Max 40 chars.</span></label>
+      <input id="pShort" type="text" maxlength="40" placeholder="e.g. Blue 0" />
+
       <label>Bullet points (one per line)</label>
       <textarea id="pBullets" placeholder="100% Combed cotton&#10;Bio-washed for softness&#10;Size S / M / L / XL&#10;Machine washable"></textarea>
 
@@ -259,6 +262,8 @@
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Title * <span style="font-weight:400;color:#64748b;">(shown to customer)</span></label>
     <input id="mColorName" placeholder="e.g. Deep Brown" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <input id="mColorHex" type="hidden" value="" />
+    <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Short title <span style="font-weight:400;color:#64748b;">(compact label in variation list, e.g. "Blue 5" — max 40)</span></label>
+    <input id="mColorShort" maxlength="40" placeholder="e.g. Blue 5" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
     <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Product ID (shown to customer)</label>
     <input id="mColorCode" type="text" placeholder="e.g. WE-45" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;" />
 
@@ -662,6 +667,7 @@ function renderProdEdit() {
   if (!p) return;
   $("#prodEdit").classList.remove("hidden");
   $("#pTitle").value = p.title;
+  $("#pShort").value = p.short_title || "";
   $("#pBullets").value = (p.bullet_points || []).join("\n");
   $("#pDesc").value = p.description || "";
   $("#pVideo").value = p.video_url || "";
@@ -794,7 +800,7 @@ $("#catNewBtn").addEventListener("click", () => {
 $("#prodNewBtn").addEventListener("click", () => {
   _selectedProdId = null;
   $("#prodEdit").classList.remove("hidden");
-  ["#pTitle","#pBullets","#pDesc","#pVideo","#pCode","#pImages","#pPrice","#pMrp","#pQty","#pPos","#pGst","#pHsn"].forEach(s => $(s).value = "");
+  ["#pTitle","#pShort","#pBullets","#pDesc","#pVideo","#pCode","#pImages","#pPrice","#pMrp","#pQty","#pPos","#pGst","#pHsn"].forEach(s => $(s).value = "");
   _prodUploaded = [];
   syncProdImagesField();
   renderProdThumbs();
@@ -812,6 +818,7 @@ $("#pSave").addEventListener("click", async () => {
     id: _selectedProdId || 0,
     category_id: _selectedCatId,
     title: $("#pTitle").value.trim(),
+    short_title: $("#pShort").value.trim(),
     bullet_points: $("#pBullets").value.split("\n").map(s => s.trim()).filter(Boolean),
     description: $("#pDesc").value.trim(),
     video_url: $("#pVideo").value.trim(),
@@ -901,6 +908,7 @@ function openColorDialog(id, type) {
   $("#colorModalTitle").textContent = (existing ? "Edit " : "Add ") + meta.label.toLowerCase();
   $("#mColorName").value = existing?.name || "";
   $("#mColorHex").value = existing?.hex_code || "";
+  $("#mColorShort").value = existing?.short_title || "";
   $("#mColorCode").value = existing?.product_code || "";
   $("#mColorVideo").value = existing?.video_url || "";
   $("#mColorPos").value = existing?.position || 100;
@@ -961,6 +969,7 @@ $("#mColorSave").addEventListener("click", async () => {
   const j = await call("save_color", {
     id: _colorEditId, product_id: _selectedProdId,
     name, hex_code: _colorEditType === "color" ? $("#mColorHex").value.trim() : "",
+    short_title: $("#mColorShort").value.trim(),
     product_code: $("#mColorCode").value.trim(),
     video_url: $("#mColorVideo").value.trim(),
     image_urls: _colorUploaded.slice(),
