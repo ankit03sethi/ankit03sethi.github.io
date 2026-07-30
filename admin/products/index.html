@@ -525,6 +525,32 @@ async function call(op, body) {
   return await res.json();
 }
 
+// Delete confirmation with email OTP. Sends an OTP to the admin email, prompts
+// for the 6-digit code, then calls the delete_<kind> op with { otp }.
+// kind: "category" | "product" | "color" | "design"
+// beforeReload: optional async cleanup that runs after successful delete but
+//               before loadAll() (e.g., clear form fields).
+async function confirmDeleteWithOtp(kind, id, name, beforeReload) {
+  if (!confirm(`Delete ${kind} "${name}"?\n\nA 6-digit OTP will be sent to your admin email to confirm.`)) return;
+  // 1) Request OTP
+  toast("Sending OTP…");
+  const otpResp = await call("request_delete_otp", { kind, id });
+  if (!otpResp.ok) { toast(otpResp.error || "Could not send OTP", true); return; }
+  const sentTo = otpResp.masked_email || "your admin email";
+  const emailWarn = otpResp.email_sent === false ? "\n\n(Email may be delayed — check spam)" : "";
+  // 2) Prompt for OTP
+  const otp = prompt(`OTP sent to ${sentTo}.\nEnter the 6-digit code to delete "${name}":${emailWarn}`, "");
+  if (!otp) return;
+  const otpClean = String(otp).trim().replace(/\D/g, "");
+  if (otpClean.length !== 6) { toast("OTP must be 6 digits", true); return; }
+  // 3) Verify + delete in one call
+  const delResp = await call(`delete_${kind}`, { id, otp: otpClean });
+  if (!delResp.ok) { toast(delResp.error || "Delete failed", true); return; }
+  toast("✓ Deleted");
+  if (beforeReload) { try { await beforeReload(); } catch (_) {} }
+  await loadAll();
+}
+
 async function loadAll() {
   const j = await call("list_all");
   if (!j.ok) { toast(j.error || "Load failed", true); return; }
@@ -562,13 +588,8 @@ function renderCats() {
       const id = Number(btn.dataset.del);
       const cat = _state.categories.find(c => c.id === id);
       const prodCount = _state.products.filter(p => p.category_id === id).length;
-      const msg = prodCount > 0
-        ? `Delete "${cat.name}" AND its ${prodCount} product${prodCount === 1 ? "" : "s"}?\n\nThis cannot be undone.`
-        : `Delete "${cat.name}"?`;
-      if (!confirm(msg)) return;
-      const j = await call("delete_category", { id });
-      if (j.ok) {
-        toast("✓ Deleted");
+      const extra = prodCount > 0 ? ` and its ${prodCount} product${prodCount === 1 ? "" : "s"}` : "";
+      await confirmDeleteWithOtp("category", id, `${cat.name}${extra}`, async () => {
         if (_selectedCatId === id) { _selectedCatId = null; _selectedProdId = null; }
         // Clear the edit form if the deleted cat was loaded there
         const editId = $("#catEditId").querySelector("span").textContent;
@@ -576,10 +597,7 @@ function renderCats() {
           $("#catName").value = ""; $("#catSlug").value = ""; $("#catPos").value = "";
           $("#catEditId").classList.add("hidden");
         }
-        await loadAll();
-      } else {
-        toast(j.error || "Delete failed", true);
-      }
+      });
     });
   });
 }
@@ -816,7 +834,12 @@ $("#pSave").addEventListener("click", async () => {
 });
 
 $("#pDelete").addEventListener("click", async () => {
-  if (!_selectedProdId || !confirm("Delete this product (and all its colors/designs)?")) return;
+  if (!_selectedProdId) return;
+  const prod = _state.products.find(p => p.id === _selectedProdId);
+  await confirmDeleteWithOtp("product", _selectedProdId, prod?.title || `#${_selectedProdId}`, async () => {
+    _selectedProdId = null;
+  });
+  return; // early return — confirmDeleteWithOtp handles everything below
   const j = await call("delete_product", { id: _selectedProdId });
   if (j.ok) { toast("Deleted"); _selectedProdId = null; await loadAll(); }
   else toast(j.error, true);
@@ -953,7 +976,9 @@ $("#mColorSave").addEventListener("click", async () => {
 });
 
 async function deleteColor(id) {
-  if (!confirm("Delete this color (and its designs)?")) return;
+  const c = _state.colors.find(x => x.id === id);
+  await confirmDeleteWithOtp("color", id, c?.name || `#${id}`, null);
+  return;
   const j = await call("delete_color", { id });
   if (j.ok) { toast("Deleted"); await loadAll(); }
   else toast(j.error, true);
@@ -1056,7 +1081,9 @@ $("#mDesignSave").addEventListener("click", async () => {
 });
 
 async function deleteDesign(id) {
-  if (!confirm("Delete this design?")) return;
+  const d = _state.designs.find(x => x.id === id);
+  await confirmDeleteWithOtp("design", id, d?.name || `#${id}`, null);
+  return;
   const j = await call("delete_design", { id });
   if (j.ok) { toast("Deleted"); await loadAll(); }
   else toast(j.error, true);
