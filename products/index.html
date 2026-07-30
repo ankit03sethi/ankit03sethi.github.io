@@ -221,7 +221,10 @@
     body.anon #cartChip,
     body.anon #openManageBtn,
     body.anon #signOutBtn { display: none !important; }
-    body.anon .var-row { pointer-events: none; opacity: 0.95; }
+    /* Anonymous users can't check the box or set qty (those are display:none
+       above), but the row itself must stay clickable so tapping a variation
+       swaps the main image. Cursor stays default since there's no purchase. */
+    body.anon .var-row { opacity: 0.95; cursor: pointer; }
     body.anon .anon-cta { display: block !important; }
     .anon-cta { display: none; }
 
@@ -710,6 +713,23 @@ function renderProductDetail(data) {
       $("#detailMainImg").style.backgroundImage = `url('${t.dataset.src}')`;
       wrap.querySelectorAll("#detailThumbs .detail-thumb").forEach(x => x.classList.remove("active"));
       t.classList.add("active");
+    });
+  });
+
+  // When customer clicks a variation row (signed-in OR anon view), swap the
+  // main product image to that variation's own image so they see what they're
+  // choosing instead of the hero. Falls back to hero image_urls[0] if the
+  // variation has none. Works in both purchase and cataloging modes.
+  const heroImg = imgs[0] || "";
+  wrap.querySelectorAll(".var-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const cid = Number(row.dataset.cid);
+      const clr = colors.find(c => c.id === cid);
+      const src = (clr && clr.image_urls && clr.image_urls[0]) || heroImg;
+      if (src) $("#detailMainImg").style.backgroundImage = `url('${src}')`;
+      // Highlight the clicked row so the user sees which one drives the image
+      wrap.querySelectorAll(".var-row").forEach(r => r.style.background = "#fff");
+      row.style.background = "#eff6ff";
     });
   });
 
