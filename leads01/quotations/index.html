@@ -125,7 +125,7 @@
       <div style="margin-bottom:14px;">
         <input id="listSearchBox" type="text" placeholder="🔍 Search by quote #, name, email, mobile, or GST number..." style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box;" autocomplete="off" />
       </div>
-      <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
+      <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
         <button class="filter-tab active" data-filter="all">All</button>
         <button class="filter-tab" data-filter="draft">Draft</button>
         <button class="filter-tab" data-filter="sent">Sent</button>
@@ -134,6 +134,11 @@
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
+        <div style="flex:1;"></div>
+        <label style="font-size:12px;color:#475467;font-weight:600;margin-right:4px;">Employee:</label>
+        <select id="empFilter" style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;background:#fff;">
+          <option value="__all__">All employees</option>
+        </select>
       </div>
       <div id="listWrap"></div>
     </div>
@@ -177,6 +182,13 @@
                 <label>Address (optional)</label>
                 <input id="custAddress" type="text" placeholder="Mumbai, MH" />
               </div>
+            </div>
+            <div class="row-2">
+              <div>
+                <label>Employee code</label>
+                <input id="empCode" type="text" maxlength="20" placeholder="e.g. V01, AK, PRIYA-N" />
+              </div>
+              <div></div>
             </div>
           </div>
 
@@ -358,12 +370,14 @@ async function callFn(name, body, method = "POST") {
 // ============ LIST ============
 let _allQuotes = [];
 let _currentFilter = "all";
+let _currentEmpFilter = "__all__";
 
 async function loadList() {
   $("#listWrap").innerHTML = `<div class="helper" style="padding:20px;text-align:center;">Loading...</div>`;
   const j = await callFn("admin-quotations", { op:"list" });
   if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error||"")}</div>`; return; }
   _allQuotes = j.quotations || [];
+  refreshEmpFilterOptions();
   updateFilterCounts();
   renderFilteredList();
 }
@@ -412,12 +426,35 @@ function searchMatches(q, term) {
          (q.customer_name || "").toLowerCase().includes(t) ||
          (q.customer_email || "").toLowerCase().includes(t) ||
          (q.customer_phone || "").toLowerCase().includes(t) ||
-         (q.customer_gst || "").toLowerCase().includes(t);
+         (q.customer_gst || "").toLowerCase().includes(t) ||
+         (q.employee_code || "").toLowerCase().includes(t);
+}
+
+function matchesEmpFilter(q) {
+  if (_currentEmpFilter === "__all__") return true;
+  if (_currentEmpFilter === "__none__") return !q.employee_code;
+  return (q.employee_code || "") === _currentEmpFilter;
+}
+
+function refreshEmpFilterOptions() {
+  const sel = document.getElementById("empFilter");
+  if (!sel) return;
+  const codes = Array.from(new Set(_allQuotes.map(q => (q.employee_code || "").trim()).filter(Boolean))).sort();
+  const hasBlank = _allQuotes.some(q => !q.employee_code);
+  const prev = _currentEmpFilter;
+  let opts = `<option value="__all__">All employees</option>`;
+  if (hasBlank) opts += `<option value="__none__">(no code)</option>`;
+  for (const c of codes) opts += `<option value="${c.replace(/"/g,"&quot;")}">${c.replace(/</g,"&lt;")}</option>`;
+  sel.innerHTML = opts;
+  // Preserve selection when possible
+  const valid = ["__all__","__none__", ...codes];
+  sel.value = valid.includes(prev) ? prev : "__all__";
+  _currentEmpFilter = sel.value;
 }
 
 function updateFilterCounts() {
   const term = ($("#listSearchBox")?.value || "");
-  const searched = _allQuotes.filter(q => searchMatches(q, term));
+  const searched = _allQuotes.filter(q => searchMatches(q, term) && matchesEmpFilter(q));
   const counts = {};
   document.querySelectorAll(".filter-tab").forEach(tab => {
     const f = tab.dataset.filter;
@@ -589,7 +626,7 @@ function renderQuoteHistoryList(elId, list) {
 
 function renderFilteredList() {
   const term = ($("#listSearchBox")?.value || "");
-  const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter));
+  const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter) && matchesEmpFilter(q));
   if (qs.length === 0) {
     $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.'}</div>`;
     return;
@@ -604,8 +641,9 @@ function renderFilteredList() {
     const callBtn = phoneDigits ? `<a href="tel:+${(phoneDigits.length===10?"91":"")+phoneDigits}" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">📞</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">📞</span>`;
     const waBtn   = phoneDigits ? `<a href="https://wa.me/${waFmt}?text=${waTxt}" target="_blank" rel="noopener" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">💬</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">💬</span>`;
     const emlBtn  = q.customer_email ? `<a href="mailto:${esc(q.customer_email)}?subject=${encodeURIComponent(`Quote ${q.quote_number}`)}" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;">✉️</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;">✉️</span>`;
+    const empChip = q.employee_code ? `<span title="Employee code" style="display:inline-block;margin-left:6px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">Emp: ${esc(q.employee_code)}</span>` : "";
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
-      <td><b>${esc(q.quote_number)}</b></td>
+      <td><b>${esc(q.quote_number)}</b>${empChip}</td>
       <td style="font-size:12.5px;line-height:1.4;">
         <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
         ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
@@ -654,6 +692,13 @@ document.querySelectorAll(".filter-tab").forEach(tab => {
 
 // Wire search box
 $("#listSearchBox").addEventListener("input", () => {
+  updateFilterCounts();
+  renderFilteredList();
+});
+
+// Wire employee-code filter dropdown
+document.getElementById("empFilter")?.addEventListener("change", (e) => {
+  _currentEmpFilter = e.target.value || "__all__";
   updateFilterCounts();
   renderFilteredList();
 });
@@ -781,6 +826,7 @@ function openBuilder(quote) {
     $("#custPhone").value = quote.customer_phone || "";
     $("#custGst").value = quote.customer_gst || "";
     $("#custAddress").value = quote.customer_address || "";
+    $("#empCode").value = quote.employee_code || "";
     $("#notes").value = quote.notes || "";
     if (quote.valid_until) {
       const daysLeft = Math.max(1, Math.round((new Date(quote.valid_until).getTime() - Date.now()) / (86400000)));
@@ -791,7 +837,7 @@ function openBuilder(quote) {
     setTimeout(updateActionButtonsVisibility, 0);
   } else {
     $("#builderTitle").textContent = "New Quotation";
-    ["custName","custEmail","custPhone","custGst","custAddress","notes"].forEach(id => $("#"+id).value = "");
+    ["custName","custEmail","custPhone","custGst","custAddress","empCode","notes"].forEach(id => $("#"+id).value = "");
     $("#validDays").value = 1;
   }
   renderItems();
@@ -1052,6 +1098,7 @@ $("#saveBtn").addEventListener("click", async () => {
       gst: $("#custGst").value.trim(),
       address: $("#custAddress").value.trim(),
     },
+    employee_code: $("#empCode").value.trim(),
     notes: $("#notes").value.trim(),
     items: _items.map(it => ({ ...it, discount_inr: Number(it.discount_inr || 0) })),
     valid_hours: validDays * 24,

@@ -354,6 +354,7 @@
       <div class="meta">
         <div>
           <span class="label">Quote No:</span> <span id="mQnum" class="val"></span>
+          <div id="mEmpRow" style="margin-top:4px;display:none;"><span class="label">Prepared by:</span> <b id="mEmp" class="val"></b></div>
         </div>
         <div>
           <div><span class="label">Date:</span> <span id="mDate" class="val"></span></div>
@@ -536,6 +537,12 @@ function render() {
   $("#mQnum").textContent = q.quote_number;
   $("#mDate").textContent = fmtDate(q.created_at);
   $("#mValid").textContent = fmtDate(q.valid_until);
+  if (q.employee_code) {
+    $("#mEmp").textContent = q.employee_code;
+    $("#mEmpRow").style.display = "";
+  } else {
+    $("#mEmpRow").style.display = "none";
+  }
 
   // Ribbon based on status
   const rb = $("#ribbonHolder");
