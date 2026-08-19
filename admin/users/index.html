@@ -20,6 +20,10 @@
     tr:hover td { background:#f8fafc; }
     .chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; margin:2px; }
     .chip.super { background:#fef3c7; color:#92400e; }
+    .chip .x { margin-left:6px; background:transparent; border:none; color:inherit; cursor:pointer; font-weight:700; opacity:.55; padding:0 2px; font-size:13px; line-height:1; }
+    .chip .x:hover { opacity:1; }
+    .chip.locked { opacity: .95; }
+    .chip.locked .x { display: none; }
     .chip.catalog { background:#dbeafe; color:#1e40af; }
     .chip.invoices { background:#dcfce7; color:#166534; }
     .chip.quotations { background:#ede9fe; color:#5b21b6; }
@@ -64,7 +68,7 @@
   <div class="panel">
     <h2>➕ Add or update an admin</h2>
     <p style="font-size:13px; color:#64748b; margin:0 0 12px;">
-      They must have already signed up at <a href="/home/" target="_blank">cursive.world/home</a> (any password of their choice — they can use forgot-password to reset). Adding their email here just grants them the selected permissions.
+      No pre-signup needed. Enter their email → they receive a <b>Cursive invite email</b> with a "set password" link. Existing accounts get the permissions added silently (no email).
     </p>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
       <div><label style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Email</label>
@@ -133,21 +137,57 @@ async function reload() {
   const tbody = document.getElementById("adminRows");
   if (error) { tbody.innerHTML = `<tr><td colspan="4" style="color:#991b1b;">Load failed: ${error.message}</td></tr>`; return; }
   if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="padding:24px; text-align:center; color:#94a3b8;">No admins yet</td></tr>`; return; }
-  tbody.innerHTML = data.map(a => `<tr>
-    <td><b>${escapeHtml(a.email)}</b></td>
-    <td>${escapeHtml(a.display_name || "")}</td>
-    <td>${(a.permissions || []).map(p => `<span class="chip ${p}">${perm_labels[p] || p}</span>`).join("")}</td>
-    <td>
-      <button class="b-outline" data-edit="${escapeHtml(a.email)}" style="font-size:11px; padding:5px 10px;">✏️ Edit</button>
-      ${a.email === session.user.email.toLowerCase() ? "" : `<button class="b-danger" data-remove="${escapeHtml(a.email)}">✕ Remove</button>`}
-    </td>
-  </tr>`).join("");
+  const OWNER = "ankit03sethi@gmail.com"; // always super, protected in DB
+  tbody.innerHTML = data.map(a => {
+    const isOwner = a.email === OWNER;
+    const isMe = a.email === session.user.email.toLowerCase();
+    const chips = (a.permissions || []).map(p => {
+      // Owner's super chip and any single last permission are locked (removing would orphan the admin)
+      const lockThisChip = (isOwner && p === "super");
+      return `<span class="chip ${p} ${lockThisChip ? "locked" : ""}">${perm_labels[p] || p}${lockThisChip ? "" : `<button class="x" title="Remove this permission only" data-strip-email="${escapeHtml(a.email)}" data-strip-perm="${p}">×</button>`}</span>`;
+    }).join("");
+    return `<tr>
+      <td><b>${escapeHtml(a.email)}</b>${isOwner ? ` <span style="color:#92400e;font-size:11px;font-weight:700;">👑 OWNER</span>` : ""}</td>
+      <td>${escapeHtml(a.display_name || "")}</td>
+      <td>${chips}</td>
+      <td>
+        ${isOwner ? "" : `<button class="b-outline" data-edit="${escapeHtml(a.email)}" style="font-size:11px; padding:5px 10px;">✏️ Edit</button>`}
+        ${(isOwner || isMe) ? "" : `<button class="b-danger" data-remove="${escapeHtml(a.email)}">✕ Remove all</button>`}
+      </td>
+    </tr>`;
+  }).join("");
   tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => loadIntoForm(data.find(x => x.email === b.dataset.edit))));
   tbody.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", async () => {
-    if (!confirm(`Remove admin access for ${b.dataset.remove}?\n\nTheir user account still exists — this only revokes admin permissions.`)) return;
+    if (!confirm(`Remove ALL admin access for ${b.dataset.remove}?\n\nTheir user account still exists — this only revokes admin permissions.`)) return;
     const { error } = await sb.rpc("admin_users_remove", { p_email: b.dataset.remove });
     if (error) { toast(error.message, true); return; }
     toast("✓ Removed");
+    reload();
+  }));
+  // × on individual chip → strip that one permission
+  tbody.querySelectorAll("[data-strip-perm]").forEach(b => b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const targetEmail = b.dataset.stripEmail;
+    const toStrip = b.dataset.stripPerm;
+    const row = data.find(x => x.email === targetEmail);
+    if (!row) return;
+    const remaining = (row.permissions || []).filter(p => p !== toStrip);
+    if (remaining.length === 0) {
+      if (!confirm(`"${perm_labels[toStrip] || toStrip}" is the LAST permission on ${targetEmail}.\n\nRemoving it will revoke ALL admin access. Continue?`)) return;
+      const { error } = await sb.rpc("admin_users_remove", { p_email: targetEmail });
+      if (error) { toast(error.message, true); return; }
+      toast("✓ Admin removed (last permission stripped)");
+      reload();
+      return;
+    }
+    if (!confirm(`Remove "${perm_labels[toStrip] || toStrip}" permission from ${targetEmail}?\n\nThey will keep: ${remaining.map(p => perm_labels[p] || p).join(", ")}.`)) return;
+    const { error } = await sb.rpc("admin_users_upsert", {
+      p_email: targetEmail,
+      p_display_name: row.display_name || null,
+      p_permissions: remaining,
+    });
+    if (error) { toast(error.message, true); return; }
+    toast(`✓ Removed ${perm_labels[toStrip] || toStrip}`);
     reload();
   }));
 }
@@ -170,9 +210,25 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
   const perms = Array.from(document.querySelectorAll("#permBox input[type=checkbox]:checked")).map(c => c.value);
   if (!email) { toast("Email required", true); return; }
   if (perms.length === 0) { toast("Pick at least one permission", true); return; }
-  const { error } = await sb.rpc("admin_users_upsert", { p_email: email, p_display_name: name || null, p_permissions: perms });
-  if (error) { toast(error.message, true); return; }
-  toast("✓ Saved");
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true; btn.textContent = "Saving…";
+  // admin-invite-user handles both cases: creates auth user if needed + emails invite + upserts permissions
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-invite-user`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, display_name: name || null, permissions: perms }),
+  });
+  const j = await res.json();
+  btn.disabled = false; btn.textContent = "💾 Save admin";
+  if (!j.ok) { toast(j.error || "Save failed", true); return; }
+  if (j.existed) {
+    toast(`✓ Updated permissions for ${email}`);
+  } else if (j.email_sent) {
+    toast(`✓ Invite email sent to ${email}. They click the link to set a password.`);
+  } else {
+    toast(`✓ Admin created — invite email failed. Copy the recovery link from the console.`, true);
+    console.log("Recovery link for", email, ":", j.recovery_url);
+  }
   document.getElementById("clearBtn").click();
   reload();
 });
