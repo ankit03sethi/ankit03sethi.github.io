@@ -121,6 +121,20 @@ let adminUserId = "";
   adminEmail = session.user.email || "";
   adminUserId = session.user.id;
 
+  // RBAC gate: require 'technical' or 'super' permission
+  const { data: perms } = await sb.rpc("current_admin_permissions");
+  const list = Array.isArray(perms) ? perms : [];
+  if (!list.includes("super") && !list.includes("technical")) {
+    whoBox.textContent = "Signed in: " + adminEmail;
+    main.innerHTML = `<div style="max-width:520px;margin:40px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.06);text-align:center;">
+      <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">🚫 No access to <b style="color:#1f6feb;">Technical</b></h1>
+      <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 16px;">Your admin account doesn't have the <code>technical</code> permission. Ask a super-admin to grant it in <a href="/admin/users/">/admin/users/</a>.</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0 0 16px;">Your current permissions: <code>${list.length ? list.join(", ") : "(none)"}</code></p>
+      <a href="/home/" style="display:inline-block;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Home</a>
+    </div>`;
+    return;
+  }
+
   // Try to load customers (this is where admin check happens server-side)
   await loadCustomers();
 })();
