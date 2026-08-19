@@ -23,7 +23,7 @@
   btn.id = "cw-forgot-btn";
   btn.type = "button";
   btn.title = "Send yourself a reset-password link";
-  btn.innerHTML = "🔑 Reset password";
+  btn.innerHTML = "🔑 Forgot password?";
   document.body.appendChild(btn);
 
   const toast = document.createElement("div");
@@ -49,47 +49,62 @@
     } catch (_) { return null; }
   }
 
+  // Always visible now — text/label adapts based on sign-in state
   function ensureVisible() {
     const email = currentEmail();
-    btn.style.display = email ? "block" : "none";
-    if (email) btn.title = "Send reset-password link to " + email;
+    btn.style.display = "block";
+    if (email) {
+      btn.innerHTML = "🔑 Reset password";
+      btn.title = "Send reset-password link to " + email;
+    } else {
+      btn.innerHTML = "🔑 Forgot password?";
+      btn.title = "Send yourself a reset-password link — for signed-out admins";
+    }
   }
   ensureVisible();
   setInterval(ensureVisible, 3000); // catch login/logout mid-session
 
+  async function sendRecovery(email) {
+    const r = await fetch(`https://bttppihskbfmxwujyztj.supabase.co/auth/v1/recover`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",
+      },
+      body: JSON.stringify({
+        email,
+        gotrue_meta_security: {},
+        options: { redirectTo: "https://cursive.world/pdtracker/reset-password.html" },
+      }),
+    });
+    if (r.ok || r.status === 200) return { ok: true };
+    const j = await r.json().catch(() => ({}));
+    return { ok: false, error: j.error_description || j.msg || j.error || "Failed" };
+  }
+
   btn.addEventListener("click", async () => {
-    const email = currentEmail();
-    if (!email) { say("Not signed in — nothing to reset.", true); return; }
-    if (!confirm(`Send a password-reset link to ${email}?\n\nYou'll receive a Cursive email with a link to set a new password. Your current session stays open until you use it.`)) return;
+    let email = currentEmail();
+    // Signed-out path — prompt for email
+    if (!email) {
+      email = (prompt("Enter your admin email to receive a password-reset link:") || "").trim().toLowerCase();
+      if (!email) return;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("Invalid email format", true); return; }
+    } else {
+      if (!confirm(`Send a password-reset link to ${email}?\n\nYou'll receive a Cursive email with a link to set a new password. Your current session stays open until you use it.`)) return;
+    }
     btn.disabled = true;
     const oldText = btn.innerHTML;
     btn.innerHTML = "Sending…";
     try {
-      // Direct call to Supabase Auth REST — no need to import the full client
-      const r = await fetch(`https://bttppihskbfmxwujyztj.supabase.co/auth/v1/recover`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",
-        },
-        body: JSON.stringify({
-          email,
-          gotrue_meta_security: {},
-          // Land them on our custom reset page after they click the email link
-          options: { redirectTo: "https://cursive.world/pdtracker/reset-password.html" },
-        }),
-      });
-      if (r.ok || r.status === 200) {
-        say("✓ Reset email sent to " + email + ". Check inbox (and spam).");
-      } else {
-        const j = await r.json().catch(() => ({}));
-        say("❌ " + (j.error_description || j.msg || j.error || "Failed"), true);
-      }
+      const res = await sendRecovery(email);
+      if (res.ok) say("✓ Reset email sent to " + email + ". Check inbox (and spam).");
+      else say("❌ " + res.error, true);
     } catch (e) {
       say("❌ Network error: " + (e.message || e), true);
     } finally {
       btn.disabled = false;
       btn.innerHTML = oldText;
+      ensureVisible();
     }
   });
 })();
