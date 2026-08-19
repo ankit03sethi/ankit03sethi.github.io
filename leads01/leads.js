@@ -131,8 +131,21 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireDateRangeHandlers();
 
   const { data: { session } } = await sb.auth.getSession();
-  if (session) bootDashboard();
-  else { hide($("#dashView")); show($("#loginView")); }
+  if (!session) { hide($("#dashView")); show($("#loginView")); return; }
+
+  // RBAC gate — require 'quotations' or 'super' permission
+  const { data: perms } = await sb.rpc("current_admin_permissions");
+  const list = Array.isArray(perms) ? perms : [];
+  if (!list.includes("super") && !list.includes("quotations")) {
+    document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.06);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;">
+      <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">🚫 No access to <b style="color:#1f6feb;">Quotations / Leads</b></h1>
+      <p style="color:#64748b;font-size:14px;line-height:1.6;">Your admin account doesn't have the <code>quotations</code> permission. Ask a super-admin in <a href="/admin/users/">/admin/users/</a>.</p>
+      <p style="color:#94a3b8;font-size:12px;margin-top:10px;">Your permissions: <code>${list.length ? list.join(", ") : "(none)"}</code></p>
+      <a href="/home/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Home</a>
+    </div>`;
+    return;
+  }
+  bootDashboard();
 });
 
 function wireDateRangeHandlers() {
