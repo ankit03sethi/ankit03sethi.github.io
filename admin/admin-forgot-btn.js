@@ -19,12 +19,57 @@
   s.textContent = STYLE;
   document.head.appendChild(s);
 
+  // Forgot-password button (visible when SIGNED OUT)
   const btn = document.createElement("button");
   btn.id = "cw-forgot-btn";
   btn.type = "button";
   btn.title = "Send yourself a reset-password link";
   btn.innerHTML = "🔑 Forgot password?";
   document.body.appendChild(btn);
+
+  // Sign-out button (visible when SIGNED IN)
+  const outBtn = document.createElement("button");
+  outBtn.id = "cw-signout-btn";
+  outBtn.type = "button";
+  outBtn.title = "Sign out of Cursive admin";
+  outBtn.innerHTML = "🚪 Sign out";
+  outBtn.style.cssText = "position:fixed; top:12px; right:12px; z-index:9999; background:#fff; color:#dc2626; border:1px solid #dc2626; border-radius:8px; padding:6px 12px; font:600 12px/1 -apple-system,'Segoe UI',Roboto,sans-serif; cursor:pointer; box-shadow:0 2px 8px rgba(15,23,42,0.08); display:none;";
+  outBtn.addEventListener("mouseover", () => outBtn.style.background = "#fef2f2");
+  outBtn.addEventListener("mouseout",  () => outBtn.style.background = "#fff");
+  document.body.appendChild(outBtn);
+  outBtn.addEventListener("click", async () => {
+    if (!confirm("Sign out of Cursive admin?")) return;
+    // Clear both known auth-token storage keys so we're logged out regardless
+    // of which storageKey the page's supabase client uses.
+    try {
+      const token = (() => {
+        for (const k of Object.keys(localStorage)) {
+          if (k === "pd_tracker_auth" || /^sb-.*-auth-token$/.test(k)) {
+            try { return JSON.parse(localStorage.getItem(k))?.access_token; } catch { return null; }
+          }
+        }
+        return null;
+      })();
+      // Best-effort server-side sign-out (kills refresh token)
+      if (token) {
+        fetch(`https://bttppihskbfmxwujyztj.supabase.co/auth/v1/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",
+            "Authorization": "Bearer " + token,
+          },
+        }).catch(() => {});
+      }
+    } catch (_) {}
+    // Wipe local session
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (k === "pd_tracker_auth" || /^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k);
+      }
+    } catch (_) {}
+    location.reload();
+  });
 
   const toast = document.createElement("div");
   toast.id = "cw-forgot-toast";
@@ -49,12 +94,19 @@
     } catch (_) { return null; }
   }
 
-  // Only show when signed OUT — signed-in admins have no reason to see it.
+  // Show Forgot? when signed out, Sign out when signed in — never both.
   function ensureVisible() {
     const email = currentEmail();
-    btn.style.display = email ? "none" : "block";
-    btn.innerHTML = "🔑 Forgot password?";
-    btn.title = "Send yourself a reset-password link";
+    if (email) {
+      btn.style.display = "none";
+      outBtn.style.display = "block";
+      outBtn.title = "Sign out — " + email;
+    } else {
+      btn.style.display = "block";
+      outBtn.style.display = "none";
+      btn.innerHTML = "🔑 Forgot password?";
+      btn.title = "Send yourself a reset-password link";
+    }
   }
   ensureVisible();
   setInterval(ensureVisible, 3000); // catch login/logout mid-session
