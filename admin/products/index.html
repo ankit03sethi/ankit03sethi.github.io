@@ -6,6 +6,8 @@
   <title>Catalog · Admin · Cursive</title>
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/pdtracker/pdtracker.css?v=2026053002" />
+  <!-- SheetJS for bulk .xlsx/.csv parse + sample download -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     body { background: #f8fafc; margin: 0; color: #0f172a; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
     main { max-width: 1250px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
@@ -103,9 +105,12 @@
 <main id="app" class="hidden">
   <!-- Left column: categories -->
   <aside class="panel">
-    <h2 style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
       <span>📂 Categories</span>
-      <button id="catNewBtn" class="b-outline" style="font-size:12px; padding:6px 10px;">➕ New</button>
+      <span style="display:flex; gap:6px;">
+        <button id="bulkUploadBtn" class="b-outline" style="font-size:12px; padding:6px 10px;" title="Upload many products + variations at once via .xlsx / .csv">⬆ Bulk</button>
+        <button id="catNewBtn" class="b-outline" style="font-size:12px; padding:6px 10px;">➕ New</button>
+      </span>
     </h2>
     <div id="catList"></div>
     <div class="subsection">
@@ -251,9 +256,42 @@
       </div>
     </div>
   </section>
-</main>
+        </main>
 
 <div id="toastHost"></div>
+
+<!-- BULK UPLOAD MODAL -->
+<div id="bulkModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h3 style="margin:0;">⬆ Bulk upload products &amp; variations</h3>
+      <button id="bulkModalClose" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">×</button>
+    </div>
+    <p style="font-size:13px; color:#64748b; margin:0 0 12px; line-height:1.55;">
+      Upload one <b>.xlsx</b> or <b>.csv</b> file with one row per variation. Existing categories/products/variations
+      (matched by name/code) will be <b>updated</b>. New ones will be inserted. Nothing gets deleted.
+    </p>
+    <button id="bulkSampleBtn" class="b-outline" style="width:100%; padding:10px; font-size:13px; margin-bottom:10px;">
+      📥 Download sample template with all columns
+    </button>
+    <label for="bulkFileInput" style="display:block; padding:14px; border:1.5px dashed #cbd5e1; border-radius:8px; background:#f8fafc; text-align:center; cursor:pointer; font-size:13px; color:#475467;">
+      📂 <b>Click to pick a file</b> — .xlsx or .csv (max 5000 rows)
+    </label>
+    <input id="bulkFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
+    <div id="bulkStatus" style="margin-top:12px; font-size:13px; color:#0f172a;"></div>
+    <div id="bulkPreview" style="margin-top:12px; display:none;">
+      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; font-size:13px;">
+        <div style="font-weight:700; color:#1e40af; margin-bottom:6px;">📊 Dry-run preview</div>
+        <div id="bulkPreviewCounts" style="color:#0f172a; line-height:1.7;"></div>
+        <div id="bulkPreviewErrors" style="color:#b91c1c; font-size:12px; margin-top:6px; max-height:120px; overflow-y:auto; white-space:pre-wrap;"></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button id="bulkConfirmBtn" class="b-primary" style="flex:1; padding:10px; font-size:14px;">✓ Confirm &amp; import</button>
+        <button id="bulkCancelBtn" class="b-outline" style="padding:10px 16px; font-size:14px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- COLOR MODAL -->
 <div id="colorModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;">
@@ -796,6 +834,133 @@ $("#catNewBtn").addEventListener("click", () => {
   $("#catEditId").classList.add("hidden");
   $("#catName").focus();
 });
+
+// ============ BULK UPLOAD (⬆ Bulk button) ============
+// One xlsx/csv → many products+variations at once. Preview counts first, then confirm.
+const BULK_COLUMNS = [
+  "Category", "Product Title", "Product Short", "Product Code", "Description", "Bullets",
+  "Product Price", "Product MRP", "Product GST", "Product HSN", "Product Images", "Product Video",
+  "Variation Name", "Variation Short", "Variation Hex", "Variation Code",
+  "Variation Price", "Variation MRP", "Variation GST", "Variation HSN",
+  "Variation Images", "Variation Video",
+];
+const BULK_EXAMPLES = [
+  { "Category": "32\" Number Balloons Blue", "Product Title": "Blue 0 Number 32 inch foil Balloon", "Product Short": "Blue 0", "Product Code": "S483",
+    "Description": "Premium quality 32-inch blue number 0 foil balloon.", "Bullets": "Air fill or helium\nSelf-sealing valve\nReusable",
+    "Product Price": 25, "Product MRP": 50, "Product GST": 18, "Product HSN": "9505", "Product Images": "https://example.com/blue0-main.jpg", "Product Video": "",
+    "Variation Name": "Blue 1 Number 32 inch foil Balloon", "Variation Short": "Blue 1", "Variation Hex": "#1f6feb", "Variation Code": "S484",
+    "Variation Price": 25, "Variation MRP": 50, "Variation GST": 18, "Variation HSN": "9505",
+    "Variation Images": "https://example.com/blue1-front.jpg,https://example.com/blue1-back.jpg", "Variation Video": "" },
+  { "Category": "32\" Number Balloons Blue", "Product Title": "Blue 0 Number 32 inch foil Balloon", "Product Short": "Blue 0", "Product Code": "S483",
+    "Description": "", "Bullets": "", "Product Price": 25, "Product MRP": 50, "Product GST": 18, "Product HSN": "9505", "Product Images": "", "Product Video": "",
+    "Variation Name": "Blue 2 Number 32 inch foil Balloon", "Variation Short": "Blue 2", "Variation Hex": "#1f6feb", "Variation Code": "S485",
+    "Variation Price": 25, "Variation MRP": 50, "Variation GST": 18, "Variation HSN": "9505",
+    "Variation Images": "https://example.com/blue2.jpg", "Variation Video": "" },
+  { "Category": "Tooth Brushes", "Product Title": "Bamboo Toothbrush Adult", "Product Short": "Bamboo Brush", "Product Code": "TB01",
+    "Description": "Eco-friendly bamboo toothbrush.", "Bullets": "100% biodegradable handle\nSoft nylon bristles",
+    "Product Price": 99, "Product MRP": 149, "Product GST": 12, "Product HSN": "9603", "Product Images": "https://example.com/bamboo.jpg", "Product Video": "",
+    "Variation Name": "", "Variation Short": "", "Variation Hex": "", "Variation Code": "",
+    "Variation Price": "", "Variation MRP": "", "Variation GST": "", "Variation HSN": "",
+    "Variation Images": "", "Variation Video": "" },
+];
+let _bulkParsedRows = null;
+
+$("#bulkUploadBtn").addEventListener("click", () => {
+  $("#bulkStatus").textContent = "";
+  $("#bulkPreview").style.display = "none";
+  $("#bulkFileInput").value = "";
+  _bulkParsedRows = null;
+  $("#bulkModal").classList.remove("hidden");
+});
+$("#bulkModalClose").addEventListener("click", () => $("#bulkModal").classList.add("hidden"));
+$("#bulkCancelBtn").addEventListener("click", () => {
+  $("#bulkPreview").style.display = "none";
+  $("#bulkStatus").textContent = "";
+  _bulkParsedRows = null;
+});
+
+// Download sample xlsx with all columns + 3 example rows
+$("#bulkSampleBtn").addEventListener("click", () => {
+  if (!window.XLSX) { toast("SheetJS still loading, try again in 1 sec", true); return; }
+  const ws = XLSX.utils.json_to_sheet(BULK_EXAMPLES, { header: BULK_COLUMNS });
+  // Set nice column widths
+  ws["!cols"] = BULK_COLUMNS.map(c => ({ wch: Math.max(14, c.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  XLSX.writeFile(wb, "cursive-catalog-bulk-template.xlsx");
+});
+
+// File picker → parse → dry-run preview
+$("#bulkFileInput").addEventListener("change", async (e) => {
+  const f = e.target.files?.[0];
+  if (!f) return;
+  if (!window.XLSX) { toast("SheetJS still loading, try again in 1 sec", true); return; }
+  $("#bulkStatus").textContent = "Reading " + f.name + " ...";
+  try {
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+    if (rows.length === 0) { $("#bulkStatus").textContent = "❌ No data rows found"; return; }
+    if (rows.length > 5000) { $("#bulkStatus").textContent = "❌ Max 5000 rows per upload. Split the file."; return; }
+
+    // Normalize keys to lowercase-with-underscores so the server accepts both header styles
+    const normalized = rows.map(r => {
+      const out = {};
+      for (const k of Object.keys(r)) {
+        out[k] = r[k]; // keep original key too
+        const nk = k.toLowerCase().replace(/\s+/g, "_");
+        out[nk] = r[k];
+      }
+      return out;
+    });
+    _bulkParsedRows = normalized;
+
+    $("#bulkStatus").textContent = `✓ Parsed ${rows.length} rows. Running dry-run preview...`;
+    const dry = await callBulk({ rows: normalized, dry_run: true });
+    if (!dry.ok) { $("#bulkStatus").textContent = "❌ " + (dry.error || "Preview failed"); return; }
+    renderBulkPreview(dry);
+  } catch (err) {
+    $("#bulkStatus").textContent = "❌ Parse failed: " + (err.message || err);
+  }
+});
+
+function renderBulkPreview(res) {
+  $("#bulkPreview").style.display = "block";
+  const counts = [
+    `📁 <b>Categories:</b> ${res.categories_created} new`,
+    `📦 <b>Products:</b> ${res.products_created} new + ${res.products_updated} updated`,
+    `🎨 <b>Variations:</b> ${res.variations_created} new + ${res.variations_updated} updated`,
+    res.rows_skipped ? `⚠ <b>${res.rows_skipped} rows skipped</b> (missing category or product title)` : ``,
+  ].filter(Boolean).join("<br>");
+  $("#bulkPreviewCounts").innerHTML = counts;
+  $("#bulkPreviewErrors").textContent = (res.errors && res.errors.length)
+    ? "⚠ Errors:\n" + res.errors.slice(0, 20).join("\n")
+    : "";
+}
+
+$("#bulkConfirmBtn").addEventListener("click", async () => {
+  if (!_bulkParsedRows) return;
+  $("#bulkConfirmBtn").disabled = true;
+  $("#bulkConfirmBtn").textContent = "Importing...";
+  const res = await callBulk({ rows: _bulkParsedRows, dry_run: false });
+  $("#bulkConfirmBtn").disabled = false;
+  $("#bulkConfirmBtn").textContent = "✓ Confirm & import";
+  if (!res.ok) { $("#bulkStatus").textContent = "❌ " + (res.error || "Import failed"); return; }
+  toast(`✓ Imported: ${res.products_created + res.products_updated} products, ${res.variations_created + res.variations_updated} variations`);
+  $("#bulkModal").classList.add("hidden");
+  await loadAll(); // refresh the category/product tree
+});
+
+// Helper: hits the dedicated bulk-import edge function (separate from the admin-catalog dispatcher)
+async function callBulk(body) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-catalog-bulk-import`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${_session.access_token}`, "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return await res.json();
+}
 
 $("#prodNewBtn").addEventListener("click", () => {
   _selectedProdId = null;
