@@ -427,9 +427,14 @@ function renderPane() {
   // Render the SHELL (toolbar + rows container) only once per tab switch.
   // Filter input changes only re-render the rows, preserving input focus.
   const isManualAdd = activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
-  const needShell = !$("#filterBar") || !$("#rowsContainer") || (isManualAdd && !$("#manualAddBar")) || (!isManualAdd && $("#manualAddBar"));
+  const currentBarSub = $("#manualAddBar")?.dataset.sub || "";
+  // Rebuild shell if the manual-add state OR the specific sub-tab changed
+  const needShell = !$("#filterBar") || !$("#rowsContainer")
+    || (isManualAdd && !$("#manualAddBar"))
+    || (!isManualAdd && $("#manualAddBar"))
+    || (isManualAdd && currentBarSub !== activeSub);
   if (needShell) {
-    const manualBarHtml = isManualAdd ? `<div id="manualAddBar"></div>` : "";
+    const manualBarHtml = isManualAdd ? `<div id="manualAddBar" data-sub="${esc(activeSub)}"></div>` : "";
     $("#paneStage").innerHTML = `<div id="filterBar"></div>${manualBarHtml}<div id="rowsContainer"></div>`;
     renderToolbarInto($("#filterBar"));
     wireToolbarHandlers();
