@@ -271,9 +271,18 @@
       Upload one <b>.xlsx</b> or <b>.csv</b> file with one row per variation. Existing categories/products/variations
       (matched by name/code) will be <b>updated</b>. New ones will be inserted. Nothing gets deleted.
     </p>
-    <button id="bulkSampleBtn" class="b-outline" style="width:100%; padding:10px; font-size:13px; margin-bottom:10px;">
-      📥 Download sample template with all columns
-    </button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+      <button id="bulkSampleBtn" class="b-outline" style="padding:10px; font-size:12.5px;" title="Blank template with example rows">
+        📥 Sample template
+      </button>
+      <button id="bulkDownloadCurrentBtn" class="b-outline" style="padding:10px; font-size:12.5px;" title="Download every category / product / variation currently in your catalog">
+        📤 Download current catalog
+      </button>
+    </div>
+    <p style="font-size:12px; color:#94a3b8; margin:0 0 10px; line-height:1.5;">
+      💡 Tip: click <b>Download current catalog</b>, edit fields in Excel, save, then upload back
+      here — matching rows (by <b>Product Code</b> / <b>Variation Code</b>) will be updated in place.
+    </p>
     <label for="bulkFileInput" style="display:block; padding:14px; border:1.5px dashed #cbd5e1; border-radius:8px; background:#f8fafc; text-align:center; cursor:pointer; font-size:13px; color:#475467;">
       📂 <b>Click to pick a file</b> — .xlsx or .csv (max 5000 rows)
     </label>
@@ -879,15 +888,81 @@ $("#bulkCancelBtn").addEventListener("click", () => {
   _bulkParsedRows = null;
 });
 
-// Download sample xlsx with all columns + 3 example rows
+// Download blank sample xlsx with all columns + 3 example rows
 $("#bulkSampleBtn").addEventListener("click", () => {
   if (!window.XLSX) { toast("SheetJS still loading, try again in 1 sec", true); return; }
   const ws = XLSX.utils.json_to_sheet(BULK_EXAMPLES, { header: BULK_COLUMNS });
-  // Set nice column widths
   ws["!cols"] = BULK_COLUMNS.map(c => ({ wch: Math.max(14, c.length + 2) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Products");
   XLSX.writeFile(wb, "cursive-catalog-bulk-template.xlsx");
+});
+
+// Download CURRENT catalog as xlsx in the bulk-import format.
+// User edits fields → re-uploads → the same upsert-by-code logic applies changes.
+// Roundtrip fully supported: no need to re-type existing values.
+$("#bulkDownloadCurrentBtn").addEventListener("click", () => {
+  if (!window.XLSX) { toast("SheetJS still loading, try again in 1 sec", true); return; }
+  if (!_state || !_state.categories) { toast("Catalog not loaded yet", true); return; }
+  const catById = Object.fromEntries(_state.categories.map(c => [c.id, c.name]));
+  const colorsByProduct = {};
+  for (const c of _state.colors || []) {
+    (colorsByProduct[c.product_id] = colorsByProduct[c.product_id] || []).push(c);
+  }
+  const imgArr = (v) => Array.isArray(v) ? v.join(", ") : (v || "");
+  const rows = [];
+  for (const p of _state.products || []) {
+    const catName = catById[p.category_id] || "";
+    // Base product-only fields (shared across all variation rows for this product)
+    const baseRow = {
+      "Category": catName,
+      "Product Title": p.title || "",
+      "Product Short": p.short_title || "",
+      "Product Code": p.product_code || "",
+      "Description": p.description || "",
+      "Bullets": (p.bullet_points || []).join("\n"),
+      "Product Price": p.price_inr || "",
+      "Product MRP": p.mrp_inr || "",
+      "Product GST": p.gst_percent ?? "",
+      "Product HSN": p.hsn_code || "",
+      "Product Images": imgArr(p.image_urls),
+      "Product Video": p.video_url || "",
+    };
+    const variations = colorsByProduct[p.id] || [];
+    if (variations.length === 0) {
+      // Product with no variations → one row with blank variation fields
+      rows.push({
+        ...baseRow,
+        "Variation Name": "", "Variation Short": "", "Variation Hex": "", "Variation Code": "",
+        "Variation Price": "", "Variation MRP": "", "Variation GST": "", "Variation HSN": "",
+        "Variation Images": "", "Variation Video": "",
+      });
+    } else {
+      for (const v of variations) {
+        rows.push({
+          ...baseRow,
+          "Variation Name": v.name || "",
+          "Variation Short": v.short_title || "",
+          "Variation Hex": v.hex_code || "",
+          "Variation Code": v.product_code || "",
+          "Variation Price": v.price_inr || "",
+          "Variation MRP": v.mrp_inr || "",
+          "Variation GST": v.gst_percent ?? "",
+          "Variation HSN": v.hsn_code || "",
+          "Variation Images": imgArr(v.image_urls),
+          "Variation Video": v.video_url || "",
+        });
+      }
+    }
+  }
+  if (rows.length === 0) { toast("No products in catalog to download", true); return; }
+  const ws = XLSX.utils.json_to_sheet(rows, { header: BULK_COLUMNS });
+  ws["!cols"] = BULK_COLUMNS.map(c => ({ wch: Math.max(14, c.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `cursive-catalog-${stamp}.xlsx`);
+  toast(`✓ Downloaded ${rows.length} rows across ${_state.products.length} products`);
 });
 
 // File picker → parse → dry-run preview
