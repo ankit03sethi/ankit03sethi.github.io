@@ -31,6 +31,7 @@
     .chip.pdtracker { background:#fce7f3; color:#9d174d; }
     .chip.users { background:#e0e7ff; color:#3730a3; }
     .chip.technical { background:#f1f5f9; color:#334155; }
+    .chip.employees { background:#ffedd5; color:#9a3412; }
     input, button { font: inherit; }
     input[type=text], input[type=email] { padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%; }
     button { padding:9px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; }
@@ -90,6 +91,7 @@
         <label class="perm-check"><input type="checkbox" value="quotations"> leads01/quotations</label>
         <label class="perm-check"><input type="checkbox" value="pdtracker"> pdtracker/passwords</label>
         <label class="perm-check"><input type="checkbox" value="technical"> technical</label>
+        <label class="perm-check"><input type="checkbox" value="employees"> admin/employees</label>
       </div>
     </div>
     <button id="saveBtn" class="b-primary">💾 Save admin</button>
@@ -144,6 +146,7 @@ const perm_labels = {
   pdtracker: "pdtracker/passwords",
   technical: "technical",
   users: "admin/users",
+  employees: "admin/employees",
 };
 
 async function reload() {

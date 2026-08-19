@@ -13,13 +13,14 @@
     header .brand-box { width:36px; height:36px; background:#1f6feb; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Dancing Script',cursive; font-size:20px; font-weight:700; }
     main { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
     .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; }
+    .hidden { display:none !important; }
     h2 { margin:0 0 12px; font-size:18px; }
     table { width:100%; border-collapse: collapse; font-size:13px; }
     th { text-align:left; padding:10px 8px; background:#f8fafc; border-bottom:2px solid #e2e8f0; font-weight:700; color:#475467; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
     td { padding:12px 8px; border-bottom:1px solid #e2e8f0; vertical-align: middle; }
     tr:hover td { background:#f8fafc; }
     input, button { font: inherit; }
-    input[type=text], input[type=email] { padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%; box-sizing:border-box; }
+    input[type=text], input[type=email], input[type=password] { padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%; box-sizing:border-box; }
     button { padding:9px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; }
     .b-primary { background:#1f6feb; color:#fff; }
     .b-primary:hover { background:#0d4cb8; }
@@ -40,6 +41,7 @@
     .row-form { display:grid; grid-template-columns:1fr 1.4fr auto; gap:10px; align-items:end; }
     label.small { font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:4px; }
     @media (max-width:640px) { .row-form { grid-template-columns:1fr; } }
+    .email-chip { background:#f1f5f9; color:#334155; padding:5px 10px; border-radius:20px; font-size:12px; font-weight:600; }
   </style>
 </head>
 <body>
@@ -47,50 +49,80 @@
 <header>
   <a href="/admin/" class="brand"><div class="brand-box">c</div>
     <div><div style="font-weight:800;">Cursive Admin</div><div style="font-size:11px;color:#94a3b8;">Employees directory</div></div></a>
-  <div id="whoami" style="font-size:13px; color:#64748b;">…</div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <button id="signOutBtn" class="b-danger hidden">Sign out</button>
+  </div>
 </header>
 
 <main>
-  <div class="panel">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-      <h2 style="margin:0;">🧑‍💼 Employees</h2>
-      <a href="/admin/users/" class="b-outline" style="text-decoration:none;padding:7px 14px;">← Admin users</a>
-    </div>
-    <p style="margin:0 0 8px;color:#64748b;font-size:13px;">
-      Each employee gets a short auto-generated <b>code</b> (4 chars). Employees type their code when creating a quotation or invoice and their name auto-fills.
-    </p>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:110px;">Code</th>
-          <th>Name</th>
-          <th>Email</th>
-          <th style="width:80px;text-align:center;">Active</th>
-          <th style="width:180px;">Added by</th>
-          <th style="width:110px;">Created</th>
-          <th style="width:150px;">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="empRows"><tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">Loading…</td></tr></tbody>
-    </table>
+
+  <!-- INLINE LOGIN (shown when signed out) -->
+  <div id="loginPanel" class="panel hidden" style="max-width:400px;margin:60px auto;">
+    <h1 style="text-align:center;margin:0 0 4px;">🔒 Admin sign in</h1>
+    <p style="text-align:center;color:#64748b;font-size:13px;margin:0 0 16px;">to manage the Employees directory</p>
+    <label style="display:block;font-size:11px;color:#475467;font-weight:700;margin:0 0 4px;text-transform:uppercase;">Email</label>
+    <input id="loginEmail" type="email" placeholder="admin@cursive.world" autocomplete="username" />
+    <label style="display:block;font-size:11px;color:#475467;font-weight:700;margin:10px 0 4px;text-transform:uppercase;">Password</label>
+    <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" />
+    <div id="loginErr" style="color:#dc2626;font-size:12px;margin-top:8px;display:none;"></div>
+    <button id="loginBtn" class="b-primary" style="width:100%;margin-top:14px;padding:10px;">Sign in</button>
   </div>
 
-  <div class="panel">
-    <h2>➕ Add employee</h2>
-    <p style="margin:0 0 12px;color:#64748b;font-size:13px;">
-      Server auto-generates a unique 4-character code from the name (e.g. "Priya" → <span class="code-chip">PR73</span>).
-    </p>
-    <div class="row-form">
-      <div>
-        <label class="small">Name *</label>
-        <input id="newName" type="text" placeholder="e.g. Priya Sharma" />
+  <!-- INLINE "NO PERMISSION" (shown when signed in but without super/employees) -->
+  <div id="noPermPanel" class="panel hidden" style="max-width:520px;margin:60px auto;text-align:center;">
+    <h1 style="margin:0 0 10px;font-size:22px;">🚫 No access to Employees directory</h1>
+    <p style="color:#64748b;">You're signed in as <b id="noPermEmail"></b>, but managing employees requires either the <b>super</b> or <b>admin/employees</b> permission.</p>
+    <p style="color:#64748b;font-size:13px;">Ask an existing super-admin to grant you access on <a href="/admin/users/">/admin/users/</a>.</p>
+    <div style="margin-top:14px;">
+      <a href="/admin/" class="b-outline" style="text-decoration:none;padding:10px 22px;display:inline-block;">← Admin home</a>
+      <button id="noPermSignOut" class="b-outline" style="margin-left:8px;">Switch account</button>
+    </div>
+  </div>
+
+  <!-- MAIN APP (shown to super or employees) -->
+  <div id="app" class="hidden">
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <h2 style="margin:0;">🧑‍💼 Employees</h2>
+        <a href="/admin/users/" class="b-outline" style="text-decoration:none;padding:7px 14px;">← Admin users</a>
       </div>
-      <div>
-        <label class="small">Email *</label>
-        <input id="newEmail" type="email" placeholder="priya@cursive.world" />
-      </div>
-      <div>
-        <button id="addBtn" class="b-primary">Add</button>
+      <p style="margin:0 0 8px;color:#64748b;font-size:13px;">
+        Each employee gets a short auto-generated <b>code</b> (2 letters + 4 digits, e.g. <span class="code-chip">PR3471</span>). Employees type their code when creating a quotation or invoice and their name auto-fills.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:110px;">Code</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th style="width:80px;text-align:center;">Active</th>
+            <th style="width:180px;">Added by</th>
+            <th style="width:110px;">Created</th>
+            <th style="width:150px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="empRows"><tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>➕ Add employee</h2>
+      <p style="margin:0 0 12px;color:#64748b;font-size:13px;">
+        Server auto-generates a unique 6-character code from the name (first 2 letters + 4 random digits, e.g. "Priya" → <span class="code-chip">PR3471</span>).
+      </p>
+      <div class="row-form">
+        <div>
+          <label class="small">Name *</label>
+          <input id="newName" type="text" placeholder="e.g. Priya Sharma" />
+        </div>
+        <div>
+          <label class="small">Email *</label>
+          <input id="newEmail" type="email" placeholder="priya@cursive.world" />
+        </div>
+        <div>
+          <button id="addBtn" class="b-primary">Add</button>
+        </div>
       </div>
     </div>
   </div>
@@ -105,41 +137,58 @@ const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
 
+const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c]);
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
 
 function toast(msg, cls) {
-  const t = document.getElementById("toast");
+  const t = $("#toast");
   t.textContent = msg;
   t.className = cls || "";
   t.style.display = "block";
   setTimeout(() => { t.style.display = "none"; }, cls === "err" ? 4200 : 3200);
 }
 
-const { data: { session } } = await sb.auth.getSession();
-if (!session) {
-  const ret = encodeURIComponent(location.pathname);
-  location.replace(`/home/?return=${ret}`);
-  throw new Error("not signed in");
+function show(which) {
+  ["#loginPanel", "#noPermPanel", "#app"].forEach(id => $(id).classList.toggle("hidden", "#" + which !== id));
 }
 
-// Super-only gate
-const { data: canSuper } = await sb.rpc("current_admin_can", { perm: "super" });
-if (!canSuper) {
-  document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;text-align:center;">
-    <h1 style="margin:0 0 10px;font-size:22px;">🚫 Only super admins can manage employees</h1>
-    <p style="color:#64748b;">Ask an existing super-admin to grant you the <b>super</b> permission.</p>
-    <a href="/admin/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Admin home</a>
-  </div>`;
-  throw new Error("not super");
+let _session = null;
+
+async function refresh() {
+  const { data: { session } } = await sb.auth.getSession();
+  _session = session;
+
+  if (!session) {
+    $("#emailChip").classList.add("hidden");
+    $("#signOutBtn").classList.add("hidden");
+    show("loginPanel");
+    return;
+  }
+
+  // Show identity + sign-out in top bar
+  $("#emailChip").textContent = session.user.email;
+  $("#emailChip").classList.remove("hidden");
+  $("#signOutBtn").classList.remove("hidden");
+
+  // Gate: super OR employees
+  const { data: perms } = await sb.rpc("current_admin_permissions");
+  const allowed = Array.isArray(perms) && (perms.includes("super") || perms.includes("employees"));
+  if (!allowed) {
+    $("#noPermEmail").textContent = session.user.email;
+    show("noPermPanel");
+    return;
+  }
+
+  show("app");
+  await reload();
 }
-document.getElementById("whoami").textContent = "Signed in: " + session.user.email + " · super";
 
 async function callFn(op, extra) {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/admin-employees`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${session.access_token}`,
+      "Authorization": `Bearer ${_session.access_token}`,
       "apikey": SUPABASE_ANON_KEY,
       "Content-Type": "application/json",
     },
@@ -150,7 +199,7 @@ async function callFn(op, extra) {
 
 async function reload() {
   const j = await callFn("list");
-  const tbody = document.getElementById("empRows");
+  const tbody = $("#empRows");
   if (!j.ok) { tbody.innerHTML = `<tr><td colspan="7" style="color:#991b1b;">Load failed: ${esc(j.error)}</td></tr>`; return; }
   const rows = j.employees || [];
   if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">No employees yet — add one below.</td></tr>`; return; }
@@ -173,14 +222,12 @@ async function reload() {
       </td>
     </tr>
   `).join("");
-  // wire toggles
   tbody.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("change", async () => {
     const code = el.dataset.toggle;
     const j = await callFn("update", { code, is_active: el.checked });
     if (!j.ok) { toast(j.error || "Update failed", "err"); el.checked = !el.checked; return; }
     toast(`✓ ${code} marked ${el.checked ? "active" : "inactive"}`, "ok");
   }));
-  // wire deletes
   tbody.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
     const code = b.dataset.del;
     if (!confirm(`Delete employee ${code}? This cannot be undone.\n\nAny quotations/invoices already stamped with this code will keep their historical name/code, but new lookups on this code will fail.`)) return;
@@ -189,7 +236,6 @@ async function reload() {
     toast(`✓ Deleted ${code}`, "ok");
     reload();
   }));
-  // wire edit
   tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => enterEditMode(b.dataset.edit, rows.find(x => x.code === b.dataset.edit))));
 }
 
@@ -219,32 +265,49 @@ function enterEditMode(code, row) {
   });
 }
 
-document.getElementById("addBtn").addEventListener("click", async () => {
-  const name = document.getElementById("newName").value.trim();
-  const email = document.getElementById("newEmail").value.trim().toLowerCase();
+// Login
+$("#loginBtn").addEventListener("click", async () => {
+  const email = $("#loginEmail").value.trim();
+  const password = $("#loginPass").value;
+  if (!email || !password) { $("#loginErr").textContent = "Email and password required"; $("#loginErr").style.display = "block"; return; }
+  const btn = $("#loginBtn");
+  btn.disabled = true; btn.textContent = "Signing in…";
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = "Sign in";
+  if (error) { $("#loginErr").textContent = error.message; $("#loginErr").style.display = "block"; return; }
+  $("#loginErr").style.display = "none";
+  await refresh();
+});
+$("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+$("#loginEmail").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginPass").focus(); });
+
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refresh(); });
+$("#noPermSignOut").addEventListener("click", async () => { await sb.auth.signOut(); await refresh(); });
+
+$("#addBtn").addEventListener("click", async () => {
+  const name = $("#newName").value.trim();
+  const email = $("#newEmail").value.trim().toLowerCase();
   if (!name) { toast("Name required", "err"); return; }
   if (!email) { toast("Email required", "err"); return; }
-  const btn = document.getElementById("addBtn");
+  const btn = $("#addBtn");
   btn.disabled = true; btn.textContent = "Adding…";
   const j = await callFn("create", { name, email });
   btn.disabled = false; btn.textContent = "Add";
   if (!j.ok) { toast(j.error || "Add failed", "err"); return; }
   const code = j.employee?.code || "??";
-  // Big green success toast including the generated code
-  const t = document.getElementById("toast");
+  const t = $("#toast");
   t.innerHTML = `✓ Added <b>${esc(name)}</b> <span class="new-badge">${esc(code)}</span>`;
   t.className = "ok";
   t.style.display = "block";
   setTimeout(() => { t.style.display = "none"; }, 5000);
-  document.getElementById("newName").value = "";
-  document.getElementById("newEmail").value = "";
+  $("#newName").value = "";
+  $("#newEmail").value = "";
   reload();
 });
+$("#newEmail").addEventListener("keydown", e => { if (e.key === "Enter") $("#addBtn").click(); });
+$("#newName").addEventListener("keydown", e => { if (e.key === "Enter") $("#newEmail").focus(); });
 
-document.getElementById("newEmail").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("addBtn").click(); });
-document.getElementById("newName").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("newEmail").focus(); });
-
-reload();
+refresh();
 </script>
 
 <script src="/admin/admin-forgot-btn.js" defer></script>
