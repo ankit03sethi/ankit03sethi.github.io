@@ -288,8 +288,11 @@
       💡 Tip: click <b>Download current catalog</b>, edit in Excel, save, upload back — rows are matched by
       <b>SKU</b>. Leave a column blank on an <i>Edit and Replace</i> row and it stays exactly as it was.
     </p>
-    <label for="bulkFileInput" style="display:block; padding:14px; border:1.5px dashed #cbd5e1; border-radius:8px; background:#f8fafc; text-align:center; cursor:pointer; font-size:13px; color:#475467;">
-      📂 <b>Click to pick a file</b> — .xlsx or .csv (max 5000 rows)
+    <div style="margin-top:6px; font-weight:700; font-size:13px; color:#0f172a;">Upload filled template ↓</div>
+    <label for="bulkFileInput" style="display:block; margin-top:6px; padding:22px 16px; border:2.5px dashed #1f6feb; border-radius:10px; background:#eff6ff; text-align:center; cursor:pointer; font-size:15px; color:#1f6feb; font-weight:700; transition:background 0.15s;"
+      onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+      📤 CLICK HERE TO UPLOAD YOUR FILLED FILE<br>
+      <span style="font-size:12px; color:#64748b; font-weight:normal;">.xlsx or .csv — max 5000 rows</span>
     </label>
     <input id="bulkFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
     <div id="bulkStatus" style="margin-top:12px; font-size:13px; color:#0f172a;"></div>
