@@ -749,12 +749,21 @@ function rowHtml(l, readOnly) {
 
   const remarksCell = renderRemarksCell(l, readOnly);
 
+  // Employee chip (from quote_invoices join done in admin-data v19+)
+  const empLabel = l.employee_code
+    ? `Emp: ${esc(l.employee_code)}${l.employee_name ? ` (${esc(l.employee_name)})` : ""}`
+    : "";
+  const empChip = l.employee_code
+    ? `<span title="Employee who handled this deal" style="display:inline-block;margin-top:4px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;">${empLabel}</span>`
+    : "";
+
   // Read-only completed row
   if (readOnly) {
     return `<tr class="done">
       <td>
         <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
         <span class="done-tag">${esc(bucketReason(l))}</span>
+        ${empChip ? `<div>${empChip}</div>` : ""}
       </td>
       <td>${contactCell}</td>
       <td>

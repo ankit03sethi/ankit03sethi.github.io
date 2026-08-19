@@ -70,12 +70,15 @@
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <h1>💼 Invoices (Accounting)</h1>
         <div style="display:flex;gap:8px;align-items:center;">
-          <input id="searchBox" type="text" placeholder="Search invoice # / customer..." style="width:280px;" />
-          <select id="periodFilter" style="width:150px;">
+          <input id="searchBox" type="text" placeholder="Search invoice # / customer / employee..." style="width:260px;" />
+          <select id="periodFilter" style="width:140px;">
             <option value="all">All time</option>
             <option value="30">Last 30 days</option>
             <option value="90">Last 90 days</option>
             <option value="365">This year</option>
+          </select>
+          <select id="empFilter" style="width:160px;">
+            <option value="__all__">All employees</option>
           </select>
         </div>
       </div>
@@ -155,6 +158,7 @@ async function load() {
 function filtered() {
   const q = ($("#searchBox").value || "").trim().toLowerCase();
   const period = $("#periodFilter").value;
+  const empSel = ($("#empFilter")?.value || "__all__");
   const now = Date.now();
   return _all.filter(inv => {
     if (period !== "all") {
@@ -162,15 +166,46 @@ function filtered() {
       const cutoff = now - days*86400000;
       if (new Date(inv.created_at).getTime() < cutoff) return false;
     }
+    if (empSel === "__none__") { if (inv.employee_code) return false; }
+    else if (empSel !== "__all__") { if ((inv.employee_code || "") !== empSel) return false; }
     if (!q) return true;
     return (inv.invoice_number || "").toLowerCase().includes(q) ||
            (inv.customer_name || "").toLowerCase().includes(q) ||
            (inv.customer_email || "").toLowerCase().includes(q) ||
-           (inv.quote_number || "").toLowerCase().includes(q);
+           (inv.quote_number || "").toLowerCase().includes(q) ||
+           (inv.employee_code || "").toLowerCase().includes(q) ||
+           (inv.employee_name || "").toLowerCase().includes(q);
   });
 }
 
+function refreshEmpFilterOptions() {
+  const sel = document.getElementById("empFilter");
+  if (!sel) return;
+  const codes = Array.from(new Set(_all.map(x => (x.employee_code || "").trim()).filter(Boolean))).sort();
+  const hasBlank = _all.some(x => !x.employee_code);
+  const prev = sel.value || "__all__";
+  let html = `<option value="__all__">All employees</option>`;
+  if (hasBlank) html += `<option value="__none__">(no code)</option>`;
+  for (const c of codes) html += `<option value="${c.replace(/"/g,"&quot;")}">${c.replace(/</g,"&lt;")}</option>`;
+  sel.innerHTML = html;
+  const valid = ["__all__","__none__", ...codes];
+  sel.value = valid.includes(prev) ? prev : "__all__";
+}
+
+// Live employee code lookup helper (used by inline edit)
+const _empLookupCache = new Map();
+async function empLookup(code) {
+  const v = String(code || "").trim();
+  if (!v) return null;
+  if (_empLookupCache.has(v)) return _empLookupCache.get(v);
+  const j = await callFn("admin-employees", { op:"lookup", code: v });
+  const hit = (j && j.ok) ? j.employee : null;
+  _empLookupCache.set(v, hit);
+  return hit;
+}
+
 function render() {
+  refreshEmpFilterOptions();
   const rows = filtered();
   // Summary
   let sub = 0, gst = 0, total = 0;
@@ -182,12 +217,19 @@ function render() {
 
   if (rows.length === 0) { $("#listWrap").innerHTML = `<div style="padding:30px;text-align:center;color:#94a3b8;">No invoices found.</div>`; return; }
   let html = `<table><thead><tr>
-    <th>Invoice #</th><th>Customer</th><th>Ref Quote</th><th>Total</th><th>Payment ID</th><th>Date</th><th>Emailed</th><th></th>
+    <th>Invoice #</th><th>Customer</th><th>Employee</th><th>Ref Quote</th><th>Total</th><th>Payment ID</th><th>Date</th><th>Emailed</th><th></th>
   </tr></thead><tbody>`;
   for (const inv of rows) {
+    const empChip = inv.employee_code
+      ? `<span style="display:inline-block;padding:2px 8px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.3px;">Emp: ${esc(inv.employee_code)}${inv.employee_name?` (${esc(inv.employee_name)})`:""}</span>`
+      : `<span style="color:#94a3b8;font-size:11px;">—</span>`;
     html += `<tr>
       <td><b>${esc(inv.invoice_number)}</b></td>
       <td>${esc(inv.customer_name)}${inv.customer_email?`<br><small style="color:#64748b;">${esc(inv.customer_email)}</small>`:""}</td>
+      <td>
+        <div data-emp-cell="${inv.id}">${empChip}</div>
+        <button data-emp-edit="${inv.id}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">✎ Set / change</button>
+      </td>
       <td>${esc(inv.quote_number || "—")}</td>
       <td><b>${fmt(inv.total_paise)}</b></td>
       <td><code style="font-family:monospace;font-size:11px;color:#64748b;">${esc((inv.payment_id||"—").slice(0,18))}</code></td>
@@ -201,6 +243,10 @@ function render() {
   }
   html += `</tbody></table>`;
   $("#listWrap").innerHTML = html;
+  // Wire "Set / change" inline emp editors
+  document.querySelectorAll("[data-emp-edit]").forEach(b => {
+    b.addEventListener("click", () => openEmpEditor(Number(b.dataset.empEdit)));
+  });
   document.querySelectorAll(".email-btn").forEach(b => {
     b.addEventListener("click", async () => {
       const id = Number(b.dataset.id);
@@ -215,6 +261,60 @@ function render() {
 
 $("#searchBox").addEventListener("input", render);
 $("#periodFilter").addEventListener("change", render);
+$("#empFilter").addEventListener("change", render);
+
+// Inline employee editor with live lookup UX (✓ NAME / ✗ unknown code)
+function openEmpEditor(invId) {
+  const inv = _all.find(x => Number(x.id) === Number(invId));
+  if (!inv) return;
+  const cell = document.querySelector(`[data-emp-cell="${invId}"]`);
+  if (!cell) return;
+  const currentCode = inv.employee_code || "";
+  cell.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <input type="text" id="empIn_${invId}" value="${esc(currentCode)}" placeholder="e.g. PR73" style="width:110px;padding:5px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:5px;" autocomplete="off" />
+      <div id="empName_${invId}" style="font-size:11px;font-weight:700;min-height:14px;"></div>
+      <div style="display:flex;gap:4px;">
+        <button data-emp-save="${invId}" style="background:#1f6feb;color:#fff;border:0;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;">Save</button>
+        <button data-emp-cancel="${invId}" style="background:#f1f5f9;color:#475467;border:0;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;">Cancel</button>
+      </div>
+    </div>`;
+  const input = document.getElementById(`empIn_${invId}`);
+  const label = document.getElementById(`empName_${invId}`);
+  let resolved = { code: "", name: "" };
+  let timer = null;
+  const showState = async (val) => {
+    const v = (val || "").trim();
+    if (!v) { label.textContent = ""; label.style.color = ""; resolved = { code:"", name:"" }; return; }
+    label.textContent = "…"; label.style.color = "#64748b";
+    const hit = await empLookup(v);
+    if (hit && hit.name) {
+      label.textContent = `✓ ${hit.name}${hit.is_active === false ? " (inactive)" : ""}`;
+      label.style.color = "#16a34a";
+      resolved = { code: v, name: hit.name };
+    } else {
+      label.textContent = "✗ unknown code";
+      label.style.color = "#dc2626";
+      resolved = { code: "", name: "" };
+    }
+  };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => showState(input.value), 300); });
+  input.focus();
+  input.select();
+  if (currentCode) showState(currentCode);
+  cell.parentElement.querySelector(`[data-emp-save="${invId}"]`).addEventListener("click", async () => {
+    const v = input.value.trim();
+    const payload = { op: "update_employee", id: invId, employee_code: v || null, employee_name: (v && v === resolved.code) ? resolved.name : null };
+    const j = await callFn("admin-invoices", payload);
+    if (!j.ok) { toast(j.error || "Save failed", true); return; }
+    toast(v ? "✓ Employee updated" : "✓ Employee cleared");
+    // Update local cache without full reload
+    inv.employee_code = j.employee_code || null;
+    inv.employee_name = j.employee_name || null;
+    render();
+  });
+  cell.parentElement.querySelector(`[data-emp-cancel="${invId}"]`).addEventListener("click", render);
+}
 
 refresh();
 </script>

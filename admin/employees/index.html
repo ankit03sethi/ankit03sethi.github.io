@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employees · Cursive Admin</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; background: #f8fafc; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #0f172a; }
+    header { background:#fff; border-bottom:1px solid #e2e8f0; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+    header .brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+    header .brand-box { width:36px; height:36px; background:#1f6feb; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Dancing Script',cursive; font-size:20px; font-weight:700; }
+    main { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+    .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; }
+    h2 { margin:0 0 12px; font-size:18px; }
+    table { width:100%; border-collapse: collapse; font-size:13px; }
+    th { text-align:left; padding:10px 8px; background:#f8fafc; border-bottom:2px solid #e2e8f0; font-weight:700; color:#475467; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+    td { padding:12px 8px; border-bottom:1px solid #e2e8f0; vertical-align: middle; }
+    tr:hover td { background:#f8fafc; }
+    input, button { font: inherit; }
+    input[type=text], input[type=email] { padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%; box-sizing:border-box; }
+    button { padding:9px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; }
+    .b-primary { background:#1f6feb; color:#fff; }
+    .b-primary:hover { background:#0d4cb8; }
+    .b-outline { background:#fff; color:#1f6feb; border:1px solid #1f6feb; }
+    .b-danger { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; padding:6px 12px; font-size:12px; }
+    .b-danger:hover { background:#fecaca; }
+    .code-chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:800; background:#eef2ff; color:#3730a3; padding:4px 10px; border-radius:6px; letter-spacing:.5px; font-size:13px; }
+    .toggle { position:relative; display:inline-block; width:44px; height:24px; }
+    .toggle input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; cursor:pointer; inset:0; background:#cbd5e1; border-radius:12px; transition:.15s; }
+    .slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    input:checked + .slider { background:#16a34a; }
+    input:checked + .slider:before { transform:translateX(20px); }
+    #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; background: #0f172a; color: #fff; border-radius: 8px; font-size: 13px; display: none; z-index:100; box-shadow:0 8px 20px rgba(0,0,0,.15); }
+    #toast.err { background: #991b1b; }
+    #toast.ok  { background: #16a34a; }
+    .new-badge { display:inline-block; margin-left:10px; padding:4px 10px; background:#dcfce7; color:#166534; border:1px solid #86efac; border-radius:8px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-weight:800; letter-spacing:.6px; font-size:13px; }
+    .row-form { display:grid; grid-template-columns:1fr 1.4fr auto; gap:10px; align-items:end; }
+    label.small { font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:4px; }
+    @media (max-width:640px) { .row-form { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/admin/" class="brand"><div class="brand-box">c</div>
+    <div><div style="font-weight:800;">Cursive Admin</div><div style="font-size:11px;color:#94a3b8;">Employees directory</div></div></a>
+  <div id="whoami" style="font-size:13px; color:#64748b;">…</div>
+</header>
+
+<main>
+  <div class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+      <h2 style="margin:0;">🧑‍💼 Employees</h2>
+      <a href="/admin/users/" class="b-outline" style="text-decoration:none;padding:7px 14px;">← Admin users</a>
+    </div>
+    <p style="margin:0 0 8px;color:#64748b;font-size:13px;">
+      Each employee gets a short auto-generated <b>code</b> (4 chars). Employees type their code when creating a quotation or invoice and their name auto-fills.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:110px;">Code</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th style="width:80px;text-align:center;">Active</th>
+          <th style="width:180px;">Added by</th>
+          <th style="width:110px;">Created</th>
+          <th style="width:150px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="empRows"><tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>➕ Add employee</h2>
+    <p style="margin:0 0 12px;color:#64748b;font-size:13px;">
+      Server auto-generates a unique 4-character code from the name (e.g. "Priya" → <span class="code-chip">PR73</span>).
+    </p>
+    <div class="row-form">
+      <div>
+        <label class="small">Name *</label>
+        <input id="newName" type="text" placeholder="e.g. Priya Sharma" />
+      </div>
+      <div>
+        <label class="small">Email *</label>
+        <input id="newEmail" type="email" placeholder="priya@cursive.world" />
+      </div>
+      <div>
+        <button id="addBtn" class="b-primary">Add</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const esc = s => String(s ?? "").replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c]);
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
+
+function toast(msg, cls) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = cls || "";
+  t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, cls === "err" ? 4200 : 3200);
+}
+
+const { data: { session } } = await sb.auth.getSession();
+if (!session) {
+  const ret = encodeURIComponent(location.pathname);
+  location.replace(`/home/?return=${ret}`);
+  throw new Error("not signed in");
+}
+
+// Super-only gate
+const { data: canSuper } = await sb.rpc("current_admin_can", { perm: "super" });
+if (!canSuper) {
+  document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;text-align:center;">
+    <h1 style="margin:0 0 10px;font-size:22px;">🚫 Only super admins can manage employees</h1>
+    <p style="color:#64748b;">Ask an existing super-admin to grant you the <b>super</b> permission.</p>
+    <a href="/admin/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Admin home</a>
+  </div>`;
+  throw new Error("not super");
+}
+document.getElementById("whoami").textContent = "Signed in: " + session.user.email + " · super";
+
+async function callFn(op, extra) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/admin-employees`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${session.access_token}`,
+      "apikey": SUPABASE_ANON_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ op, ...(extra || {}) }),
+  });
+  return await r.json();
+}
+
+async function reload() {
+  const j = await callFn("list");
+  const tbody = document.getElementById("empRows");
+  if (!j.ok) { tbody.innerHTML = `<tr><td colspan="7" style="color:#991b1b;">Load failed: ${esc(j.error)}</td></tr>`; return; }
+  const rows = j.employees || [];
+  if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">No employees yet — add one below.</td></tr>`; return; }
+  tbody.innerHTML = rows.map(e => `
+    <tr data-code="${esc(e.code)}">
+      <td><span class="code-chip">${esc(e.code)}</span></td>
+      <td class="cell-name">${esc(e.name)}</td>
+      <td class="cell-email">${esc(e.email)}</td>
+      <td style="text-align:center;">
+        <label class="toggle" title="${e.is_active ? "Active" : "Inactive"}">
+          <input type="checkbox" data-toggle="${esc(e.code)}" ${e.is_active ? "checked" : ""}/>
+          <span class="slider"></span>
+        </label>
+      </td>
+      <td style="font-size:12px;color:#64748b;">${esc(e.added_by_email || "—")}</td>
+      <td style="font-size:12px;color:#64748b;">${fmtDate(e.created_at)}</td>
+      <td>
+        <button class="b-outline" data-edit="${esc(e.code)}" style="padding:5px 10px;font-size:11.5px;">✏️ Edit</button>
+        <button class="b-danger" data-del="${esc(e.code)}">✕ Delete</button>
+      </td>
+    </tr>
+  `).join("");
+  // wire toggles
+  tbody.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("change", async () => {
+    const code = el.dataset.toggle;
+    const j = await callFn("update", { code, is_active: el.checked });
+    if (!j.ok) { toast(j.error || "Update failed", "err"); el.checked = !el.checked; return; }
+    toast(`✓ ${code} marked ${el.checked ? "active" : "inactive"}`, "ok");
+  }));
+  // wire deletes
+  tbody.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
+    const code = b.dataset.del;
+    if (!confirm(`Delete employee ${code}? This cannot be undone.\n\nAny quotations/invoices already stamped with this code will keep their historical name/code, but new lookups on this code will fail.`)) return;
+    const j = await callFn("delete", { code });
+    if (!j.ok) { toast(j.error || "Delete failed", "err"); return; }
+    toast(`✓ Deleted ${code}`, "ok");
+    reload();
+  }));
+  // wire edit
+  tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => enterEditMode(b.dataset.edit, rows.find(x => x.code === b.dataset.edit))));
+}
+
+function enterEditMode(code, row) {
+  if (!row) return;
+  const tr = document.querySelector(`tr[data-code="${CSS.escape(code)}"]`);
+  if (!tr) return;
+  const nameTd = tr.querySelector(".cell-name");
+  const emailTd = tr.querySelector(".cell-email");
+  nameTd.innerHTML = `<input type="text" class="edit-name" value="${esc(row.name)}" />`;
+  emailTd.innerHTML = `<input type="email" class="edit-email" value="${esc(row.email)}" />`;
+  const actionsTd = tr.querySelector("td:last-child");
+  actionsTd.innerHTML = `
+    <button class="b-primary" data-save="${esc(code)}" style="padding:5px 10px;font-size:11.5px;">💾 Save</button>
+    <button class="b-outline" data-cancel="${esc(code)}" style="padding:5px 10px;font-size:11.5px;">Cancel</button>
+  `;
+  actionsTd.querySelector("[data-cancel]").addEventListener("click", reload);
+  actionsTd.querySelector("[data-save]").addEventListener("click", async () => {
+    const newName = tr.querySelector(".edit-name").value.trim();
+    const newEmail = tr.querySelector(".edit-email").value.trim().toLowerCase();
+    if (!newName) { toast("Name required", "err"); return; }
+    if (!newEmail) { toast("Email required", "err"); return; }
+    const j = await callFn("update", { code, name: newName, email: newEmail });
+    if (!j.ok) { toast(j.error || "Save failed", "err"); return; }
+    toast(`✓ Updated ${code}`, "ok");
+    reload();
+  });
+}
+
+document.getElementById("addBtn").addEventListener("click", async () => {
+  const name = document.getElementById("newName").value.trim();
+  const email = document.getElementById("newEmail").value.trim().toLowerCase();
+  if (!name) { toast("Name required", "err"); return; }
+  if (!email) { toast("Email required", "err"); return; }
+  const btn = document.getElementById("addBtn");
+  btn.disabled = true; btn.textContent = "Adding…";
+  const j = await callFn("create", { name, email });
+  btn.disabled = false; btn.textContent = "Add";
+  if (!j.ok) { toast(j.error || "Add failed", "err"); return; }
+  const code = j.employee?.code || "??";
+  // Big green success toast including the generated code
+  const t = document.getElementById("toast");
+  t.innerHTML = `✓ Added <b>${esc(name)}</b> <span class="new-badge">${esc(code)}</span>`;
+  t.className = "ok";
+  t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, 5000);
+  document.getElementById("newName").value = "";
+  document.getElementById("newEmail").value = "";
+  reload();
+});
+
+document.getElementById("newEmail").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("addBtn").click(); });
+document.getElementById("newName").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("newEmail").focus(); });
+
+reload();
+</script>
+
+<script src="/admin/admin-forgot-btn.js" defer></script>
+</body>
+</html>

@@ -538,7 +538,10 @@ function render() {
   $("#mDate").textContent = fmtDate(q.created_at);
   $("#mValid").textContent = fmtDate(q.valid_until);
   if (q.employee_code) {
-    $("#mEmp").textContent = q.employee_code;
+    // Prefer NAME (CODE) when we have a resolved name; fall back to just the code
+    $("#mEmp").textContent = q.employee_name
+      ? `${q.employee_name} (${q.employee_code})`
+      : q.employee_code;
     $("#mEmpRow").style.display = "";
   } else {
     $("#mEmpRow").style.display = "none";

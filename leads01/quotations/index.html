@@ -185,8 +185,8 @@
             </div>
             <div class="row-2">
               <div>
-                <label>Employee code</label>
-                <input id="empCode" type="text" maxlength="20" placeholder="e.g. V01, AK, PRIYA-N" />
+                <label>Employee code <span id="empCodeName" style="margin-left:6px;font-weight:700;letter-spacing:.3px;"></span></label>
+                <input id="empCode" type="text" maxlength="20" placeholder="e.g. PR73 — type your code, name auto-fills" autocomplete="off" />
               </div>
               <div></div>
             </div>
@@ -641,7 +641,10 @@ function renderFilteredList() {
     const callBtn = phoneDigits ? `<a href="tel:+${(phoneDigits.length===10?"91":"")+phoneDigits}" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">📞</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">📞</span>`;
     const waBtn   = phoneDigits ? `<a href="https://wa.me/${waFmt}?text=${waTxt}" target="_blank" rel="noopener" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;margin-right:3px;">💬</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;margin-right:3px;">💬</span>`;
     const emlBtn  = q.customer_email ? `<a href="mailto:${esc(q.customer_email)}?subject=${encodeURIComponent(`Quote ${q.quote_number}`)}" data-nopropagate="1" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;">✉️</a>` : `<span style="display:inline-block;padding:3px 8px;background:#f1f5f9;color:#94a3b8;border-radius:4px;font-size:11px;font-weight:700;">✉️</span>`;
-    const empChip = q.employee_code ? `<span title="Employee code" style="display:inline-block;margin-left:6px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">Emp: ${esc(q.employee_code)}</span>` : "";
+    const empChipLabel = q.employee_code
+      ? (q.employee_name ? `Emp: ${esc(q.employee_code)} (${esc(q.employee_name)})` : `Emp: ${esc(q.employee_code)}`)
+      : "";
+    const empChip = q.employee_code ? `<span title="Employee code" style="display:inline-block;margin-left:6px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">${empChipLabel}</span>` : "";
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
       <td><b>${esc(q.quote_number)}</b>${empChip}</td>
       <td style="font-size:12.5px;line-height:1.4;">
@@ -694,6 +697,61 @@ document.querySelectorAll(".filter-tab").forEach(tab => {
 $("#listSearchBox").addEventListener("input", () => {
   updateFilterCounts();
   renderFilteredList();
+});
+
+// ============ EMPLOYEE CODE LIVE LOOKUP ============
+// Cache lookups so repeated typing of the same code doesn't hammer the edge function.
+const _empLookupCache = new Map();
+let _empLookupTimer = null;
+let _resolvedEmpName = "";      // last successfully resolved name for #empCode value
+let _resolvedEmpCode = "";      // last code that was resolved
+
+async function doEmpLookup(code) {
+  const val = String(code || "").trim();
+  const label = document.getElementById("empCodeName");
+  if (!label) return;
+  if (!val) { label.textContent = ""; label.style.color = ""; _resolvedEmpName = ""; _resolvedEmpCode = ""; return; }
+  if (_empLookupCache.has(val)) {
+    const hit = _empLookupCache.get(val);
+    if (hit && hit.name) {
+      label.textContent = `✓ ${hit.name}${hit.is_active === false ? " (inactive)" : ""}`;
+      label.style.color = "#16a34a";
+      _resolvedEmpName = hit.name; _resolvedEmpCode = val;
+    } else {
+      label.textContent = "✗ unknown code";
+      label.style.color = "#dc2626";
+      _resolvedEmpName = ""; _resolvedEmpCode = "";
+    }
+    return;
+  }
+  label.textContent = "…";
+  label.style.color = "#64748b";
+  try {
+    const j = await callFn("admin-employees", { op: "lookup", code: val });
+    if (j && j.ok && j.employee && j.employee.name) {
+      _empLookupCache.set(val, j.employee);
+      label.textContent = `✓ ${j.employee.name}${j.employee.is_active === false ? " (inactive)" : ""}`;
+      label.style.color = "#16a34a";
+      _resolvedEmpName = j.employee.name; _resolvedEmpCode = val;
+    } else {
+      _empLookupCache.set(val, null);
+      label.textContent = "✗ unknown code";
+      label.style.color = "#dc2626";
+      _resolvedEmpName = ""; _resolvedEmpCode = "";
+    }
+  } catch (e) {
+    label.textContent = "";
+    label.style.color = "";
+  }
+}
+document.getElementById("empCode")?.addEventListener("input", (e) => {
+  const val = e.target.value;
+  clearTimeout(_empLookupTimer);
+  _empLookupTimer = setTimeout(() => doEmpLookup(val), 300);
+});
+document.getElementById("empCode")?.addEventListener("change", (e) => {
+  clearTimeout(_empLookupTimer);
+  doEmpLookup(e.target.value);
 });
 
 // Wire employee-code filter dropdown
@@ -827,6 +885,19 @@ function openBuilder(quote) {
     $("#custGst").value = quote.customer_gst || "";
     $("#custAddress").value = quote.customer_address || "";
     $("#empCode").value = quote.employee_code || "";
+    // Seed the "resolved name" so an unchanged code preserves employee_name on save
+    if (quote.employee_code && quote.employee_name) {
+      _resolvedEmpCode = quote.employee_code;
+      _resolvedEmpName = quote.employee_name;
+      const lbl = document.getElementById("empCodeName");
+      if (lbl) { lbl.textContent = `✓ ${quote.employee_name}`; lbl.style.color = "#16a34a"; }
+    } else if (quote.employee_code) {
+      doEmpLookup(quote.employee_code);
+    } else {
+      const lbl = document.getElementById("empCodeName");
+      if (lbl) { lbl.textContent = ""; lbl.style.color = ""; }
+      _resolvedEmpCode = ""; _resolvedEmpName = "";
+    }
     $("#notes").value = quote.notes || "";
     if (quote.valid_until) {
       const daysLeft = Math.max(1, Math.round((new Date(quote.valid_until).getTime() - Date.now()) / (86400000)));
@@ -838,6 +909,9 @@ function openBuilder(quote) {
   } else {
     $("#builderTitle").textContent = "New Quotation";
     ["custName","custEmail","custPhone","custGst","custAddress","empCode","notes"].forEach(id => $("#"+id).value = "");
+    const lbl = document.getElementById("empCodeName");
+    if (lbl) { lbl.textContent = ""; lbl.style.color = ""; }
+    _resolvedEmpCode = ""; _resolvedEmpName = "";
     $("#validDays").value = 1;
   }
   renderItems();
@@ -1099,6 +1173,7 @@ $("#saveBtn").addEventListener("click", async () => {
       address: $("#custAddress").value.trim(),
     },
     employee_code: $("#empCode").value.trim(),
+    employee_name: ($("#empCode").value.trim() && $("#empCode").value.trim() === _resolvedEmpCode) ? _resolvedEmpName : (_currentQuote?.employee_name || null),
     notes: $("#notes").value.trim(),
     items: _items.map(it => ({ ...it, discount_inr: Number(it.discount_inr || 0) })),
     valid_hours: validDays * 24,
