@@ -106,6 +106,10 @@ let employeeFilter = ""; // "" = all; "__none__" = no-code leads; else employee_
 let _lastResolvedEmp = { code: "", name: "" };
 let _empLookupTimer = null;
 
+// Per-row employee lookup state for existing (editable) lead rows.
+// Keyed by customer_key. Each entry: { code, name, ok (true=resolved), timer }.
+const _rowEmpState = {};
+
 // Date-range filter (applies to pipeline + total-paid chip + quotations iframe)
 let dateRange = { from: null, to: null, preset: "last30" };  // ISO strings or null
 
@@ -838,6 +842,7 @@ function renderTable(rows, readOnly) {
       <th>Contact</th>
       <th>Last activity</th>
       <th style="min-width:160px;">Call status</th>
+      <th style="min-width:170px;">Employee</th>
       <th style="min-width:260px;">Remarks (latest + history)</th>
       ${readOnly ? "" : "<th>Save / Add</th>"}
     </tr></thead>
@@ -903,6 +908,21 @@ function rowHtml(l, readOnly) {
     ? `<span title="Employee assigned to this lead (immutable)" style="display:inline-block;margin-top:4px;padding:2px 8px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>`
     : "";
 
+  // Employee CELL for the dedicated column.
+  //   - locked chip when lead already has employee_code (no way to edit)
+  //   - input + name-status span otherwise (300ms debounced lookup, admin-employees)
+  const empCellHtml = l.employee_code
+    ? `<div style="display:flex;flex-direction:column;gap:2px;">
+         <span title="Locked once saved" style="display:inline-block;padding:3px 9px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>
+         <span title="Locked once saved" style="font-size:10.5px;color:#9a3412;">🔒 <span class="muted-small" style="color:#9a3412;">Locked once saved</span></span>
+       </div>`
+    : (readOnly
+        ? `<span class="muted-small">—</span>`
+        : `<div class="row-emp-wrap" style="display:flex;flex-direction:column;gap:3px;">
+             <input class="row-emp-code" data-customer-key="${cur}" maxlength="12" placeholder="EMP CODE" style="width:100%;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;"/>
+             <span class="row-emp-name muted-small" data-customer-key="${cur}" style="padding:2px 6px;border-radius:4px;background:#f8fafc;color:#64748b;font-size:11px;">Enter code above…</span>
+           </div>`);
+
   // Read-only completed row
   if (readOnly) {
     return `<tr class="done">
@@ -918,6 +938,7 @@ function rowHtml(l, readOnly) {
         <div style="margin-top:6px;">${callBtn}${waBtn}${emailBtn}</div>
       </td>
       <td><span class="muted-small" style="font-weight:600;color:#0f172a;">${esc(statusLabel)}</span></td>
+      <td>${empCellHtml}</td>
       <td>${remarksCell}</td>
     </tr>`;
   }
@@ -945,14 +966,45 @@ function rowHtml(l, readOnly) {
     <td>
       <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
     </td>
+    <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
     <td>
       ${isTerminal
         ? `<span class="muted-small">Terminal state</span>`
-        : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}">${statusValue ? "Update status" : "Save status"}</button>`}
+        : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;">${statusValue ? "Update status" : "Save status"}</button>`}
       <div class="row-save-error" style="display:none;"></div>
     </td>
   </tr>`;
+}
+
+// Called after every input/change in a row (status dropdown or emp-code input)
+// to flip the row's Save button between enabled and disabled/blurred.
+function refreshRowSaveGate(tr) {
+  if (!tr) return;
+  const btn = tr.querySelector(".row-save-btn");
+  if (!btn) return;
+  const sel = tr.querySelector("select.status-select");
+  const key = tr.getAttribute("data-customer-key") || "";
+  const lead = pipelineCache.find((x) => x.customer_key === key);
+  const hasStatus = !!(sel && sel.value);
+  let empOk = false;
+  if (lead && lead.employee_code) {
+    empOk = true; // locked pre-existing code
+  } else {
+    const st = _rowEmpState[key];
+    empOk = !!(st && st.ok && st.code);
+  }
+  const enable = hasStatus && empOk;
+  btn.disabled = !enable;
+  if (enable) {
+    btn.style.opacity = "";
+    btn.style.cursor = "";
+    btn.style.pointerEvents = "";
+  } else {
+    btn.style.opacity = ".4";
+    btn.style.cursor = "not-allowed";
+    btn.style.pointerEvents = "none";
+  }
 }
 
 function allowedStatusesFor(lead) {
@@ -1054,6 +1106,51 @@ function wireRowHandlers() {
   // add-remark click was producing 50+ rows).
   if (_paneClickAttached) return;
   _paneClickAttached = true;
+
+  // Live gate refresh: react to status dropdown + per-row employee-code input.
+  $("#paneStage").addEventListener("change", (e) => {
+    const sel = e.target.closest("select.status-select");
+    if (sel) {
+      const tr = sel.closest("tr");
+      refreshRowSaveGate(tr);
+    }
+  });
+  $("#paneStage").addEventListener("input", (e) => {
+    const inp = e.target.closest("input.row-emp-code");
+    if (!inp) return;
+    const tr = inp.closest("tr");
+    const key = inp.dataset.customerKey || "";
+    const raw = (inp.value || "").trim().toUpperCase();
+    inp.value = raw;
+    const nameSpan = tr.querySelector(".row-emp-name");
+    // reset resolution
+    _rowEmpState[key] = { code: "", name: "", ok: false, timer: (_rowEmpState[key] && _rowEmpState[key].timer) || null };
+    if (_rowEmpState[key].timer) clearTimeout(_rowEmpState[key].timer);
+    if (!raw) {
+      if (nameSpan) { nameSpan.textContent = "Enter code above…"; nameSpan.style.color = "#64748b"; nameSpan.style.background = "#f8fafc"; }
+      refreshRowSaveGate(tr);
+      return;
+    }
+    if (nameSpan) { nameSpan.textContent = "Checking…"; nameSpan.style.color = "#64748b"; nameSpan.style.background = "#f8fafc"; }
+    refreshRowSaveGate(tr);
+    _rowEmpState[key].timer = setTimeout(async () => {
+      try {
+        const res = await callEmployeeLookup(raw);
+        if (res && res.ok && res.employee && res.employee.code === raw) {
+          _rowEmpState[key] = { code: raw, name: res.employee.name || "", ok: true, timer: null };
+          if (nameSpan) { nameSpan.textContent = "✓ " + (res.employee.name || raw); nameSpan.style.color = "#065f46"; nameSpan.style.background = "#d1fae5"; }
+        } else {
+          _rowEmpState[key] = { code: "", name: "", ok: false, timer: null };
+          if (nameSpan) { nameSpan.textContent = "✗ unknown code"; nameSpan.style.color = "#991b1b"; nameSpan.style.background = "#fee2e2"; }
+        }
+      } catch {
+        _rowEmpState[key] = { code: "", name: "", ok: false, timer: null };
+        if (nameSpan) { nameSpan.textContent = "✗ lookup failed"; nameSpan.style.color = "#991b1b"; nameSpan.style.background = "#fee2e2"; }
+      }
+      refreshRowSaveGate(tr);
+    }, 300);
+  });
+
   $("#paneStage").addEventListener("click", async (e) => {
     const target = e.target.closest("[data-action]");
     if (!target) return;
@@ -1154,15 +1251,41 @@ function wireRowHandlers() {
         errBox.style.display = "block";
         return;
       }
+      // Belt-and-suspenders: gate should already have blocked this, but re-check.
+      const leadRow = pipelineCache.find((x) => x.customer_key === key) || {};
+      const empSt = _rowEmpState[key] || { ok: false, code: "", name: "" };
+      const hasExistingEmp = !!leadRow.employee_code;
+      if (!hasExistingEmp && !(empSt.ok && empSt.code)) {
+        errBox.textContent = "Enter a valid employee code before saving.";
+        errBox.style.display = "block";
+        return;
+      }
       target.disabled = true; target.textContent = "Saving...";
+      target.style.opacity = ".4"; target.style.cursor = "not-allowed"; target.style.pointerEvents = "none";
       try {
-        await callAdmin("set_lead_status", { customer_key: key, talk_status });
+        const payload = { customer_key: key, talk_status };
+        // Only send employee_code/name when the lead didn't already have one.
+        // Existing codes are immutable — trigger would reject and this avoids noise.
+        if (!hasExistingEmp) {
+          payload.employee_code = empSt.code;
+          payload.employee_name = empSt.name || "";
+        }
+        await callAdmin("set_lead_status", payload);
         const idx = pipelineCache.findIndex((x) => x.customer_key === key);
-        if (idx >= 0) pipelineCache[idx].talk_status = talk_status;
+        if (idx >= 0) {
+          pipelineCache[idx].talk_status = talk_status;
+          if (!hasExistingEmp) {
+            pipelineCache[idx].employee_code = empSt.code;
+            pipelineCache[idx].employee_name = empSt.name || "";
+          }
+        }
+        // Clear per-row emp state now that it's persisted / locked.
+        delete _rowEmpState[key];
         updateTopCounts();
         renderActive();
       } catch (err) {
         target.disabled = false; target.textContent = "Save status";
+        target.style.opacity = ""; target.style.cursor = ""; target.style.pointerEvents = "";
         errBox.textContent = "Save failed: " + err.message;
         errBox.style.display = "block";
       }
