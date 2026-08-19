@@ -82,6 +82,25 @@ let remarkFilter = "";      // free-text contains filter
 let expandedRows = new Set(); // customer_keys with expanded remark history
 let remarksByKey = {};       // cache: customer_key -> [ {remark, created_at, created_by} ]
 
+// Services that a customer might be asking about — used by the Add-lead form dropdown
+// AND the "Filter by service" dropdown on every sub-tab.
+const SERVICES = [
+  { value: "pd_tracker",        label: "PD Tracker" },
+  { value: "analyst",           label: "Cursive Analyst" },
+  { value: "business_launcher", label: "Business Launcher" },
+  { value: "gst",               label: "GST Registration" },
+  { value: "trademark",         label: "Trademark" },
+  { value: "udyam",             label: "Udyam (MSME)" },
+  { value: "iec",               label: "IEC Code" },
+  { value: "platform_account",  label: "Marketplace Setup" },
+  { value: "listing",           label: "Listing Service" },
+  { value: "imaging",           label: "Product Imaging" },
+  { value: "website",           label: "Website Creation" },
+  { value: "creators",          label: "Creators" },
+  { value: "other",             label: "Other / Not sure" },
+];
+let serviceFilter = "";  // "" = all; else a service value
+
 // Date-range filter (applies to pipeline + total-paid chip + quotations iframe)
 let dateRange = { from: null, to: null, preset: "last30" };  // ISO strings or null
 
@@ -323,8 +342,10 @@ function updateTopCounts() {
 
 // Pipeline filtered by active date range (uses last_event_at)
 function filteredPipeline() {
-  if (!dateRange.from && !dateRange.to) return pipelineCache;
-  return pipelineCache.filter((l) => withinRange(l.last_event_at));
+  let rows = pipelineCache;
+  if (dateRange.from || dateRange.to) rows = rows.filter((l) => withinRange(l.last_event_at));
+  if (serviceFilter) rows = rows.filter((l) => (l.service_type || "").toLowerCase() === serviceFilter.toLowerCase());
+  return rows;
 }
 
 function switchTop(top) {
@@ -440,12 +461,23 @@ function renderManualAddBar(el) {
           <div><div class="muted-small" style="margin-bottom:3px;">Mobile</div><input id="manualAddMobile" type="tel" placeholder="10-digit mobile" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
           <div><div class="muted-small" style="margin-bottom:3px;">Email (optional)</div><input id="manualAddEmail" type="email" placeholder="customer@email.com" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:8px;">
+          <div><div class="muted-small" style="margin-bottom:3px;">Service *</div>
+            <select id="manualAddService" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#fff;">
+              <option value="">— pick service the customer asked for —</option>
+              ${SERVICES.map(s => `<option value="${s.value}">${s.label}</option>`).join("")}
+            </select>
+          </div>
+          <div><div class="muted-small" style="margin-bottom:3px;">First note (carries through all tabs, never deletes)</div>
+            <textarea id="manualAddNote" rows="2" placeholder="e.g. Called about GST registration for a Delhi seller. Callback tomorrow 3 PM." style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+          </div>
+        </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
           <button id="manualAddSaveBtn" data-type="${type}" style="background:#059669;color:#fff;padding:6px 14px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
           <button id="manualAddCancelBtn" style="background:#e5e7eb;color:#111;padding:6px 12px;border-radius:4px;font-size:12.5px;border:0;cursor:pointer;">Cancel</button>
           <div id="manualAddMsg" style="font-size:12px;flex:1;"></div>
         </div>
-        <div class="muted-small" style="margin-top:6px;color:#64748b;">Once saved you can't change these details, but you can keep adding remarks. Remarks carry over to Follow Ups.</div>
+        <div class="muted-small" style="margin-top:6px;color:#64748b;">Once saved you can't change name/mobile/email/service, but you can keep adding remarks. Note + remarks carry over to Follow Ups &amp; every subsequent tab.</div>
       </div>
     </div>`;
   wireManualAddHandlers();
@@ -468,7 +500,7 @@ function wireManualAddHandlers() {
   cancelBtn.onclick = () => {
     form.classList.add("hidden");
     openBtn.style.display = "";
-    ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
     msg.textContent = "";
   };
   saveBtn.onclick = async () => {
@@ -476,14 +508,20 @@ function wireManualAddHandlers() {
     const name = ($("#manualAddName").value || "").trim();
     const mobile = ($("#manualAddMobile").value || "").replace(/\D/g, "");
     const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
+    const service = ($("#manualAddService").value || "").trim();
+    const note = ($("#manualAddNote").value || "").trim();
     msg.textContent = ""; msg.style.color = "";
     if (!mobile && !email) {
       msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
       return;
     }
+    if (!service) {
+      msg.style.color = "#dc2626"; msg.textContent = "Pick which service the customer asked about.";
+      return;
+    }
     saveBtn.disabled = true; saveBtn.textContent = "Saving...";
     try {
-      const res = await callAdmin("add_manual_lead", { type, name, mobile, email });
+      const res = await callAdmin("add_manual_lead", { type, name, mobile, email, service, note });
       // Show success + any duplicate info
       let dupMsg = "";
       if (res.duplicates && res.duplicates.length > 0) {
@@ -492,7 +530,7 @@ function wireManualAddHandlers() {
       }
       msg.style.color = "#059669";
       msg.textContent = "Saved." + dupMsg;
-      ["manualAddName","manualAddMobile","manualAddEmail"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
       // Refresh pipeline so the new row appears
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
@@ -565,7 +603,7 @@ function leadsInCurrentSubTab() {
 }
 
 function renderToolbarInto(el) {
-  el.innerHTML = `<div class="filter-bar">
+  el.innerHTML = `<div class="filter-bar" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
     <span class="filter-lbl">Filter by remark:</span>
     <input id="remarkFilterText" type="text" class="remark-filter-input" placeholder="Type to filter..." value="${esc(remarkFilter)}" />
     <select id="remarkFilterSelect" class="remark-filter-select">
@@ -573,6 +611,13 @@ function renderToolbarInto(el) {
       ${buildRemarkOptions()}
     </select>
     <button id="remarkFilterClear" class="remark-filter-clear" style="display:${remarkFilter ? "inline-block" : "none"};">Clear</button>
+
+    <span class="filter-lbl" style="margin-left:12px;">Service:</span>
+    <select id="serviceFilterSelect" class="remark-filter-select">
+      <option value="">All services</option>
+      ${SERVICES.map(s => `<option value="${s.value}" ${s.value === serviceFilter ? "selected" : ""}>${s.label}</option>`).join("")}
+    </select>
+    <button id="serviceFilterClear" class="remark-filter-clear" style="display:${serviceFilter ? "inline-block" : "none"};">Clear service</button>
   </div>`;
 }
 
@@ -613,6 +658,24 @@ function wireToolbarHandlers() {
       if (txtIn) txtIn.value = "";
       renderRows();
       clear.style.display = "none";
+    });
+  }
+
+  // Service filter dropdown — applies globally (all sub-tabs + all top-tabs)
+  const svcSel = $("#serviceFilterSelect");
+  if (svcSel) {
+    svcSel.addEventListener("change", (e) => {
+      serviceFilter = e.target.value;
+      updateTopCounts();
+      renderActive();
+    });
+  }
+  const svcClear = $("#serviceFilterClear");
+  if (svcClear) {
+    svcClear.addEventListener("click", () => {
+      serviceFilter = "";
+      updateTopCounts();
+      renderActive();
     });
   }
 }
