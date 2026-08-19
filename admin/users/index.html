@@ -209,6 +209,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
   const name = document.getElementById("newName").value.trim();
   const perms = Array.from(document.querySelectorAll("#permBox input[type=checkbox]:checked")).map(c => c.value);
   if (!email) { toast("Email required", true); return; }
+  if (email === "ankit03sethi@gmail.com") { toast("Owner account is locked — cannot be re-assigned from this page.", true); return; }
   if (perms.length === 0) { toast("Pick at least one permission", true); return; }
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Saving…";
