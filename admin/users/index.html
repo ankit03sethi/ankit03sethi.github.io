@@ -80,13 +80,13 @@
     <div style="margin-bottom:10px;">
       <label style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px;">Sections they can access</label>
       <div id="permBox">
-        <label class="perm-check"><input type="checkbox" value="super"> 👑 Super (all sections + manages other admins)</label>
-        <label class="perm-check"><input type="checkbox" value="catalog"> 🛒 Catalog</label>
-        <label class="perm-check"><input type="checkbox" value="invoices"> 🧾 Invoices</label>
-        <label class="perm-check"><input type="checkbox" value="leads"> 📇 Leads (/leads01/ pipeline)</label>
-        <label class="perm-check"><input type="checkbox" value="quotations"> 📄 Quotations (/leads01/quotations/ quote builder)</label>
-        <label class="perm-check"><input type="checkbox" value="pdtracker"> 📈 PDTracker</label>
-        <label class="perm-check"><input type="checkbox" value="technical"> 🛠 Technical (customer directory, impersonate, audit)</label>
+        <label class="perm-check"><input type="checkbox" value="super"> 👑 super</label>
+        <label class="perm-check"><input type="checkbox" value="catalog"> /admin/products/</label>
+        <label class="perm-check"><input type="checkbox" value="invoices"> /admin/invoices/</label>
+        <label class="perm-check"><input type="checkbox" value="leads"> /leads01/</label>
+        <label class="perm-check"><input type="checkbox" value="quotations"> /leads01/quotations/</label>
+        <label class="perm-check"><input type="checkbox" value="pdtracker"> /pdtracker/passwords/</label>
+        <label class="perm-check"><input type="checkbox" value="technical"> /technical/</label>
       </div>
     </div>
     <button id="saveBtn" class="b-primary">💾 Save admin</button>
@@ -132,7 +132,16 @@ if (!isSuper) {
 }
 document.getElementById("whoami").textContent = "Signed in: " + session.user.email + " · super";
 
-const perm_labels = { super: "👑 Super", catalog: "🛒 Catalog", invoices: "🧾 Invoices", leads: "📇 Leads", quotations: "📄 Quotations", pdtracker: "📈 PDTracker", users: "👥 Users", technical: "🛠 Technical" };
+const perm_labels = {
+  super: "👑 super",
+  catalog: "/admin/products/",
+  invoices: "/admin/invoices/",
+  leads: "/leads01/",
+  quotations: "/leads01/quotations/",
+  pdtracker: "/pdtracker/passwords/",
+  technical: "/technical/",
+  users: "/admin/users/",
+};
 
 async function reload() {
   const { data, error } = await sb.rpc("admin_users_list");
