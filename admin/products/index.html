@@ -1016,15 +1016,45 @@ function renderBulkPreview(res) {
 
 $("#bulkConfirmBtn").addEventListener("click", async () => {
   if (!_bulkParsedRows) return;
+  const rowCount = _bulkParsedRows.length;
   $("#bulkConfirmBtn").disabled = true;
-  $("#bulkConfirmBtn").textContent = "Importing...";
-  const res = await callBulk({ rows: _bulkParsedRows, dry_run: false });
+
+  // Step 1: request OTP to admin email
+  $("#bulkConfirmBtn").textContent = "Sending OTP…";
+  const otpReq = await callBulk({ request_otp: true, row_count: rowCount });
+  if (!otpReq.ok) {
+    $("#bulkConfirmBtn").disabled = false;
+    $("#bulkConfirmBtn").textContent = "✓ Confirm & import";
+    $("#bulkStatus").textContent = "❌ " + (otpReq.error || "OTP send failed");
+    return;
+  }
+  const sentTo = otpReq.masked_email || "your admin email";
+  const emailWarn = otpReq.email_sent === false ? "\n\n(Email delayed — check spam / try again in 30s)" : "";
+
+  // Step 2: prompt admin for the 6-digit code
+  const otp = prompt(`Confirming bulk upload of ${rowCount} rows.\n\nOTP sent to ${sentTo}. Enter the 6-digit code:${emailWarn}`, "");
+  if (!otp) {
+    $("#bulkConfirmBtn").disabled = false;
+    $("#bulkConfirmBtn").textContent = "✓ Confirm & import";
+    return;
+  }
+  const otpClean = String(otp).trim().replace(/\D/g, "");
+  if (otpClean.length !== 6) {
+    $("#bulkConfirmBtn").disabled = false;
+    $("#bulkConfirmBtn").textContent = "✓ Confirm & import";
+    $("#bulkStatus").textContent = "❌ OTP must be 6 digits";
+    return;
+  }
+
+  // Step 3: real import with OTP
+  $("#bulkConfirmBtn").textContent = "Importing…";
+  const res = await callBulk({ rows: _bulkParsedRows, dry_run: false, otp: otpClean });
   $("#bulkConfirmBtn").disabled = false;
   $("#bulkConfirmBtn").textContent = "✓ Confirm & import";
   if (!res.ok) { $("#bulkStatus").textContent = "❌ " + (res.error || "Import failed"); return; }
   toast(`✓ Imported: ${res.products_created + res.products_updated} products, ${res.variations_created + res.variations_updated} variations`);
   $("#bulkModal").classList.add("hidden");
-  await loadAll(); // refresh the category/product tree
+  await loadAll();
 });
 
 // Helper: hits the dedicated bulk-import edge function (separate from the admin-catalog dispatcher)
