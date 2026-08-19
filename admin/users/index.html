@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin users · Cursive</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; background: #f8fafc; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #0f172a; }
+    header { background:#fff; border-bottom:1px solid #e2e8f0; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+    header .brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+    header .brand-box { width:36px; height:36px; background:#1f6feb; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Dancing Script',cursive; font-size:20px; font-weight:700; }
+    main { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+    .panel { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; }
+    h2 { margin:0 0 12px; font-size:18px; }
+    table { width:100%; border-collapse: collapse; font-size:13px; }
+    th { text-align:left; padding:10px 8px; background:#f8fafc; border-bottom:2px solid #e2e8f0; font-weight:700; color:#475467; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+    td { padding:12px 8px; border-bottom:1px solid #e2e8f0; vertical-align: top; }
+    tr:hover td { background:#f8fafc; }
+    .chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; margin:2px; }
+    .chip.super { background:#fef3c7; color:#92400e; }
+    .chip.catalog { background:#dbeafe; color:#1e40af; }
+    .chip.invoices { background:#dcfce7; color:#166534; }
+    .chip.quotations { background:#ede9fe; color:#5b21b6; }
+    .chip.pdtracker { background:#fce7f3; color:#9d174d; }
+    .chip.users { background:#e0e7ff; color:#3730a3; }
+    input, button { font: inherit; }
+    input[type=text], input[type=email] { padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%; }
+    button { padding:9px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; }
+    .b-primary { background:#1f6feb; color:#fff; }
+    .b-primary:hover { background:#0d4cb8; }
+    .b-outline { background:#fff; color:#1f6feb; border:1px solid #1f6feb; }
+    .b-danger { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; padding:6px 12px; font-size:12px; }
+    .b-danger:hover { background:#fecaca; }
+    label.perm-check { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; margin:3px; font-size:12px; cursor:pointer; font-weight:600; }
+    label.perm-check input { margin:0; accent-color:#1f6feb; }
+    #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; background: #0f172a; color: #fff; border-radius: 8px; font-size: 13px; display: none; z-index:100; }
+    #toast.err { background: #991b1b; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/admin/" class="brand"><div class="brand-box">c</div>
+    <div><div style="font-weight:800;">Cursive Admin</div><div style="font-size:11px;color:#94a3b8;">Manage admin users</div></div></a>
+  <div id="whoami" style="font-size:13px; color:#64748b;">…</div>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>👥 Admin users</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th><th>Name</th><th>Permissions</th><th style="width:1%"></th>
+        </tr>
+      </thead>
+      <tbody id="adminRows"><tr><td colspan="4" style="padding:24px; text-align:center; color:#94a3b8;">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>➕ Add or update an admin</h2>
+    <p style="font-size:13px; color:#64748b; margin:0 0 12px;">
+      They must have already signed up at <a href="/home/" target="_blank">cursive.world/home</a> (any password of their choice — they can use forgot-password to reset). Adding their email here just grants them the selected permissions.
+    </p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+      <div><label style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Email</label>
+        <input id="newEmail" type="email" placeholder="admin@example.com" /></div>
+      <div><label style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Display name (optional)</label>
+        <input id="newName" type="text" placeholder="e.g. Priya (Catalog Manager)" /></div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px;">Sections they can access</label>
+      <div id="permBox">
+        <label class="perm-check"><input type="checkbox" value="super"> 👑 Super (all sections + manages other admins)</label>
+        <label class="perm-check"><input type="checkbox" value="catalog"> 🛒 Catalog</label>
+        <label class="perm-check"><input type="checkbox" value="invoices"> 🧾 Invoices</label>
+        <label class="perm-check"><input type="checkbox" value="quotations"> 📄 Quotations / Leads</label>
+        <label class="perm-check"><input type="checkbox" value="pdtracker"> 📈 PDTracker</label>
+      </div>
+    </div>
+    <button id="saveBtn" class="b-primary">💾 Save admin</button>
+    <button id="clearBtn" class="b-outline" style="margin-left:6px;">Clear form</button>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+
+const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+function toast(msg, err = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = err ? "err" : "";
+  t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, 3200);
+}
+
+// Redirect if not signed in
+const { data: { session } } = await sb.auth.getSession();
+if (!session) {
+  const ret = encodeURIComponent(location.pathname);
+  location.replace(`/home/?return=${ret}`);
+  throw new Error("not signed in");
+}
+
+// Only super-admins may open this page
+const { data: perms } = await sb.rpc("current_admin_permissions");
+const isSuper = Array.isArray(perms) && perms.includes("super");
+if (!isSuper) {
+  document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;text-align:center;">
+    <h1 style="margin:0 0 10px;font-size:22px;">🚫 Super-admin only</h1>
+    <p style="color:#64748b;">Managing admin users requires the <b>super</b> permission. Ask an existing super-admin.</p>
+    <a href="/home/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Home</a>
+  </div>`;
+  throw new Error("not super");
+}
+document.getElementById("whoami").textContent = "Signed in: " + session.user.email + " · super";
+
+const perm_labels = { super: "👑 Super", catalog: "🛒 Catalog", invoices: "🧾 Invoices", quotations: "📄 Quotations", pdtracker: "📈 PDTracker", users: "👥 Users" };
+
+async function reload() {
+  const { data, error } = await sb.rpc("admin_users_list");
+  const tbody = document.getElementById("adminRows");
+  if (error) { tbody.innerHTML = `<tr><td colspan="4" style="color:#991b1b;">Load failed: ${error.message}</td></tr>`; return; }
+  if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="padding:24px; text-align:center; color:#94a3b8;">No admins yet</td></tr>`; return; }
+  tbody.innerHTML = data.map(a => `<tr>
+    <td><b>${escapeHtml(a.email)}</b></td>
+    <td>${escapeHtml(a.display_name || "")}</td>
+    <td>${(a.permissions || []).map(p => `<span class="chip ${p}">${perm_labels[p] || p}</span>`).join("")}</td>
+    <td>
+      <button class="b-outline" data-edit="${escapeHtml(a.email)}" style="font-size:11px; padding:5px 10px;">✏️ Edit</button>
+      ${a.email === session.user.email.toLowerCase() ? "" : `<button class="b-danger" data-remove="${escapeHtml(a.email)}">✕ Remove</button>`}
+    </td>
+  </tr>`).join("");
+  tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => loadIntoForm(data.find(x => x.email === b.dataset.edit))));
+  tbody.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", async () => {
+    if (!confirm(`Remove admin access for ${b.dataset.remove}?\n\nTheir user account still exists — this only revokes admin permissions.`)) return;
+    const { error } = await sb.rpc("admin_users_remove", { p_email: b.dataset.remove });
+    if (error) { toast(error.message, true); return; }
+    toast("✓ Removed");
+    reload();
+  }));
+}
+function escapeHtml(s) { return String(s || "").replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c]); }
+function loadIntoForm(a) {
+  if (!a) return;
+  document.getElementById("newEmail").value = a.email;
+  document.getElementById("newName").value = a.display_name || "";
+  document.querySelectorAll("#permBox input[type=checkbox]").forEach(c => { c.checked = (a.permissions || []).includes(c.value); });
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+document.getElementById("clearBtn").addEventListener("click", () => {
+  document.getElementById("newEmail").value = "";
+  document.getElementById("newName").value = "";
+  document.querySelectorAll("#permBox input[type=checkbox]").forEach(c => c.checked = false);
+});
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  const email = document.getElementById("newEmail").value.trim().toLowerCase();
+  const name = document.getElementById("newName").value.trim();
+  const perms = Array.from(document.querySelectorAll("#permBox input[type=checkbox]:checked")).map(c => c.value);
+  if (!email) { toast("Email required", true); return; }
+  if (perms.length === 0) { toast("Pick at least one permission", true); return; }
+  const { error } = await sb.rpc("admin_users_upsert", { p_email: email, p_display_name: name || null, p_permissions: perms });
+  if (error) { toast(error.message, true); return; }
+  toast("✓ Saved");
+  document.getElementById("clearBtn").click();
+  reload();
+});
+
+reload();
+</script>
+
+</body>
+</html>
