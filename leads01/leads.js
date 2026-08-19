@@ -100,6 +100,11 @@ const SERVICES = [
   { value: "other",             label: "Other / Not sure" },
 ];
 let serviceFilter = "";  // "" = all; else a service value
+let employeeFilter = ""; // "" = all; "__none__" = no-code leads; else employee_code
+
+// Cache of the most recently resolved employee name from the add-lead code lookup
+let _lastResolvedEmp = { code: "", name: "" };
+let _empLookupTimer = null;
 
 // Date-range filter (applies to pipeline + total-paid chip + quotations iframe)
 let dateRange = { from: null, to: null, preset: "last30" };  // ISO strings or null
@@ -262,6 +267,23 @@ async function callAdmin(kind, extra = {}) {
   return json.data;
 }
 
+// Look up an employee by code via admin-employees v2 op:"lookup".
+// Returns { ok:true, employee:{code,name,is_active} } or { ok:false, error:"not_found" }.
+async function callEmployeeLookup(code) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch(SUPABASE_URL + "/functions/v1/admin-employees", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + session.access_token,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ op: "lookup", code }),
+  });
+  return await res.json().catch(() => ({ ok: false, error: "bad_response" }));
+}
+
 async function refreshAll() {
   try {
     pipelineCache = await callAdmin("pipeline");
@@ -345,7 +367,25 @@ function filteredPipeline() {
   let rows = pipelineCache;
   if (dateRange.from || dateRange.to) rows = rows.filter((l) => withinRange(l.last_event_at));
   if (serviceFilter) rows = rows.filter((l) => (l.service_type || "").toLowerCase() === serviceFilter.toLowerCase());
+  if (employeeFilter) {
+    if (employeeFilter === "__none__") rows = rows.filter((l) => !l.employee_code);
+    else rows = rows.filter((l) => (l.employee_code || "") === employeeFilter);
+  }
   return rows;
+}
+
+// Distinct sorted list of employee codes present in the currently loaded pipeline.
+// Returns [{code, name}], sorted by code.
+function distinctEmployees() {
+  const map = new Map();
+  (pipelineCache || []).forEach((l) => {
+    if (!l.employee_code) return;
+    if (!map.has(l.employee_code)) map.set(l.employee_code, l.employee_name || "");
+    else if (!map.get(l.employee_code) && l.employee_name) map.set(l.employee_code, l.employee_name);
+  });
+  return Array.from(map.entries())
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => a.code.localeCompare(b.code));
 }
 
 function switchTop(top) {
@@ -477,6 +517,16 @@ function renderManualAddBar(el) {
             <textarea id="manualAddNote" rows="2" placeholder="e.g. Called about GST registration for a Delhi seller. Callback tomorrow 3 PM." style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
           </div>
         </div>
+        <div style="display:grid;grid-template-columns:180px 1fr;gap:8px;margin-top:8px;align-items:end;">
+          <div>
+            <div class="muted-small" style="margin-bottom:3px;">Employee code * <span style="color:#dc2626;">(cannot be changed later)</span></div>
+            <input id="empCodeAdd" type="text" maxlength="12" placeholder="e.g. PR3471" autocomplete="off" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;text-transform:uppercase;"/>
+          </div>
+          <div>
+            <div class="muted-small" style="margin-bottom:3px;">Resolved employee</div>
+            <span id="empCodeAddName" style="display:inline-block;padding:6px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:4px;font-size:12.5px;color:#64748b;min-height:18px;">Enter code above…</span>
+          </div>
+        </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
           <button id="manualAddSaveBtn" data-type="${type}" style="background:#059669;color:#fff;padding:6px 14px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
           <button id="manualAddCancelBtn" style="background:#e5e7eb;color:#111;padding:6px 12px;border-radius:4px;font-size:12.5px;border:0;cursor:pointer;">Cancel</button>
@@ -505,9 +555,54 @@ function wireManualAddHandlers() {
   cancelBtn.onclick = () => {
     form.classList.add("hidden");
     openBtn.style.display = "";
-    ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote","empCodeAdd"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    const nameSpan = $("#empCodeAddName");
+    if (nameSpan) { nameSpan.textContent = "Enter code above…"; nameSpan.style.color = "#64748b"; nameSpan.style.background = "#f8fafc"; }
+    _lastResolvedEmp = { code: "", name: "" };
     msg.textContent = "";
   };
+
+  // Employee-code live lookup (debounced 300ms)
+  const empInput = $("#empCodeAdd");
+  const empNameSpan = $("#empCodeAddName");
+  if (empInput && empNameSpan) {
+    empInput.addEventListener("input", () => {
+      const raw = (empInput.value || "").trim().toUpperCase();
+      empInput.value = raw;
+      _lastResolvedEmp = { code: "", name: "" };
+      if (_empLookupTimer) clearTimeout(_empLookupTimer);
+      if (!raw) {
+        empNameSpan.textContent = "Enter code above…";
+        empNameSpan.style.color = "#64748b";
+        empNameSpan.style.background = "#f8fafc";
+        return;
+      }
+      empNameSpan.textContent = "Checking…";
+      empNameSpan.style.color = "#64748b";
+      empNameSpan.style.background = "#f8fafc";
+      _empLookupTimer = setTimeout(async () => {
+        try {
+          const res = await callEmployeeLookup(raw);
+          if (res && res.ok && res.employee && res.employee.code === raw) {
+            _lastResolvedEmp = { code: raw, name: res.employee.name || "" };
+            empNameSpan.textContent = "✓ " + (res.employee.name || raw);
+            empNameSpan.style.color = "#065f46";
+            empNameSpan.style.background = "#d1fae5";
+          } else {
+            _lastResolvedEmp = { code: "", name: "" };
+            empNameSpan.textContent = "✗ unknown code";
+            empNameSpan.style.color = "#991b1b";
+            empNameSpan.style.background = "#fee2e2";
+          }
+        } catch (e) {
+          _lastResolvedEmp = { code: "", name: "" };
+          empNameSpan.textContent = "✗ lookup failed";
+          empNameSpan.style.color = "#991b1b";
+          empNameSpan.style.background = "#fee2e2";
+        }
+      }, 300);
+    });
+  }
   saveBtn.onclick = async () => {
     const type = saveBtn.dataset.type;
     const name = ($("#manualAddName").value || "").trim();
@@ -515,6 +610,7 @@ function wireManualAddHandlers() {
     const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
     const service = ($("#manualAddService").value || "").trim();
     const note = ($("#manualAddNote").value || "").trim();
+    const empCode = (($("#empCodeAdd") && $("#empCodeAdd").value) || "").trim().toUpperCase();
     msg.textContent = ""; msg.style.color = "";
     if (!mobile && !email) {
       msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
@@ -524,9 +620,15 @@ function wireManualAddHandlers() {
       msg.style.color = "#dc2626"; msg.textContent = "Pick which service the customer asked about.";
       return;
     }
+    if (!empCode || empCode !== _lastResolvedEmp.code) {
+      msg.style.color = "#dc2626";
+      msg.textContent = "Enter a valid employee code — this cannot be changed later.";
+      const empIn = $("#empCodeAdd"); if (empIn) empIn.focus();
+      return;
+    }
     saveBtn.disabled = true; saveBtn.textContent = "Saving...";
     try {
-      const res = await callAdmin("add_manual_lead", { type, name, mobile, email, service, note });
+      const res = await callAdmin("add_manual_lead", { type, name, mobile, email, service, note, employee_code: empCode, employee_name: _lastResolvedEmp.name || "" });
       // Show success + any duplicate info
       let dupMsg = "";
       if (res.duplicates && res.duplicates.length > 0) {
@@ -535,7 +637,10 @@ function wireManualAddHandlers() {
       }
       msg.style.color = "#059669";
       msg.textContent = "Saved." + dupMsg;
-      ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote","empCodeAdd"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      const nameSpan2 = $("#empCodeAddName");
+      if (nameSpan2) { nameSpan2.textContent = "Enter code above…"; nameSpan2.style.color = "#64748b"; nameSpan2.style.background = "#f8fafc"; }
+      _lastResolvedEmp = { code: "", name: "" };
       // Refresh pipeline so the new row appears
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
@@ -623,7 +728,26 @@ function renderToolbarInto(el) {
       ${SERVICES.map(s => `<option value="${s.value}" ${s.value === serviceFilter ? "selected" : ""}>${s.label}</option>`).join("")}
     </select>
     <button id="serviceFilterClear" class="remark-filter-clear" style="display:${serviceFilter ? "inline-block" : "none"};">Clear service</button>
+
+    <span class="filter-lbl" style="margin-left:12px;">Emp:</span>
+    <select id="employeeFilterSelect" class="remark-filter-select">
+      ${buildEmployeeFilterOptions()}
+    </select>
+    <button id="employeeFilterClear" class="remark-filter-clear" style="display:${employeeFilter ? "inline-block" : "none"};">Clear emp</button>
   </div>`;
+}
+
+function buildEmployeeFilterOptions() {
+  const emps = distinctEmployees();
+  const opts = [
+    `<option value="" ${employeeFilter === "" ? "selected" : ""}>All employees</option>`,
+    `<option value="__none__" ${employeeFilter === "__none__" ? "selected" : ""}>(no code)</option>`,
+  ];
+  emps.forEach((e) => {
+    const label = e.name ? `${e.code} — ${e.name}` : e.code;
+    opts.push(`<option value="${esc(e.code)}" ${e.code === employeeFilter ? "selected" : ""}>${esc(label)}</option>`);
+  });
+  return opts.join("");
 }
 
 function renderToolbarDropdownOnly() {
@@ -632,6 +756,10 @@ function renderToolbarDropdownOnly() {
   if (sel) sel.innerHTML = `<option value="">All remarks</option>` + buildRemarkOptions();
   const clear = $("#remarkFilterClear");
   if (clear) clear.style.display = remarkFilter ? "inline-block" : "none";
+  const empSel = $("#employeeFilterSelect");
+  if (empSel) empSel.innerHTML = buildEmployeeFilterOptions();
+  const empClear = $("#employeeFilterClear");
+  if (empClear) empClear.style.display = employeeFilter ? "inline-block" : "none";
 }
 
 function wireToolbarHandlers() {
@@ -679,6 +807,24 @@ function wireToolbarHandlers() {
   if (svcClear) {
     svcClear.addEventListener("click", () => {
       serviceFilter = "";
+      updateTopCounts();
+      renderActive();
+    });
+  }
+
+  // Employee filter — applies globally across all tabs + sub-tabs
+  const empSel = $("#employeeFilterSelect");
+  if (empSel) {
+    empSel.addEventListener("change", (e) => {
+      employeeFilter = e.target.value;
+      updateTopCounts();
+      renderActive();
+    });
+  }
+  const empClear = $("#employeeFilterClear");
+  if (empClear) {
+    empClear.addEventListener("click", () => {
+      employeeFilter = "";
       updateTopCounts();
       renderActive();
     });
@@ -749,12 +895,12 @@ function rowHtml(l, readOnly) {
 
   const remarksCell = renderRemarksCell(l, readOnly);
 
-  // Employee chip (from quote_invoices join done in admin-data v19+)
-  const empLabel = l.employee_code
-    ? `Emp: ${esc(l.employee_code)}${l.employee_name ? ` (${esc(l.employee_name)})` : ""}`
+  // Employee chip (prefers native pipeline_leads.employee_code from admin-data v20+)
+  const empChipLabel = l.employee_code
+    ? `👤 ${esc(l.employee_code)}${l.employee_name ? ` · ${esc(l.employee_name)}` : ""}`
     : "";
   const empChip = l.employee_code
-    ? `<span title="Employee who handled this deal" style="display:inline-block;margin-top:4px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;">${empLabel}</span>`
+    ? `<span title="Employee assigned to this lead (immutable)" style="display:inline-block;margin-top:4px;padding:2px 8px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>`
     : "";
 
   // Read-only completed row
@@ -787,6 +933,7 @@ function rowHtml(l, readOnly) {
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
+      ${empChip ? `<div>${empChip}</div>` : ""}
     </td>
     <td>${contactCell}</td>
     <td>
