@@ -49,17 +49,12 @@
     } catch (_) { return null; }
   }
 
-  // Always visible now — text/label adapts based on sign-in state
+  // Only show when signed OUT — signed-in admins have no reason to see it.
   function ensureVisible() {
     const email = currentEmail();
-    btn.style.display = "block";
-    if (email) {
-      btn.innerHTML = "🔑 Reset password";
-      btn.title = "Send reset-password link to " + email;
-    } else {
-      btn.innerHTML = "🔑 Forgot password?";
-      btn.title = "Send yourself a reset-password link — for signed-out admins";
-    }
+    btn.style.display = email ? "none" : "block";
+    btn.innerHTML = "🔑 Forgot password?";
+    btn.title = "Send yourself a reset-password link";
   }
   ensureVisible();
   setInterval(ensureVisible, 3000); // catch login/logout mid-session
@@ -83,15 +78,10 @@
   }
 
   btn.addEventListener("click", async () => {
-    let email = currentEmail();
-    // Signed-out path — prompt for email
-    if (!email) {
-      email = (prompt("Enter your admin email to receive a password-reset link:") || "").trim().toLowerCase();
-      if (!email) return;
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("Invalid email format", true); return; }
-    } else {
-      if (!confirm(`Send a password-reset link to ${email}?\n\nYou'll receive a Cursive email with a link to set a new password. Your current session stays open until you use it.`)) return;
-    }
+    // Button only shows when signed out, so always prompt for email
+    const email = (prompt("Enter your admin email to receive a password-reset link:") || "").trim().toLowerCase();
+    if (!email) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("Invalid email format", true); return; }
     btn.disabled = true;
     const oldText = btn.innerHTML;
     btn.innerHTML = "Sending…";
