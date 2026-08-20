@@ -115,6 +115,51 @@ let _lastResolvedEmp = { code: "", name: "" };
 let _empLookupTimer = null;
 // In-flight recommendation request token so old responses don't overwrite newer picks
 let _recommendReqSeq = 0;
+// Per-service cache for lowest-count-employee recommendations used by the Unassigned tab
+// inline assign UI. Value: {code, name} on success, null on empty result, or a Promise
+// while a call is in flight — so we hit admin-data at most once per distinct service.
+const _recommendCache = new Map();
+
+async function recommendForService(service) {
+  if (!service) return null;
+  const svc = String(service).toLowerCase();
+  if (_recommendCache.has(svc)) {
+    const cached = _recommendCache.get(svc);
+    if (cached && typeof cached.then === "function") return await cached;
+    return cached;
+  }
+  const p = (async () => {
+    try {
+      const rec = await callAdmin("recommend_employee_for_lead", { service: svc });
+      const val = (rec && rec.code) ? { code: rec.code, name: rec.name || "" } : null;
+      _recommendCache.set(svc, val);
+      return val;
+    } catch (e) {
+      _recommendCache.delete(svc);
+      return null;
+    }
+  })();
+  _recommendCache.set(svc, p);
+  return await p;
+}
+
+// Candidates eligible to be assigned this lead: active + sales role + (if service supplied) handles service.
+function candidatesForLead(service) {
+  const svc = String(service || "").toLowerCase();
+  return (_allEmployeesCache || []).filter((e) => {
+    if (e.is_active === false) return false;
+    const roles = Array.isArray(e.roles) ? e.roles : [];
+    if (!roles.includes("sales")) return false;
+    if (!svc) return true; // fallback: all sales when lead has no service_type
+    const services = Array.isArray(e.services) ? e.services.map((s) => String(s).toLowerCase()) : [];
+    return services.includes(svc);
+  }).slice().sort((a, b) => String(a.code).localeCompare(String(b.code)));
+}
+
+function empLabel(e) {
+  const services = Array.isArray(e.services) ? e.services.join(", ") : "";
+  return `${e.code} — ${e.name || ""}${services ? " · " + services : ""}`.trim();
+}
 
 // Per-row employee lookup state for existing (editable) lead rows.
 // Keyed by customer_key. Each entry: { code, name, ok (true=resolved), timer }.
@@ -656,6 +701,61 @@ function renderPane() {
   }
   renderRows();
   wireRowHandlers();
+  if (activeTop === "unassigned" && _isManager) primeInlineAssignRecommendations();
+}
+
+// After rendering the Unassigned tab, fetch the "lowest open-lead count" recommendation
+// once per distinct service and auto-fill any inline picker that the user hasn't already
+// typed into. Uses _recommendCache so repeat renders / additional rows for the same
+// service reuse the cached pick.
+function primeInlineAssignRecommendations() {
+  const wraps = document.querySelectorAll("#rowsContainer .asn-inline");
+  if (!wraps.length) return;
+  const byService = new Map(); // service -> [wrap, wrap, ...]
+  wraps.forEach((wrap) => {
+    const inp = wrap.querySelector(".asn-inline-input");
+    if (!inp || inp.disabled) return;
+    if (inp.value) return; // manager already typed / picked
+    const svc = String(wrap.dataset.service || "").toLowerCase();
+    if (!svc) return; // no service on lead -> no auto-pick, they can still choose from fallback list
+    if (!byService.has(svc)) byService.set(svc, []);
+    byService.get(svc).push(wrap);
+  });
+  byService.forEach((wrapList, svc) => {
+    recommendForService(svc).then((rec) => {
+      if (!rec || !rec.code) {
+        wrapList.forEach((wrap) => {
+          const status = wrap.querySelector(".asn-inline-status");
+          if (status && !wrap.querySelector(".asn-inline-input")?.value) {
+            status.textContent = "No auto-pick available — pick someone from the dropdown.";
+            status.style.color = "#64748b";
+          }
+        });
+        return;
+      }
+      const cands = candidatesForLead(svc);
+      const emp = cands.find((e) => e.code === rec.code)
+        || { code: rec.code, name: rec.name || "", services: [svc] };
+      const label = empLabel(emp);
+      wrapList.forEach((wrap) => {
+        const inp = wrap.querySelector(".asn-inline-input");
+        const status = wrap.querySelector(".asn-inline-status");
+        if (inp && !inp.value) {
+          inp.value = label;
+          inp.placeholder = "Auto-picked · change if needed";
+        }
+        if (status) {
+          status.textContent = `✓ Auto-picked ${emp.code}${emp.name ? " — " + emp.name : ""} (fewest open leads). Change if needed.`;
+          status.style.color = "#065f46";
+        }
+      });
+    }).catch(() => {
+      wrapList.forEach((wrap) => {
+        const status = wrap.querySelector(".asn-inline-status");
+        if (status) { status.textContent = "Auto-pick unavailable — pick manually."; status.style.color = "#64748b"; }
+      });
+    });
+  });
 }
 
 // Manual-add bar: Add lead button + inline form (Reference / Call / WhatsApp sub-tabs)
@@ -1246,13 +1346,16 @@ function rowHtml(l, readOnly) {
   const asnBg = asnCode ? "#fef3c7" : "#f1f5f9";
   const asnFg = asnCode ? "#92400e" : "#64748b";
   const asnBorder = asnCode ? "#fde68a" : "#e2e8f0";
-  const reassignBtn = (_isManager && !readOnly) ? `<button class="reassign-btn" data-action="reassign" data-customer-key="${cur}" title="Reassign this lead to a different employee" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">Reassign</button>` : "";
+  // In the Unassigned tab we render a full inline picker (see empCellHtml below);
+  // hide the tiny prompt-based Reassign button there so we don't show two competing UIs.
+  const showReassignBtn = _isManager && !readOnly && activeTop !== "unassigned";
+  const reassignBtn = showReassignBtn ? `<button class="reassign-btn" data-action="reassign" data-customer-key="${cur}" title="Reassign this lead to a different employee" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">Reassign</button>` : "";
   const assigneeChip = `<span title="Employee this lead is currently assigned to" style="display:inline-flex;align-items:center;margin-top:4px;margin-left:4px;padding:2px 8px;background:${asnBg};color:${asnFg};border:1px solid ${asnBorder};border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${asnChipInner}${reassignBtn}</span>`;
 
   // Employee CELL for the dedicated column.
   //   - locked chip when lead already has employee_code (no way to edit)
   //   - input + name-status span otherwise (300ms debounced lookup, admin-employees)
-  const empCellHtml = l.employee_code
+  let empCellHtml = l.employee_code
     ? `<div style="display:flex;flex-direction:column;gap:2px;">
          <span title="Locked once saved" style="display:inline-block;padding:3px 9px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>
          <span title="Locked once saved" style="font-size:10.5px;color:#9a3412;">🔒 <span class="muted-small" style="color:#9a3412;">Locked once saved</span></span>
@@ -1263,6 +1366,38 @@ function rowHtml(l, readOnly) {
              <input class="row-emp-code" data-customer-key="${cur}" maxlength="12" placeholder="EMP CODE" style="width:100%;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;"/>
              <span class="row-emp-name muted-small" data-customer-key="${cur}" style="padding:2px 6px;border-radius:4px;background:#f8fafc;color:#64748b;font-size:11px;">Enter code above…</span>
            </div>`);
+
+  // Unassigned tab (managers only): inline searchable dropdown + Assign button, replacing
+  // the numbered prompt() flow. Datalist is service-filtered (falls back to all sales when
+  // lead has no service_type). The recommended employee is auto-filled after render via
+  // primeInlineAssignRecommendations() — cached per-service so we don't hit the RPC N times.
+  if (_isManager && !readOnly && activeTop === "unassigned") {
+    const serviceLc = String(l.service_type || "").toLowerCase();
+    const cands = candidatesForLead(serviceLc);
+    const listId = `asnList_${cur}`;
+    const options = cands.map((e) => `<option value="${esc(empLabel(e))}"></option>`).join("");
+    const placeholder = cands.length === 0
+      ? "No sales employee handles this service"
+      : (serviceLc ? "Auto-picking best fit…" : "Pick a sales employee (no service on lead)");
+    const initialStatus = cands.length === 0
+      ? "✗ No sales employee is configured for this service. Add one at /admin/users/."
+      : (serviceLc ? "Finding the sales rep with the fewest open leads…" : "Lead has no service_type — showing all sales employees.");
+    const statusColor = cands.length === 0 ? "#991b1b" : "#64748b";
+    const inlineAssign = `
+      <div class="asn-inline" data-customer-key="${cur}" data-service="${esc(serviceLc)}" style="margin-top:6px;display:flex;flex-direction:column;gap:3px;">
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input class="asn-inline-input" list="${listId}" type="text" autocomplete="off" placeholder="${esc(placeholder)}" ${cands.length === 0 ? "disabled" : ""} style="flex:1;min-width:160px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;background:#fff;"/>
+          <datalist id="${listId}">${options}</datalist>
+          <button class="asn-inline-btn" data-action="assign-inline" data-customer-key="${cur}" ${cands.length === 0 ? "disabled" : ""} style="padding:4px 10px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;${cands.length === 0 ? "opacity:.4;cursor:not-allowed;" : ""}">Assign</button>
+        </div>
+        <div class="asn-inline-status muted-small" style="color:${statusColor};font-size:11px;min-height:14px;">${esc(initialStatus)}</div>
+      </div>`;
+    // Keep the creator chip (if any) visible above the assign UI so the manager still sees who made the lead.
+    const creatorChip = l.employee_code
+      ? `<div style="margin-bottom:4px;"><span title="Lead creator (immutable)" style="display:inline-block;padding:2px 8px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:10.5px;font-weight:700;">${empChipLabel}</span></div>`
+      : "";
+    empCellHtml = `${creatorChip}${inlineAssign}`;
+  }
 
   // Read-only completed row
   if (readOnly) {
@@ -1571,6 +1706,45 @@ function wireRowHandlers() {
         mobile: target.dataset.mobile || "",
         whatsapp: target.dataset.whatsapp || "",
       });
+      return;
+    }
+    if (action === "assign-inline") {
+      if (!_isManager) return;
+      const wrap = target.closest(".asn-inline");
+      if (!wrap) return;
+      const inp = wrap.querySelector(".asn-inline-input");
+      const statusEl = wrap.querySelector(".asn-inline-status");
+      const serviceLc = String(wrap.dataset.service || "").toLowerCase();
+      const raw = (inp?.value || "").trim();
+      const setStatus = (txt, tone) => {
+        if (!statusEl) return;
+        statusEl.textContent = txt || "";
+        statusEl.style.color = tone === "err" ? "#991b1b" : (tone === "ok" ? "#065f46" : "#64748b");
+      };
+      if (!raw) { setStatus("Pick an employee from the dropdown first.", "err"); inp?.focus(); return; }
+      const cands = candidatesForLead(serviceLc);
+      // Resolve label / free-text to a candidate. Accept "CODE — NAME · services", bare CODE, or any label match.
+      const codeGuess = raw.split(/[\s—\-·]/)[0].trim().toUpperCase();
+      let hit = cands.find((e) => e.code === codeGuess);
+      if (!hit) {
+        const upper = raw.toUpperCase();
+        hit = cands.find((e) => (e.code || "").toUpperCase() === upper)
+          || cands.find((e) => empLabel(e).toUpperCase() === upper);
+      }
+      if (!hit) { setStatus("✗ Not a valid pick — choose someone from the dropdown.", "err"); return; }
+      target.disabled = true; target.textContent = "Assigning…";
+      target.style.opacity = ".5"; target.style.cursor = "wait";
+      try {
+        await callAdmin("reassign_lead", { customer_key: key, to_code: hit.code });
+        // Refresh so this row disappears from Unassigned (and shows up under the assignee elsewhere)
+        pipelineCache = await callAdmin("pipeline");
+        updateTopCounts();
+        renderActive();
+      } catch (err) {
+        target.disabled = false; target.textContent = "Assign";
+        target.style.opacity = ""; target.style.cursor = "pointer";
+        setStatus("Assign failed: " + err.message, "err");
+      }
       return;
     }
     if (action === "reassign") {
