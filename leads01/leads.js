@@ -78,13 +78,9 @@ const NEW_BUCKET_STATUS_OPTIONS = [
 let pipelineCache = [];
 let activeTop = "new";
 let activeSub = "lead_captured";
-// Populated in bootDashboard(). _isManager = super || leads (VIEW gate — kept for tab visibility,
-// employee list load, filters, iframe). _isSuper is a stricter MUTATION gate — only super can
-// change lead status, reassign, add leads, edit contacts. Leads-perm-only users are "view + remarks
-// + quotations" supervisors. _myEmpCode is the caller's employees.code (needed to scope + label).
-// _isEmployeeOnly = employee perm w/out super/leads.
+// Populated in bootDashboard(). _isManager = super || leads. _myEmpCode is the caller's
+// employees.code (needed to scope + label). _isEmployeeOnly = employee perm w/out super/leads.
 let _isManager = false;
-let _isSuper = false;
 let _isEmployeeOnly = false;
 let _myEmpCode = "";
 let _myEmpName = "";
@@ -244,7 +240,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
   _isManager = hasSuper || hasLeads;
-  _isSuper = hasSuper;
   _isEmployeeOnly = hasEmp && !_isManager;
   // Track whether this admin can also access the quote builder — used to hide the "Send Quote" button etc.
   window._canQuotations = hasSuper || hasQuot;
@@ -359,10 +354,9 @@ async function bootDashboard() {
   // Unassigned tab is manager-only
   const uTab = document.getElementById("topTabUnassigned");
   if (uTab) uTab.classList.toggle("hidden", !_isManager);
-  // Add-leads tab is SUPER-ONLY (not just any manager). 'leads' permission is
-  // now view + remarks + quotations only, so it cannot create leads.
+  // Add-leads tab is manager-only (super OR leads perm) — same gate as Unassigned.
   const addTab = document.getElementById("topTabAdd");
-  if (addTab) addTab.classList.toggle("hidden", !_isSuper);
+  if (addTab) addTab.classList.toggle("hidden", !_isManager);
   // Load the full active-employees list so the Add-Lead form can render its
   // service-filtered "Assigned to" dropdown for both managers AND employees.
   // Managers first try the richer `list` op (needs super/employees perm), then
@@ -1397,7 +1391,7 @@ function renderToolbarInto(el) {
     <button id="assignedFilterClear" class="remark-filter-clear" style="display:${assignedFilter ? "inline-block" : "none"};">Clear</button>
     ` : ""}
 
-    ${(_isSuper && activeTop === "unassigned") ? `
+    ${(_isManager && activeTop === "unassigned") ? `
     <div style="flex-basis:100%;height:0;"></div>
     <div id="bulkAssignWrap" style="width:100%;margin-top:6px;padding:10px 12px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1613,11 +1607,7 @@ function renderTable(rows, readOnly) {
   // been actioned) and there's nothing to "save" — so we hide the Call Status
   // and Save/Add columns entirely. Assignment happens via the inline picker in
   // the Employee cell.
-  // Non-super managers ('leads' perm) also don't see the Save/Add column since
-  // they can't change status. Call Status column stays visible (rendered
-  // disabled) so they still see the current status label.
   const hideStatusCol = activeTop === "unassigned";
-  const hideSaveCol = hideStatusCol || readOnly || !_isSuper;
   return `<div class="table-scroll"><table class="data">
     <thead><tr>
       <th>Service</th>
@@ -1626,7 +1616,7 @@ function renderTable(rows, readOnly) {
       ${hideStatusCol ? "" : `<th style="min-width:160px;">Call status</th>`}
       <th style="min-width:170px;">Employee</th>
       <th style="min-width:260px;">Remarks (latest + history)</th>
-      ${hideSaveCol ? "" : "<th>Save / Add</th>"}
+      ${(readOnly || hideStatusCol) ? "" : "<th>Save / Add</th>"}
     </tr></thead>
     <tbody>${rows.map((r) => rowHtml(r, readOnly)).join("")}</tbody>
   </table></div>`;
@@ -1651,20 +1641,15 @@ function rowHtml(l, readOnly) {
   const statusLabel = (TALK_STATUS_OPTIONS.find(o => o.value === statusValue) || {}).label || "—";
   // Contact-update data (used by fallback buttons when a value is missing)
   const contactData = `data-customer-key="${cur}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}"`;
-  // Missing-value fallback opens the contact editor — but only super can edit
-  // contact info. For non-super, render a disabled greyed-out button instead.
-  const missingContactBtn = (icon, label, tip) => _isSuper
-    ? `<button data-action="edit-contact" ${contactData} title="${esc(tip)}" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:4px;">${icon} ${label}</button>`
-    : `<button disabled title="Not set — only super-admins can add contact info" style="padding:4px 10px;background:#f1f5f9;color:#94a3b8;border:1px dashed #e2e8f0;border-radius:4px;font-size:11.5px;font-weight:700;cursor:not-allowed;margin-right:4px;opacity:.65;">${icon} ${label}</button>`;
   const callBtn = phone
     ? `<a href="tel:+${(phone.length===10?"91":"")+phone}" style="display:inline-block;padding:4px 10px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">📞 Call</a>`
-    : missingContactBtn("📞", "Call", "No mobile yet — add one");
+    : `<button data-action="edit-contact" ${contactData} title="No mobile yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:4px;">📞 Call</button>`;
   const waBtn = waPhone
     ? `<a href="https://wa.me/${waPhoneFmt}?text=${waText}" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#dcfce7;color:#065f46;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;margin-right:4px;">💬 WhatsApp</a>`
-    : missingContactBtn("💬", "WhatsApp", "No WhatsApp yet — add one");
+    : `<button data-action="edit-contact" ${contactData} title="No WhatsApp yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:4px;">💬 WhatsApp</button>`;
   const emailBtn = latestEmail
     ? `<a href="mailto:${esc(latestEmail)}" style="display:inline-block;padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">✉️ Email</a>`
-    : missingContactBtn("✉️", "Email", "No email yet — add one");
+    : `<button data-action="edit-contact" ${contactData} title="No email yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">✉️ Email</button>`;
 
   // Contact cell HTML: latest email + mobile + WhatsApp + Add contact button (opens add-only modal)
   const contactCell = `
@@ -1672,7 +1657,7 @@ function rowHtml(l, readOnly) {
       ${latestEmail ? `<div><a href="mailto:${esc(latestEmail)}" style="color:#0f766e;">${esc(latestEmail)}</a></div>` : `<div class="muted-small">no email</div>`}
       ${latestMobile ? `<div class="muted-small" style="color:#0f172a;font-weight:600;">📱 ${esc(latestMobile)}</div>` : ""}
       ${(l.whatsapp && l.whatsapp !== latestMobile) ? `<div class="muted-small" style="color:#065f46;">💬 ${esc(l.whatsapp)}</div>` : ""}
-      ${(readOnly || !_isSuper) ? "" : `<button data-action="edit-contact" data-customer-key="${cur}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>`}
+      ${readOnly ? "" : `<button data-action="edit-contact" data-customer-key="${cur}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>`}
     </div>`;
   // Send Quote button - appears in Send Quote sub-tab; opens Quotations tab with prefilled data
   const quotePrefill = new URLSearchParams({
@@ -1707,8 +1692,7 @@ function rowHtml(l, readOnly) {
   const asnBorder = asnCode ? "#fde68a" : "#e2e8f0";
   // In the Unassigned tab we render a full inline picker (see empCellHtml below);
   // hide the tiny prompt-based Reassign button there so we don't show two competing UIs.
-  // Reassign is a SUPER-only mutation. 'leads' perm holders see the chip but no button.
-  const showReassignBtn = _isSuper && !readOnly && activeTop !== "unassigned";
+  const showReassignBtn = _isManager && !readOnly && activeTop !== "unassigned";
   const reassignBtn = showReassignBtn ? `<button class="reassign-btn" data-action="reassign" data-customer-key="${cur}" title="Reassign this lead to a different employee" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">Reassign</button>` : "";
   const assigneeChip = `<span title="Employee this lead is currently assigned to" style="display:inline-flex;align-items:center;margin-top:4px;margin-left:4px;padding:2px 8px;background:${asnBg};color:${asnFg};border:1px solid ${asnBorder};border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${asnChipInner}${reassignBtn}</span>`;
 
@@ -1720,7 +1704,7 @@ function rowHtml(l, readOnly) {
          <span title="Locked once saved" style="display:inline-block;padding:3px 9px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>
          <span title="Locked once saved" style="font-size:10.5px;color:#9a3412;">🔒 <span class="muted-small" style="color:#9a3412;">Locked once saved</span></span>
        </div>`
-    : ((readOnly || !_isSuper)
+    : (readOnly
         ? `<span class="muted-small">—</span>`
         : `<div class="row-emp-wrap" style="display:flex;flex-direction:column;gap:3px;">
              <input class="row-emp-code" data-customer-key="${cur}" maxlength="12" placeholder="EMP CODE" style="width:100%;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;"/>
@@ -1735,14 +1719,7 @@ function rowHtml(l, readOnly) {
   // (fetched via recommendForService, cached per-service). Assign gates on BOTH set.
   // Backend contract is unchanged: only the assignee is written — the lead's original
   // service_type is preserved even if the manager picks a different service for filtering.
-  // Unassigned tab: 'leads' perm holders can VIEW unassigned leads but not assign them.
-  // Show a small note in the employee cell instead of the picker.
-  if (_isManager && !_isSuper && !readOnly && activeTop === "unassigned") {
-    const creatorChip = l.employee_code
-      ? `<div style="margin-bottom:4px;"><span title="Lead creator (immutable)" style="display:inline-block;padding:2px 8px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:10.5px;font-weight:700;">${empChipLabel}</span></div>`
-      : "";
-    empCellHtml = `${creatorChip}<div class="muted-small" style="margin-top:6px;padding:4px 8px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;font-size:11px;color:#64748b;">🔒 Assignment: super-admin only.</div>`;
-  } else if (_isSuper && !readOnly && activeTop === "unassigned") {
+  if (_isManager && !readOnly && activeTop === "unassigned") {
     // Service is the only editable field. If the lead's own service_type isn't a
     // real value in SERVICES (blank/null/legacy like 'manual'), default to 'other'
     // so the auto-picker kicks in immediately.
@@ -1806,16 +1783,6 @@ function rowHtml(l, readOnly) {
   // Unassigned tab: no call-status dropdown and no Save/Add cell — those only
   // make sense once the lead has been assigned and moved into New / Follow Ups.
   const hideStatusCell = activeTop === "unassigned";
-  // Non-super callers ('leads' perm) get a disabled/read-only status dropdown
-  // and the Save/Add column is dropped entirely (see renderTable).
-  const statusDisabledForNonSuper = !_isSuper;
-  const statusSelectAttrs = (isTerminal || statusDisabledForNonSuper) ? "disabled" : "";
-  const statusSelectStyle = statusDisabledForNonSuper
-    ? `style="background:#f1f5f9;color:#334155;cursor:not-allowed;opacity:.75;"`
-    : "";
-  const statusSelectTitle = statusDisabledForNonSuper
-    ? `title="Only super-admins can change status."`
-    : "";
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
@@ -1830,12 +1797,11 @@ function rowHtml(l, readOnly) {
       ${quoteBtn ? `<div style="margin-top:6px;">${quoteBtn}</div>` : ""}
     </td>
     ${hideStatusCell ? "" : `<td>
-      <select class="status-select" data-customer-key="${cur}" ${statusSelectAttrs} ${statusSelectStyle} ${statusSelectTitle}>${statusOpts}</select>
-      ${statusDisabledForNonSuper ? `<div class="muted-small" style="margin-top:3px;font-size:10.5px;color:#64748b;">🔒 Super-admin only</div>` : ""}
+      <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
     </td>`}
     <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
-    ${(hideStatusCell || !_isSuper) ? "" : `<td>
+    ${hideStatusCell ? "" : `<td>
       ${isTerminal
         ? `<span class="muted-small">Terminal state</span>`
         : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;">${statusValue ? "Update status" : "Save status"}</button>`}
@@ -2097,7 +2063,6 @@ function wireRowHandlers() {
       return;
     }
     if (action === "edit-contact") {
-      if (!_isSuper) { alert("Only super-admins can edit contact info."); return; }
       showContactUpdateModal({
         customer_key: key,
         email: target.dataset.email || "",
@@ -2107,7 +2072,7 @@ function wireRowHandlers() {
       return;
     }
     if (action === "assign-inline") {
-      if (!_isSuper) { alert("Only super-admins can assign leads."); return; }
+      if (!_isManager) return;
       const wrap = target.closest(".asn-inline");
       if (!wrap) return;
       const statusEl = wrap.querySelector(".asn-inline-status");
@@ -2145,7 +2110,7 @@ function wireRowHandlers() {
       return;
     }
     if (action === "reassign") {
-      if (!_isSuper) { alert("Only super-admins can reassign leads."); return; }
+      if (!_isManager) return;
       const list = (_allEmployeesCache || []);
       if (list.length === 0) { alert("No active employees found. Add employees at /admin/users/ first."); return; }
       const listStr = list.map((e, i) => `${i + 1}. ${e.code}${e.name ? " — " + e.name : ""}`).join("\n");
@@ -2188,7 +2153,6 @@ function wireRowHandlers() {
       return;
     }
     if (action === "save-status") {
-      if (!_isSuper) { alert("Only super-admins can change lead status."); return; }
       const tr = target.closest("tr");
       const sel = tr.querySelector("select.status-select");
       const errBox = tr.querySelector(".row-save-error");
