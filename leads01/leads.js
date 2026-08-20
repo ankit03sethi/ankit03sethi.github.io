@@ -869,7 +869,10 @@ function renderManualAddBar(el) {
           + Add a lead manually to <b>${label}</b> sub-tab
           <div class="muted-small" style="font-weight:400;margin-top:2px;color:#475569;">Once saved it can't be deleted. Same status options as Lead captured.</div>
         </div>
-        <button id="manualAddOpenBtn" data-type="${type}" style="background:#2563eb;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">+ Add lead</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button id="manualAddOpenBtn" data-type="${type}" style="background:#2563eb;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">+ Add lead</button>
+          <a href="/leads01/bulk-add/" target="_blank" rel="noopener" style="background:#0f766e;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;text-decoration:none;display:inline-block;">📋 Bulk add</a>
+        </div>
       </div>
       <div id="manualAddForm" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px dashed #cfe0ff;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">

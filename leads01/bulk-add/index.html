@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Bulk Add Leads &mdash; cursive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="../leads.css?v=2026052690" />
+  <style>
+    .bulk-wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .bulk-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+    .bulk-title h1 { margin:0 0 6px; font-size:24px; color:#0f172a; }
+    .bulk-title p  { margin:0; color:#64748b; font-size:13px; }
+    .bulk-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .btn-save { background:#059669; color:#fff; padding:10px 18px; border:0; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
+    .btn-save:disabled { opacity:.4; cursor:not-allowed; pointer-events:none; }
+    .btn-back { color:#1f6feb; text-decoration:none; font-size:13px; font-weight:600; }
+    .btn-back:hover { text-decoration:underline; }
+    .row-btn { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; padding:7px 12px; border-radius:6px; font-size:12.5px; font-weight:600; cursor:pointer; }
+    .row-btn:hover { background:#e0e7ff; }
+    .row-btn.danger { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+    .row-btn.danger:hover { background:#fee2e2; }
+    .bulk-grid-wrap { overflow-x:auto; background:#fff; border:1px solid #e2e8f0; border-radius:10px; }
+    table.bulk-grid { width:100%; border-collapse:collapse; font-size:13px; min-width:1200px; }
+    table.bulk-grid th { background:#f1f5f9; padding:8px 10px; text-align:left; font-size:12px; color:#475569; font-weight:700; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid #e2e8f0; position:sticky; top:0; z-index:1; }
+    table.bulk-grid td { padding:5px 6px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    table.bulk-grid td.num { color:#94a3b8; font-weight:700; text-align:center; width:38px; }
+    table.bulk-grid input, table.bulk-grid select { width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; font-family:inherit; box-sizing:border-box; background:#fff; }
+    table.bulk-grid input.assigned { background:#f8fafc; color:#334155; cursor:not-allowed; font-size:12px; }
+    table.bulk-grid input.assigned.err { color:#991b1b; background:#fef2f2; border-color:#fecaca; }
+    table.bulk-grid td.status { font-size:12px; font-weight:600; white-space:nowrap; }
+    table.bulk-grid tr.saved td { background:#f0fdf4; }
+    table.bulk-grid tr.dup td { background:#fffbeb; }
+    table.bulk-grid tr.err td { background:#fef2f2; }
+    .col-src   { width:120px; }
+    .col-name  { width:150px; }
+    .col-mob   { width:130px; }
+    .col-email { width:180px; }
+    .col-svc   { width:180px; }
+    .col-note  { width:220px; }
+    .col-asg   { width:200px; }
+    .col-st    { width:150px; }
+    .toast { position:fixed; bottom:24px; right:24px; background:#1e293b; color:#fff; padding:12px 18px; border-radius:8px; font-size:13.5px; font-weight:600; box-shadow:0 8px 30px rgba(0,0,0,.2); z-index:100; }
+    .toast.hidden { display:none; }
+    .summary { margin-top:12px; padding:12px 14px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0; font-size:13px; color:#334155; }
+    .row-count-note { color:#64748b; font-size:12px; margin-left:6px; }
+    .required-note { color:#64748b; font-size:12px; margin-top:8px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/leads01/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">India's seller toolkit</div>
+    </div>
+  </a>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
+  </div>
+</header>
+
+<main id="loginView" class="auth-wrap hidden">
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Sign in</h1>
+    <p class="lede">Only whitelisted emails can view this page.</p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+    <p id="loginError" class="error hidden"></p>
+  </form>
+</main>
+
+<main id="gateView" class="hidden">
+  <div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.06);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;">
+    <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">🚫 Manager only</h1>
+    <p style="color:#64748b;font-size:14px;line-height:1.6;">Bulk Add Leads is available to super-admins and admins with the <code>leads</code> permission.</p>
+    <p id="gatePerms" style="color:#94a3b8;font-size:12px;margin-top:10px;"></p>
+    <a href="/leads01/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Back to Leads pipeline</a>
+  </div>
+</main>
+
+<main id="bulkView" class="hidden">
+  <div class="bulk-wrap">
+    <div class="bulk-header">
+      <div class="bulk-title">
+        <h1>📋 Bulk Add Leads</h1>
+        <p>Fill many leads below and click Save all. Each row auto-assigns to the sales person for that service with the fewest open leads.</p>
+      </div>
+      <div class="bulk-actions">
+        <a href="/leads01/" class="btn-back">← Back to /leads01/</a>
+        <button id="saveAllBtn" class="btn-save" disabled>💾 Save all</button>
+      </div>
+    </div>
+
+    <div class="bulk-grid-wrap">
+      <table class="bulk-grid" id="bulkGrid">
+        <thead>
+          <tr>
+            <th class="num">#</th>
+            <th class="col-src">Source *</th>
+            <th class="col-name">Name</th>
+            <th class="col-mob">Mobile *</th>
+            <th class="col-email">Email</th>
+            <th class="col-svc">Service *</th>
+            <th class="col-note">First note</th>
+            <th class="col-asg">Assigned to (auto)</th>
+            <th class="col-st">Status</th>
+          </tr>
+        </thead>
+        <tbody id="bulkBody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <button id="add10Btn" class="row-btn">+ Add 10 more rows</button>
+      <button id="add50Btn" class="row-btn">+ Add 50 rows</button>
+      <button id="clearBtn" class="row-btn danger">× Clear all rows</button>
+      <span class="row-count-note" id="rowCountNote"></span>
+    </div>
+
+    <div class="required-note">Required per row: <b>Source</b>, <b>Mobile</b> (10 digits), <b>Service</b>. Email is optional but backend needs mobile OR email. Assigned-to is auto-populated when you pick a Service. Tab moves between fields; Enter on Mobile jumps to Service.</div>
+
+    <div id="summary" class="summary hidden"></div>
+  </div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="bulk-add.js?v=2026082008"></script>
+</body>
+</html>
