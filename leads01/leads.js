@@ -89,6 +89,7 @@ let assignedFilter = ""; // "" = all, "__none__" = unassigned, else employee cod
 let remarkFilter = "";      // free-text contains filter
 let expandedRows = new Set(); // customer_keys with expanded remark history
 let remarksByKey = {};       // cache: customer_key -> [ {remark, created_at, created_by} ]
+let starRatingsByKey = {};   // cache: customer_key -> [ {stars, note, created_by, created_at} ] (v2026082020)
 
 // Services that a customer might be asking about — used by the Add-lead form dropdown
 // AND the "Filter by service" dropdown on every sub-tab.
@@ -629,6 +630,15 @@ function filteredPipeline() {
     if (assignedFilter === "__none__") rows = rows.filter((l) => !l.assigned_employee_code);
     else rows = rows.filter((l) => (l.assigned_employee_code || "") === assignedFilter);
   }
+  // v2026082020: sort by max_stars DESC NULLS LAST so priority customers surface
+  // first on every tab. Ties fall back to existing pipeline order (last_event_at
+  // DESC — that's already how the server returned them, so we keep the stable
+  // slice() + sort by max_stars only).
+  rows = rows.slice().sort((a, b) => {
+    const sa = (a.max_stars == null) ? -1 : Number(a.max_stars);
+    const sb = (b.max_stars == null) ? -1 : Number(b.max_stars);
+    return sb - sa;
+  });
   return rows;
 }
 
@@ -1966,6 +1976,21 @@ function buildStatusOptionsHtml(allowedIds, currentValue) {
   return opts.join("");
 }
 
+function renderStarChip(l) {
+  // v2026082020: current max priority rating chip. Gold when >=4, grey when unrated,
+  // slate when 1-3. Click opens the star history/add modal.
+  const cur = esc(l.customer_key || "");
+  const maxStars = (l.max_stars == null) ? 0 : Number(l.max_stars);
+  const rated = maxStars > 0;
+  const gold = maxStars >= 4;
+  const bg = gold ? "#fef3c7" : (rated ? "#e2e8f0" : "#f1f5f9");
+  const fg = gold ? "#b45309" : (rated ? "#334155" : "#94a3b8");
+  const bd = gold ? "#f59e0b" : (rated ? "#cbd5e1" : "#e2e8f0");
+  const label = rated ? `⭐ ${maxStars}` : "☆ Unrated";
+  const tip = "Highest priority rating on this lead. Click to see history.";
+  return `<button data-action="show-star-modal" data-customer-key="${cur}" title="${esc(tip)}" style="display:inline-flex;align-items:center;padding:2px 8px;background:${bg};color:${fg};border:1px solid ${bd};border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.2px;">${label}</button>`;
+}
+
 function renderRemarksCell(l, readOnly) {
   const cur = esc(l.customer_key || "");
   const latestHeader = l.latest_remark_header || "";
@@ -1975,7 +2000,8 @@ function renderRemarksCell(l, readOnly) {
   const isExpanded = expandedRows.has(l.customer_key);
   const olderCount = Math.max(0, count - 1);
 
-  let html = "";
+  // v2026082020: star chip sits at the top of the remarks cell so it's always visible.
+  let html = `<div style="margin-bottom:4px;">${renderStarChip(l)}</div>`;
 
   if (latest || latestHeader) {
     html += `<div class="remark-latest">
@@ -2006,6 +2032,7 @@ function renderRemarksCell(l, readOnly) {
   if (!readOnly) {
     html += `<div class="add-remark-wrap">
       <button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>
+      <button data-action="show-star-modal" data-customer-key="${cur}" title="Add a priority star rating (or view history)" style="margin-left:6px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:3px 8px;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">⭐ Rate</button>
       <div class="add-remark-form hidden">
         <input class="add-remark-header" type="text" placeholder="Header / short caption (e.g. Called at 3pm, discussed pricing)" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;font-weight:600;margin-bottom:4px;"/>
         <textarea class="add-remark-input" placeholder="Full discussion / details..." rows="2" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;"></textarea>
@@ -2292,6 +2319,12 @@ function wireRowHandlers() {
     }
     if (action === "show-asn-history") {
       await showAssignmentHistoryModal(key);
+      return;
+    }
+    if (action === "show-star-modal") {
+      // v2026082020: 5-star priority rating modal — click stars to pick N,
+      // optional note, save (append-only). History shown below.
+      await showStarRatingModal(key);
       return;
     }
     if (action === "send-quote") {
@@ -2688,6 +2721,149 @@ function renderServicesCell(l, readOnly) {
     </div>`;
 
   return `<div class="services-cell">${activeChips || `<span class="muted-small">no active services</span>`}${pendingChips ? `<div style="margin-top:2px;">${pendingChips}</div>` : ""}${removedChips ? `<div style="margin-top:2px;">${removedChips}</div>` : ""}${addSvcHtml}</div>`;
+}
+
+// v2026082020: 5-star priority rating modal.
+// - 5 empty stars (click to select N, hover to preview)
+// - Optional note
+// - Save button (append-only — history never deletes)
+// - History below (newest first) with format: ⭐⭐⭐⭐ "note" — by <email> — <date>
+async function showStarRatingModal(customerKey) {
+  document.getElementById("starRatingOverlay")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "starRatingOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;";
+
+  // Star row builder — buttons drive the pick, hover previews via mouseenter/leave.
+  const buildStarsHtml = (selected) => {
+    let s = "";
+    for (let i = 1; i <= 5; i++) {
+      const filled = i <= selected;
+      s += `<button type="button" class="star-btn" data-star="${i}" style="background:transparent;border:0;padding:0 2px;font-size:32px;line-height:1;cursor:pointer;color:${filled ? "#f59e0b" : "#cbd5e1"};transition:color .1s;">${filled ? "★" : "☆"}</button>`;
+    }
+    return s;
+  };
+
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:22px 24px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 20px 50px rgba(15,23,42,.35);">
+      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:2px;">⭐ Priority rating</div>
+      <div style="color:#64748b;font-size:12.5px;margin-bottom:14px;">Rate this lead 1-5 stars. Past ratings are kept as history (never deleted).</div>
+
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">New rating</div>
+        <div id="starRow" style="display:flex;align-items:center;gap:2px;margin-bottom:8px;">${buildStarsHtml(0)}</div>
+        <textarea id="starNote" rows="2" placeholder="Optional note (e.g. Big client, ready to buy, high-value deal)" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+          <button id="starSaveBtn" disabled style="background:#f59e0b;color:#fff;border:0;border-radius:5px;padding:7px 16px;font-size:13px;font-weight:700;cursor:not-allowed;opacity:.4;">Save rating</button>
+          <span id="starMsg" style="font-size:12px;color:#64748b;"></span>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">History (newest first — cannot be deleted)</div>
+      <div id="starHistoryList" style="font-size:13px;color:#334155;">Loading…</div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button id="starClose" style="background:#e5e7eb;color:#111;padding:8px 16px;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const cleanup = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(); });
+  overlay.querySelector("#starClose").onclick = cleanup;
+
+  const starRow = overlay.querySelector("#starRow");
+  const saveBtn = overlay.querySelector("#starSaveBtn");
+  const noteEl  = overlay.querySelector("#starNote");
+  const msgEl   = overlay.querySelector("#starMsg");
+  let selectedStars = 0;
+
+  const paint = (n) => {
+    Array.from(starRow.querySelectorAll(".star-btn")).forEach((btn) => {
+      const v = Number(btn.dataset.star);
+      const filled = v <= n;
+      btn.textContent = filled ? "★" : "☆";
+      btn.style.color = filled ? "#f59e0b" : "#cbd5e1";
+    });
+  };
+  const refreshGate = () => {
+    const enable = selectedStars >= 1 && selectedStars <= 5;
+    saveBtn.disabled = !enable;
+    saveBtn.style.opacity = enable ? "" : ".4";
+    saveBtn.style.cursor = enable ? "pointer" : "not-allowed";
+  };
+  starRow.addEventListener("mouseover", (e) => {
+    const btn = e.target.closest(".star-btn");
+    if (!btn) return;
+    paint(Number(btn.dataset.star));
+  });
+  starRow.addEventListener("mouseleave", () => paint(selectedStars));
+  starRow.addEventListener("click", (e) => {
+    const btn = e.target.closest(".star-btn");
+    if (!btn) return;
+    selectedStars = Number(btn.dataset.star);
+    paint(selectedStars);
+    refreshGate();
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    if (selectedStars < 1) return;
+    saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+    msgEl.style.color = "#64748b"; msgEl.textContent = "";
+    try {
+      const saved = await callAdmin("add_star_rating", {
+        customer_key: customerKey,
+        stars: selectedStars,
+        note: (noteEl.value || "").trim() || null,
+      });
+      msgEl.style.color = "#059669"; msgEl.textContent = "✓ Saved.";
+      // Optimistically update pipelineCache so the row chip re-renders correctly
+      const idx = pipelineCache.findIndex((x) => x.customer_key === customerKey);
+      if (idx >= 0) {
+        const prev = pipelineCache[idx].max_stars || 0;
+        if (selectedStars > prev) {
+          pipelineCache[idx].max_stars = selectedStars;
+          pipelineCache[idx].latest_stars_at = saved?.created_at || new Date().toISOString();
+        }
+      }
+      if (starRatingsByKey[customerKey]) starRatingsByKey[customerKey].unshift(saved);
+      // Reset form for another
+      selectedStars = 0; paint(0); noteEl.value = ""; refreshGate();
+      await loadStarHistory(customerKey);
+      updateTopCounts();
+      renderActive();
+      saveBtn.textContent = "Save rating";
+    } catch (err) {
+      msgEl.style.color = "#dc2626"; msgEl.textContent = "Save failed: " + err.message;
+      saveBtn.disabled = false; saveBtn.textContent = "Save rating";
+    }
+  });
+
+  await loadStarHistory(customerKey);
+}
+
+async function loadStarHistory(customerKey) {
+  const listEl = document.getElementById("starHistoryList");
+  if (!listEl) return;
+  try {
+    const rows = await callAdmin("lead_star_ratings", { customer_key: customerKey });
+    starRatingsByKey[customerKey] = rows || [];
+    if (!rows || rows.length === 0) {
+      listEl.innerHTML = `<div style="padding:12px;color:#94a3b8;text-align:center;background:#f8fafc;border-radius:6px;">No ratings yet.</div>`;
+      return;
+    }
+    // Format: ⭐⭐⭐⭐ "note" — by <email> — <date>. Newest first.
+    listEl.innerHTML = rows.map((r) => {
+      const stars = "⭐".repeat(Math.max(0, Math.min(5, Number(r.stars) || 0)));
+      const noteHtml = r.note ? ` "${esc(r.note)}"` : "";
+      const byHtml = r.created_by ? ` — by ${esc(r.created_by)}` : "";
+      const dtHtml = ` — ${esc(fmtDate(r.created_at))} ${esc(fmtTime(r.created_at))}`;
+      return `<div style="padding:8px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#334155;">
+        <span style="color:#f59e0b;letter-spacing:1px;">${stars}</span>${noteHtml}<span style="color:#64748b;font-size:12px;">${byHtml}${dtHtml}</span>
+      </div>`;
+    }).join("");
+  } catch (err) {
+    listEl.innerHTML = `<div style="color:#991b1b;padding:12px;background:#fef2f2;border-radius:6px;">Load failed: ${esc(err.message)}</div>`;
+  }
 }
 
 // Modal that lists lead_assignment_history for a lead
