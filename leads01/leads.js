@@ -1507,6 +1507,7 @@ function wireBulkAssignHandlers() {
           customer_key: l.customer_key,
           to_code: hit.code,
           service: svcOverride || null,
+          reset_status: true,
         });
         done += 1;
       } catch (err) {
@@ -2054,9 +2055,9 @@ function wireRowHandlers() {
       target.disabled = true; target.textContent = "Assigning…";
       target.style.opacity = ".5"; target.style.cursor = "wait";
       try {
-        // Pass picked service too — admin-data v25 forwards it to reassign_lead(p_service),
-        // which persists it in lead_overrides.override_service_type when different from current.
-        await callAdmin("reassign_lead", { customer_key: key, to_code: hit.code, service: serviceLc || null });
+        // v26: also send reset_status=true so the RPC wipes talk_status → lead lands in NEW LEADS
+        // (not stuck in FOLLOW UPS due to historical status like 'quotation_sent').
+        await callAdmin("reassign_lead", { customer_key: key, to_code: hit.code, service: serviceLc || null, reset_status: true });
         // Refresh so this row disappears from Unassigned (and shows up under the assignee elsewhere)
         pipelineCache = await callAdmin("pipeline");
         updateTopCounts();
