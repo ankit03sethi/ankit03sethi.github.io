@@ -204,7 +204,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (!_myEmpCode) {
       document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;font-family:system-ui;text-align:center;">
         <h1 style="margin:0 0 10px;font-size:20px;">👤 Employee account not linked</h1>
-        <p style="color:#64748b;font-size:14px;">Your login has the <code>employee</code> permission, but your email isn't linked to an entry in the Employees directory yet. Ask a super-admin to add you at <a href="/admin/employees/">/admin/employees/</a>.</p>
+        <p style="color:#64748b;font-size:14px;">Your login has the <code>employee</code> permission, but your email isn't linked to an entry in the Employees directory yet. Ask a super-admin to add you at <a href="/admin/users/">/admin/users/</a>.</p>
       </div>`;
       return;
     }
@@ -1367,7 +1367,7 @@ function wireRowHandlers() {
     if (action === "reassign") {
       if (!_isManager) return;
       const list = (_allEmployeesCache || []);
-      if (list.length === 0) { alert("No active employees found. Add employees at /admin/employees/ first."); return; }
+      if (list.length === 0) { alert("No active employees found. Add employees at /admin/users/ first."); return; }
       const listStr = list.map((e, i) => `${i + 1}. ${e.code}${e.name ? " — " + e.name : ""}`).join("\n");
       const pick = prompt(`Reassign lead to which employee?\n\n${listStr}\n\nEnter the number (1-${list.length}) or the code:`);
       if (pick === null) return;
