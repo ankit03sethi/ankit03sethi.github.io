@@ -354,6 +354,9 @@ async function bootDashboard() {
   // Unassigned tab is manager-only
   const uTab = document.getElementById("topTabUnassigned");
   if (uTab) uTab.classList.toggle("hidden", !_isManager);
+  // Add-leads tab is manager-only (super OR leads perm) — same gate as Unassigned.
+  const addTab = document.getElementById("topTabAdd");
+  if (addTab) addTab.classList.toggle("hidden", !_isManager);
   // Load the full active-employees list so the Add-Lead form can render its
   // service-filtered "Assigned to" dropdown for both managers AND employees.
   // Managers first try the richer `list` op (needs super/employees perm), then
@@ -619,16 +622,27 @@ function switchTop(top) {
   const subTabs = $("#subTabs");
   const toolbar = document.querySelector(".toolbar");
   const isEmbedded = top === "quotations";
+  const isAddLeads = top === "add";
 
   paneStage?.classList.toggle("hidden", isEmbedded);
   paneQuot?.classList.toggle("hidden", !isEmbedded);
-  if (subTabs) subTabs.style.display = isEmbedded ? "none" : "";
+  if (subTabs) subTabs.style.display = (isEmbedded || isAddLeads) ? "none" : "";
   // Keep the top toolbar (search + refresh + date range) VISIBLE on all tabs
   if (toolbar) toolbar.style.display = "";
 
   if (top === "quotations") {
     const f = $("#quotationsFrame");
     if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/?v=" + Date.now();
+    return;
+  }
+
+  if (top === "add") {
+    expandedRows.clear();
+    remarkFilter = "";
+    if (paneStage) {
+      paneStage.innerHTML = "";
+      renderAddLeadsPanel(paneStage);
+    }
     return;
   }
 
@@ -643,6 +657,9 @@ function switchTop(top) {
 }
 
 function renderActive() {
+  // The Add-leads top-card renders its own dedicated two-card panel via switchTop("add").
+  // Skip the sub-tabs + rows pipeline for it (there are no leads to list).
+  if (activeTop === "add") return;
   renderSubTabs();
   renderPane();
 }
@@ -694,8 +711,9 @@ function renderSubTabs() {
 function renderPane() {
   // Render the SHELL (toolbar + rows container) only once per tab switch.
   // Filter input changes only re-render the rows, preserving input focus.
-  // Add-Lead bar is manager-only (super OR 'leads' permission). Employees don't add leads.
-  const isManualAdd = _isManager && activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
+  // Add-Lead bar was formerly rendered under New leads' Reference/Call/WhatsApp sub-tabs.
+  // It now lives ONLY on the dedicated "Add leads" top-card, so it never renders here.
+  const isManualAdd = false;
   const currentBarSub = $("#manualAddBar")?.dataset.sub || "";
   // Rebuild shell if the manual-add state OR the specific sub-tab changed
   const needShell = !$("#filterBar") || !$("#rowsContainer")
@@ -859,6 +877,82 @@ function primeInlineAssignRecommendations() {
 }
 
 // Manual-add bar: Add lead button + inline form (Reference / Call / WhatsApp sub-tabs)
+// --- "Add leads" dedicated top-card panel ---------------------------------
+// Two side-by-side cards: single-lead form (Card A) + bulk-add launcher (Card B).
+// Card A reuses all the wireManualAddHandlers() logic — the presence of
+// #manualAddSource inside the DOM tells that wiring to derive the lead's `type`
+// from a picked value instead of from the (removed) sub-tab context.
+function renderAddLeadsPanel(el) {
+  if (!el) return;
+  el.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:12px 0;">
+      <!-- Card A: Single lead -->
+      <div style="flex:1 1 380px;min-width:320px;background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:18px;">
+        <div style="font-size:16px;font-weight:800;color:#065f46;margin-bottom:4px;">&#10133; Add single lead</div>
+        <div class="muted-small" style="color:#065f46;opacity:.8;margin-bottom:12px;">Pick the source, fill the customer details, and it lands directly on the matching sub-tab under NEW LEADS.</div>
+        <div id="manualAddForm">
+          <div style="margin-bottom:8px;">
+            <div class="muted-small" style="margin-bottom:3px;">Source *</div>
+            <select id="manualAddSource" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#fff;">
+              <option value="call" selected>Call</option>
+              <option value="ref">Reference</option>
+              <option value="wa">WhatsApp</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div><div class="muted-small" style="margin-bottom:3px;">Name (optional)</div><input id="manualAddName" type="text" placeholder="Customer name" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
+            <div><div class="muted-small" style="margin-bottom:3px;">Mobile</div><input id="manualAddMobile" type="tel" placeholder="10-digit mobile" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/></div>
+          </div>
+          <div style="margin-top:8px;">
+            <div class="muted-small" style="margin-bottom:3px;">Email (optional)</div>
+            <input id="manualAddEmail" type="email" placeholder="customer@email.com" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;"/>
+          </div>
+          <div style="margin-top:8px;">
+            <div class="muted-small" style="margin-bottom:3px;">Service *</div>
+            <select id="manualAddService" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#fff;">
+              <option value="">&mdash; pick service the customer asked for &mdash;</option>
+              ${SERVICES.map(s => `<option value="${s.value}">${s.label}</option>`).join("")}
+            </select>
+          </div>
+          <div style="margin-top:8px;">
+            <div class="muted-small" style="margin-bottom:3px;">First note (carries through all tabs, never deletes)</div>
+            <textarea id="manualAddNote" rows="2" placeholder="e.g. Called about GST registration for a Delhi seller. Callback tomorrow 3 PM." style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+          </div>
+          <div style="margin-top:8px;">
+            <div class="muted-small" style="margin-bottom:3px;">Assigned to * <span style="color:#0f172a;">(auto-picked &mdash; not editable)</span> <span style="color:#dc2626;">(cannot be changed later)</span></div>
+            <input id="empAssignPicker" type="text" readonly placeholder="Select a service first" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#f8fafc;color:#334155;cursor:not-allowed;pointer-events:none;"/>
+            <datalist id="empAssignList"></datalist>
+            <div class="muted-small" style="margin-top:4px;color:#64748b;">System auto-picks the sales member handling this service with the fewest open leads (ties broken by earliest join date).</div>
+            <div id="empAssignStatus" class="muted-small" style="margin-top:4px;color:#64748b;min-height:16px;">&mdash;</div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button id="manualAddSaveBtn" style="background:#059669;color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
+            <button id="manualAddCancelBtn" style="background:#e5e7eb;color:#111;padding:8px 14px;border-radius:6px;font-size:13px;border:0;cursor:pointer;">Clear</button>
+            <div id="manualAddMsg" style="font-size:12.5px;flex:1;min-width:180px;"></div>
+          </div>
+          <div class="muted-small" style="margin-top:6px;color:#64748b;">Once saved you can't change name/mobile/email/service, but you can keep adding remarks. Form clears after save so you can add another.</div>
+        </div>
+      </div>
+
+      <!-- Card B: Bulk add -->
+      <div style="flex:1 1 380px;min-width:320px;background:#eff6ff;border:2px solid #93c5fd;border-radius:12px;padding:18px;display:flex;flex-direction:column;">
+        <div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:4px;">&#128203; Bulk add many leads</div>
+        <div style="color:#1e3a8a;opacity:.85;font-size:13px;line-height:1.55;margin-bottom:14px;">
+          Open a spreadsheet-style page to enter multiple leads at once. Each row auto-assigns to the sales person with the fewest open leads for that service.
+        </div>
+        <ul style="margin:0 0 14px 18px;padding:0;color:#334155;font-size:12.5px;line-height:1.7;">
+          <li>Paste rows from Excel or type them one by one.</li>
+          <li>Pick the source per row (Reference / Call / WhatsApp).</li>
+          <li>Same auto-assign rule as the single-add form.</li>
+        </ul>
+        <div style="margin-top:auto;">
+          <a href="/leads01/bulk-add/" target="_blank" rel="noopener" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;">&#128203; Open Bulk Add page &rarr;</a>
+        </div>
+      </div>
+    </div>`;
+  wireManualAddHandlers();
+}
+
 function renderManualAddBar(el) {
   const type = activeSub === "manual_ref" ? "ref" : (activeSub === "manual_call" ? "call" : "wa");
   const label = type === "ref" ? "Reference" : (type === "call" ? "Call" : "WhatsApp");
@@ -915,7 +1009,11 @@ function wireManualAddHandlers() {
   const saveBtn = $("#manualAddSaveBtn");
   const cancelBtn = $("#manualAddCancelBtn");
   const msg = $("#manualAddMsg");
-  if (!openBtn) return;
+  const sourceSel = $("#manualAddSource"); // present only on the "Add leads" top-card panel
+  if (!saveBtn) return;
+  // isAddPanel = the always-open two-card panel. When false we're in the legacy
+  // (now-unused) sub-tab variant that still uses an openBtn / hide-on-cancel toggle.
+  const isAddPanel = !!sourceSel;
 
   const svcSel = $("#manualAddService");
   const empPicker = $("#empAssignPicker");
@@ -992,20 +1090,28 @@ function wireManualAddHandlers() {
     saveBtn.style.pointerEvents = enabled ? "" : "none";
   };
 
-  openBtn.onclick = () => {
-    form.classList.remove("hidden");
-    openBtn.style.display = "none";
-    $("#manualAddMobile").focus();
-    msg.textContent = ""; msg.style.color = "";
-    refreshManualSaveGate();
-  };
-  cancelBtn.onclick = () => {
-    form.classList.add("hidden");
-    openBtn.style.display = "";
-    ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
-    resetEmpPicker("Select a service first");
-    msg.textContent = "";
-  };
+  if (openBtn) {
+    openBtn.onclick = () => {
+      if (form) form.classList.remove("hidden");
+      openBtn.style.display = "none";
+      $("#manualAddMobile")?.focus();
+      msg.textContent = ""; msg.style.color = "";
+      refreshManualSaveGate();
+    };
+  }
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      resetEmpPicker("Select a service first");
+      msg.textContent = "";
+      // Legacy sub-tab variant: collapse the form back behind the open button.
+      // Add-panel variant: form is always open, so leave it visible.
+      if (openBtn && form) {
+        form.classList.add("hidden");
+        openBtn.style.display = "";
+      }
+    };
+  }
 
   // Service change -> repopulate datalist, kick off recommendation
   if (svcSel) {
@@ -1096,7 +1202,10 @@ function wireManualAddHandlers() {
   }
 
   saveBtn.onclick = async () => {
-    const type = saveBtn.dataset.type;
+    // Type source:
+    //   - Add-leads top-card panel: picked from #manualAddSource dropdown
+    //   - Legacy sub-tab bar: baked into saveBtn.dataset.type from the sub-tab id
+    const type = sourceSel ? (sourceSel.value || "call") : saveBtn.dataset.type;
     const name = ($("#manualAddName").value || "").trim();
     const mobile = ($("#manualAddMobile").value || "").replace(/\D/g, "");
     const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
@@ -1126,10 +1235,14 @@ function wireManualAddHandlers() {
         const list = res.duplicates.slice(0, 3).map(d => `${d.service_name || d.service_type} (${d.email || d.mobile})`).join(", ");
         dupMsg = ` Already exists in: ${list}`;
       }
+      const subLabel = type === "ref" ? "Reference" : (type === "wa" ? "WhatsApp" : "Call");
       msg.style.color = "#059669";
-      msg.textContent = "Saved." + dupMsg;
+      msg.textContent = `✓ Saved — visible on NEW LEADS → ${subLabel}.` + dupMsg;
       ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      // Keep the Source selection on the Add-panel so the user can rapidly add another lead
+      // of the same type without re-picking. Reset employee picker for the next entry.
       resetEmpPicker("Select a service first");
+      saveBtn.disabled = false; saveBtn.textContent = "Save lead";
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
       renderActive();
