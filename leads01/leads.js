@@ -1773,7 +1773,6 @@ function rowHtml(l, readOnly) {
         <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
         ${servicesCell}
         <span class="done-tag">${esc(bucketReason(l))}</span>
-        <div>${empChip}${assigneeChip}</div>
       </td>
       <td>${contactCell}</td>
       <td>
@@ -1797,17 +1796,18 @@ function rowHtml(l, readOnly) {
   // Unassigned tab: no call-status dropdown and no Save/Add cell — those only
   // make sense once the lead has been assigned and moved into New / Follow Ups.
   const hideStatusCell = activeTop === "unassigned";
-  // v2026082015: rename Reassign → Forward and move it into the Save cell,
-  // positioned RIGHT BEFORE the Save button. Manager only.
-  const forwardBtnHtml = (_isManager && !hideStatusCell)
-    ? `<button class="forward-btn" data-action="reassign" data-customer-key="${cur}" title="Forward this lead to a different employee" style="margin-right:6px;padding:6px 12px;background:#f97316;color:#fff;border:0;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;">Forward</button>`
+  // v2026082016: Forward + Save merged into ONE "💾 Save + Forward" primary button.
+  // The old explicit "Forward" employee-picker becomes a subtle underline link
+  // "↪ Manual forward" below the primary button — an escape hatch for picking a
+  // specific employee. Manager only for the manual-forward link.
+  const manualForwardLinkHtml = (_isManager && !hideStatusCell)
+    ? `<a href="#" class="manual-forward-link" data-action="reassign" data-customer-key="${cur}" title="Hand-pick a different employee to forward this lead to" style="display:inline-block;margin-top:6px;font-size:11px;color:#f97316;text-decoration:underline;cursor:pointer;">↪ Manual forward</a>`
     : "";
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
       ${servicesCell}
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
-      <div>${empChip}${assigneeChip}</div>
     </td>
     <td>${contactCell}</td>
     <td>
@@ -1822,11 +1822,11 @@ function rowHtml(l, readOnly) {
     <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
     ${hideStatusCell ? "" : `<td>
-      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
-        ${forwardBtnHtml}
+      <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
         ${isTerminal
           ? `<span class="muted-small">Terminal state</span>`
-          : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;">${statusValue ? "Update status" : "Save status"}</button>`}
+          : `<button class="row-save-btn" data-action="save-and-forward" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;padding:7px 14px;background:linear-gradient(90deg,#2563eb 0%,#f97316 100%);color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;">💾 Save + Forward</button>`}
+        ${manualForwardLinkHtml}
       </div>
       <div class="row-save-error" style="display:none;"></div>
     </td>`}
@@ -2018,6 +2018,8 @@ function wireRowHandlers() {
     if (!target) return;
     const action = target.dataset.action;
     const key = target.dataset.customerKey;
+    // Manual forward link is an <a href="#"> — stop the page from jumping to top.
+    if (target.tagName === "A") e.preventDefault();
 
     if (action === "expand-remarks") {
       // Fetch full remarks list and expand
@@ -2227,6 +2229,112 @@ function wireRowHandlers() {
       switchTop("quotations");
       const f = document.getElementById("quotationsFrame");
       if (f) f.src = "/leads01/quotations/?" + prefill;
+      return;
+    }
+    if (action === "save-and-forward") {
+      // v2026082016: merged button. Steps:
+      //   1. Run the same save-status logic (set_lead_status). If it fails, stop.
+      //   2. For each ACTIVE service on this lead that the CURRENT ASSIGNEE does
+      //      NOT handle (their employees.services array doesn't include it), call
+      //      add_service_to_lead — which triggers the auto-forward RPC and creates
+      //      a new lead for whoever handles that service.
+      //   3. Show a combined toast, then refresh pipeline.
+      const tr = target.closest("tr");
+      const sel = tr.querySelector("select.status-select");
+      const errBox = tr.querySelector(".row-save-error");
+      errBox.style.display = "none";
+      const talk_status = sel.value || null;
+      if (!talk_status) {
+        errBox.textContent = "Pick a status before saving.";
+        errBox.style.display = "block";
+        return;
+      }
+      const leadRow = pipelineCache.find((x) => x.customer_key === key) || {};
+      if (!leadRow.employee_code && !leadRow.assigned_employee_code) {
+        errBox.textContent = "Lead has no assignee — click Manual forward to assign first.";
+        errBox.style.display = "block";
+        return;
+      }
+      // Freeze the button visuals during the two-step operation
+      const origHtml = target.innerHTML;
+      target.disabled = true;
+      target.innerHTML = "Saving + forwarding…";
+      target.style.opacity = ".5";
+      target.style.cursor = "wait";
+      target.style.pointerEvents = "none";
+
+      // Step 1: save status
+      try {
+        await callAdmin("set_lead_status", { customer_key: key, talk_status });
+        const idx = pipelineCache.findIndex((x) => x.customer_key === key);
+        if (idx >= 0) pipelineCache[idx].talk_status = talk_status;
+      } catch (err) {
+        target.disabled = false; target.innerHTML = origHtml;
+        target.style.opacity = ""; target.style.cursor = ""; target.style.pointerEvents = "";
+        errBox.textContent = "Save failed: " + err.message;
+        errBox.style.display = "block";
+        return;
+      }
+
+      // Step 2: for each active service the current assignee doesn't handle,
+      // call add_service_to_lead (backend auto-forwards to matching employee).
+      const assigneeCode = leadRow.assigned_employee_code || leadRow.employee_code || "";
+      const assigneeEmp = (_allEmployeesCache || []).find((e) => e.code === assigneeCode) || null;
+      const assigneeSvcs = new Set(
+        Array.isArray(assigneeEmp?.services)
+          ? assigneeEmp.services.map((s) => String(s).toLowerCase())
+          : []
+      );
+      // Derive active services the same way renderServicesCell does.
+      const detail = Array.isArray(leadRow.services_detail) ? leadRow.services_detail : [];
+      let activeSvcs = detail.filter((x) => x.is_active).map((x) => String(x.service || "").toLowerCase());
+      if (activeSvcs.length === 0 && Array.isArray(leadRow.services_active)) {
+        activeSvcs = leadRow.services_active.map((s) => String(s).toLowerCase());
+      }
+      if (activeSvcs.length === 0 && leadRow.service_type) {
+        activeSvcs = [String(leadRow.service_type).toLowerCase()];
+      }
+      activeSvcs = Array.from(new Set(activeSvcs.filter(Boolean)));
+      // Services this lead is on but the assignee does NOT handle → candidates for forwarding.
+      // Only forward services that exist in SERVICES (skip legacy 'manual'/'other'/blank).
+      const knownSvcVals = new Set(SERVICES.map((s) => s.value));
+      const toForward = activeSvcs.filter((s) => knownSvcVals.has(s) && !assigneeSvcs.has(s));
+
+      const forwardedTo = []; // [{service, empCode}]
+      const forwardErrors = []; // [{service, msg}]
+      for (const svc of toForward) {
+        try {
+          const res = await callAdmin("add_service_to_lead", { customer_key: key, service: svc });
+          const kind = res?.result || "stayed";
+          const newLeads = res?.new_leads || [];
+          if (kind === "forwarded" || kind === "split") {
+            const first = newLeads[0] || {};
+            forwardedTo.push({ service: svc, empCode: first.employee_code || "?" });
+          }
+          // "stayed" means backend decided current employee handles it after all — skip toast entry.
+        } catch (err) {
+          forwardErrors.push({ service: svc, msg: err.message || "failed" });
+        }
+      }
+
+      // Build combined toast
+      let toast = "✓ Status saved";
+      if (forwardedTo.length > 0) {
+        const list = forwardedTo.map((f) => `${svcLabel(f.service)} → ${f.empCode}`).join(", ");
+        toast += `\n✓ Forwarded ${forwardedTo.length} service${forwardedTo.length === 1 ? "" : "s"}: ${list}`;
+      }
+      if (forwardErrors.length > 0) {
+        const list = forwardErrors.map((f) => `${svcLabel(f.service)}: ${f.msg}`).join("; ");
+        toast += `\n⚠ Some forwards failed: ${list}`;
+      }
+      alert(toast);
+
+      // Refresh pipeline + re-render
+      try {
+        pipelineCache = await callAdmin("pipeline");
+      } catch {}
+      updateTopCounts();
+      renderActive();
       return;
     }
     if (action === "save-status") {
