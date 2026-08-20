@@ -1224,6 +1224,29 @@ function renderToolbarInto(el) {
     </select>
     <button id="assignedFilterClear" class="remark-filter-clear" style="display:${assignedFilter ? "inline-block" : "none"};">Clear</button>
     ` : ""}
+
+    ${(_isManager && activeTop === "unassigned") ? `
+    <div style="flex-basis:100%;height:0;"></div>
+    <div id="bulkAssignWrap" style="width:100%;margin-top:6px;padding:10px 12px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button id="bulkAssignToggle" style="padding:6px 14px;background:#0284c7;color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;">📌 Assign all visible</button>
+        <span class="muted-small" style="font-size:11.5px;color:#92400e;">Assigns every unassigned lead currently shown (respects your filters).</span>
+      </div>
+      <div id="bulkAssignPicker" class="hidden" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <span class="filter-lbl" style="font-size:11.5px;">Service:</span>
+        <select id="bulkAssignSvc" style="padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;background:#fff;">
+          <option value="__keep__" selected>— keep each lead's own service —</option>
+          ${SERVICES.map((s) => `<option value="${esc(s.value)}">${esc(s.label)}</option>`).join("")}
+        </select>
+        <span class="filter-lbl" style="font-size:11.5px;margin-left:6px;">Employee:</span>
+        <input id="bulkAssignEmp" list="bulkAssignEmpList" type="text" autocomplete="off" placeholder="Pick employee" style="flex:1 1 180px;min-width:180px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;background:#fff;"/>
+        <datalist id="bulkAssignEmpList"></datalist>
+        <button id="bulkAssignConfirm" disabled style="padding:5px 12px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:12px;font-weight:700;cursor:not-allowed;opacity:.4;">Assign all</button>
+        <button id="bulkAssignCancel" style="padding:5px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;cursor:pointer;">Cancel</button>
+        <div id="bulkAssignStatus" class="muted-small" style="width:100%;font-size:12px;color:#64748b;margin-top:2px;"></div>
+      </div>
+    </div>
+    ` : ""}
   </div>`;
 }
 
@@ -1350,18 +1373,176 @@ function wireToolbarHandlers() {
       renderActive();
     });
   }
+
+  // Bulk "Assign all visible" (manager, Unassigned tab only) — opens an inline
+  // picker (service + employee) that mirrors the per-row picker, then loops
+  // reassign_lead over every currently-visible unassigned lead.
+  wireBulkAssignHandlers();
+}
+
+// Populate the bulk-assign employee datalist for a given service ("" = all
+// active sales, mirrors the per-row picker's "keep each lead's own service"
+// mode). Also refreshes the placeholder + gate.
+function bulkAssignRepopulateEmpList(svcLc) {
+  const list = document.getElementById("bulkAssignEmpList");
+  const inp  = document.getElementById("bulkAssignEmp");
+  if (!list || !inp) return;
+  const cands = candidatesForLead(svcLc || "");
+  list.innerHTML = cands.map((e) => `<option value="${esc(empLabel(e))}"></option>`).join("");
+  if (cands.length === 0) {
+    inp.value = "";
+    inp.disabled = true;
+    inp.placeholder = "No sales employee handles this service";
+    inp.style.opacity = ".6";
+  } else {
+    inp.disabled = false;
+    inp.style.opacity = "";
+    inp.placeholder = svcLc
+      ? `Pick from ${cands.length} employee${cands.length > 1 ? "s" : ""} handling this service`
+      : `Pick any of ${cands.length} active sales employee${cands.length > 1 ? "s" : ""}`;
+  }
+  bulkAssignRefreshGate();
+}
+
+function bulkAssignRefreshGate() {
+  const btn = document.getElementById("bulkAssignConfirm");
+  const inp = document.getElementById("bulkAssignEmp");
+  if (!btn || !inp) return;
+  const enable = !inp.disabled && !!(inp.value || "").trim();
+  btn.disabled = !enable;
+  btn.style.opacity = enable ? "" : ".4";
+  btn.style.cursor  = enable ? "pointer" : "not-allowed";
+}
+
+function wireBulkAssignHandlers() {
+  const toggle  = document.getElementById("bulkAssignToggle");
+  const picker  = document.getElementById("bulkAssignPicker");
+  const cancel  = document.getElementById("bulkAssignCancel");
+  const svcSel  = document.getElementById("bulkAssignSvc");
+  const empInp  = document.getElementById("bulkAssignEmp");
+  const confirm = document.getElementById("bulkAssignConfirm");
+  const status  = document.getElementById("bulkAssignStatus");
+  if (!toggle || !picker || !svcSel || !empInp || !confirm) return;
+
+  const setStatus = (txt, tone) => {
+    if (!status) return;
+    status.textContent = txt || "";
+    status.style.color = tone === "err" ? "#991b1b" : (tone === "ok" ? "#065f46" : "#64748b");
+  };
+
+  toggle.addEventListener("click", () => {
+    const visible = leadsInCurrentSubTab().length;
+    if (visible === 0) { alert("No unassigned leads to assign in the current view."); return; }
+    picker.classList.remove("hidden");
+    toggle.disabled = true;
+    toggle.style.opacity = ".5";
+    toggle.style.cursor = "default";
+    // Default: "keep each lead's own service" -> show all active sales.
+    svcSel.value = "__keep__";
+    bulkAssignRepopulateEmpList("");
+    confirm.textContent = `Assign all ${visible} lead${visible > 1 ? "s" : ""}`;
+    setStatus("Pick an employee, then confirm. Each lead keeps its own service unless you pick one above.");
+  });
+
+  cancel?.addEventListener("click", () => {
+    picker.classList.add("hidden");
+    toggle.disabled = false;
+    toggle.style.opacity = "";
+    toggle.style.cursor = "pointer";
+    empInp.value = "";
+    setStatus("");
+  });
+
+  svcSel.addEventListener("change", () => {
+    const raw = svcSel.value;
+    const svcLc = (raw === "__keep__") ? "" : String(raw || "").toLowerCase();
+    empInp.value = ""; // service changed -> force a fresh pick
+    bulkAssignRepopulateEmpList(svcLc);
+  });
+
+  empInp.addEventListener("input",  bulkAssignRefreshGate);
+  empInp.addEventListener("change", bulkAssignRefreshGate);
+
+  confirm.addEventListener("click", async () => {
+    if (confirm.disabled) return;
+    const raw = svcSel.value;
+    const svcOverride = (raw === "__keep__") ? "" : String(raw || "").toLowerCase();
+    const cands = candidatesForLead(svcOverride);
+    const typed = (empInp.value || "").trim();
+    const codeGuess = typed.split(/[\s—\-·]/)[0].trim().toUpperCase();
+    let hit = cands.find((e) => e.code === codeGuess);
+    if (!hit) {
+      const upper = typed.toUpperCase();
+      hit = cands.find((e) => (e.code || "").toUpperCase() === upper)
+         || cands.find((e) => empLabel(e).toUpperCase() === upper);
+    }
+    if (!hit) { setStatus("✗ Not a valid pick — choose someone from the dropdown.", "err"); return; }
+
+    // Snapshot the visible leads NOW so filter/render changes during the loop
+    // don't shift the target set. leadsInCurrentSubTab() on the Unassigned tab
+    // returns exactly the unassigned rows currently shown.
+    const targets = leadsInCurrentSubTab().slice();
+    if (targets.length === 0) { setStatus("No leads to assign.", "err"); return; }
+
+    const svcNote = svcOverride
+      ? `\n\nService for every lead will be set to: ${svcOverride}.`
+      : `\n\nEach lead will keep its own service.`;
+    const ok = window.confirm(`Assign ${targets.length} lead${targets.length > 1 ? "s" : ""} to ${hit.code}${hit.name ? " — " + hit.name : ""}?${svcNote}`);
+    if (!ok) return;
+
+    confirm.disabled = true;
+    confirm.style.opacity = ".5";
+    confirm.style.cursor = "wait";
+    cancel && (cancel.disabled = true);
+    svcSel.disabled = true;
+    empInp.disabled = true;
+
+    let done = 0, failed = 0;
+    const failures = [];
+    for (let i = 0; i < targets.length; i++) {
+      const l = targets[i];
+      setStatus(`Assigning ${i + 1} of ${targets.length}… (${done} done${failed ? `, ${failed} failed` : ""})`);
+      try {
+        await callAdmin("reassign_lead", {
+          customer_key: l.customer_key,
+          to_code: hit.code,
+          service: svcOverride || null,
+        });
+        done += 1;
+      } catch (err) {
+        failed += 1;
+        failures.push(`${l.customer_key}: ${err.message || err}`);
+      }
+    }
+    setStatus(`✓ ${done} of ${targets.length} assigned${failed ? ` · ${failed} failed` : ""}. Refreshing…`, failed ? "err" : "ok");
+    try {
+      pipelineCache = await callAdmin("pipeline");
+      updateTopCounts();
+      renderActive();
+    } catch (err) {
+      setStatus(`Assigned ${done}/${targets.length} but refresh failed: ${err.message || err}. Reload the page.`, "err");
+    }
+    if (failures.length) {
+      console.error("Bulk assign failures:\n" + failures.join("\n"));
+    }
+  });
 }
 
 function renderTable(rows, readOnly) {
+  // On the Unassigned tab there is no meaningful call status yet (the lead hasn't
+  // been actioned) and there's nothing to "save" — so we hide the Call Status
+  // and Save/Add columns entirely. Assignment happens via the inline picker in
+  // the Employee cell.
+  const hideStatusCol = activeTop === "unassigned";
   return `<div class="table-scroll"><table class="data">
     <thead><tr>
       <th>Service</th>
       <th>Contact</th>
       <th>Last activity</th>
-      <th style="min-width:160px;">Call status</th>
+      ${hideStatusCol ? "" : `<th style="min-width:160px;">Call status</th>`}
       <th style="min-width:170px;">Employee</th>
       <th style="min-width:260px;">Remarks (latest + history)</th>
-      ${readOnly ? "" : "<th>Save / Add</th>"}
+      ${(readOnly || hideStatusCol) ? "" : "<th>Save / Add</th>"}
     </tr></thead>
     <tbody>${rows.map((r) => rowHtml(r, readOnly)).join("")}</tbody>
   </table></div>`;
@@ -1537,6 +1718,9 @@ function rowHtml(l, readOnly) {
     ? `<option value="">— no further moves —</option>`
     : buildStatusOptionsHtml(allowed, statusValue);
 
+  // Unassigned tab: no call-status dropdown and no Save/Add cell — those only
+  // make sense once the lead has been assigned and moved into New / Follow Ups.
+  const hideStatusCell = activeTop === "unassigned";
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
@@ -1550,17 +1734,17 @@ function rowHtml(l, readOnly) {
       <div style="margin-top:6px;">${callBtn}${waBtn}</div>
       ${quoteBtn ? `<div style="margin-top:6px;">${quoteBtn}</div>` : ""}
     </td>
-    <td>
+    ${hideStatusCell ? "" : `<td>
       <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
-    </td>
+    </td>`}
     <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
-    <td>
+    ${hideStatusCell ? "" : `<td>
       ${isTerminal
         ? `<span class="muted-small">Terminal state</span>`
         : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;">${statusValue ? "Update status" : "Save status"}</button>`}
       <div class="row-save-error" style="display:none;"></div>
-    </td>
+    </td>`}
   </tr>`;
 }
 
