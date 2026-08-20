@@ -552,8 +552,8 @@ function renderSubTabs() {
 function renderPane() {
   // Render the SHELL (toolbar + rows container) only once per tab switch.
   // Filter input changes only re-render the rows, preserving input focus.
-  // Employees can't add leads — hide the manual-add bar for them.
-  const isManualAdd = _isManager && activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
+  // Add-Lead bar is available to any signed-in user with dashboard access (managers AND employees).
+  const isManualAdd = activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
   const currentBarSub = $("#manualAddBar")?.dataset.sub || "";
   // Rebuild shell if the manual-add state OR the specific sub-tab changed
   const needShell = !$("#filterBar") || !$("#rowsContainer")
