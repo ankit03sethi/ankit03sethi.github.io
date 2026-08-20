@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>cursive &mdash; Processing dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%2316a34a'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="/leads01/leads.css?v=2026082001" />
+  <style>
+    .top-tab[data-top="new"].active         { border-color:#0369a1; background:#e0f2fe; color:#0369a1; }
+    .top-tab[data-top="new"].active .big-count { color:#0369a1; }
+    .top-tab[data-top="progress"].active    { border-color:#b45309; background:#fef3c7; color:#b45309; }
+    .top-tab[data-top="progress"].active .big-count { color:#b45309; }
+    .top-tab[data-top="delivered"].active   { border-color:#047857; background:#ecfdf5; color:#047857; }
+    .top-tab[data-top="delivered"].active .big-count { color:#047857; }
+    .top-tab[data-top="renewal"].active     { border-color:#7c3aed; background:#f5f3ff; color:#7c3aed; }
+    .top-tab[data-top="renewal"].active .big-count { color:#7c3aed; }
+    .brand-box { background: #16a34a !important; }
+    .brand-wordmark { color: #16a34a !important; }
+    .pstatus-pill { display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+    .pstatus-null { background:#e0f2fe; color:#0369a1; }
+    .pstatus-in_progress { background:#fef3c7; color:#b45309; }
+    .pstatus-delivered { background:#dcfce7; color:#065f46; }
+    .pstatus-renewal { background:#ede9fe; color:#5b21b6; }
+    .proc-action-btn { padding:5px 10px; margin:2px 3px 2px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:1px solid #d0d5dd; background:#fff; cursor:pointer; }
+    .proc-action-btn:hover { background:#f9fafb; }
+    .proc-action-btn.primary  { background:#fef3c7; color:#b45309; border-color:#fde68a; }
+    .proc-action-btn.success  { background:#dcfce7; color:#065f46; border-color:#86efac; }
+    .proc-action-btn.renewal  { background:#ede9fe; color:#5b21b6; border-color:#c4b5fd; }
+    .proc-notes { width:100%; min-height:44px; padding:6px 8px; font-size:12px; border:1px solid #d0d5dd; border-radius:7px; font-family:inherit; resize:vertical; }
+    .proc-notes:focus { outline:none; border-color:#16a34a; box-shadow:0 0 0 2px rgba(22,163,74,.15); }
+    .proc-saved { color:#065f46; font-size:11px; margin-top:2px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/processing/" class="brand">
+    <div class="brand-box" aria-label="cursive logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 17 9 11 13 15 21 6"/>
+        <polyline points="15 6 21 6 21 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Processing dashboard</div>
+    </div>
+  </a>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="emailChip" class="email-chip hidden"></span>
+    <a href="/leads01/" style="padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;font-size:12px;color:#475467;text-decoration:none;">Leads</a>
+    <button id="signOutBtn" class="btn-ghost hidden" type="button">Sign out</button>
+  </div>
+</header>
+
+<main id="loginView" class="auth-wrap hidden">
+  <form id="loginForm" class="auth-card" autocomplete="on" novalidate>
+    <h1>Sign in</h1>
+    <p class="lede">Processing team dashboard &mdash; only whitelisted employees.</p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" class="btn-primary" id="loginBtn" style="background:#16a34a;">Sign in</button>
+    <p id="loginError" class="error hidden"></p>
+  </form>
+</main>
+
+<main id="dashView" class="dash hidden">
+  <div class="toolbar">
+    <input id="searchBox" class="search-box" type="search" placeholder="Search by email or mobile..." autocomplete="off" />
+    <button id="refreshBtn" class="btn-refresh" type="button">Refresh</button>
+    <span class="last-refreshed" id="lastRefreshed"></span>
+  </div>
+
+  <nav class="tabs top-tabs" id="topTabs">
+    <button class="tab top-tab active" data-top="new">
+      <span class="big-count" id="topcnt_new">0</span>
+      <span class="stage-title">&#128229; New handoff</span>
+    </button>
+    <button class="tab top-tab" data-top="progress">
+      <span class="big-count" id="topcnt_progress">0</span>
+      <span class="stage-title">&#9203; In progress</span>
+    </button>
+    <button class="tab top-tab" data-top="delivered">
+      <span class="big-count" id="topcnt_delivered">0</span>
+      <span class="stage-title">&#9989; Delivered</span>
+    </button>
+    <button class="tab top-tab" data-top="renewal">
+      <span class="big-count" id="topcnt_renewal">0</span>
+      <span class="stage-title">&#10145; Sent to renewal</span>
+    </button>
+  </nav>
+
+  <div id="filterBar"></div>
+  <div class="panel">
+    <div id="paneRows" class="pane"></div>
+  </div>
+
+  <p style="margin-top:18px;color:#94a3b8;font-size:11px;text-align:center;">
+    Powered by Supabase Edge Functions &middot; Processing team &middot; All times local.
+  </p>
+</main>
+
+<script type="module" src="processing.js?v=2026082001"></script>
+<script src="/admin/admin-forgot-btn.js" defer></script>
+</body>
+</html>

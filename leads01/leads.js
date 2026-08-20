@@ -200,6 +200,12 @@ window.addEventListener("DOMContentLoaded", async () => {
       const who = await callAdmin("whoami").catch(() => null);
       _myEmpCode = who?.employee_code || "";
       _myEmpName = who?.email || em;
+      // Auto-redirect processing-only employees to /processing/. Managers stay put.
+      const roles = Array.isArray(who?.roles) ? who.roles : [];
+      if (!_isManager && roles.includes("processing") && !roles.includes("sales")) {
+        location.replace("/processing/");
+        return;
+      }
     } catch {}
     if (!_myEmpCode) {
       document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;font-family:system-ui;text-align:center;">
