@@ -113,6 +113,8 @@ let employeeFilter = ""; // "" = all; "__none__" = no-code leads; else employee_
 // Cache of the most recently resolved employee name from the add-lead code lookup
 let _lastResolvedEmp = { code: "", name: "" };
 let _empLookupTimer = null;
+// In-flight recommendation request token so old responses don't overwrite newer picks
+let _recommendReqSeq = 0;
 
 // Per-row employee lookup state for existing (editable) lead rows.
 // Keyed by customer_key. Each entry: { code, name, ok (true=resolved), timer }.
@@ -301,18 +303,39 @@ async function bootDashboard() {
   // Unassigned tab is manager-only
   const uTab = document.getElementById("topTabUnassigned");
   if (uTab) uTab.classList.toggle("hidden", !_isManager);
-  // Managers get the full employees list for the Assigned-to filter + Reassign dropdown
-  if (_isManager) {
-    try {
-      const r = await fetch(SUPABASE_URL + "/functions/v1/admin-employees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (await sb.auth.getSession()).data.session.access_token, "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify({ op: "list" }),
-      });
-      const jj = await r.json();
-      if (jj?.ok && Array.isArray(jj.employees)) _allEmployeesCache = jj.employees.filter(e => e.is_active);
-    } catch (e) { console.warn("employees list failed:", e); }
-  }
+  // Load the full active-employees list so the Add-Lead form can render its
+  // service-filtered "Assigned to" dropdown for both managers AND employees.
+  // Managers first try the richer `list` op (needs super/employees perm), then
+  // fall back to the lightweight `list_active_employees` op available to any
+  // signed-in admin (super/leads/quotations/employee/technical).
+  try {
+    const token = (await sb.auth.getSession()).data.session.access_token;
+    const commonHeaders = { "Content-Type": "application/json", "Authorization": "Bearer " + token, "apikey": SUPABASE_ANON_KEY };
+    let loaded = false;
+    if (_isManager) {
+      try {
+        const r = await fetch(SUPABASE_URL + "/functions/v1/admin-employees", {
+          method: "POST", headers: commonHeaders, body: JSON.stringify({ op: "list" }),
+        });
+        const jj = await r.json();
+        if (jj?.ok && Array.isArray(jj.employees)) {
+          _allEmployeesCache = jj.employees.filter(e => e.is_active);
+          loaded = true;
+        }
+      } catch (e) { console.warn("employees list (manager) failed:", e); }
+    }
+    if (!loaded) {
+      try {
+        const r = await fetch(SUPABASE_URL + "/functions/v1/admin-employees", {
+          method: "POST", headers: commonHeaders, body: JSON.stringify({ op: "list_active_employees" }),
+        });
+        const jj = await r.json();
+        if (jj?.ok && Array.isArray(jj.employees)) {
+          _allEmployeesCache = jj.employees; // already filtered to is_active on server
+        }
+      } catch (e) { console.warn("list_active_employees failed:", e); }
+    }
+  } catch (e) { console.warn("employees load failed:", e); }
   await refreshAll();
 }
 
@@ -665,15 +688,12 @@ function renderManualAddBar(el) {
             <textarea id="manualAddNote" rows="2" placeholder="e.g. Called about GST registration for a Delhi seller. Callback tomorrow 3 PM." style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:180px 1fr;gap:8px;margin-top:8px;align-items:end;">
-          <div>
-            <div class="muted-small" style="margin-bottom:3px;">Employee code * <span style="color:#dc2626;">(cannot be changed later)</span></div>
-            <input id="empCodeAdd" type="text" maxlength="12" placeholder="e.g. PR3471" autocomplete="off" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;text-transform:uppercase;"/>
-          </div>
-          <div>
-            <div class="muted-small" style="margin-bottom:3px;">Resolved employee</div>
-            <span id="empCodeAddName" style="display:inline-block;padding:6px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:4px;font-size:12.5px;color:#64748b;min-height:18px;">Enter code above…</span>
-          </div>
+        <div style="margin-top:8px;">
+          <div class="muted-small" style="margin-bottom:3px;">Assigned to * <span style="color:#0f172a;">(auto-picked, change if needed)</span> <span style="color:#dc2626;">(cannot be changed later)</span></div>
+          <input id="empAssignPicker" list="empAssignList" type="text" autocomplete="off" placeholder="Select a service first" disabled style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#fff;"/>
+          <datalist id="empAssignList"></datalist>
+          <div class="muted-small" style="margin-top:4px;color:#64748b;">Only sales team members who handle this service are shown. Cycle picks whoever has the fewest open leads.</div>
+          <div id="empAssignStatus" class="muted-small" style="margin-top:4px;color:#64748b;min-height:16px;">—</div>
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
           <button id="manualAddSaveBtn" data-type="${type}" style="background:#059669;color:#fff;padding:6px 14px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">Save lead</button>
@@ -694,63 +714,184 @@ function wireManualAddHandlers() {
   const msg = $("#manualAddMsg");
   if (!openBtn) return;
 
+  const svcSel = $("#manualAddService");
+  const empPicker = $("#empAssignPicker");
+  const empList = $("#empAssignList");
+  const empStatus = $("#empAssignStatus");
+
+  const setEmpStatus = (text, tone) => {
+    if (!empStatus) return;
+    empStatus.textContent = text || "";
+    if (tone === "ok")   { empStatus.style.color = "#065f46"; }
+    else if (tone === "err") { empStatus.style.color = "#991b1b"; }
+    else                 { empStatus.style.color = "#64748b"; }
+  };
+
+  const resetEmpPicker = (placeholder) => {
+    if (empPicker) {
+      empPicker.value = "";
+      empPicker.disabled = true;
+      empPicker.placeholder = placeholder || "Select a service first";
+    }
+    if (empList) empList.innerHTML = "";
+    _lastResolvedEmp = { code: "", name: "" };
+    setEmpStatus("—", "muted");
+    refreshManualSaveGate();
+  };
+
+  // Employees eligible for the currently-selected service (sales role + service capability + active).
+  const candidatesForService = (service) => {
+    if (!service) return [];
+    return (_allEmployeesCache || []).filter((e) => {
+      if (e.is_active === false) return false;
+      const roles = Array.isArray(e.roles) ? e.roles : [];
+      const services = Array.isArray(e.services) ? e.services : [];
+      return roles.includes("sales") && services.includes(service);
+    }).slice().sort((a, b) => String(a.code).localeCompare(String(b.code)));
+  };
+
+  const fillDatalist = (candidates) => {
+    if (!empList) return;
+    empList.innerHTML = candidates.map((e) => {
+      const services = Array.isArray(e.services) ? e.services.join(", ") : "";
+      const label = `${e.code} — ${e.name || ""}${services ? " · " + services : ""}`;
+      return `<option value="${esc(label)}"></option>`;
+    }).join("");
+  };
+
+  const findByLabelOrCode = (raw, candidates) => {
+    const trimmed = String(raw || "").trim();
+    if (!trimmed) return null;
+    // Try "CODE — NAME · services" -> extract CODE before " — "
+    const codeGuess = trimmed.split(/[\s—\-·]/)[0].trim().toUpperCase();
+    let hit = candidates.find((e) => e.code === codeGuess);
+    if (hit) return hit;
+    // Fall back to case-insensitive contains / exact-label match
+    const upper = trimmed.toUpperCase();
+    hit = candidates.find((e) => (e.code || "").toUpperCase() === upper);
+    if (hit) return hit;
+    hit = candidates.find((e) => {
+      const services = Array.isArray(e.services) ? e.services.join(", ") : "";
+      const label = `${e.code} — ${e.name || ""}${services ? " · " + services : ""}`;
+      return label.toUpperCase() === upper;
+    });
+    return hit || null;
+  };
+
+  const refreshManualSaveGate = () => {
+    if (!saveBtn) return;
+    const service = ($("#manualAddService")?.value || "").trim();
+    const empOk = !!(_lastResolvedEmp && _lastResolvedEmp.code);
+    const enabled = !!service && empOk;
+    saveBtn.disabled = !enabled;
+    saveBtn.style.opacity = enabled ? "" : ".4";
+    saveBtn.style.cursor = enabled ? "" : "not-allowed";
+    saveBtn.style.pointerEvents = enabled ? "" : "none";
+  };
+
   openBtn.onclick = () => {
     form.classList.remove("hidden");
     openBtn.style.display = "none";
     $("#manualAddMobile").focus();
     msg.textContent = ""; msg.style.color = "";
+    refreshManualSaveGate();
   };
   cancelBtn.onclick = () => {
     form.classList.add("hidden");
     openBtn.style.display = "";
-    ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote","empCodeAdd"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
-    const nameSpan = $("#empCodeAddName");
-    if (nameSpan) { nameSpan.textContent = "Enter code above…"; nameSpan.style.color = "#64748b"; nameSpan.style.background = "#f8fafc"; }
-    _lastResolvedEmp = { code: "", name: "" };
+    ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+    resetEmpPicker("Select a service first");
     msg.textContent = "";
   };
 
-  // Employee-code live lookup (debounced 300ms)
-  const empInput = $("#empCodeAdd");
-  const empNameSpan = $("#empCodeAddName");
-  if (empInput && empNameSpan) {
-    empInput.addEventListener("input", () => {
-      const raw = (empInput.value || "").trim().toUpperCase();
-      empInput.value = raw;
+  // Service change -> repopulate datalist, kick off recommendation
+  if (svcSel) {
+    svcSel.addEventListener("change", async () => {
+      const service = (svcSel.value || "").trim();
       _lastResolvedEmp = { code: "", name: "" };
-      if (_empLookupTimer) clearTimeout(_empLookupTimer);
-      if (!raw) {
-        empNameSpan.textContent = "Enter code above…";
-        empNameSpan.style.color = "#64748b";
-        empNameSpan.style.background = "#f8fafc";
+      if (!service) {
+        resetEmpPicker("Select a service first");
         return;
       }
-      empNameSpan.textContent = "Checking…";
-      empNameSpan.style.color = "#64748b";
-      empNameSpan.style.background = "#f8fafc";
-      _empLookupTimer = setTimeout(async () => {
-        try {
-          const res = await callEmployeeLookup(raw);
-          if (res && res.ok && res.employee && res.employee.code === raw) {
-            _lastResolvedEmp = { code: raw, name: res.employee.name || "" };
-            empNameSpan.textContent = "✓ " + (res.employee.name || raw);
-            empNameSpan.style.color = "#065f46";
-            empNameSpan.style.background = "#d1fae5";
-          } else {
-            _lastResolvedEmp = { code: "", name: "" };
-            empNameSpan.textContent = "✗ unknown code";
-            empNameSpan.style.color = "#991b1b";
-            empNameSpan.style.background = "#fee2e2";
-          }
-        } catch (e) {
-          _lastResolvedEmp = { code: "", name: "" };
-          empNameSpan.textContent = "✗ lookup failed";
-          empNameSpan.style.color = "#991b1b";
-          empNameSpan.style.background = "#fee2e2";
+      const candidates = candidatesForService(service);
+      fillDatalist(candidates);
+      if (empPicker) {
+        empPicker.disabled = candidates.length === 0;
+        empPicker.value = "";
+        empPicker.placeholder = candidates.length === 0
+          ? "No sales employee handles this service yet"
+          : "Type or pick — e.g. PR3471 — Alice";
+      }
+      if (candidates.length === 0) {
+        setEmpStatus("No active sales employee handles this service yet.", "err");
+        refreshManualSaveGate();
+        return;
+      }
+      setEmpStatus("Finding the sales rep with the fewest open leads…", "muted");
+      refreshManualSaveGate();
+      const mySeq = ++_recommendReqSeq;
+      try {
+        const rec = await callAdmin("recommend_employee_for_lead", { service });
+        if (mySeq !== _recommendReqSeq) return; // stale
+        let picked = null;
+        if (rec && rec.code) {
+          picked = candidates.find((e) => e.code === rec.code) || { code: rec.code, name: rec.name || "" };
         }
-      }, 300);
+        if (!picked) picked = candidates[0]; // safety fallback
+        _lastResolvedEmp = { code: picked.code, name: picked.name || "" };
+        if (empPicker) {
+          const services = Array.isArray(picked.services) ? picked.services.join(", ") : "";
+          empPicker.value = `${picked.code} — ${picked.name || ""}${services ? " · " + services : ""}`.trim();
+        }
+        setEmpStatus(`✓ Auto-picked ${picked.code}${picked.name ? " — " + picked.name : ""} (fewest open leads). Change if needed.`, "ok");
+      } catch (err) {
+        if (mySeq !== _recommendReqSeq) return;
+        const picked = candidates[0];
+        _lastResolvedEmp = { code: picked.code, name: picked.name || "" };
+        if (empPicker) {
+          const services = Array.isArray(picked.services) ? picked.services.join(", ") : "";
+          empPicker.value = `${picked.code} — ${picked.name || ""}${services ? " · " + services : ""}`.trim();
+        }
+        setEmpStatus(`⚠ Auto-pick failed (${err.message}). Falling back to ${picked.code}. Pick anyone from the list.`, "err");
+      }
+      refreshManualSaveGate();
     });
   }
+
+  // Datalist / free-text picker: resolve to a candidate on every change
+  if (empPicker) {
+    const onPickerChange = () => {
+      const service = ($("#manualAddService")?.value || "").trim();
+      const candidates = candidatesForService(service);
+      const hit = findByLabelOrCode(empPicker.value, candidates);
+      if (hit) {
+        _lastResolvedEmp = { code: hit.code, name: hit.name || "" };
+        const services = Array.isArray(hit.services) ? hit.services.join(", ") : "";
+        empPicker.value = `${hit.code} — ${hit.name || ""}${services ? " · " + services : ""}`.trim();
+        setEmpStatus(`✓ Assigned to ${hit.code}${hit.name ? " — " + hit.name : ""}`, "ok");
+      } else {
+        _lastResolvedEmp = { code: "", name: "" };
+        setEmpStatus("✗ Pick someone from the dropdown (only sales members who handle this service are listed).", "err");
+      }
+      refreshManualSaveGate();
+    };
+    empPicker.addEventListener("change", onPickerChange);
+    empPicker.addEventListener("input", () => {
+      // Live re-check as they type / pick from datalist
+      const service = ($("#manualAddService")?.value || "").trim();
+      const candidates = candidatesForService(service);
+      const hit = findByLabelOrCode(empPicker.value, candidates);
+      if (hit) {
+        _lastResolvedEmp = { code: hit.code, name: hit.name || "" };
+        setEmpStatus(`✓ Assigned to ${hit.code}${hit.name ? " — " + hit.name : ""}`, "ok");
+      } else {
+        _lastResolvedEmp = { code: "", name: "" };
+        setEmpStatus(empPicker.value ? "Keep typing / pick from the list…" : "—", "muted");
+      }
+      refreshManualSaveGate();
+    });
+  }
+
   saveBtn.onclick = async () => {
     const type = saveBtn.dataset.type;
     const name = ($("#manualAddName").value || "").trim();
@@ -758,7 +899,7 @@ function wireManualAddHandlers() {
     const email = ($("#manualAddEmail").value || "").trim().toLowerCase();
     const service = ($("#manualAddService").value || "").trim();
     const note = ($("#manualAddNote").value || "").trim();
-    const empCode = (($("#empCodeAdd") && $("#empCodeAdd").value) || "").trim().toUpperCase();
+    const empCode = (_lastResolvedEmp && _lastResolvedEmp.code) || "";
     msg.textContent = ""; msg.style.color = "";
     if (!mobile && !email) {
       msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
@@ -768,16 +909,15 @@ function wireManualAddHandlers() {
       msg.style.color = "#dc2626"; msg.textContent = "Pick which service the customer asked about.";
       return;
     }
-    if (!empCode || empCode !== _lastResolvedEmp.code) {
+    if (!empCode) {
       msg.style.color = "#dc2626";
-      msg.textContent = "Enter a valid employee code — this cannot be changed later.";
-      const empIn = $("#empCodeAdd"); if (empIn) empIn.focus();
+      msg.textContent = "Pick an assignee from the dropdown — this cannot be changed later.";
+      if (empPicker) empPicker.focus();
       return;
     }
     saveBtn.disabled = true; saveBtn.textContent = "Saving...";
     try {
       const res = await callAdmin("add_manual_lead", { type, name, mobile, email, service, note, employee_code: empCode, employee_name: _lastResolvedEmp.name || "" });
-      // Show success + any duplicate info
       let dupMsg = "";
       if (res.duplicates && res.duplicates.length > 0) {
         const list = res.duplicates.slice(0, 3).map(d => `${d.service_name || d.service_type} (${d.email || d.mobile})`).join(", ");
@@ -785,11 +925,8 @@ function wireManualAddHandlers() {
       }
       msg.style.color = "#059669";
       msg.textContent = "Saved." + dupMsg;
-      ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote","empCodeAdd"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
-      const nameSpan2 = $("#empCodeAddName");
-      if (nameSpan2) { nameSpan2.textContent = "Enter code above…"; nameSpan2.style.color = "#64748b"; nameSpan2.style.background = "#f8fafc"; }
-      _lastResolvedEmp = { code: "", name: "" };
-      // Refresh pipeline so the new row appears
+      ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      resetEmpPicker("Select a service first");
       pipelineCache = await callAdmin("pipeline");
       updateTopCounts();
       renderActive();
@@ -798,6 +935,9 @@ function wireManualAddHandlers() {
       saveBtn.disabled = false; saveBtn.textContent = "Save lead";
     }
   };
+
+  // Initial gate — disabled until service + employee are chosen.
+  refreshManualSaveGate();
 }
 
 function renderRows() {
