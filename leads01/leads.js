@@ -710,57 +710,144 @@ function renderPane() {
   if (activeTop === "unassigned" && _isManager) primeInlineAssignRecommendations();
 }
 
-// After rendering the Unassigned tab, fetch the "lowest open-lead count" recommendation
-// once per distinct service and auto-fill any inline picker that the user hasn't already
-// typed into. Uses _recommendCache so repeat renders / additional rows for the same
-// service reuse the cached pick.
+// Enable/disable the Assign button based on whether BOTH a service and an employee are set.
+// Called live from the service <select>, the employee <input>, and after auto-fill.
+function refreshAsnGate(wrap) {
+  if (!wrap) return;
+  const btn = wrap.querySelector(".asn-inline-btn");
+  const inp = wrap.querySelector(".asn-inline-input");
+  if (!btn || !inp) return;
+  const svc = String(wrap.dataset.service || "").trim();
+  const enable = !!svc && !inp.disabled && !!(inp.value || "").trim();
+  btn.disabled = !enable;
+  if (enable) {
+    btn.style.opacity = "";
+    btn.style.cursor = "pointer";
+  } else {
+    btn.style.opacity = ".4";
+    btn.style.cursor = "not-allowed";
+  }
+}
+
+// Tiny grey "(overriding lead's service: X)" hint under the row's dropdowns — shown only
+// when the manager picked a different service than the lead's original service_type.
+function updateAsnServiceNote(wrap) {
+  if (!wrap) return;
+  const note = wrap.querySelector(".asn-inline-svc-note");
+  if (!note) return;
+  const orig = String(wrap.dataset.originalService || "").trim();
+  const picked = String(wrap.dataset.service || "").trim();
+  if (picked && orig && picked !== orig) {
+    note.textContent = `(overriding lead's service: ${orig})`;
+    note.style.color = "#64748b";
+  } else {
+    note.textContent = "";
+  }
+}
+
+// Apply a service selection to an inline-assign wrap: repopulate the employee datalist,
+// enable/disable + reset the input, refresh the override note, refresh the gate, and
+// (unless opts.autoPick === false) fetch a recommendation via recommendForService and
+// pre-fill the input. Guarded so a slow recommendation call doesn't overwrite a newer
+// service pick.
+function applyServiceToAsnWrap(wrap, svc, opts) {
+  opts = opts || {};
+  if (!wrap) return;
+  const svcLc = String(svc || "").toLowerCase();
+  wrap.dataset.service = svcLc;
+  const inp = wrap.querySelector(".asn-inline-input");
+  const status = wrap.querySelector(".asn-inline-status");
+  const listId = inp ? inp.getAttribute("list") : "";
+  const list = listId ? document.getElementById(listId) : null;
+  updateAsnServiceNote(wrap);
+
+  if (!svcLc) {
+    if (inp) {
+      inp.value = "";
+      inp.disabled = true;
+      inp.placeholder = "Pick service first";
+      inp.style.opacity = ".6";
+    }
+    if (list) list.innerHTML = "";
+    if (status) {
+      status.textContent = "Pick a service to filter employees.";
+      status.style.color = "#991b1b";
+    }
+    refreshAsnGate(wrap);
+    return;
+  }
+
+  const cands = candidatesForLead(svcLc);
+  if (list) list.innerHTML = cands.map((e) => `<option value="${esc(empLabel(e))}"></option>`).join("");
+  if (inp) {
+    if (cands.length === 0) {
+      inp.value = "";
+      inp.disabled = true;
+      inp.placeholder = "No sales employee handles this service";
+      inp.style.opacity = ".6";
+    } else {
+      inp.disabled = false;
+      inp.style.opacity = "";
+      if (opts.clearInput !== false) inp.value = "";
+      inp.placeholder = "Auto-picking best fit…";
+    }
+  }
+  if (status) {
+    if (cands.length === 0) {
+      status.textContent = "✗ No sales employee is configured for this service. Add one at /admin/users/.";
+      status.style.color = "#991b1b";
+    } else {
+      status.textContent = "Finding the sales rep with the fewest open leads…";
+      status.style.color = "#64748b";
+    }
+  }
+  refreshAsnGate(wrap);
+
+  if (cands.length === 0 || opts.autoPick === false) return;
+
+  recommendForService(svcLc).then((rec) => {
+    // Guard: manager may have changed the service before this resolved.
+    if (String(wrap.dataset.service || "").toLowerCase() !== svcLc) return;
+    if (!inp) return;
+    // Don't clobber a value the manager already typed while we were fetching.
+    if (inp.value && opts.forceOverride !== true) return;
+    if (!rec || !rec.code) {
+      if (status) {
+        status.textContent = "No auto-pick available — pick someone from the dropdown.";
+        status.style.color = "#64748b";
+      }
+      return;
+    }
+    const emp = cands.find((e) => e.code === rec.code)
+      || { code: rec.code, name: rec.name || "", services: [svcLc] };
+    inp.value = empLabel(emp);
+    inp.placeholder = "Auto-picked · change if needed";
+    if (status) {
+      status.textContent = `✓ Auto-picked ${emp.code}${emp.name ? " — " + emp.name : ""} (fewest open leads). Change if needed.`;
+      status.style.color = "#065f46";
+    }
+    refreshAsnGate(wrap);
+  }).catch(() => {
+    if (String(wrap.dataset.service || "").toLowerCase() !== svcLc) return;
+    if (status) {
+      status.textContent = "Auto-pick unavailable — pick manually.";
+      status.style.color = "#64748b";
+    }
+  });
+}
+
+// After rendering the Unassigned tab, for every row that already has a service pre-selected
+// (either the lead's own valid service_type, or one the manager just picked), kick off the
+// "lowest open-lead count" recommendation and pre-fill the employee input. Recommendations
+// are cached per-service in _recommendCache so N rows with the same service share one RPC.
 function primeInlineAssignRecommendations() {
   const wraps = document.querySelectorAll("#rowsContainer .asn-inline");
-  if (!wraps.length) return;
-  const byService = new Map(); // service -> [wrap, wrap, ...]
   wraps.forEach((wrap) => {
-    const inp = wrap.querySelector(".asn-inline-input");
-    if (!inp || inp.disabled) return;
-    if (inp.value) return; // manager already typed / picked
     const svc = String(wrap.dataset.service || "").toLowerCase();
-    if (!svc) return; // no service on lead -> no auto-pick, they can still choose from fallback list
-    if (!byService.has(svc)) byService.set(svc, []);
-    byService.get(svc).push(wrap);
-  });
-  byService.forEach((wrapList, svc) => {
-    recommendForService(svc).then((rec) => {
-      if (!rec || !rec.code) {
-        wrapList.forEach((wrap) => {
-          const status = wrap.querySelector(".asn-inline-status");
-          if (status && !wrap.querySelector(".asn-inline-input")?.value) {
-            status.textContent = "No auto-pick available — pick someone from the dropdown.";
-            status.style.color = "#64748b";
-          }
-        });
-        return;
-      }
-      const cands = candidatesForLead(svc);
-      const emp = cands.find((e) => e.code === rec.code)
-        || { code: rec.code, name: rec.name || "", services: [svc] };
-      const label = empLabel(emp);
-      wrapList.forEach((wrap) => {
-        const inp = wrap.querySelector(".asn-inline-input");
-        const status = wrap.querySelector(".asn-inline-status");
-        if (inp && !inp.value) {
-          inp.value = label;
-          inp.placeholder = "Auto-picked · change if needed";
-        }
-        if (status) {
-          status.textContent = `✓ Auto-picked ${emp.code}${emp.name ? " — " + emp.name : ""} (fewest open leads). Change if needed.`;
-          status.style.color = "#065f46";
-        }
-      });
-    }).catch(() => {
-      wrapList.forEach((wrap) => {
-        const status = wrap.querySelector(".asn-inline-status");
-        if (status) { status.textContent = "Auto-pick unavailable — pick manually."; status.style.color = "#64748b"; }
-      });
-    });
+    if (!svc) return; // no pre-selected service -> wait for manager to pick one
+    const inp = wrap.querySelector(".asn-inline-input");
+    // Don't clobber if the manager already typed something before we got here.
+    applyServiceToAsnWrap(wrap, svc, { clearInput: !(inp && inp.value) });
   });
 }
 
@@ -1369,29 +1456,51 @@ function rowHtml(l, readOnly) {
              <span class="row-emp-name muted-small" data-customer-key="${cur}" style="padding:2px 6px;border-radius:4px;background:#f8fafc;color:#64748b;font-size:11px;">Enter code above…</span>
            </div>`);
 
-  // Unassigned tab (managers only): inline searchable dropdown + Assign button, replacing
-  // the numbered prompt() flow. Datalist is service-filtered (falls back to all sales when
-  // lead has no service_type). The recommended employee is auto-filled after render via
-  // primeInlineAssignRecommendations() — cached per-service so we don't hit the RPC N times.
+  // Unassigned tab (managers only): inline Service dropdown + searchable Employee dropdown
+  // + Assign button. Service dropdown is populated from SERVICES; pre-selects the lead's
+  // service_type when it maps to a real service (legacy values like manual/other/service/
+  // website leave the placeholder). Employee dropdown starts disabled until a service is
+  // picked, then repopulates + auto-prefills the "fewest open leads" recommendation
+  // (fetched via recommendForService, cached per-service). Assign gates on BOTH set.
+  // Backend contract is unchanged: only the assignee is written — the lead's original
+  // service_type is preserved even if the manager picks a different service for filtering.
   if (_isManager && !readOnly && activeTop === "unassigned") {
-    const serviceLc = String(l.service_type || "").toLowerCase();
-    const cands = candidatesForLead(serviceLc);
+    const LEGACY_SERVICES = new Set(["manual", "other", "service", "website"]);
+    const origSvcLc = String(l.service_type || "").toLowerCase();
+    const inSvcList = SERVICES.some((s) => s.value === origSvcLc);
+    const isValidPreselect = inSvcList && !LEGACY_SERVICES.has(origSvcLc);
+    const pickedSvc = isValidPreselect ? origSvcLc : "";
+    const svcOptsHtml = [
+      `<option value="" ${pickedSvc ? "" : "selected"}>— select service —</option>`,
+      ...SERVICES.map((s) => `<option value="${esc(s.value)}" ${s.value === pickedSvc ? "selected" : ""}>${esc(s.label)}</option>`),
+    ].join("");
+
+    const cands = pickedSvc ? candidatesForLead(pickedSvc) : [];
     const listId = `asnList_${cur}`;
     const options = cands.map((e) => `<option value="${esc(empLabel(e))}"></option>`).join("");
-    const placeholder = cands.length === 0
-      ? "No sales employee handles this service"
-      : (serviceLc ? "Auto-picking best fit…" : "Pick a sales employee (no service on lead)");
-    const initialStatus = cands.length === 0
-      ? "✗ No sales employee is configured for this service. Add one at /admin/users/."
-      : (serviceLc ? "Finding the sales rep with the fewest open leads…" : "Lead has no service_type — showing all sales employees.");
-    const statusColor = cands.length === 0 ? "#991b1b" : "#64748b";
+    const empDisabled = !pickedSvc || cands.length === 0;
+    const placeholder = !pickedSvc
+      ? "Pick service first"
+      : (cands.length === 0
+          ? "No sales employee handles this service"
+          : "Auto-picking best fit…");
+    const initialStatus = !pickedSvc
+      ? (origSvcLc
+          ? `Lead's service (${origSvcLc}) isn't in the standard list — pick a service to filter employees.`
+          : "Pick a service to filter employees.")
+      : (cands.length === 0
+          ? "✗ No sales employee is configured for this service. Add one at /admin/users/."
+          : "Finding the sales rep with the fewest open leads…");
+    const statusColor = (!pickedSvc || cands.length === 0) ? "#991b1b" : "#64748b";
     const inlineAssign = `
-      <div class="asn-inline" data-customer-key="${cur}" data-service="${esc(serviceLc)}" style="margin-top:6px;display:flex;flex-direction:column;gap:3px;">
-        <div style="display:flex;gap:4px;align-items:center;">
-          <input class="asn-inline-input" list="${listId}" type="text" autocomplete="off" placeholder="${esc(placeholder)}" ${cands.length === 0 ? "disabled" : ""} style="flex:1;min-width:160px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;background:#fff;"/>
+      <div class="asn-inline" data-customer-key="${cur}" data-service="${esc(pickedSvc)}" data-original-service="${esc(origSvcLc)}" style="margin-top:6px;display:flex;flex-direction:column;gap:3px;">
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+          <select class="asn-inline-svc" data-customer-key="${cur}" style="flex:0 1 130px;min-width:100px;max-width:150px;padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11.5px;background:#fff;">${svcOptsHtml}</select>
+          <input class="asn-inline-input" list="${listId}" type="text" autocomplete="off" placeholder="${esc(placeholder)}" ${empDisabled ? "disabled" : ""} style="flex:1 1 130px;min-width:120px;padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11.5px;background:#fff;${empDisabled ? "opacity:.6;" : ""}"/>
           <datalist id="${listId}">${options}</datalist>
-          <button class="asn-inline-btn" data-action="assign-inline" data-customer-key="${cur}" ${cands.length === 0 ? "disabled" : ""} style="padding:4px 10px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;${cands.length === 0 ? "opacity:.4;cursor:not-allowed;" : ""}">Assign</button>
+          <button class="asn-inline-btn" data-action="assign-inline" data-customer-key="${cur}" disabled style="padding:3px 9px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:11.5px;font-weight:700;cursor:not-allowed;opacity:.4;">Assign</button>
         </div>
+        <div class="asn-inline-svc-note muted-small" style="font-size:10.5px;color:#64748b;min-height:0;"></div>
         <div class="asn-inline-status muted-small" style="color:${statusColor};font-size:11px;min-height:14px;">${esc(initialStatus)}</div>
       </div>`;
     // Keep the creator chip (if any) visible above the assign UI so the manager still sees who made the lead.
@@ -1592,8 +1701,27 @@ function wireRowHandlers() {
       const tr = sel.closest("tr");
       refreshRowSaveGate(tr);
     }
+    // Unassigned tab: service dropdown changed -> repopulate employee list, refetch reco.
+    const svcSel = e.target.closest("select.asn-inline-svc");
+    if (svcSel) {
+      const wrap = svcSel.closest(".asn-inline");
+      if (wrap) applyServiceToAsnWrap(wrap, svcSel.value, { clearInput: true, forceOverride: true });
+    }
+    // Unassigned tab: employee input change (e.g. datalist pick) -> re-gate Assign button.
+    const asnInp = e.target.closest("input.asn-inline-input");
+    if (asnInp) {
+      const wrap = asnInp.closest(".asn-inline");
+      if (wrap) refreshAsnGate(wrap);
+    }
   });
   $("#paneStage").addEventListener("input", (e) => {
+    // Unassigned tab: employee input typing -> re-gate Assign button live.
+    const asnInp = e.target.closest("input.asn-inline-input");
+    if (asnInp) {
+      const wrap = asnInp.closest(".asn-inline");
+      if (wrap) refreshAsnGate(wrap);
+      return;
+    }
     const inp = e.target.closest("input.row-emp-code");
     if (!inp) return;
     const tr = inp.closest("tr");
@@ -1723,6 +1851,11 @@ function wireRowHandlers() {
         statusEl.textContent = txt || "";
         statusEl.style.color = tone === "err" ? "#991b1b" : (tone === "ok" ? "#065f46" : "#64748b");
       };
+      if (!serviceLc) {
+        setStatus("Pick a service first.", "err");
+        wrap.querySelector(".asn-inline-svc")?.focus();
+        return;
+      }
       if (!raw) { setStatus("Pick an employee from the dropdown first.", "err"); inp?.focus(); return; }
       const cands = candidatesForLead(serviceLc);
       // Resolve label / free-text to a candidate. Accept "CODE — NAME · services", bare CODE, or any label match.
