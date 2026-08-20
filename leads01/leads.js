@@ -146,14 +146,20 @@ async function recommendForService(service) {
 // Candidates eligible to be assigned this lead: active + sales role + (if service supplied) handles service.
 function candidatesForLead(service) {
   const svc = String(service || "").toLowerCase();
-  return (_allEmployeesCache || []).filter((e) => {
+  const activeSales = (_allEmployeesCache || []).filter((e) => {
     if (e.is_active === false) return false;
     const roles = Array.isArray(e.roles) ? e.roles : [];
-    if (!roles.includes("sales")) return false;
-    if (!svc) return true; // fallback: all sales when lead has no service_type
+    return roles.includes("sales");
+  });
+  if (!svc) return activeSales.slice().sort((a, b) => String(a.code).localeCompare(String(b.code)));
+  const matched = activeSales.filter((e) => {
     const services = Array.isArray(e.services) ? e.services.map((s) => String(s).toLowerCase()) : [];
     return services.includes(svc);
-  }).slice().sort((a, b) => String(a.code).localeCompare(String(b.code)));
+  });
+  // Fallback: if no sales member handles this exact service (e.g. legacy service_type
+  // values like 'manual'/'other'), show all active sales so managers can still assign.
+  const list = matched.length > 0 ? matched : activeSales;
+  return list.slice().sort((a, b) => String(a.code).localeCompare(String(b.code)));
 }
 
 function empLabel(e) {
