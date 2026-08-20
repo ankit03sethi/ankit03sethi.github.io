@@ -171,6 +171,12 @@ function empLabel(e) {
 // Keyed by customer_key. Each entry: { code, name, ok (true=resolved), timer }.
 const _rowEmpState = {};
 
+// v2026082018: Per-row pending service-add queue. Keyed by customer_key.
+// Value: array of service values ("gst", "iec", ...) queued to be added on
+// the next Save + Forward click. Nothing here has hit the backend yet — the
+// chips render with a dashed "pending" style so the user can see the queue.
+const _pendingServiceAdds = {};
+
 // Date-range filter (applies to pipeline + total-paid chip + quotations iframe)
 let dateRange = { from: null, to: null, preset: "last30" };  // ISO strings or null
 
@@ -1796,13 +1802,11 @@ function rowHtml(l, readOnly) {
   // Unassigned tab: no call-status dropdown and no Save/Add cell — those only
   // make sense once the lead has been assigned and moved into New / Follow Ups.
   const hideStatusCell = activeTop === "unassigned";
-  // v2026082016: Forward + Save merged into ONE "💾 Save + Forward" primary button.
-  // The old explicit "Forward" employee-picker becomes a subtle underline link
-  // "↪ Manual forward" below the primary button — an escape hatch for picking a
-  // specific employee. Manager only for the manual-forward link.
-  const manualForwardLinkHtml = (_isManager && !hideStatusCell)
-    ? `<a href="#" class="manual-forward-link" data-action="reassign" data-customer-key="${cur}" title="Hand-pick a different employee to forward this lead to" style="display:inline-block;margin-top:6px;font-size:11px;color:#f97316;text-decoration:underline;cursor:pointer;">↪ Manual forward</a>`
-    : "";
+  // v2026082018: The "↪ Manual forward" link below Save + Forward has been
+  // removed. Save + Forward now handles both the queued pending service adds
+  // (each of which the backend will auto-forward if the assignee doesn't
+  // handle the service) AND the status update in one shot — there's nothing
+  // Manual forward could do that Save + Forward doesn't already cover.
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
@@ -1826,7 +1830,6 @@ function rowHtml(l, readOnly) {
         ${isTerminal
           ? `<span class="muted-small">Terminal state</span>`
           : `<button class="row-save-btn" data-action="save-and-forward" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;padding:7px 14px;background:linear-gradient(90deg,#2563eb 0%,#f97316 100%);color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;">💾 Save + Forward</button>`}
-        ${manualForwardLinkHtml}
       </div>
       <div class="row-save-error" style="display:none;"></div>
     </td>`}
@@ -2170,38 +2173,35 @@ function wireRowHandlers() {
       return;
     }
     if (action === "add-service") {
+      // v2026082018: Local queue only. Do NOT call the backend here — that
+      // used to fire add_service_to_lead immediately (which auto-forwarded
+      // and popped a "Forwarded X to Y…" alert every click). Instead we
+      // push the picked service into _pendingServiceAdds and re-render, so
+      // it shows up as a dashed "pending" chip. The real backend call
+      // happens once, in the Save + Forward handler.
       if (!_isManager) return;
       const wrap = target.closest(".add-svc-wrap");
       const sel = wrap?.querySelector(".add-svc-select");
       const svc = String(sel?.value || "").trim().toLowerCase();
       if (!svc) { alert("Pick a service first."); return; }
-      target.disabled = true; target.textContent = "Adding…";
-      try {
-        const res = await callAdmin("add_service_to_lead", { customer_key: key, service: svc });
-        const kind = res?.result || "stayed";
-        const newLeads = res?.new_leads || [];
-        const svcLabelStr = svcLabel(svc);
-        let msg;
-        if (kind === "stayed") {
-          const code = newLeads[0]?.employee_code || "current employee";
-          msg = `Added ${svcLabelStr}. Stays with ${code}.`;
-        } else if (kind === "forwarded") {
-          const first = newLeads[0] || {};
-          const services = (first.services || [svc]).map((s) => svcLabel(s)).join(", ");
-          msg = `Forwarded ${services} to ${first.employee_code || "new employee"} as a new lead.`;
-        } else if (kind === "split") {
-          msg = `Split into ${newLeads.length} new leads.`;
-        } else {
-          msg = `Add service result: ${kind}`;
-        }
-        alert(msg);
-        pipelineCache = await callAdmin("pipeline");
-        updateTopCounts();
-        renderActive();
-      } catch (err) {
-        target.disabled = false; target.textContent = "Add";
-        alert("Add service failed: " + err.message);
-      }
+      const list = Array.isArray(_pendingServiceAdds[key]) ? _pendingServiceAdds[key] : [];
+      if (!list.includes(svc)) list.push(svc);
+      _pendingServiceAdds[key] = list;
+      renderActive();
+      return;
+    }
+    if (action === "remove-pending-service") {
+      // Cancel a queued (not-yet-saved) service add. No backend call — just
+      // drop it from the local queue and re-render so the chip disappears
+      // and the option reappears in the dropdown.
+      if (!_isManager) return;
+      const svc = String(target.dataset.service || "").trim().toLowerCase();
+      if (!svc) return;
+      const list = Array.isArray(_pendingServiceAdds[key]) ? _pendingServiceAdds[key] : [];
+      const next = list.filter((x) => x !== svc);
+      if (next.length === 0) delete _pendingServiceAdds[key];
+      else _pendingServiceAdds[key] = next;
+      renderActive();
       return;
     }
     if (action === "remove-service") {
@@ -2232,13 +2232,18 @@ function wireRowHandlers() {
       return;
     }
     if (action === "save-and-forward") {
-      // v2026082016: merged button. Steps:
-      //   1. Run the same save-status logic (set_lead_status). If it fails, stop.
-      //   2. For each ACTIVE service on this lead that the CURRENT ASSIGNEE does
-      //      NOT handle (their employees.services array doesn't include it), call
-      //      add_service_to_lead — which triggers the auto-forward RPC and creates
-      //      a new lead for whoever handles that service.
-      //   3. Show a combined toast, then refresh pipeline.
+      // v2026082018: rewritten flow. The Add-service dropdown no longer hits
+      // the backend on click — it just queues into _pendingServiceAdds. This
+      // handler now:
+      //   1. Validates status + assignee (same as before).
+      //   2. For each PENDING queued service, calls add_service_to_lead.
+      //      The backend RPC decides "stayed" vs "forwarded" per service, and
+      //      it's ALSO the place that writes lead_assignment_history rows —
+      //      so history is naturally only logged now, on Save + Forward.
+      //   3. Then calls set_lead_status for the status update.
+      //   4. Shows ONE combined toast summarising all of it.
+      //   5. Clears the pending queue for this row and refetches pipeline
+      //      (NEW LEADS count updates naturally when new pipeline rows show up).
       const tr = target.closest("tr");
       const sel = tr.querySelector("select.status-select");
       const errBox = tr.querySelector(".row-save-error");
@@ -2251,11 +2256,11 @@ function wireRowHandlers() {
       }
       const leadRow = pipelineCache.find((x) => x.customer_key === key) || {};
       if (!leadRow.employee_code && !leadRow.assigned_employee_code) {
-        errBox.textContent = "Lead has no assignee — click Manual forward to assign first.";
+        errBox.textContent = "Lead has no assignee — assign it first.";
         errBox.style.display = "block";
         return;
       }
-      // Freeze the button visuals during the two-step operation
+      // Freeze the button visuals during the multi-step operation
       const origHtml = target.innerHTML;
       target.disabled = true;
       target.innerHTML = "Saving + forwarding…";
@@ -2263,46 +2268,18 @@ function wireRowHandlers() {
       target.style.cursor = "wait";
       target.style.pointerEvents = "none";
 
-      // Step 1: save status
-      try {
-        await callAdmin("set_lead_status", { customer_key: key, talk_status });
-        const idx = pipelineCache.findIndex((x) => x.customer_key === key);
-        if (idx >= 0) pipelineCache[idx].talk_status = talk_status;
-      } catch (err) {
-        target.disabled = false; target.innerHTML = origHtml;
-        target.style.opacity = ""; target.style.cursor = ""; target.style.pointerEvents = "";
-        errBox.textContent = "Save failed: " + err.message;
-        errBox.style.display = "block";
-        return;
-      }
-
-      // Step 2: for each active service the current assignee doesn't handle,
-      // call add_service_to_lead (backend auto-forwards to matching employee).
-      const assigneeCode = leadRow.assigned_employee_code || leadRow.employee_code || "";
-      const assigneeEmp = (_allEmployeesCache || []).find((e) => e.code === assigneeCode) || null;
-      const assigneeSvcs = new Set(
-        Array.isArray(assigneeEmp?.services)
-          ? assigneeEmp.services.map((s) => String(s).toLowerCase())
-          : []
-      );
-      // Derive active services the same way renderServicesCell does.
-      const detail = Array.isArray(leadRow.services_detail) ? leadRow.services_detail : [];
-      let activeSvcs = detail.filter((x) => x.is_active).map((x) => String(x.service || "").toLowerCase());
-      if (activeSvcs.length === 0 && Array.isArray(leadRow.services_active)) {
-        activeSvcs = leadRow.services_active.map((s) => String(s).toLowerCase());
-      }
-      if (activeSvcs.length === 0 && leadRow.service_type) {
-        activeSvcs = [String(leadRow.service_type).toLowerCase()];
-      }
-      activeSvcs = Array.from(new Set(activeSvcs.filter(Boolean)));
-      // Services this lead is on but the assignee does NOT handle → candidates for forwarding.
-      // Only forward services that exist in SERVICES (skip legacy 'manual'/'other'/blank).
-      const knownSvcVals = new Set(SERVICES.map((s) => s.value));
-      const toForward = activeSvcs.filter((s) => knownSvcVals.has(s) && !assigneeSvcs.has(s));
-
-      const forwardedTo = []; // [{service, empCode}]
-      const forwardErrors = []; // [{service, msg}]
-      for (const svc of toForward) {
+      // Step 1: process every pending service add. Each call may return
+      // "stayed" (assignee handles it → same employee's lead just gains the
+      // service) or "forwarded"/"split" (backend spun up new pipeline rows
+      // for another employee → we surface the SERVICE → CODE mapping so the
+      // manager sees exactly where it went).
+      const pending = Array.isArray(_pendingServiceAdds[key])
+        ? _pendingServiceAdds[key].slice()
+        : [];
+      const stayedSvcs = [];             // ["gst", ...]
+      const forwardedTo = [];            // [{service, empCode}]
+      const addErrors = [];              // [{service, msg}]
+      for (const svc of pending) {
         try {
           const res = await callAdmin("add_service_to_lead", { customer_key: key, service: svc });
           const kind = res?.result || "stayed";
@@ -2310,31 +2287,74 @@ function wireRowHandlers() {
           if (kind === "forwarded" || kind === "split") {
             const first = newLeads[0] || {};
             forwardedTo.push({ service: svc, empCode: first.employee_code || "?" });
+          } else {
+            stayedSvcs.push(svc);
           }
-          // "stayed" means backend decided current employee handles it after all — skip toast entry.
         } catch (err) {
-          forwardErrors.push({ service: svc, msg: err.message || "failed" });
+          addErrors.push({ service: svc, msg: err.message || "failed" });
         }
       }
 
-      // Build combined toast
-      let toast = "✓ Status saved";
+      // Step 2: save the call-status. If this fails we still want the toast
+      // to reflect anything that already happened above, so we don't bail early.
+      let statusSaved = false;
+      let statusError = null;
+      try {
+        await callAdmin("set_lead_status", { customer_key: key, talk_status });
+        const idx = pipelineCache.findIndex((x) => x.customer_key === key);
+        if (idx >= 0) pipelineCache[idx].talk_status = talk_status;
+        statusSaved = true;
+      } catch (err) {
+        statusError = err.message || "failed";
+      }
+
+      // Step 3: build the single combined toast per spec.
+      const lines = [];
+      if (statusSaved) lines.push("✓ Status saved");
+      if (stayedSvcs.length > 0) {
+        const list = stayedSvcs.map((s) => svcLabel(s)).join(", ");
+        lines.push(`✓ Added ${stayedSvcs.length} service${stayedSvcs.length === 1 ? "" : "s"}: ${list}`);
+      }
       if (forwardedTo.length > 0) {
         const list = forwardedTo.map((f) => `${svcLabel(f.service)} → ${f.empCode}`).join(", ");
-        toast += `\n✓ Forwarded ${forwardedTo.length} service${forwardedTo.length === 1 ? "" : "s"}: ${list}`;
+        lines.push(`✓ Forwarded ${forwardedTo.length} service${forwardedTo.length === 1 ? "" : "s"} → new lead${forwardedTo.length === 1 ? "" : "s"}: ${list}`);
       }
-      if (forwardErrors.length > 0) {
-        const list = forwardErrors.map((f) => `${svcLabel(f.service)}: ${f.msg}`).join("; ");
-        toast += `\n⚠ Some forwards failed: ${list}`;
+      if (addErrors.length > 0) {
+        const list = addErrors.map((f) => `${svcLabel(f.service)}: ${f.msg}`).join("; ");
+        lines.push(`⚠ Some service adds failed: ${list}`);
       }
-      alert(toast);
+      if (statusError) {
+        lines.push(`⚠ Status save failed: ${statusError}`);
+      }
+      if (lines.length === 0) lines.push("Nothing to save.");
+      alert(lines.join("\n"));
 
-      // Refresh pipeline + re-render
+      // Step 4: clear pending queue for this row (only if the add call was
+      // attempted — leave any items with real errors so the user can retry).
+      if (addErrors.length === 0) {
+        delete _pendingServiceAdds[key];
+      } else {
+        _pendingServiceAdds[key] = addErrors.map((e) => e.service);
+      }
+
+      // Step 5: refresh pipeline + re-render. Any forwarded services will
+      // materialise as brand-new pipeline_leads rows, and the top NEW LEADS
+      // counter will naturally bump when it re-reads pipelineCache.
       try {
         pipelineCache = await callAdmin("pipeline");
       } catch {}
       updateTopCounts();
       renderActive();
+
+      // If status also failed and nothing else worked, unfreeze the button
+      // so the manager can retry.
+      if (!statusSaved && stayedSvcs.length === 0 && forwardedTo.length === 0) {
+        target.disabled = false;
+        target.innerHTML = origHtml;
+        target.style.opacity = "";
+        target.style.cursor = "";
+        target.style.pointerEvents = "";
+      }
       return;
     }
     if (action === "save-status") {
@@ -2564,19 +2584,32 @@ function renderServicesCell(l, readOnly) {
     return `<span title="${esc(tip)}" style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;font-size:10.5px;font-weight:600;text-decoration:line-through;">${esc(svcLabel(svcVal))}</span>`;
   }).join("");
 
+  // v2026082018: Pending service adds — chips rendered with a dashed "pending"
+  // style so the user knows they haven't been sent to the backend yet. Save +
+  // Forward is what actually calls add_service_to_lead for each of these.
+  const pendingList = Array.isArray(_pendingServiceAdds[l.customer_key])
+    ? _pendingServiceAdds[l.customer_key].slice()
+    : [];
+  const pendingChips = pendingList.map((svcVal) => {
+    const rmBtn = readOnly ? "" : `<button data-action="remove-pending-service" data-customer-key="${cur}" data-service="${esc(svcVal)}" title="Cancel pending add — nothing has been saved yet" style="margin-left:4px;background:transparent;border:0;color:#9a3412;font-weight:700;cursor:pointer;font-size:11px;line-height:1;">✕</button>`;
+    return `<span title="Pending — will be added on Save + Forward" style="display:inline-flex;align-items:center;margin:2px 4px 2px 0;padding:2px 6px;background:#fff7ed;color:#9a3412;border:1px dashed #fdba74;border-radius:8px;font-size:10.5px;font-weight:700;">${esc(svcLabel(svcVal))} <span style="margin-left:4px;padding:0 4px;background:#fed7aa;color:#7c2d12;border-radius:6px;font-size:9.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;">pending</span>${rmBtn}</span>`;
+  }).join("");
+
   // Build add-service dropdown that lists all SERVICES not already active on this lead
+  // AND not already sitting in the pending queue.
   const activeSet = new Set(active.map((s) => String(s.service || "").toLowerCase()));
-  const availableSvcs = SERVICES.filter((s) => !activeSet.has(s.value));
+  const pendingSet = new Set(pendingList.map((s) => String(s || "").toLowerCase()));
+  const availableSvcs = SERVICES.filter((s) => !activeSet.has(s.value) && !pendingSet.has(s.value));
   const addSvcHtml = (readOnly || !_isManager || availableSvcs.length === 0) ? "" : `
     <div class="add-svc-wrap" data-customer-key="${cur}" style="margin-top:4px;display:flex;align-items:center;gap:4px;">
       <select class="add-svc-select" data-customer-key="${cur}" style="padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background:#fff;max-width:140px;">
         <option value="">＋ Add service…</option>
         ${availableSvcs.map((s) => `<option value="${esc(s.value)}">${esc(s.label)}</option>`).join("")}
       </select>
-      <button data-action="add-service" data-customer-key="${cur}" style="padding:2px 8px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;">Add</button>
+      <button data-action="add-service" data-customer-key="${cur}" title="Queue this service — nothing hits the backend until you click Save + Forward" style="padding:2px 8px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;">Add</button>
     </div>`;
 
-  return `<div class="services-cell">${activeChips || `<span class="muted-small">no active services</span>`}${removedChips ? `<div style="margin-top:2px;">${removedChips}</div>` : ""}${addSvcHtml}</div>`;
+  return `<div class="services-cell">${activeChips || `<span class="muted-small">no active services</span>`}${pendingChips ? `<div style="margin-top:2px;">${pendingChips}</div>` : ""}${removedChips ? `<div style="margin-top:2px;">${removedChips}</div>` : ""}${addSvcHtml}</div>`;
 }
 
 // Modal that lists lead_assignment_history for a lead
