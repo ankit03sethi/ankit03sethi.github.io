@@ -2826,12 +2826,10 @@ async function showStarRatingModal(customerKey) {
         }
       }
       if (starRatingsByKey[customerKey]) starRatingsByKey[customerKey].unshift(saved);
-      // Reset form for another
-      selectedStars = 0; paint(0); noteEl.value = ""; refreshGate();
-      await loadStarHistory(customerKey);
       updateTopCounts();
       renderActive();
-      saveBtn.textContent = "Save rating";
+      // Auto-close the modal after successful save
+      document.getElementById("starRatingOverlay")?.remove();
     } catch (err) {
       msgEl.style.color = "#dc2626"; msgEl.textContent = "Save failed: " + err.message;
       saveBtn.disabled = false; saveBtn.textContent = "Save rating";
