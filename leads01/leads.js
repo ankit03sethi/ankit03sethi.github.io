@@ -1870,7 +1870,9 @@ function wireRowHandlers() {
       target.disabled = true; target.textContent = "Assigning…";
       target.style.opacity = ".5"; target.style.cursor = "wait";
       try {
-        await callAdmin("reassign_lead", { customer_key: key, to_code: hit.code });
+        // Pass picked service too — admin-data v25 forwards it to reassign_lead(p_service),
+        // which persists it in lead_overrides.override_service_type when different from current.
+        await callAdmin("reassign_lead", { customer_key: key, to_code: hit.code, service: serviceLc || null });
         // Refresh so this row disappears from Unassigned (and shows up under the assignee elsewhere)
         pipelineCache = await callAdmin("pipeline");
         updateTopCounts();
