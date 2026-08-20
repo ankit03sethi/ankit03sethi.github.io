@@ -109,6 +109,10 @@ const SERVICES = [
 ];
 let serviceFilter = "";  // "" = all; else a service value
 let employeeFilter = ""; // "" = all; "__none__" = no-code leads; else employee_code
+// v2026082019: Origin filter — "" = All, "direct" = only leads NOT auto-forwarded,
+// "forwarded" = only auto-forwarded leads. Applied on Follow Ups, Quotations, Paid tabs.
+// Ignored on Add Leads / Unassigned / New Leads (filter UI is hidden there too).
+let originFilter = "";
 
 // Cache of the most recently resolved employee name from the add-lead code lookup
 let _lastResolvedEmp = { code: "", name: "" };
@@ -566,6 +570,14 @@ function updateTopCounts() {
     // for them every lead is countable.
     if (_isManager && !l.assigned_employee_code) return;
     const b = bucketOf(l);
+    // v2026082019: Origin filter also constrains the Follow/Done top-tab counts
+    // (it's exposed on those tabs, so counts should match what the user will
+    // see when they click through). New/Unassigned tabs never expose it, so we
+    // don't apply it there.
+    if (originFilter && isOriginFilterTab(b)) {
+      if (originFilter === "forwarded" && !l.is_forwarded) return;
+      if (originFilter === "direct"    &&  l.is_forwarded) return;
+    }
     if (b === "follow") {
       if (activeFollowSubs.has(followSubOf(l))) counts.follow += 1;
     } else {
@@ -587,7 +599,23 @@ function updateTopCounts() {
   const uEl = $("#topcnt_unassigned"); if (uEl) uEl.textContent = counts.unassigned;
 }
 
-// Pipeline filtered by active date range (uses last_event_at)
+// v2026082019: Origin filter is exposed only on Follow Ups / Quotations / Paid.
+// Everywhere else (Add / Unassigned / New) the filter is intentionally ignored
+// so switching it doesn't shift counts on tabs where it isn't visible.
+function isOriginFilterTab(top) {
+  return top === "follow" || top === "quotations" || top === "done";
+}
+function applyOriginFilter(rows) {
+  if (!originFilter) return rows;
+  if (originFilter === "forwarded") return rows.filter((l) => !!l.is_forwarded);
+  if (originFilter === "direct")    return rows.filter((l) => !l.is_forwarded);
+  return rows;
+}
+
+// Pipeline filtered by active date range (uses last_event_at).
+// NOTE: Origin filter is NOT applied here — callers apply it via
+// applyOriginFilter() at the point where they know they're rendering rows /
+// counting a tab that exposes the Origin filter.
 function filteredPipeline() {
   let rows = pipelineCache;
   if (dateRange.from || dateRange.to) rows = rows.filter((l) => withinRange(l.last_event_at));
@@ -679,9 +707,11 @@ function renderSubTabs() {
 
   // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
   // Employees only see leads assigned to them anyway.
-  const inBucket = activeTop === "unassigned"
+  let inBucket = activeTop === "unassigned"
     ? filteredPipeline().filter((l) => !l.assigned_employee_code)
     : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
+  // v2026082019: sub-tab counts also honour the Origin filter on tabs that expose it.
+  if (isOriginFilterTab(activeTop)) inBucket = applyOriginFilter(inBucket);
   const counts = {};
   subs.forEach((s) => counts[s.id] = 0);
   inBucket.forEach((l) => {
@@ -1304,9 +1334,11 @@ function wireManualAddHandlers() {
 function renderRows() {
   // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
   // Employees only see leads assigned to them anyway.
-  const inBucket = activeTop === "unassigned"
+  let inBucket = activeTop === "unassigned"
     ? filteredPipeline().filter((l) => !l.assigned_employee_code)
     : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
+  // v2026082019: Origin filter — only meaningful on Follow / Quotations / Paid.
+  if (isOriginFilterTab(activeTop)) inBucket = applyOriginFilter(inBucket);
   let rows;
   if (activeTop === "new")    rows = inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
@@ -1362,9 +1394,11 @@ function buildRemarkOptions() {
 function leadsInCurrentSubTab() {
   // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
   // Employees only see leads assigned to them anyway.
-  const inBucket = activeTop === "unassigned"
+  let inBucket = activeTop === "unassigned"
     ? filteredPipeline().filter((l) => !l.assigned_employee_code)
     : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
+  // v2026082019: Origin filter on tabs that expose it.
+  if (isOriginFilterTab(activeTop)) inBucket = applyOriginFilter(inBucket);
   if (activeTop === "new")    return inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") return inBucket.filter((l) => followSubOf(l) === activeSub);
   return inBucket;
@@ -1395,6 +1429,16 @@ function renderToolbarInto(el) {
       ${buildAssignedFilterOptions()}
     </select>
     <button id="assignedFilterClear" class="remark-filter-clear" style="display:${assignedFilter ? "inline-block" : "none"};">Clear</button>
+    ` : ""}
+
+    ${isOriginFilterTab(activeTop) ? `
+    <span class="filter-lbl" style="margin-left:12px;" title="Filter by whether the lead was auto-forwarded from another service">Origin:</span>
+    <select id="originFilterSelect" class="remark-filter-select" title="Only affects Follow Ups, Quotations and Paid tabs">
+      <option value=""          ${originFilter === ""          ? "selected" : ""}>All</option>
+      <option value="direct"    ${originFilter === "direct"    ? "selected" : ""}>Direct only</option>
+      <option value="forwarded" ${originFilter === "forwarded" ? "selected" : ""}>Forwarded only</option>
+    </select>
+    <button id="originFilterClear" class="remark-filter-clear" style="display:${originFilter ? "inline-block" : "none"};">Clear origin</button>
     ` : ""}
 
     ${(_isManager && activeTop === "unassigned") ? `
@@ -1529,6 +1573,24 @@ function wireToolbarHandlers() {
   if (asnClear) {
     asnClear.addEventListener("click", () => {
       assignedFilter = "";
+      updateTopCounts();
+      renderActive();
+    });
+  }
+
+  // Origin filter (v2026082019) — Follow Ups / Quotations / Paid tabs only.
+  const originSel = $("#originFilterSelect");
+  if (originSel) {
+    originSel.addEventListener("change", (e) => {
+      originFilter = e.target.value;
+      updateTopCounts();
+      renderActive();
+    });
+  }
+  const originClear = $("#originFilterClear");
+  if (originClear) {
+    originClear.addEventListener("click", () => {
+      originFilter = "";
       updateTopCounts();
       renderActive();
     });
@@ -1720,8 +1782,17 @@ function rowHtml(l, readOnly) {
   const historyBtnInCell = (_isManager && !readOnly)
     ? `<button data-action="show-asn-history" data-customer-key="${cur}" title="Show past assignees" style="margin-top:3px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;align-self:flex-start;">History</button>`
     : "";
+  // v2026082019: Forwarded chip. Shown on every row (any tab) whose backing
+  // lead_overrides row has is_forwarded=true — i.e. this pipeline lead was
+  // auto-created when a manager added a service that the previous assignee
+  // couldn't handle. Sits next to the assignee chip so it's obvious at a
+  // glance who inherited it and why.
+  const forwardedChip = l.is_forwarded
+    ? `<span title="This lead was auto-forwarded from another service." style="display:inline-block;margin-top:3px;padding:2px 7px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;align-self:flex-start;">&#8618; Forwarded</span>`
+    : "";
   let empCellHtml = `<div style="display:flex;flex-direction:column;gap:3px;">
       <span title="Assigned employee (read-only — use Forward to reassign)" style="display:inline-block;padding:3px 9px;background:${asnChipBg};color:${asnChipFg};border:1px solid ${asnChipBd};border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${esc(asnDisplay)}</span>
+      ${forwardedChip}
       ${creatorLine}
       ${historyBtnInCell}
     </div>`;
@@ -2576,12 +2647,19 @@ function renderServicesCell(l, readOnly) {
     return `<span title="${esc(svcVal)}${s.added_at ? ' · added ' + fmtDate(s.added_at) : ''}" style="display:inline-flex;align-items:center;margin:2px 4px 2px 0;padding:2px 6px;background:#dcfce7;color:#065f46;border:1px solid #86efac;border-radius:8px;font-size:10.5px;font-weight:700;">${esc(svcLabel(svcVal))}${rmBtn}</span>`;
   }).join("");
 
-  const removedChips = removed.map((s) => {
+  // v2026082019: Removed chips render as a vertical column, newest removal on
+  // top. Sort by removed_at DESC (nulls last). Keep strikethrough + tooltip.
+  const removedSorted = removed.slice().sort((a, b) => {
+    const ta = a.removed_at ? new Date(a.removed_at).getTime() : 0;
+    const tb = b.removed_at ? new Date(b.removed_at).getTime() : 0;
+    return tb - ta;
+  });
+  const removedChips = removedSorted.map((s) => {
     const svcVal = String(s.service || "").toLowerCase();
     const tip = s.removed_at
       ? `Removed on ${fmtDate(s.removed_at)}${s.removed_by ? ' by ' + s.removed_by : ''}`
       : "Removed";
-    return `<span title="${esc(tip)}" style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;font-size:10.5px;font-weight:600;text-decoration:line-through;">${esc(svcLabel(svcVal))}</span>`;
+    return `<span title="${esc(tip)}" style="display:block;margin:2px 0;padding:2px 6px;background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;font-size:10.5px;font-weight:600;text-decoration:line-through;width:fit-content;max-width:100%;">${esc(svcLabel(svcVal))}</span>`;
   }).join("");
 
   // v2026082018: Pending service adds — chips rendered with a dashed "pending"
@@ -2654,7 +2732,7 @@ async function showAssignmentHistoryModal(customerKey) {
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:12px;padding:22px 24px;max-width:680px;width:100%;max-height:82vh;overflow-y:auto;box-shadow:0 20px 50px rgba(15,23,42,.35);">
-      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Assignment history</div>
+      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Lead history</div>
       <div style="color:#475569;font-size:13px;margin-bottom:14px;">Contact <b>${esc(rawContact || "—")}</b> · Service <b>${esc(svcNice)}</b></div>
       <div id="asnHistoryList" style="font-size:13px;color:#334155;">Loading…</div>
       <div style="display:flex;justify-content:flex-end;margin-top:16px;">
@@ -2667,22 +2745,28 @@ async function showAssignmentHistoryModal(customerKey) {
   overlay.querySelector("#asnHistoryClose").onclick = cleanup;
 
   try {
-    const rows = await callAdmin("lead_assignment_history", { customer_key: customerKey });
+    // v2026082019: fetch the merged timeline — assignment history + service
+    // add/remove events — so managers see the full story in one place.
+    const full = await callAdmin("lead_full_history", { customer_key: customerKey });
+    const asnRows = (full && full.assignments)     || [];
+    const svcRows = (full && full.service_events)  || [];
     const listEl = document.getElementById("asnHistoryList");
-    if (!rows || rows.length === 0) {
-      listEl.innerHTML = `<div style="padding:16px;color:#94a3b8;text-align:center;background:#f8fafc;border-radius:6px;">No assignment history yet.</div>`;
+    if (asnRows.length === 0 && svcRows.length === 0) {
+      listEl.innerHTML = `<div style="padding:16px;color:#94a3b8;text-align:center;background:#f8fafc;border-radius:6px;">No history yet.</div>`;
       return;
     }
-    // Sort oldest first so timeline reads top→bottom
-    const sorted = rows.slice().sort((a, b) => new Date(a.at) - new Date(b.at));
-    listEl.innerHTML = `
-      <div style="border-left:3px solid #cbd5e1;padding-left:14px;margin-left:4px;">
-      ${sorted.map((r) => {
-        const why = reasonPretty[r.reason] || `↪ ${esc(r.reason || "changed")}`;
-        const byLine = r.by_email && r.by_email !== "system"
-          ? `<div style="color:#64748b;font-size:11.5px;margin-top:3px;">Done by <b>${esc(r.by_email)}</b></div>`
-          : `<div style="color:#94a3b8;font-size:11.5px;margin-top:3px;font-style:italic;">Done by the system</div>`;
-        return `
+    // Tag each row with its kind then merge & sort oldest-first.
+    const merged = []
+      .concat(asnRows.map((r) => ({ kind: "assignment", at: r.at, data: r })))
+      .concat(svcRows.map((r) => ({ kind: "service",    at: r.at, data: r })))
+      .sort((a, b) => new Date(a.at) - new Date(b.at));
+
+    const renderAssignment = (r) => {
+      const why = reasonPretty[r.reason] || `↪ ${esc(r.reason || "changed")}`;
+      const byLine = r.by_email && r.by_email !== "system"
+        ? `<div style="color:#64748b;font-size:11.5px;margin-top:3px;">Done by <b>${esc(r.by_email)}</b></div>`
+        : `<div style="color:#94a3b8;font-size:11.5px;margin-top:3px;font-style:italic;">Done by the system</div>`;
+      return `
         <div style="padding:10px 12px;margin-bottom:8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;position:relative;">
           <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:#1f6feb;border-radius:50%;border:2px solid #fff;"></div>
           <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:6px;">${why}</div>
@@ -2694,7 +2778,33 @@ async function showAssignmentHistoryModal(customerKey) {
           <div style="color:#475569;font-size:11.5px;margin-top:4px;">📅 ${esc(fmtDate(r.at))} · ${esc(fmtTime(r.at))}</div>
           ${byLine}
         </div>`;
-      }).join("")}
+    };
+    const renderServiceEvent = (r) => {
+      const isAdd = r.action === "added";
+      const icon  = isAdd ? "➕" : "✖";
+      const verb  = isAdd ? "Added service" : "Removed service";
+      const dot   = isAdd ? "#059669" : "#dc2626";
+      const bg    = isAdd ? "#f0fdf4" : "#fef2f2";
+      const bd    = isAdd ? "#bbf7d0" : "#fecaca";
+      const svcNiceLabel = (function () {
+        const hit = (typeof SERVICES !== "undefined" ? SERVICES : []).find(s => String(s.value).toLowerCase() === String(r.service || "").toLowerCase());
+        return hit ? hit.label : (r.service || "—");
+      })();
+      const byLine = r.by_email
+        ? `<div style="color:#64748b;font-size:11.5px;margin-top:3px;">Done by <b>${esc(r.by_email)}</b></div>`
+        : `<div style="color:#94a3b8;font-size:11.5px;margin-top:3px;font-style:italic;">Done by the system</div>`;
+      return `
+        <div style="padding:10px 12px;margin-bottom:8px;background:${bg};border-radius:6px;border:1px solid ${bd};position:relative;">
+          <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:${dot};border-radius:50%;border:2px solid #fff;"></div>
+          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:4px;">${icon} ${esc(verb)}: <span style="color:${dot};">${esc(svcNiceLabel)}</span></div>
+          <div style="color:#475569;font-size:11.5px;margin-top:4px;">📅 ${esc(fmtDate(r.at))} · ${esc(fmtTime(r.at))}</div>
+          ${byLine}
+        </div>`;
+    };
+
+    listEl.innerHTML = `
+      <div style="border-left:3px solid #cbd5e1;padding-left:14px;margin-left:4px;">
+      ${merged.map((entry) => entry.kind === "assignment" ? renderAssignment(entry.data) : renderServiceEvent(entry.data)).join("")}
       </div>`;
   } catch (err) {
     document.getElementById("asnHistoryList").innerHTML = `<div style="color:#991b1b;padding:12px;background:#fef2f2;border-radius:6px;">Load failed: ${esc(err.message)}</div>`;
