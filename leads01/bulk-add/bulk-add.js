@@ -446,14 +446,15 @@ async function boot() {
   }
   $("#signOutBtn").classList.remove("hidden");
 
-  // RBAC — manager only: super OR leads.
+  // RBAC — SUPER only. 'leads' perm is now view + remarks + quotations only, so
+  // even lead-mgrs cannot bulk-add new leads.
   let perms = [];
   try {
     const { data } = await sb.rpc("current_admin_permissions");
     perms = Array.isArray(data) ? data : [];
   } catch {}
-  const isManager = perms.includes("super") || perms.includes("leads");
-  if (!isManager) {
+  const isSuper = perms.includes("super");
+  if (!isSuper) {
     $("#gatePerms").innerHTML = `Your permissions: <code>${perms.length ? perms.join(", ") : "(none)"}</code>`;
     show($("#gateView"));
     return;
