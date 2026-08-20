@@ -789,10 +789,10 @@ function renderManualAddBar(el) {
           </div>
         </div>
         <div style="margin-top:8px;">
-          <div class="muted-small" style="margin-bottom:3px;">Assigned to * <span style="color:#0f172a;">(auto-picked, change if needed)</span> <span style="color:#dc2626;">(cannot be changed later)</span></div>
-          <input id="empAssignPicker" list="empAssignList" type="text" autocomplete="off" placeholder="Select a service first" disabled style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#fff;"/>
+          <div class="muted-small" style="margin-bottom:3px;">Assigned to * <span style="color:#0f172a;">(auto-picked — not editable)</span> <span style="color:#dc2626;">(cannot be changed later)</span></div>
+          <input id="empAssignPicker" type="text" readonly placeholder="Select a service first" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;background:#f8fafc;color:#334155;cursor:not-allowed;pointer-events:none;"/>
           <datalist id="empAssignList"></datalist>
-          <div class="muted-small" style="margin-top:4px;color:#64748b;">Only sales team members who handle this service are shown. Cycle picks whoever has the fewest open leads.</div>
+          <div class="muted-small" style="margin-top:4px;color:#64748b;">System auto-picks the sales team member handling this service with the fewest open leads (ties broken by earliest join date). Non-editable.</div>
           <div id="empAssignStatus" class="muted-small" style="margin-top:4px;color:#64748b;min-height:16px;">—</div>
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
