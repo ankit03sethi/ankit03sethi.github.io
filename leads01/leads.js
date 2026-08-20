@@ -2582,33 +2582,89 @@ function renderServicesCell(l, readOnly) {
 // Modal that lists lead_assignment_history for a lead
 async function showAssignmentHistoryModal(customerKey) {
   document.getElementById("asnHistoryOverlay")?.remove();
+
+  // Parse "9111000006|gst" → { contact: "9111000006", service: "gst" }
+  const [rawContact, rawSvc] = String(customerKey || "").split("|");
+  const svcNice = (function(){
+    const found = (typeof SERVICES !== "undefined" ? SERVICES : []).find(s => String(s.value).toLowerCase() === String(rawSvc||"").toLowerCase());
+    return found ? found.label : (rawSvc || "—");
+  })();
+
+  // Lookup employee name by code from cached list
+  const empName = (code) => {
+    if (!code) return "";
+    const hit = (_allEmployeesCache || []).find((e) => e.code === code);
+    return hit ? (hit.name || "") : "";
+  };
+  const empChip = (code, tone) => {
+    if (!code) return `<span style="color:#94a3b8;font-style:italic;">no one</span>`;
+    const nm = empName(code);
+    const bg = tone === "to"   ? "background:#dcfce7;color:#166534;border:1px solid #86efac;"
+             : tone === "from" ? "background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;"
+             : "background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;";
+    return `<span style="display:inline-block;${bg}padding:2px 8px;border-radius:5px;font-weight:700;font-size:12px;">${esc(code)}${nm ? ` <span style="font-weight:500;">— ${esc(nm)}</span>` : ""}</span>`;
+  };
+
+  // Human-friendly "why"
+  const reasonPretty = {
+    auto_new_lead:            "🎯 Auto-assigned when lead was created",
+    auto_website_lead:        "🌐 Auto-assigned when captured from website",
+    auto_forward_service_add: "↪ Auto-forwarded because a service was added",
+    auto_handoff_payment:     "💰 Auto-handed off to processing on payment",
+    auto_handoff_renewal:     "🔁 Auto-handed off to renewal",
+    manual_reassign:          "✏️ Manually reassigned by an admin",
+    backfill_scraped:         "🛠 Backfilled (existing lead)",
+  };
+
   const overlay = document.createElement("div");
   overlay.id = "asnHistoryOverlay";
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:640px;width:100%;max-height:80vh;overflow-y:auto;">
-      <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:12px;">Assignment history</div>
-      <div class="muted-small" style="color:#64748b;margin-bottom:12px;">${esc(customerKey)}</div>
-      <div id="asnHistoryList" style="font-size:12.5px;color:#334155;">Loading…</div>
-      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
-        <button id="asnHistoryClose" style="background:#e5e7eb;color:#111;padding:8px 14px;border:none;border-radius:5px;font-size:13px;cursor:pointer;">Close</button>
+    <div style="background:#fff;border-radius:12px;padding:22px 24px;max-width:680px;width:100%;max-height:82vh;overflow-y:auto;box-shadow:0 20px 50px rgba(15,23,42,.35);">
+      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Assignment history</div>
+      <div style="color:#475569;font-size:13px;margin-bottom:14px;">Contact <b>${esc(rawContact || "—")}</b> · Service <b>${esc(svcNice)}</b></div>
+      <div id="asnHistoryList" style="font-size:13px;color:#334155;">Loading…</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button id="asnHistoryClose" style="background:#1f6feb;color:#fff;padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
   const cleanup = () => overlay.remove();
   overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(); });
   overlay.querySelector("#asnHistoryClose").onclick = cleanup;
+
   try {
     const rows = await callAdmin("lead_assignment_history", { customer_key: customerKey });
     const listEl = document.getElementById("asnHistoryList");
-    if (!rows || rows.length === 0) { listEl.innerHTML = `<span class="muted-small">No history.</span>`; return; }
-    listEl.innerHTML = rows.map((r) => `
-      <div style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">
-        <div style="font-weight:600;">${esc(r.from_code || "—")} → <span style="color:#059669;">${esc(r.to_code || "—")}</span></div>
-        <div class="muted-small" style="color:#64748b;font-size:11px;">${esc(r.reason || "")} · ${esc(r.by_email || "")} · ${esc(fmtDate(r.at))} ${esc(fmtTime(r.at))}</div>
-      </div>`).join("");
+    if (!rows || rows.length === 0) {
+      listEl.innerHTML = `<div style="padding:16px;color:#94a3b8;text-align:center;background:#f8fafc;border-radius:6px;">No assignment history yet.</div>`;
+      return;
+    }
+    // Sort oldest first so timeline reads top→bottom
+    const sorted = rows.slice().sort((a, b) => new Date(a.at) - new Date(b.at));
+    listEl.innerHTML = `
+      <div style="border-left:3px solid #cbd5e1;padding-left:14px;margin-left:4px;">
+      ${sorted.map((r) => {
+        const why = reasonPretty[r.reason] || `↪ ${esc(r.reason || "changed")}`;
+        const byLine = r.by_email && r.by_email !== "system"
+          ? `<div style="color:#64748b;font-size:11.5px;margin-top:3px;">Done by <b>${esc(r.by_email)}</b></div>`
+          : `<div style="color:#94a3b8;font-size:11.5px;margin-top:3px;font-style:italic;">Done by the system</div>`;
+        return `
+        <div style="padding:10px 12px;margin-bottom:8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;position:relative;">
+          <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:#1f6feb;border-radius:50%;border:2px solid #fff;"></div>
+          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:6px;">${why}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;">
+            <span style="color:#64748b;">From</span> ${empChip(r.from_code, "from")}
+            <span style="color:#64748b;">→</span>
+            <span style="color:#64748b;">To</span> ${empChip(r.to_code, "to")}
+          </div>
+          <div style="color:#475569;font-size:11.5px;margin-top:4px;">📅 ${esc(fmtDate(r.at))} · ${esc(fmtTime(r.at))}</div>
+          ${byLine}
+        </div>`;
+      }).join("")}
+      </div>`;
   } catch (err) {
-    document.getElementById("asnHistoryList").innerHTML = `<span style="color:#991b1b;">Load failed: ${esc(err.message)}</span>`;
+    document.getElementById("asnHistoryList").innerHTML = `<div style="color:#991b1b;padding:12px;background:#fef2f2;border-radius:6px;">Load failed: ${esc(err.message)}</div>`;
   }
 }
 
