@@ -1240,20 +1240,8 @@ function renderToolbarInto(el) {
     <div style="flex-basis:100%;height:0;"></div>
     <div id="bulkAssignWrap" style="width:100%;margin-top:6px;padding:10px 12px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <button id="bulkAssignToggle" style="padding:6px 14px;background:#0284c7;color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;">📌 Assign all visible</button>
-        <span class="muted-small" style="font-size:11.5px;color:#92400e;">Assigns every unassigned lead currently shown (respects your filters).</span>
-      </div>
-      <div id="bulkAssignPicker" class="hidden" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-        <span class="filter-lbl" style="font-size:11.5px;">Service:</span>
-        <select id="bulkAssignSvc" style="padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;background:#fff;">
-          <option value="__keep__" selected>— keep each lead's own service —</option>
-          ${SERVICES.map((s) => `<option value="${esc(s.value)}">${esc(s.label)}</option>`).join("")}
-        </select>
-        <span class="filter-lbl" style="font-size:11.5px;margin-left:6px;">Employee:</span>
-        <input id="bulkAssignEmp" list="bulkAssignEmpList" type="text" autocomplete="off" placeholder="Pick employee" style="flex:1 1 180px;min-width:180px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;background:#fff;"/>
-        <datalist id="bulkAssignEmpList"></datalist>
-        <button id="bulkAssignConfirm" disabled style="padding:5px 12px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:12px;font-weight:700;cursor:not-allowed;opacity:.4;">Assign all</button>
-        <button id="bulkAssignCancel" style="padding:5px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;cursor:pointer;">Cancel</button>
+        <button id="bulkAssignRun" style="padding:6px 14px;background:#0284c7;color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;">📌 Assign all visible</button>
+        <span class="muted-small" style="font-size:11.5px;color:#92400e;">Uses the Service + Employee already picked in each row. Rows missing either are skipped — assign those one-by-one after filling.</span>
         <div id="bulkAssignStatus" class="muted-small" style="width:100%;font-size:12px;color:#64748b;margin-top:2px;"></div>
       </div>
     </div>
@@ -1391,49 +1379,10 @@ function wireToolbarHandlers() {
   wireBulkAssignHandlers();
 }
 
-// Populate the bulk-assign employee datalist for a given service ("" = all
-// active sales, mirrors the per-row picker's "keep each lead's own service"
-// mode). Also refreshes the placeholder + gate.
-function bulkAssignRepopulateEmpList(svcLc) {
-  const list = document.getElementById("bulkAssignEmpList");
-  const inp  = document.getElementById("bulkAssignEmp");
-  if (!list || !inp) return;
-  const cands = candidatesForLead(svcLc || "");
-  list.innerHTML = cands.map((e) => `<option value="${esc(empLabel(e))}"></option>`).join("");
-  if (cands.length === 0) {
-    inp.value = "";
-    inp.disabled = true;
-    inp.placeholder = "No sales employee handles this service";
-    inp.style.opacity = ".6";
-  } else {
-    inp.disabled = false;
-    inp.style.opacity = "";
-    inp.placeholder = svcLc
-      ? `Pick from ${cands.length} employee${cands.length > 1 ? "s" : ""} handling this service`
-      : `Pick any of ${cands.length} active sales employee${cands.length > 1 ? "s" : ""}`;
-  }
-  bulkAssignRefreshGate();
-}
-
-function bulkAssignRefreshGate() {
-  const btn = document.getElementById("bulkAssignConfirm");
-  const inp = document.getElementById("bulkAssignEmp");
-  if (!btn || !inp) return;
-  const enable = !inp.disabled && !!(inp.value || "").trim();
-  btn.disabled = !enable;
-  btn.style.opacity = enable ? "" : ".4";
-  btn.style.cursor  = enable ? "pointer" : "not-allowed";
-}
-
 function wireBulkAssignHandlers() {
-  const toggle  = document.getElementById("bulkAssignToggle");
-  const picker  = document.getElementById("bulkAssignPicker");
-  const cancel  = document.getElementById("bulkAssignCancel");
-  const svcSel  = document.getElementById("bulkAssignSvc");
-  const empInp  = document.getElementById("bulkAssignEmp");
-  const confirm = document.getElementById("bulkAssignConfirm");
-  const status  = document.getElementById("bulkAssignStatus");
-  if (!toggle || !picker || !svcSel || !empInp || !confirm) return;
+  const run    = document.getElementById("bulkAssignRun");
+  const status = document.getElementById("bulkAssignStatus");
+  if (!run) return;
 
   const setStatus = (txt, tone) => {
     if (!status) return;
@@ -1441,92 +1390,65 @@ function wireBulkAssignHandlers() {
     status.style.color = tone === "err" ? "#991b1b" : (tone === "ok" ? "#065f46" : "#64748b");
   };
 
-  toggle.addEventListener("click", () => {
-    const visible = leadsInCurrentSubTab().length;
-    if (visible === 0) { alert("No unassigned leads to assign in the current view."); return; }
-    picker.classList.remove("hidden");
-    toggle.disabled = true;
-    toggle.style.opacity = ".5";
-    toggle.style.cursor = "default";
-    // Default: "keep each lead's own service" -> show all active sales.
-    svcSel.value = "__keep__";
-    bulkAssignRepopulateEmpList("");
-    confirm.textContent = `Assign all ${visible} lead${visible > 1 ? "s" : ""}`;
-    setStatus("Pick an employee, then confirm. Each lead keeps its own service unless you pick one above.");
-  });
+  run.addEventListener("click", async () => {
+    // Iterate every currently-visible unassigned row and read what the manager
+    // has already picked in each row's per-row Service + Employee dropdowns.
+    // Only rows where BOTH service AND a resolved employee code are set get
+    // assigned. Rows missing either are counted as skipped.
+    const wraps = Array.from(document.querySelectorAll("#rowsContainer .asn-inline"));
+    if (wraps.length === 0) { alert("No unassigned leads visible."); return; }
 
-  cancel?.addEventListener("click", () => {
-    picker.classList.add("hidden");
-    toggle.disabled = false;
-    toggle.style.opacity = "";
-    toggle.style.cursor = "pointer";
-    empInp.value = "";
-    setStatus("");
-  });
-
-  svcSel.addEventListener("change", () => {
-    const raw = svcSel.value;
-    const svcLc = (raw === "__keep__") ? "" : String(raw || "").toLowerCase();
-    empInp.value = ""; // service changed -> force a fresh pick
-    bulkAssignRepopulateEmpList(svcLc);
-  });
-
-  empInp.addEventListener("input",  bulkAssignRefreshGate);
-  empInp.addEventListener("change", bulkAssignRefreshGate);
-
-  confirm.addEventListener("click", async () => {
-    if (confirm.disabled) return;
-    const raw = svcSel.value;
-    const svcOverride = (raw === "__keep__") ? "" : String(raw || "").toLowerCase();
-    const cands = candidatesForLead(svcOverride);
-    const typed = (empInp.value || "").trim();
-    const codeGuess = typed.split(/[\s—\-·]/)[0].trim().toUpperCase();
-    let hit = cands.find((e) => e.code === codeGuess);
-    if (!hit) {
-      const upper = typed.toUpperCase();
-      hit = cands.find((e) => (e.code || "").toUpperCase() === upper)
-         || cands.find((e) => empLabel(e).toUpperCase() === upper);
+    const jobs = [];
+    for (const wrap of wraps) {
+      const key   = wrap.dataset.customerKey || "";
+      const svcLc = String(wrap.dataset.service || "").trim().toLowerCase();
+      const inp   = wrap.querySelector(".asn-inline-input");
+      const typed = (inp?.value || "").trim();
+      if (!key || !svcLc || !typed) continue;
+      const cands = candidatesForLead(svcLc);
+      const codeGuess = typed.split(/[\s—\-·]/)[0].trim().toUpperCase();
+      let hit = cands.find((e) => e.code === codeGuess);
+      if (!hit) {
+        const upper = typed.toUpperCase();
+        hit = cands.find((e) => (e.code || "").toUpperCase() === upper)
+           || cands.find((e) => empLabel(e).toUpperCase() === upper);
+      }
+      if (!hit) continue;
+      jobs.push({ key, svcLc, code: hit.code, name: hit.name || "" });
     }
-    if (!hit) { setStatus("✗ Not a valid pick — choose someone from the dropdown.", "err"); return; }
 
-    // Snapshot the visible leads NOW so filter/render changes during the loop
-    // don't shift the target set. leadsInCurrentSubTab() on the Unassigned tab
-    // returns exactly the unassigned rows currently shown.
-    const targets = leadsInCurrentSubTab().slice();
-    if (targets.length === 0) { setStatus("No leads to assign.", "err"); return; }
+    const skipped = wraps.length - jobs.length;
+    if (jobs.length === 0) {
+      setStatus(`✗ None ready. All ${wraps.length} rows are missing Service or Employee. Fill each row's dropdowns first, or use the per-row Assign button.`, "err");
+      return;
+    }
 
-    const svcNote = svcOverride
-      ? `\n\nService for every lead will be set to: ${svcOverride}.`
-      : `\n\nEach lead will keep its own service.`;
-    const ok = window.confirm(`Assign ${targets.length} lead${targets.length > 1 ? "s" : ""} to ${hit.code}${hit.name ? " — " + hit.name : ""}?${svcNote}`);
+    const ok = window.confirm(`Assign ${jobs.length} lead${jobs.length > 1 ? "s" : ""}?${skipped > 0 ? `\n\n${skipped} row${skipped > 1 ? "s" : ""} will be skipped (missing Service or Employee).` : ""}`);
     if (!ok) return;
 
-    confirm.disabled = true;
-    confirm.style.opacity = ".5";
-    confirm.style.cursor = "wait";
-    cancel && (cancel.disabled = true);
-    svcSel.disabled = true;
-    empInp.disabled = true;
+    run.disabled = true;
+    run.style.opacity = ".5";
+    run.style.cursor = "wait";
 
     let done = 0, failed = 0;
     const failures = [];
-    for (let i = 0; i < targets.length; i++) {
-      const l = targets[i];
-      setStatus(`Assigning ${i + 1} of ${targets.length}… (${done} done${failed ? `, ${failed} failed` : ""})`);
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      setStatus(`Assigning ${i + 1} of ${jobs.length}… (${done} done${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""})`);
       try {
         await callAdmin("reassign_lead", {
-          customer_key: l.customer_key,
-          to_code: hit.code,
-          service: svcOverride || null,
+          customer_key: job.key,
+          to_code: job.code,
+          service: job.svcLc || null,
           reset_status: true,
         });
         done += 1;
       } catch (err) {
         failed += 1;
-        failures.push(`${l.customer_key}: ${err.message || err}`);
+        failures.push(`${job.key}: ${err.message || err}`);
       }
     }
-    setStatus(`✓ ${done} of ${targets.length} assigned${failed ? ` · ${failed} failed` : ""}. Reloading…`, failed ? "err" : "ok");
+    setStatus(`✓ ${done} of ${jobs.length} assigned${failed ? ` · ${failed} failed` : ""}${skipped ? ` · ${skipped} skipped (missing Service/Employee)` : ""}. Reloading…`, failed ? "err" : "ok");
     setTimeout(() => location.reload(), 600);
     if (failures.length) {
       console.error("Bulk assign failures:\n" + failures.join("\n"));
