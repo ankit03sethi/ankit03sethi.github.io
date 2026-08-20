@@ -1515,14 +1515,8 @@ function wireBulkAssignHandlers() {
         failures.push(`${l.customer_key}: ${err.message || err}`);
       }
     }
-    setStatus(`✓ ${done} of ${targets.length} assigned${failed ? ` · ${failed} failed` : ""}. Refreshing…`, failed ? "err" : "ok");
-    try {
-      pipelineCache = await callAdmin("pipeline");
-      updateTopCounts();
-      renderActive();
-    } catch (err) {
-      setStatus(`Assigned ${done}/${targets.length} but refresh failed: ${err.message || err}. Reload the page.`, "err");
-    }
+    setStatus(`✓ ${done} of ${targets.length} assigned${failed ? ` · ${failed} failed` : ""}. Reloading…`, failed ? "err" : "ok");
+    setTimeout(() => location.reload(), 600);
     if (failures.length) {
       console.error("Bulk assign failures:\n" + failures.join("\n"));
     }
@@ -2058,10 +2052,10 @@ function wireRowHandlers() {
         // v26: also send reset_status=true so the RPC wipes talk_status → lead lands in NEW LEADS
         // (not stuck in FOLLOW UPS due to historical status like 'quotation_sent').
         await callAdmin("reassign_lead", { customer_key: key, to_code: hit.code, service: serviceLc || null, reset_status: true });
-        // Refresh so this row disappears from Unassigned (and shows up under the assignee elsewhere)
-        pipelineCache = await callAdmin("pipeline");
-        updateTopCounts();
-        renderActive();
+        // Full page reload — guarantees NEW LEADS count reflects the assign,
+        // sidesteps any cached JS / stale state. Only used from Unassigned assign.
+        setStatus("✓ Assigned. Reloading…", "ok");
+        setTimeout(() => location.reload(), 400);
       } catch (err) {
         target.disabled = false; target.textContent = "Assign";
         target.style.opacity = ""; target.style.cursor = "pointer";
