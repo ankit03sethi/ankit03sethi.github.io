@@ -551,6 +551,11 @@ function updateTopCounts() {
   const activeFollowSubs = new Set(["not_picked", "callback", "interested"]);
   const counts = { new: 0, follow: 0, done: 0, unassigned: 0 };
   filteredPipeline().forEach((l) => {
+    // Cards must be mutually exclusive for managers: an unassigned lead lives
+    // in the Unassigned card, NOT double-counted in New/Follow/Done. Employees
+    // don't see the Unassigned card and only see their own assigned leads, so
+    // for them every lead is countable.
+    if (_isManager && !l.assigned_employee_code) return;
     const b = bucketOf(l);
     if (b === "follow") {
       if (activeFollowSubs.has(followSubOf(l))) counts.follow += 1;
@@ -649,9 +654,11 @@ function renderSubTabs() {
   if (activeTop === "done")   subs = [{ id: "all", title: "All paid" }];
   if (activeTop === "unassigned") subs = [{ id: "all", title: "All unassigned" }];
 
+  // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
+  // Employees only see leads assigned to them anyway.
   const inBucket = activeTop === "unassigned"
     ? filteredPipeline().filter((l) => !l.assigned_employee_code)
-    : filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+    : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
   const counts = {};
   subs.forEach((s) => counts[s.id] = 0);
   inBucket.forEach((l) => {
@@ -1134,9 +1141,11 @@ function wireManualAddHandlers() {
 }
 
 function renderRows() {
+  // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
+  // Employees only see leads assigned to them anyway.
   const inBucket = activeTop === "unassigned"
     ? filteredPipeline().filter((l) => !l.assigned_employee_code)
-    : filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+    : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
   let rows;
   if (activeTop === "new")    rows = inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
@@ -1190,9 +1199,11 @@ function buildRemarkOptions() {
 
 // All leads currently visible in the active sub-tab (matches renderRows() logic minus filters)
 function leadsInCurrentSubTab() {
+  // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
+  // Employees only see leads assigned to them anyway.
   const inBucket = activeTop === "unassigned"
     ? filteredPipeline().filter((l) => !l.assigned_employee_code)
-    : filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+    : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
   if (activeTop === "new")    return inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") return inBucket.filter((l) => followSubOf(l) === activeSub);
   return inBucket;
