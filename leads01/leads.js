@@ -358,6 +358,7 @@ async function refreshAll() {
     updateTopCounts();
     renderActive();
     refreshTotalPaid();
+    refreshQuotationsCard();
     // Push date range into quotations iframe (if loaded)
     const f = $("#quotationsFrame");
     if (f && f.contentWindow) {
@@ -365,6 +366,53 @@ async function refreshAll() {
     }
   } catch (e) {
     $("#paneStage").innerHTML = `<div class="empty"><strong>Error:</strong> ${esc(e.message)}</div>`;
+  }
+}
+
+async function refreshQuotationsCard() {
+  const cntEl = document.getElementById("quotAcceptedCount");
+  const totEl = document.getElementById("quotAcceptedTotal");
+  if (!cntEl || !totEl) return;
+  cntEl.textContent = "—";
+  totEl.textContent = "—";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const res = await fetch(SUPABASE_URL + "/functions/v1/admin-quotations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + session.access_token,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ op: "list" }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!j || !j.ok || !Array.isArray(j.quotations)) return;
+    const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
+    const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
+    let count = 0;
+    let totalPaise = 0;
+    for (const q of j.quotations) {
+      if (q.status !== "accepted") continue;
+      const ts = q.created_at || q.updated_at;
+      if (ts) {
+        const t = new Date(ts).getTime();
+        if (fromT !== null && t < fromT) continue;
+        if (toT !== null && t > toT) continue;
+      }
+      if (employeeFilter) {
+        if (employeeFilter === "__none__") { if (q.employee_code) continue; }
+        else if ((q.employee_code || "") !== employeeFilter) continue;
+      }
+      count += 1;
+      totalPaise += Number(q.total_paise || 0);
+    }
+    const rupees = Math.round(totalPaise / 100);
+    cntEl.textContent = String(count);
+    totEl.textContent = "₹" + rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  } catch (e) {
+    console.warn("quotations card fetch failed:", e);
   }
 }
 
@@ -931,6 +979,7 @@ function wireToolbarHandlers() {
       employeeFilter = e.target.value;
       updateTopCounts();
       renderActive();
+      refreshQuotationsCard();
     });
   }
   const empClear = $("#employeeFilterClear");
@@ -939,6 +988,7 @@ function wireToolbarHandlers() {
       employeeFilter = "";
       updateTopCounts();
       renderActive();
+      refreshQuotationsCard();
     });
   }
   // Assigned-to filter (manager only)

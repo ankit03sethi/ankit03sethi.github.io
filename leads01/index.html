@@ -73,6 +73,10 @@
   </div>
 
   <nav class="tabs top-tabs" id="topTabs">
+    <button class="tab top-tab hidden" id="topTabUnassigned" data-top="unassigned">
+      <span class="big-count" id="topcnt_unassigned" style="color:#9a3412;">0</span>
+      <span class="stage-title">Unassigned</span>
+    </button>
     <button class="tab top-tab active" data-top="new">
       <span class="big-count" id="topcnt_new">0</span>
       <span class="stage-title">New leads</span>
@@ -81,13 +85,18 @@
       <span class="big-count" id="topcnt_follow">0</span>
       <span class="stage-title">Follow ups</span>
     </button>
-    <button class="tab top-tab hidden" id="topTabUnassigned" data-top="unassigned">
-      <span class="big-count" id="topcnt_unassigned" style="color:#9a3412;">0</span>
-      <span class="stage-title">Unassigned</span>
-    </button>
     <button class="tab top-tab" data-top="quotations">
-      <span class="big-count" style="color:#7c3aed;">📋</span>
-      <span class="stage-title">Quotations</span>
+      <div style="display:flex;gap:10px;width:100%;justify-content:center;align-items:flex-end;">
+        <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;">
+          <span class="big-count" id="quotAcceptedCount" style="color:#7c3aed;font-size:24px;">&mdash;</span>
+          <span style="font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.3px;margin-top:2px;">Accepted</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;border-left:1px solid #e5e7eb;padding-left:10px;">
+          <span class="big-count" id="quotAcceptedTotal" style="color:#7c3aed;font-size:18px;white-space:nowrap;">&mdash;</span>
+          <span style="font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.3px;margin-top:2px;">Total</span>
+        </div>
+      </div>
+      <span class="stage-title" style="margin-top:6px;">Quotations</span>
     </button>
     <button class="tab top-tab" data-top="done">
       <span class="big-count" id="topcnt_done">0</span>
@@ -109,7 +118,7 @@
   </p>
 </main>
 
-<script type="module" src="leads.js?v=2026082001"></script>
+<script type="module" src="leads.js?v=2026082002"></script>
 <script src="/admin/admin-forgot-btn.js" defer></script>
 </body>
 </html>
