@@ -109,18 +109,21 @@ function seedRows(n) {
   for (let i = 0; i < n; i++) rows.push(blankRow());
 }
 
+function mobileIsInvalid(r) {
+  // Only flag as invalid when the row has any user input at all. Purely-empty
+  // rows shouldn't glow red.
+  if (!isPartiallyFilled(r)) return false;
+  const mobDigits = String(r.mobile || "").replace(/\D/g, "");
+  return mobDigits.length !== 10;
+}
+
 function isValidRow(r) {
   if (r.saved) return false;
   if (!r.source) return false;
   if (!r.service) return false;
   const mobDigits = String(r.mobile || "").replace(/\D/g, "");
-  if (mobDigits.length !== 10 && !r.email) return false;
-  if (mobDigits.length !== 10 && !r.email) return false;
-  if (mobDigits && mobDigits.length !== 10) return false;
-  // Need mobile OR email (both accepted forms per backend); mobile field is marked required
-  // in the UI, but we still allow email-only when mobile blank so a manager can enter
-  // reference leads with only an email.
-  if (!mobDigits && !r.email) return false;
+  // Mobile is required and must be exactly 10 digits (Indian format).
+  if (mobDigits.length !== 10) return false;
   if (!r.assigned || !r.assigned.code) return false;
   if (r.assignErr) return false;
   return true;
@@ -157,9 +160,19 @@ function renderRowHTML(r, idx) {
     ? "⚠️ no sales person for this service"
     : (r.assigned ? `${r.assigned.code}${r.assigned.name ? " — " + r.assigned.name : ""}` : "");
   const asgCls  = r.assignErr ? "assigned err" : "assigned";
-  const statusColor = r.statusKind === "saved" ? "#065f46"
-                    : r.statusKind === "dup"   ? "#92400e"
-                    : r.statusKind === "err"   ? "#991b1b"
+  const mobBad  = mobileIsInvalid(r);
+  const mobCls  = mobBad ? "invalid" : "";
+  const mobStyle = mobBad ? "border:1px solid #dc2626;background:#fef2f2;" : "";
+  // If mobile is invalid and there's no other status, surface it inline in the status column.
+  let statusText = r.status;
+  let statusKind = r.statusKind;
+  if (mobBad && !r.saved && (!r.statusKind || r.statusKind === "" || r.status === "—")) {
+    statusText = "✗ Mobile must be 10 digits";
+    statusKind = "err";
+  }
+  const statusColor = statusKind === "saved" ? "#065f46"
+                    : statusKind === "dup"   ? "#92400e"
+                    : statusKind === "err"   ? "#991b1b"
                     : "#94a3b8";
   const disabledAttr = r.saved ? "disabled" : "";
   return `<tr data-row-id="${r.id}" class="${trCls}">
@@ -170,7 +183,7 @@ function renderRowHTML(r, idx) {
       </select>
     </td>
     <td><input data-field="name"   type="text" value="${esc(r.name)}"   placeholder="Customer name" ${disabledAttr}/></td>
-    <td><input data-field="mobile" type="tel"  value="${esc(r.mobile)}" placeholder="10-digit"      ${disabledAttr}/></td>
+    <td><input data-field="mobile" type="tel" class="${mobCls}" style="${mobStyle}" value="${esc(r.mobile)}" placeholder="10-digit" ${disabledAttr}/></td>
     <td><input data-field="email"  type="email" value="${esc(r.email)}" placeholder="optional"      ${disabledAttr}/></td>
     <td>
       <select data-field="service" ${disabledAttr}>
@@ -180,7 +193,7 @@ function renderRowHTML(r, idx) {
     </td>
     <td><input data-field="note"   type="text" value="${esc(r.note)}"   placeholder="optional"      ${disabledAttr}/></td>
     <td><input data-field="assigned" class="${asgCls}" type="text" readonly value="${esc(asgText)}" placeholder="Pick a service first" tabindex="-1"/></td>
-    <td class="status" style="color:${statusColor};">${esc(r.status)}</td>
+    <td class="status" style="color:${statusColor};">${esc(statusText)}</td>
   </tr>`;
 }
 
@@ -247,6 +260,32 @@ function wireGridEvents() {
     if (f === "mobile") {
       r.mobile = String(e.target.value || "").replace(/[^\d]/g, "").slice(0, 10);
       if (e.target.value !== r.mobile) e.target.value = r.mobile;
+      // Live invalid styling without re-rendering (keeps caret / focus).
+      const bad = mobileIsInvalid(r);
+      if (bad) {
+        e.target.classList.add("invalid");
+        e.target.style.border = "1px solid #dc2626";
+        e.target.style.background = "#fef2f2";
+      } else {
+        e.target.classList.remove("invalid");
+        e.target.style.border = "";
+        e.target.style.background = "";
+      }
+      // Live status-column update — only overwrite if it's still the neutral state or
+      // a previously-shown mobile-invalid message.
+      const tr = e.target.closest("tr[data-row-id]");
+      const stEl = tr && tr.querySelector("td.status");
+      if (stEl && !r.saved && (!r.statusKind || r.statusKind === "" || r.status === "—" || r.status.indexOf("Mobile must be 10") >= 0)) {
+        if (bad) {
+          r.status = "✗ Mobile must be 10 digits";
+          stEl.style.color = "#991b1b";
+          stEl.textContent = r.status;
+        } else {
+          r.status = "—";
+          stEl.style.color = "#94a3b8";
+          stEl.textContent = r.status;
+        }
+      }
     } else if (f === "email") {
       r.email = String(e.target.value || "").trim().toLowerCase();
     } else {
@@ -340,8 +379,9 @@ async function onSaveAll() {
     updateRowDom(r);
   }
 
-  const skipped = rows.filter((r) => !r.saved && !isValidRow(r) && isPartiallyFilled(r)).length;
-  const summary = `✓ ${okCount} saved · ${dupCount} duplicate · ${errCount} error${skipped ? ` · ${skipped} skipped (incomplete)` : ""}`;
+  const invalidMobile = rows.filter((r) => !r.saved && isPartiallyFilled(r) && mobileIsInvalid(r)).length;
+  const skipped = rows.filter((r) => !r.saved && !isValidRow(r) && isPartiallyFilled(r) && !mobileIsInvalid(r)).length;
+  const summary = `✓ ${okCount} saved · ${dupCount} duplicate · ${errCount} error${invalidMobile ? ` · ${invalidMobile} skipped (invalid mobile)` : ""}${skipped ? ` · ${skipped} skipped (incomplete)` : ""}`;
   toast(summary, 6000);
   const sumEl = $("#summary");
   sumEl.textContent = summary + " — rows with errors stay editable; fix and click Save all again.";

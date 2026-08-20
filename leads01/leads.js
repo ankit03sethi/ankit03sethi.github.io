@@ -1079,11 +1079,62 @@ function wireManualAddHandlers() {
     return hit || null;
   };
 
+  // --- Mobile 10-digit validation -----------------------------------------
+  const mobileInput = $("#manualAddMobile");
+  const ensureMobileErrEl = () => {
+    if (!mobileInput) return null;
+    let err = document.getElementById("manualAddMobileErr");
+    if (!err) {
+      err = document.createElement("div");
+      err.id = "manualAddMobileErr";
+      err.className = "muted-small";
+      err.style.color = "#dc2626";
+      err.style.marginTop = "3px";
+      err.style.fontSize = "11.5px";
+      err.style.display = "none";
+      mobileInput.parentNode && mobileInput.parentNode.appendChild(err);
+    }
+    return err;
+  };
+  const isMobileValid = () => {
+    const digits = ((mobileInput?.value || "")).replace(/\D/g, "");
+    return digits.length === 10;
+  };
+  const setMobileInvalidUI = (invalid) => {
+    if (!mobileInput) return;
+    const err = ensureMobileErrEl();
+    if (invalid) {
+      mobileInput.classList.add("invalid");
+      mobileInput.style.border = "1px solid #dc2626";
+      mobileInput.style.background = "#fef2f2";
+      if (err) { err.textContent = "Mobile must be exactly 10 digits"; err.style.display = "block"; }
+    } else {
+      mobileInput.classList.remove("invalid");
+      mobileInput.style.border = "1px solid #cbd5e1";
+      mobileInput.style.background = "";
+      if (err) { err.textContent = ""; err.style.display = "none"; }
+    }
+  };
+  if (mobileInput) {
+    mobileInput.addEventListener("input", () => {
+      // Only show red once the user has typed something; empty stays neutral until blur.
+      const raw = mobileInput.value || "";
+      if (!raw) { setMobileInvalidUI(false); }
+      else setMobileInvalidUI(!isMobileValid());
+      refreshManualSaveGate();
+    });
+    mobileInput.addEventListener("blur", () => {
+      setMobileInvalidUI(!isMobileValid());
+      refreshManualSaveGate();
+    });
+  }
+
   const refreshManualSaveGate = () => {
     if (!saveBtn) return;
     const service = ($("#manualAddService")?.value || "").trim();
     const empOk = !!(_lastResolvedEmp && _lastResolvedEmp.code);
-    const enabled = !!service && empOk;
+    const mobileOk = isMobileValid();
+    const enabled = !!service && empOk && mobileOk;
     saveBtn.disabled = !enabled;
     saveBtn.style.opacity = enabled ? "" : ".4";
     saveBtn.style.cursor = enabled ? "" : "not-allowed";
@@ -1102,6 +1153,7 @@ function wireManualAddHandlers() {
   if (cancelBtn) {
     cancelBtn.onclick = () => {
       ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      setMobileInvalidUI(false);
       resetEmpPicker("Select a service first");
       msg.textContent = "";
       // Legacy sub-tab variant: collapse the form back behind the open button.
@@ -1213,8 +1265,10 @@ function wireManualAddHandlers() {
     const note = ($("#manualAddNote").value || "").trim();
     const empCode = (_lastResolvedEmp && _lastResolvedEmp.code) || "";
     msg.textContent = ""; msg.style.color = "";
-    if (!mobile && !email) {
-      msg.style.color = "#dc2626"; msg.textContent = "Enter mobile or email (at least one).";
+    if (mobile.length !== 10) {
+      setMobileInvalidUI(true);
+      msg.style.color = "#dc2626"; msg.textContent = "Mobile must be exactly 10 digits.";
+      mobileInput && mobileInput.focus();
       return;
     }
     if (!service) {
@@ -1239,6 +1293,7 @@ function wireManualAddHandlers() {
       msg.style.color = "#059669";
       msg.textContent = `✓ Saved — visible on NEW LEADS → ${subLabel}.` + dupMsg;
       ["manualAddName","manualAddMobile","manualAddEmail","manualAddService","manualAddNote"].forEach(id => { const el = $("#"+id); if (el) el.value = ""; });
+      setMobileInvalidUI(false);
       // Keep the Source selection on the Add-panel so the user can rapidly add another lead
       // of the same type without re-picking. Reset employee picker for the next entry.
       resetEmpPicker("Select a service first");

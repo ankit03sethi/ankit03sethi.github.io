@@ -879,7 +879,7 @@ function openBuilder(quote) {
     $("#qnumBadge").textContent = quote.quote_number;
     $("#qnumBadge").classList.remove("hidden");
     $("#statusHere").innerHTML = `<span class="status-badge st-${quote.status}">${quote.status}</span>`;
-    $("#custName").value = quote.customer_name || "";
+    $("#custName").value = quote.customer_name || "Dear customer";
     $("#custEmail").value = quote.customer_email || "";
     $("#custPhone").value = quote.customer_phone || "";
     $("#custGst").value = quote.customer_gst || "";
@@ -1159,14 +1159,18 @@ function computeTotals() {
 
 // ============ SAVE ============
 $("#saveBtn").addEventListener("click", async () => {
-  if (!$("#custName").value.trim()) { toast("Customer name required", true); return; }
   if (_items.length === 0) { toast("Add at least 1 item", true); return; }
+  // Name is optional now — backend defaults empty to "Dear customer" so we never write
+  // a blank customer_name row. Reflect the fallback in the UI too if the user left it blank.
+  if (!$("#custName").value.trim()) {
+    $("#custName").value = "Dear customer";
+  }
   const validDays = Math.max(1, parseInt($("#validDays").value,10) || 1);
   const body = {
     op:"save",
     id: _currentQuote?.id || null,
     customer: {
-      name: $("#custName").value.trim(),
+      name: $("#custName").value.trim() || "Dear customer",
       email: $("#custEmail").value.trim(),
       phone: $("#custPhone").value.trim(),
       gst: $("#custGst").value.trim(),
@@ -1458,7 +1462,10 @@ async function tryPrefillFromUrl() {
     check();
   });
   openBuilder(null);
-  $("#custName").value = email ? email.split("@")[0] : (mobile || "Customer");
+  // When creating a quote from a lead that has no customer name captured yet,
+  // default to "Dear customer" so we never send a blank/awkward salutation.
+  // (The lead prefill URL only carries email/mobile/service — no name.)
+  $("#custName").value = "Dear customer";
   $("#custEmail").value = email;
   $("#custPhone").value = mobile;
   // Remember for backend auto-move

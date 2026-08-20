@@ -556,7 +556,9 @@ function render() {
   else if (q.status === "sent") rb.innerHTML = '<div class="ribbon sent">SENT</div>';
 
   // Customer
-  $("#cName").textContent = q.customer_name || "";
+  // Never render a blank salutation — fall back to "Dear customer" if the DB row
+  // has no customer_name (e.g. a lead-sourced quote where name wasn't captured).
+  $("#cName").textContent = (q.customer_name && String(q.customer_name).trim()) ? q.customer_name : "Dear customer";
   $("#cEmail").textContent = q.customer_email ? "Email: " + q.customer_email : "";
   $("#cPhone").textContent = q.customer_phone ? "Phone: " + q.customer_phone : "";
   $("#cGst").textContent = q.customer_gst ? "GSTIN: " + q.customer_gst : "";
