@@ -372,7 +372,18 @@ async function refreshAll() {
 async function refreshQuotationsCard() {
   const cntEl = document.getElementById("quotAcceptedCount");
   const totEl = document.getElementById("quotAcceptedTotal");
+  const statsWrap = document.getElementById("quotStatsWrap");
+  const iconOnly = document.getElementById("quotIconOnly");
   if (!cntEl || !totEl) return;
+  // Managers only (super OR leads perm). Employees see the plain 📋 icon.
+  if (!_isManager) {
+    if (statsWrap) statsWrap.classList.add("hidden");
+    if (iconOnly)  iconOnly.classList.remove("hidden");
+    return;
+  } else {
+    if (statsWrap) statsWrap.classList.remove("hidden");
+    if (iconOnly)  iconOnly.classList.add("hidden");
+  }
   cntEl.textContent = "—";
   totEl.textContent = "—";
   try {
