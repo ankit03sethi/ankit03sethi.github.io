@@ -2883,6 +2883,22 @@ async function showAssignmentHistoryModal(customerKey) {
     const hit = (_allEmployeesCache || []).find((e) => e.code === code);
     return hit ? (hit.name || "") : "";
   };
+  // Resolve an email to the matching employee's code+name. Returns "" if not an employee.
+  const empByEmail = (email) => {
+    if (!email) return null;
+    const hit = (_allEmployeesCache || []).find((e) => String(e.email || "").toLowerCase() === String(email).toLowerCase());
+    return hit || null;
+  };
+  // Show WHO performed the action as employee chip if we can resolve them; else fall back to "the system".
+  const byActorChip = (email) => {
+    if (!email || email === "system") return `<span style="color:#94a3b8;font-style:italic;">the system</span>`;
+    const emp = empByEmail(email);
+    if (emp) {
+      return `<span style="display:inline-block;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;padding:2px 8px;border-radius:5px;font-weight:700;font-size:12px;">${esc(emp.code)}${emp.name ? ` <span style="font-weight:500;">— ${esc(emp.name)}</span>` : ""}</span>`;
+    }
+    // Admin user (super) not in employees table
+    return `<span style="display:inline-block;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:2px 8px;border-radius:5px;font-weight:700;font-size:12px;">👤 Admin</span>`;
+  };
   const empChip = (code, tone) => {
     if (!code) return `<span style="color:#94a3b8;font-style:italic;">no one</span>`;
     const nm = empName(code);
@@ -2939,9 +2955,7 @@ async function showAssignmentHistoryModal(customerKey) {
 
     const renderAssignment = (r) => {
       const why = reasonPretty[r.reason] || `↪ ${esc(r.reason || "changed")}`;
-      const byLine = r.by_email && r.by_email !== "system"
-        ? `<div style="color:#64748b;font-size:11.5px;margin-top:3px;">Done by <b>${esc(r.by_email)}</b></div>`
-        : `<div style="color:#94a3b8;font-size:11.5px;margin-top:3px;font-style:italic;">Done by the system</div>`;
+      const byLine = `<div style="color:#64748b;font-size:11.5px;margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">Done by ${byActorChip(r.by_email)}</div>`;
       return `
         <div style="padding:10px 12px;margin-bottom:8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;position:relative;">
           <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:#1f6feb;border-radius:50%;border:2px solid #fff;"></div>
@@ -2966,9 +2980,7 @@ async function showAssignmentHistoryModal(customerKey) {
         const hit = (typeof SERVICES !== "undefined" ? SERVICES : []).find(s => String(s.value).toLowerCase() === String(r.service || "").toLowerCase());
         return hit ? hit.label : (r.service || "—");
       })();
-      const byLine = r.by_email
-        ? `<div style="color:#64748b;font-size:11.5px;margin-top:3px;">Done by <b>${esc(r.by_email)}</b></div>`
-        : `<div style="color:#94a3b8;font-size:11.5px;margin-top:3px;font-style:italic;">Done by the system</div>`;
+      const byLine = `<div style="color:#64748b;font-size:11.5px;margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${isAdd ? "Added" : "Cancelled"} by ${byActorChip(r.by_email)}</div>`;
       return `
         <div style="padding:10px 12px;margin-bottom:8px;background:${bg};border-radius:6px;border:1px solid ${bd};position:relative;">
           <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:${dot};border-radius:50%;border:2px solid #fff;"></div>
