@@ -1122,11 +1122,7 @@ function renderToolbarInto(el) {
     </select>
     <button id="serviceFilterClear" class="remark-filter-clear" style="display:${serviceFilter ? "inline-block" : "none"};">Clear service</button>
 
-    <span class="filter-lbl" style="margin-left:12px;">Emp:</span>
-    <select id="employeeFilterSelect" class="remark-filter-select">
-      ${buildEmployeeFilterOptions()}
-    </select>
-    <button id="employeeFilterClear" class="remark-filter-clear" style="display:${employeeFilter ? "inline-block" : "none"};">Clear emp</button>
+    <!-- 'Emp:' (lead creator) filter removed — redundant with 'Assigned to' since auto-assign makes them the same on manual leads. -->
 
     ${_isManager ? `
     <span class="filter-lbl" style="margin-left:12px;">Assigned to:</span>
