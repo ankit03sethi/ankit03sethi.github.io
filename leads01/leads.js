@@ -1690,26 +1690,35 @@ function rowHtml(l, readOnly) {
   const asnBg = asnCode ? "#fef3c7" : "#f1f5f9";
   const asnFg = asnCode ? "#92400e" : "#64748b";
   const asnBorder = asnCode ? "#fde68a" : "#e2e8f0";
-  // In the Unassigned tab we render a full inline picker (see empCellHtml below);
-  // hide the tiny prompt-based Reassign button there so we don't show two competing UIs.
-  const showReassignBtn = _isManager && !readOnly && activeTop !== "unassigned";
-  const reassignBtn = showReassignBtn ? `<button class="reassign-btn" data-action="reassign" data-customer-key="${cur}" title="Reassign this lead to a different employee" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">Reassign</button>` : "";
-  const assigneeChip = `<span title="Employee this lead is currently assigned to" style="display:inline-flex;align-items:center;margin-top:4px;margin-left:4px;padding:2px 8px;background:${asnBg};color:${asnFg};border:1px solid ${asnBorder};border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${asnChipInner}${reassignBtn}</span>`;
+  // v2026082015: the Reassign button was moved out of the chip and into its own
+  // "Forward" action button placed right before Save (see below). The chip is now
+  // purely a display of the current assignee + a tiny "History" click that opens
+  // a modal listing lead_assignment_history.
+  const historyBtn = (_isManager && !readOnly) ? `<button class="asn-history-btn" data-action="show-asn-history" data-customer-key="${cur}" title="Show past assignees" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">History</button>` : "";
+  const assigneeChip = `<span title="Employee this lead is currently assigned to" style="display:inline-flex;align-items:center;margin-top:4px;margin-left:4px;padding:2px 8px;background:${asnBg};color:${asnFg};border:1px solid ${asnBorder};border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${asnChipInner}${historyBtn}</span>`;
 
-  // Employee CELL for the dedicated column.
-  //   - locked chip when lead already has employee_code (no way to edit)
-  //   - input + name-status span otherwise (300ms debounced lookup, admin-employees)
-  let empCellHtml = l.employee_code
-    ? `<div style="display:flex;flex-direction:column;gap:2px;">
-         <span title="Locked once saved" style="display:inline-block;padding:3px 9px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>
-         <span title="Locked once saved" style="font-size:10.5px;color:#9a3412;">🔒 <span class="muted-small" style="color:#9a3412;">Locked once saved</span></span>
-       </div>`
-    : (readOnly
-        ? `<span class="muted-small">—</span>`
-        : `<div class="row-emp-wrap" style="display:flex;flex-direction:column;gap:3px;">
-             <input class="row-emp-code" data-customer-key="${cur}" maxlength="12" placeholder="EMP CODE" style="width:100%;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;"/>
-             <span class="row-emp-name muted-small" data-customer-key="${cur}" style="padding:2px 6px;border-radius:4px;background:#f8fafc;color:#64748b;font-size:11px;">Enter code above…</span>
-           </div>`);
+  // Employee CELL for the dedicated column (v2026082015).
+  // ── EMP CODE input is gone. The cell is a READ-ONLY chip showing the current
+  // ASSIGNEE (assigned_employee_code / _name) with a small History button.
+  // To change the assignee, managers use the "Forward" action button in the
+  // right-side action column (see rowSaveCell below).
+  const asnDisplay = asnCode
+    ? `${esc(asnCode)}${asnName ? ` · ${esc(asnName)}` : ""}`
+    : `— Unassigned —`;
+  const asnChipBg = asnCode ? "#fef3c7" : "#f1f5f9";
+  const asnChipFg = asnCode ? "#92400e" : "#64748b";
+  const asnChipBd = asnCode ? "#fde68a" : "#e2e8f0";
+  const creatorLine = l.employee_code
+    ? `<div class="muted-small" style="font-size:10.5px;color:#9a3412;">👤 creator: ${esc(l.employee_code)}${l.employee_name ? " · " + esc(l.employee_name) : ""}</div>`
+    : "";
+  const historyBtnInCell = (_isManager && !readOnly)
+    ? `<button data-action="show-asn-history" data-customer-key="${cur}" title="Show past assignees" style="margin-top:3px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;align-self:flex-start;">History</button>`
+    : "";
+  let empCellHtml = `<div style="display:flex;flex-direction:column;gap:3px;">
+      <span title="Assigned employee (read-only — use Forward to reassign)" style="display:inline-block;padding:3px 9px;background:${asnChipBg};color:${asnChipFg};border:1px solid ${asnChipBd};border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${esc(asnDisplay)}</span>
+      ${creatorLine}
+      ${historyBtnInCell}
+    </div>`;
 
   // Unassigned tab (managers only): inline Service dropdown + searchable Employee dropdown
   // + Assign button. Service dropdown is populated from SERVICES; pre-selects the lead's
@@ -1753,11 +1762,16 @@ function rowHtml(l, readOnly) {
     empCellHtml = `${creatorChip}${inlineAssign}`;
   }
 
+  // Services cell (chips + optional add-service dropdown). Replaces the old
+  // single service_name text in the Service column.
+  const servicesCell = renderServicesCell(l, readOnly);
+
   // Read-only completed row
   if (readOnly) {
     return `<tr class="done">
       <td>
         <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
+        ${servicesCell}
         <span class="done-tag">${esc(bucketReason(l))}</span>
         <div>${empChip}${assigneeChip}</div>
       </td>
@@ -1783,9 +1797,15 @@ function rowHtml(l, readOnly) {
   // Unassigned tab: no call-status dropdown and no Save/Add cell — those only
   // make sense once the lead has been assigned and moved into New / Follow Ups.
   const hideStatusCell = activeTop === "unassigned";
+  // v2026082015: rename Reassign → Forward and move it into the Save cell,
+  // positioned RIGHT BEFORE the Save button. Manager only.
+  const forwardBtnHtml = (_isManager && !hideStatusCell)
+    ? `<button class="forward-btn" data-action="reassign" data-customer-key="${cur}" title="Forward this lead to a different employee" style="margin-right:6px;padding:6px 12px;background:#f97316;color:#fff;border:0;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;">Forward</button>`
+    : "";
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
+      ${servicesCell}
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
       <div>${empChip}${assigneeChip}</div>
     </td>
@@ -1802,9 +1822,12 @@ function rowHtml(l, readOnly) {
     <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
     ${hideStatusCell ? "" : `<td>
-      ${isTerminal
-        ? `<span class="muted-small">Terminal state</span>`
-        : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;">${statusValue ? "Update status" : "Save status"}</button>`}
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+        ${forwardBtnHtml}
+        ${isTerminal
+          ? `<span class="muted-small">Terminal state</span>`
+          : `<button class="row-save-btn" data-action="save-status" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;">${statusValue ? "Update status" : "Save status"}</button>`}
+      </div>
       <div class="row-save-error" style="display:none;"></div>
     </td>`}
   </tr>`;
@@ -1820,12 +1843,12 @@ function refreshRowSaveGate(tr) {
   const key = tr.getAttribute("data-customer-key") || "";
   const lead = pipelineCache.find((x) => x.customer_key === key);
   const hasStatus = !!(sel && sel.value);
+  // v2026082015: EMP CODE input is gone. Gate save on either an existing
+  // creator code OR a current assignee. If neither, block save and prompt
+  // the manager to Forward the lead instead.
   let empOk = false;
-  if (lead && lead.employee_code) {
-    empOk = true; // locked pre-existing code
-  } else {
-    const st = _rowEmpState[key];
-    empOk = !!(st && st.ok && st.code);
+  if (lead && (lead.employee_code || lead.assigned_employee_code)) {
+    empOk = true;
   }
   const enable = hasStatus && empOk;
   btn.disabled = !enable;
@@ -2144,6 +2167,60 @@ function wireRowHandlers() {
       }
       return;
     }
+    if (action === "add-service") {
+      if (!_isManager) return;
+      const wrap = target.closest(".add-svc-wrap");
+      const sel = wrap?.querySelector(".add-svc-select");
+      const svc = String(sel?.value || "").trim().toLowerCase();
+      if (!svc) { alert("Pick a service first."); return; }
+      target.disabled = true; target.textContent = "Adding…";
+      try {
+        const res = await callAdmin("add_service_to_lead", { customer_key: key, service: svc });
+        const kind = res?.result || "stayed";
+        const newLeads = res?.new_leads || [];
+        const svcLabelStr = svcLabel(svc);
+        let msg;
+        if (kind === "stayed") {
+          const code = newLeads[0]?.employee_code || "current employee";
+          msg = `Added ${svcLabelStr}. Stays with ${code}.`;
+        } else if (kind === "forwarded") {
+          const first = newLeads[0] || {};
+          const services = (first.services || [svc]).map((s) => svcLabel(s)).join(", ");
+          msg = `Forwarded ${services} to ${first.employee_code || "new employee"} as a new lead.`;
+        } else if (kind === "split") {
+          msg = `Split into ${newLeads.length} new leads.`;
+        } else {
+          msg = `Add service result: ${kind}`;
+        }
+        alert(msg);
+        pipelineCache = await callAdmin("pipeline");
+        updateTopCounts();
+        renderActive();
+      } catch (err) {
+        target.disabled = false; target.textContent = "Add";
+        alert("Add service failed: " + err.message);
+      }
+      return;
+    }
+    if (action === "remove-service") {
+      if (!_isManager) return;
+      const svc = String(target.dataset.service || "").trim().toLowerCase();
+      if (!svc) return;
+      if (!confirm(`Remove service "${svcLabel(svc)}" from this lead? (It will be kept as history.)`)) return;
+      try {
+        await callAdmin("remove_service_from_lead", { customer_key: key, service: svc });
+        pipelineCache = await callAdmin("pipeline");
+        updateTopCounts();
+        renderActive();
+      } catch (err) {
+        alert("Remove service failed: " + err.message);
+      }
+      return;
+    }
+    if (action === "show-asn-history") {
+      await showAssignmentHistoryModal(key);
+      return;
+    }
     if (action === "send-quote") {
       const prefill = target.dataset.prefill || "";
       // Switch to Quotations tab + load prefilled URL in iframe
@@ -2163,12 +2240,12 @@ function wireRowHandlers() {
         errBox.style.display = "block";
         return;
       }
-      // Belt-and-suspenders: gate should already have blocked this, but re-check.
+      // v2026082015: no more EMP CODE input; the row is gated on assignee /
+      // creator existing (checked by refreshRowSaveGate). If neither exists,
+      // the manager must Forward the lead first.
       const leadRow = pipelineCache.find((x) => x.customer_key === key) || {};
-      const empSt = _rowEmpState[key] || { ok: false, code: "", name: "" };
-      const hasExistingEmp = !!leadRow.employee_code;
-      if (!hasExistingEmp && !(empSt.ok && empSt.code)) {
-        errBox.textContent = "Enter a valid employee code before saving.";
+      if (!leadRow.employee_code && !leadRow.assigned_employee_code) {
+        errBox.textContent = "Lead has no assignee — click Forward to assign first.";
         errBox.style.display = "block";
         return;
       }
@@ -2176,23 +2253,11 @@ function wireRowHandlers() {
       target.style.opacity = ".4"; target.style.cursor = "not-allowed"; target.style.pointerEvents = "none";
       try {
         const payload = { customer_key: key, talk_status };
-        // Only send employee_code/name when the lead didn't already have one.
-        // Existing codes are immutable — trigger would reject and this avoids noise.
-        if (!hasExistingEmp) {
-          payload.employee_code = empSt.code;
-          payload.employee_name = empSt.name || "";
-        }
         await callAdmin("set_lead_status", payload);
         const idx = pipelineCache.findIndex((x) => x.customer_key === key);
         if (idx >= 0) {
           pipelineCache[idx].talk_status = talk_status;
-          if (!hasExistingEmp) {
-            pipelineCache[idx].employee_code = empSt.code;
-            pipelineCache[idx].employee_name = empSt.name || "";
-          }
         }
-        // Clear per-row emp state now that it's persisted / locked.
-        delete _rowEmpState[key];
         updateTopCounts();
         renderActive();
       } catch (err) {
@@ -2349,6 +2414,94 @@ function renderHistoryList(elId, list) {
       <div style="padding:4px 8px;font-size:11px;font-weight:700;color:#64748b;background:#f1f5f9;">📜 All values (${values.length}) — read only, cannot be deleted</div>
       ${rows}
     </div>`;
+}
+
+// ── Multi-service chip rendering (v2026082015) ─────────────────────────────
+// Reads services from either the aggregated arrays (services_active / services_removed)
+// or from services_detail[] returned by admin-data v31 (needed for the tooltip
+// showing WHO removed a service AND WHEN — the arrays alone don't carry that).
+function svcLabel(svc) {
+  const hit = SERVICES.find((s) => s.value === String(svc || "").toLowerCase());
+  return hit ? hit.label : String(svc || "");
+}
+
+function renderServicesCell(l, readOnly) {
+  const cur = esc(l.customer_key || "");
+  const detail = Array.isArray(l.services_detail) ? l.services_detail : [];
+  // Fallback: build a synthetic detail array if only services_active/services_removed present
+  let active   = detail.filter((x) => x.is_active);
+  let removed  = detail.filter((x) => !x.is_active);
+  if (active.length === 0 && Array.isArray(l.services_active)) {
+    active = (l.services_active || []).map((s) => ({ service: s, is_active: true, added_at: null, added_by: null }));
+  }
+  if (removed.length === 0 && Array.isArray(l.services_removed)) {
+    removed = (l.services_removed || []).map((s) => ({ service: s, is_active: false, removed_at: null, removed_by: null }));
+  }
+  // If no lead_services rows at all (legacy row not yet migrated), synthesize one from service_type
+  if (active.length === 0 && removed.length === 0 && l.service_type) {
+    active = [{ service: String(l.service_type).toLowerCase(), is_active: true, is_primary: true, added_at: null }];
+  }
+
+  const activeChips = active.map((s) => {
+    const svcVal = String(s.service || "").toLowerCase();
+    const rmBtn = readOnly ? "" : `<button data-action="remove-service" data-customer-key="${cur}" data-service="${esc(svcVal)}" title="Remove ${esc(svcLabel(svcVal))}" style="margin-left:4px;background:transparent;border:0;color:#7c2d12;font-weight:700;cursor:pointer;font-size:11px;line-height:1;">✕</button>`;
+    return `<span title="${esc(svcVal)}${s.added_at ? ' · added ' + fmtDate(s.added_at) : ''}" style="display:inline-flex;align-items:center;margin:2px 4px 2px 0;padding:2px 6px;background:#dcfce7;color:#065f46;border:1px solid #86efac;border-radius:8px;font-size:10.5px;font-weight:700;">${esc(svcLabel(svcVal))}${rmBtn}</span>`;
+  }).join("");
+
+  const removedChips = removed.map((s) => {
+    const svcVal = String(s.service || "").toLowerCase();
+    const tip = s.removed_at
+      ? `Removed on ${fmtDate(s.removed_at)}${s.removed_by ? ' by ' + s.removed_by : ''}`
+      : "Removed";
+    return `<span title="${esc(tip)}" style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;font-size:10.5px;font-weight:600;text-decoration:line-through;">${esc(svcLabel(svcVal))}</span>`;
+  }).join("");
+
+  // Build add-service dropdown that lists all SERVICES not already active on this lead
+  const activeSet = new Set(active.map((s) => String(s.service || "").toLowerCase()));
+  const availableSvcs = SERVICES.filter((s) => !activeSet.has(s.value));
+  const addSvcHtml = (readOnly || !_isManager || availableSvcs.length === 0) ? "" : `
+    <div class="add-svc-wrap" data-customer-key="${cur}" style="margin-top:4px;display:flex;align-items:center;gap:4px;">
+      <select class="add-svc-select" data-customer-key="${cur}" style="padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background:#fff;max-width:140px;">
+        <option value="">＋ Add service…</option>
+        ${availableSvcs.map((s) => `<option value="${esc(s.value)}">${esc(s.label)}</option>`).join("")}
+      </select>
+      <button data-action="add-service" data-customer-key="${cur}" style="padding:2px 8px;background:#059669;color:#fff;border:0;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;">Add</button>
+    </div>`;
+
+  return `<div class="services-cell">${activeChips || `<span class="muted-small">no active services</span>`}${removedChips ? `<div style="margin-top:2px;">${removedChips}</div>` : ""}${addSvcHtml}</div>`;
+}
+
+// Modal that lists lead_assignment_history for a lead
+async function showAssignmentHistoryModal(customerKey) {
+  document.getElementById("asnHistoryOverlay")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "asnHistoryOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:640px;width:100%;max-height:80vh;overflow-y:auto;">
+      <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:12px;">Assignment history</div>
+      <div class="muted-small" style="color:#64748b;margin-bottom:12px;">${esc(customerKey)}</div>
+      <div id="asnHistoryList" style="font-size:12.5px;color:#334155;">Loading…</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <button id="asnHistoryClose" style="background:#e5e7eb;color:#111;padding:8px 14px;border:none;border-radius:5px;font-size:13px;cursor:pointer;">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const cleanup = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(); });
+  overlay.querySelector("#asnHistoryClose").onclick = cleanup;
+  try {
+    const rows = await callAdmin("lead_assignment_history", { customer_key: customerKey });
+    const listEl = document.getElementById("asnHistoryList");
+    if (!rows || rows.length === 0) { listEl.innerHTML = `<span class="muted-small">No history.</span>`; return; }
+    listEl.innerHTML = rows.map((r) => `
+      <div style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">
+        <div style="font-weight:600;">${esc(r.from_code || "—")} → <span style="color:#059669;">${esc(r.to_code || "—")}</span></div>
+        <div class="muted-small" style="color:#64748b;font-size:11px;">${esc(r.reason || "")} · ${esc(r.by_email || "")} · ${esc(fmtDate(r.at))} ${esc(fmtTime(r.at))}</div>
+      </div>`).join("");
+  } catch (err) {
+    document.getElementById("asnHistoryList").innerHTML = `<span style="color:#991b1b;">Load failed: ${esc(err.message)}</span>`;
+  }
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
