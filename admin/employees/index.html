@@ -42,6 +42,15 @@
     label.small { font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:4px; }
     @media (max-width:640px) { .row-form { grid-template-columns:1fr; } }
     .email-chip { background:#f1f5f9; color:#334155; padding:5px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:8px; font-size:10.5px; font-weight:700; margin:1px 3px 1px 0; letter-spacing:.2px; }
+    .pill.role-sales      { background:#dbeafe; color:#1e40af; }
+    .pill.role-processing { background:#dcfce7; color:#166534; }
+    .pill.role-renewal    { background:#ede9fe; color:#5b21b6; }
+    .pill.role-technical  { background:#fee2e2; color:#991b1b; }
+    .pill.svc             { background:#f1f5f9; color:#334155; }
+    label.chk { display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; margin:2px; font-size:12px; cursor:pointer; font-weight:600; }
+    label.chk input { margin:0; accent-color:#1f6feb; }
+    .chk-group { display:flex; flex-wrap:wrap; gap:2px; margin-top:4px; }
   </style>
 </head>
 <body>
@@ -96,13 +105,15 @@
             <th style="width:110px;">Code</th>
             <th>Name</th>
             <th>Email</th>
+            <th style="width:150px;">Roles</th>
+            <th style="width:220px;">Services</th>
             <th style="width:80px;text-align:center;">Active</th>
             <th style="width:180px;">Added by</th>
             <th style="width:110px;">Created</th>
             <th style="width:150px;">Actions</th>
           </tr>
         </thead>
-        <tbody id="empRows"><tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">Loading…</td></tr></tbody>
+        <tbody id="empRows"><tr><td colspan="9" style="padding:24px;text-align:center;color:#94a3b8;">Loading…</td></tr></tbody>
       </table>
     </div>
 
@@ -124,6 +135,15 @@
           <button id="addBtn" class="b-primary">Add</button>
         </div>
       </div>
+      <div style="margin-top:14px;">
+        <label class="small">Roles (what buckets can this employee take leads from)</label>
+        <div class="chk-group" id="rolesBox"></div>
+      </div>
+      <div style="margin-top:10px;">
+        <label class="small">Services (which services can this employee handle)</label>
+        <div class="chk-group" id="servicesBox"></div>
+      </div>
+      <p style="margin:10px 0 0;color:#64748b;font-size:12px;">On save, the employee is also invited as an admin user with the <b>employee</b> permission and receives an email to set their password for <code>/leads01/</code>.</p>
     </div>
   </div>
 </main>
@@ -140,6 +160,34 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSessio
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c]);
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
+
+const ROLES = ["sales", "processing", "renewal", "technical"];
+// Mirror of leads01/leads.js SERVICES list
+const SERVICES = [
+  { value: "pd_tracker",        label: "PD Tracker" },
+  { value: "analyst",           label: "Cursive Analyst" },
+  { value: "business_launcher", label: "Business Launcher" },
+  { value: "gst",               label: "GST Registration" },
+  { value: "trademark",         label: "Trademark" },
+  { value: "udyam",             label: "Udyam (MSME)" },
+  { value: "iec",               label: "IEC Code" },
+  { value: "platform_account",  label: "Marketplace Setup" },
+  { value: "listing",           label: "Listing Service" },
+  { value: "imaging",           label: "Product Imaging" },
+  { value: "website",           label: "Website Creation" },
+  { value: "creators",          label: "Creators" },
+  { value: "other",             label: "Other / Not sure" },
+];
+function svcLabel(v) { const h = SERVICES.find(x => x.value === v); return h ? h.label : v; }
+function renderRoleChecks(target, selected) {
+  target.innerHTML = ROLES.map(r => `<label class="chk"><input type="checkbox" value="${r}" ${(selected||[]).includes(r)?"checked":""}/> ${r}</label>`).join("");
+}
+function renderServiceChecks(target, selected) {
+  target.innerHTML = SERVICES.map(s => `<label class="chk"><input type="checkbox" value="${s.value}" ${(selected||[]).includes(s.value)?"checked":""}/> ${s.label}</label>`).join("");
+}
+function readChecks(target) {
+  return Array.from(target.querySelectorAll('input[type=checkbox]:checked')).map(x => x.value);
+}
 
 function toast(msg, cls) {
   const t = $("#toast");
@@ -200,14 +248,21 @@ async function callFn(op, extra) {
 async function reload() {
   const j = await callFn("list");
   const tbody = $("#empRows");
-  if (!j.ok) { tbody.innerHTML = `<tr><td colspan="7" style="color:#991b1b;">Load failed: ${esc(j.error)}</td></tr>`; return; }
+  if (!j.ok) { tbody.innerHTML = `<tr><td colspan="9" style="color:#991b1b;">Load failed: ${esc(j.error)}</td></tr>`; return; }
   const rows = j.employees || [];
-  if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;">No employees yet — add one below.</td></tr>`; return; }
-  tbody.innerHTML = rows.map(e => `
+  if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="9" style="padding:24px;text-align:center;color:#94a3b8;">No employees yet — add one below.</td></tr>`; return; }
+  tbody.innerHTML = rows.map(e => {
+    const roles = e.roles || [];
+    const services = e.services || [];
+    const rolePills = roles.length ? roles.map(r => `<span class="pill role-${esc(r)}">${esc(r)}</span>`).join("") : `<span class="muted-small" style="color:#94a3b8;">—</span>`;
+    const svcPills = services.length ? services.map(s => `<span class="pill svc" title="${esc(s)}">${esc(svcLabel(s))}</span>`).join("") : `<span class="muted-small" style="color:#94a3b8;">—</span>`;
+    return `
     <tr data-code="${esc(e.code)}">
       <td><span class="code-chip">${esc(e.code)}</span></td>
       <td class="cell-name">${esc(e.name)}</td>
       <td class="cell-email">${esc(e.email)}</td>
+      <td class="cell-roles">${rolePills}</td>
+      <td class="cell-services">${svcPills}</td>
       <td style="text-align:center;">
         <label class="toggle" title="${e.is_active ? "Active" : "Inactive"}">
           <input type="checkbox" data-toggle="${esc(e.code)}" ${e.is_active ? "checked" : ""}/>
@@ -221,7 +276,7 @@ async function reload() {
         <button class="b-danger" data-del="${esc(e.code)}">✕ Delete</button>
       </td>
     </tr>
-  `).join("");
+  `;}).join("");
   tbody.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("change", async () => {
     const code = el.dataset.toggle;
     const j = await callFn("update", { code, is_active: el.checked });
@@ -245,8 +300,14 @@ function enterEditMode(code, row) {
   if (!tr) return;
   const nameTd = tr.querySelector(".cell-name");
   const emailTd = tr.querySelector(".cell-email");
+  const rolesTd = tr.querySelector(".cell-roles");
+  const svcTd = tr.querySelector(".cell-services");
   nameTd.innerHTML = `<input type="text" class="edit-name" value="${esc(row.name)}" />`;
   emailTd.innerHTML = `<input type="email" class="edit-email" value="${esc(row.email)}" />`;
+  rolesTd.innerHTML = `<div class="edit-roles chk-group"></div>`;
+  svcTd.innerHTML = `<div class="edit-svc chk-group" style="max-width:220px;"></div>`;
+  renderRoleChecks(rolesTd.querySelector(".edit-roles"), row.roles || []);
+  renderServiceChecks(svcTd.querySelector(".edit-svc"), row.services || []);
   const actionsTd = tr.querySelector("td:last-child");
   actionsTd.innerHTML = `
     <button class="b-primary" data-save="${esc(code)}" style="padding:5px 10px;font-size:11.5px;">💾 Save</button>
@@ -256,9 +317,11 @@ function enterEditMode(code, row) {
   actionsTd.querySelector("[data-save]").addEventListener("click", async () => {
     const newName = tr.querySelector(".edit-name").value.trim();
     const newEmail = tr.querySelector(".edit-email").value.trim().toLowerCase();
+    const roles = readChecks(rolesTd.querySelector(".edit-roles"));
+    const services = readChecks(svcTd.querySelector(".edit-svc"));
     if (!newName) { toast("Name required", "err"); return; }
     if (!newEmail) { toast("Email required", "err"); return; }
-    const j = await callFn("update", { code, name: newName, email: newEmail });
+    const j = await callFn("update", { code, name: newName, email: newEmail, roles, services });
     if (!j.ok) { toast(j.error || "Save failed", "err"); return; }
     toast(`✓ Updated ${code}`, "ok");
     reload();
@@ -287,23 +350,30 @@ $("#noPermSignOut").addEventListener("click", async () => { await sb.auth.signOu
 $("#addBtn").addEventListener("click", async () => {
   const name = $("#newName").value.trim();
   const email = $("#newEmail").value.trim().toLowerCase();
+  const roles = readChecks($("#rolesBox"));
+  const services = readChecks($("#servicesBox"));
   if (!name) { toast("Name required", "err"); return; }
   if (!email) { toast("Email required", "err"); return; }
   const btn = $("#addBtn");
   btn.disabled = true; btn.textContent = "Adding…";
-  const j = await callFn("create", { name, email });
+  const j = await callFn("create", { name, email, roles, services });
   btn.disabled = false; btn.textContent = "Add";
   if (!j.ok) { toast(j.error || "Add failed", "err"); return; }
   const code = j.employee?.code || "??";
   const t = $("#toast");
-  t.innerHTML = `✓ Added <b>${esc(name)}</b> <span class="new-badge">${esc(code)}</span>`;
+  t.innerHTML = `✓ Added <b>${esc(name)}</b> <span class="new-badge">${esc(code)}</span> — invite email sent to <b>${esc(email)}</b> for their /leads01/ dashboard login.`;
   t.className = "ok";
   t.style.display = "block";
-  setTimeout(() => { t.style.display = "none"; }, 5000);
+  setTimeout(() => { t.style.display = "none"; }, 7000);
   $("#newName").value = "";
   $("#newEmail").value = "";
+  renderRoleChecks($("#rolesBox"), []);
+  renderServiceChecks($("#servicesBox"), []);
   reload();
 });
+// Initial render of role/service checkbox groups
+renderRoleChecks($("#rolesBox"), []);
+renderServiceChecks($("#servicesBox"), []);
 $("#newEmail").addEventListener("keydown", e => { if (e.key === "Enter") $("#addBtn").click(); });
 $("#newName").addEventListener("keydown", e => { if (e.key === "Enter") $("#newEmail").focus(); });
 

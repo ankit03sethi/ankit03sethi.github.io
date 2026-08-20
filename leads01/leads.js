@@ -78,6 +78,14 @@ const NEW_BUCKET_STATUS_OPTIONS = [
 let pipelineCache = [];
 let activeTop = "new";
 let activeSub = "lead_captured";
+// Populated in bootDashboard(). _isManager = super || leads. _myEmpCode is the caller's
+// employees.code (needed to scope + label). _isEmployeeOnly = employee perm w/out super/leads.
+let _isManager = false;
+let _isEmployeeOnly = false;
+let _myEmpCode = "";
+let _myEmpName = "";
+let _allEmployeesCache = [];  // [{code, name, is_active}] for reassign dropdown & assignee filter
+let assignedFilter = ""; // "" = all, "__none__" = unassigned, else employee code
 let remarkFilter = "";      // free-text contains filter
 let expandedRows = new Set(); // customer_keys with expanded remark history
 let remarksByKey = {};       // cache: customer_key -> [ {remark, created_at, created_by} ]
@@ -161,21 +169,46 @@ window.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { hide($("#dashView")); show($("#loginView")); return; }
 
-  // RBAC gate — leads pipeline needs 'leads' OR 'quotations' OR 'super'.
+  // RBAC gate — leads pipeline is open to super, leads, quotations, OR employee.
   // (The quote-builder sub-page /leads01/quotations/ enforces 'quotations' or 'super' separately.)
   const { data: perms } = await sb.rpc("current_admin_permissions");
   const list = Array.isArray(perms) ? perms : [];
-  if (!list.includes("super") && !list.includes("leads") && !list.includes("quotations")) {
+  const hasSuper = list.includes("super");
+  const hasLeads = list.includes("leads");
+  const hasQuot = list.includes("quotations");
+  const hasEmp = list.includes("employee");
+  if (!hasSuper && !hasLeads && !hasQuot && !hasEmp) {
     document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.06);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;">
       <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">🚫 No access to <b style="color:#1f6feb;">Leads pipeline</b></h1>
-      <p style="color:#64748b;font-size:14px;line-height:1.6;">Your admin account doesn't have the <code>leads</code> or <code>quotations</code> permission. Ask a super-admin in <a href="/admin/users/">/admin/users/</a>.</p>
+      <p style="color:#64748b;font-size:14px;line-height:1.6;">Your admin account doesn't have the <code>leads</code>, <code>quotations</code>, or <code>employee</code> permission. Ask a super-admin in <a href="/admin/users/">/admin/users/</a>.</p>
       <p style="color:#94a3b8;font-size:12px;margin-top:10px;">Your permissions: <code>${list.length ? list.join(", ") : "(none)"}</code></p>
       <a href="/home/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Home</a>
     </div>`;
     return;
   }
+  _isManager = hasSuper || hasLeads;
+  _isEmployeeOnly = hasEmp && !_isManager;
   // Track whether this admin can also access the quote builder — used to hide the "Send Quote" button etc.
-  window._canQuotations = list.includes("super") || list.includes("quotations");
+  window._canQuotations = hasSuper || hasQuot;
+
+  // If this is an employee-only caller, look up their employees.code + name.
+  if (_isEmployeeOnly) {
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      const em = String(user?.email || "").toLowerCase();
+      // Look up via admin-data whoami (server-side) so no direct table access needed
+      const who = await callAdmin("whoami").catch(() => null);
+      _myEmpCode = who?.employee_code || "";
+      _myEmpName = who?.email || em;
+    } catch {}
+    if (!_myEmpCode) {
+      document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;font-family:system-ui;text-align:center;">
+        <h1 style="margin:0 0 10px;font-size:20px;">👤 Employee account not linked</h1>
+        <p style="color:#64748b;font-size:14px;">Your login has the <code>employee</code> permission, but your email isn't linked to an entry in the Employees directory yet. Ask a super-admin to add you at <a href="/admin/employees/">/admin/employees/</a>.</p>
+      </div>`;
+      return;
+    }
+  }
   bootDashboard();
 });
 
@@ -249,8 +282,31 @@ async function onSignOut() {
 async function bootDashboard() {
   hide($("#loginView")); show($("#dashView"));
   const { data: { user } } = await sb.auth.getUser();
-  $("#emailChip").textContent = "01";
+  $("#emailChip").textContent = _isEmployeeOnly ? `${_myEmpCode}` : "01";
   show($("#emailChip")); show($("#signOutBtn"));
+  // Page title: employees see their own dashboard label
+  if (_isEmployeeOnly) {
+    try {
+      const titleEl = document.querySelector("h1.dash-title") || document.querySelector("h1");
+      if (titleEl) titleEl.textContent = `My Leads · ${_myEmpCode}${_myEmpName ? " — " + _myEmpName : ""}`;
+      document.title = `My Leads · ${_myEmpCode}`;
+    } catch {}
+  }
+  // Unassigned tab is manager-only
+  const uTab = document.getElementById("topTabUnassigned");
+  if (uTab) uTab.classList.toggle("hidden", !_isManager);
+  // Managers get the full employees list for the Assigned-to filter + Reassign dropdown
+  if (_isManager) {
+    try {
+      const r = await fetch(SUPABASE_URL + "/functions/v1/admin-employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (await sb.auth.getSession()).data.session.access_token, "apikey": SUPABASE_ANON_KEY },
+        body: JSON.stringify({ op: "list" }),
+      });
+      const jj = await r.json();
+      if (jj?.ok && Array.isArray(jj.employees)) _allEmployeesCache = jj.employees.filter(e => e.is_active);
+    } catch (e) { console.warn("employees list failed:", e); }
+  }
   await refreshAll();
 }
 
@@ -352,7 +408,7 @@ function followSubOf(lead) {
 
 function updateTopCounts() {
   const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress"]);
-  const counts = { new: 0, follow: 0, done: 0 };
+  const counts = { new: 0, follow: 0, done: 0, unassigned: 0 };
   filteredPipeline().forEach((l) => {
     const b = bucketOf(l);
     if (b === "follow") {
@@ -361,9 +417,19 @@ function updateTopCounts() {
       counts[b] += 1;
     }
   });
+  // Unassigned count is manager-only: total leads without an assigned_employee_code.
+  // Use the raw pipeline (date-range only, no assignee-filter) so switching the
+  // Assigned-to dropdown doesn't zero the Unassigned card.
+  if (_isManager) {
+    let raw = pipelineCache;
+    if (dateRange.from || dateRange.to) raw = raw.filter((l) => withinRange(l.last_event_at));
+    if (serviceFilter) raw = raw.filter((l) => (l.service_type || "").toLowerCase() === serviceFilter.toLowerCase());
+    raw.forEach((l) => { if (!l.assigned_employee_code) counts.unassigned += 1; });
+  }
   $("#topcnt_new").textContent    = counts.new;
   $("#topcnt_follow").textContent = counts.follow;
   $("#topcnt_done").textContent   = counts.done;
+  const uEl = $("#topcnt_unassigned"); if (uEl) uEl.textContent = counts.unassigned;
 }
 
 // Pipeline filtered by active date range (uses last_event_at)
@@ -374,6 +440,11 @@ function filteredPipeline() {
   if (employeeFilter) {
     if (employeeFilter === "__none__") rows = rows.filter((l) => !l.employee_code);
     else rows = rows.filter((l) => (l.employee_code || "") === employeeFilter);
+  }
+  // Assigned-to filter (manager only). Employee-only callers are already server-scoped.
+  if (_isManager && assignedFilter) {
+    if (assignedFilter === "__none__") rows = rows.filter((l) => !l.assigned_employee_code);
+    else rows = rows.filter((l) => (l.assigned_employee_code || "") === assignedFilter);
   }
   return rows;
 }
@@ -418,6 +489,7 @@ function switchTop(top) {
   if (top === "new")    activeSub = "lead_captured";
   if (top === "follow") activeSub = "not_picked";
   if (top === "done")   activeSub = "all";
+  if (top === "unassigned") activeSub = "all";
   expandedRows.clear();
   remarkFilter = "";
   $("#paneStage").innerHTML = "";
@@ -434,8 +506,11 @@ function renderSubTabs() {
   if (activeTop === "new")    subs = NEW_SUBS;
   if (activeTop === "follow") subs = FOLLOW_SUBS;
   if (activeTop === "done")   subs = [{ id: "all", title: "All paid" }];
+  if (activeTop === "unassigned") subs = [{ id: "all", title: "All unassigned" }];
 
-  const inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+  const inBucket = activeTop === "unassigned"
+    ? filteredPipeline().filter((l) => !l.assigned_employee_code)
+    : filteredPipeline().filter((l) => bucketOf(l) === activeTop);
   const counts = {};
   subs.forEach((s) => counts[s.id] = 0);
   inBucket.forEach((l) => {
@@ -443,6 +518,7 @@ function renderSubTabs() {
     if (activeTop === "new")    k = newSubOf(l);
     if (activeTop === "follow") k = followSubOf(l);
     if (activeTop === "done")   k = "all";
+    if (activeTop === "unassigned") k = "all";
     if (k in counts) counts[k] += 1;
   });
 
@@ -470,7 +546,8 @@ function renderSubTabs() {
 function renderPane() {
   // Render the SHELL (toolbar + rows container) only once per tab switch.
   // Filter input changes only re-render the rows, preserving input focus.
-  const isManualAdd = activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
+  // Employees can't add leads — hide the manual-add bar for them.
+  const isManualAdd = _isManager && activeTop === "new" && MANUAL_ADD_SUBS.has(activeSub);
   const currentBarSub = $("#manualAddBar")?.dataset.sub || "";
   // Rebuild shell if the manual-add state OR the specific sub-tab changed
   const needShell = !$("#filterBar") || !$("#rowsContainer")
@@ -657,11 +734,14 @@ function wireManualAddHandlers() {
 }
 
 function renderRows() {
-  const inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+  const inBucket = activeTop === "unassigned"
+    ? filteredPipeline().filter((l) => !l.assigned_employee_code)
+    : filteredPipeline().filter((l) => bucketOf(l) === activeTop);
   let rows;
   if (activeTop === "new")    rows = inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
   if (activeTop === "done")   rows = inBucket;
+  if (activeTop === "unassigned") rows = inBucket;
 
   const qq = (remarkFilter || "").trim().toLowerCase();
   if (qq) rows = rows.filter((l) =>
@@ -710,7 +790,9 @@ function buildRemarkOptions() {
 
 // All leads currently visible in the active sub-tab (matches renderRows() logic minus filters)
 function leadsInCurrentSubTab() {
-  const inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop);
+  const inBucket = activeTop === "unassigned"
+    ? filteredPipeline().filter((l) => !l.assigned_employee_code)
+    : filteredPipeline().filter((l) => bucketOf(l) === activeTop);
   if (activeTop === "new")    return inBucket.filter((l) => newSubOf(l) === activeSub);
   if (activeTop === "follow") return inBucket.filter((l) => followSubOf(l) === activeSub);
   return inBucket;
@@ -738,7 +820,27 @@ function renderToolbarInto(el) {
       ${buildEmployeeFilterOptions()}
     </select>
     <button id="employeeFilterClear" class="remark-filter-clear" style="display:${employeeFilter ? "inline-block" : "none"};">Clear emp</button>
+
+    ${_isManager ? `
+    <span class="filter-lbl" style="margin-left:12px;">Assigned to:</span>
+    <select id="assignedFilterSelect" class="remark-filter-select">
+      ${buildAssignedFilterOptions()}
+    </select>
+    <button id="assignedFilterClear" class="remark-filter-clear" style="display:${assignedFilter ? "inline-block" : "none"};">Clear</button>
+    ` : ""}
   </div>`;
+}
+
+function buildAssignedFilterOptions() {
+  const opts = [
+    `<option value="" ${assignedFilter === "" ? "selected" : ""}>All</option>`,
+    `<option value="__none__" ${assignedFilter === "__none__" ? "selected" : ""}>Unassigned</option>`,
+  ];
+  (_allEmployeesCache || []).forEach((e) => {
+    const label = `${e.code}${e.name ? " — " + e.name : ""}`;
+    opts.push(`<option value="${esc(e.code)}" ${e.code === assignedFilter ? "selected" : ""}>${esc(label)}</option>`);
+  });
+  return opts.join("");
 }
 
 function buildEmployeeFilterOptions() {
@@ -833,6 +935,23 @@ function wireToolbarHandlers() {
       renderActive();
     });
   }
+  // Assigned-to filter (manager only)
+  const asnSel = $("#assignedFilterSelect");
+  if (asnSel) {
+    asnSel.addEventListener("change", (e) => {
+      assignedFilter = e.target.value;
+      updateTopCounts();
+      renderActive();
+    });
+  }
+  const asnClear = $("#assignedFilterClear");
+  if (asnClear) {
+    asnClear.addEventListener("click", () => {
+      assignedFilter = "";
+      updateTopCounts();
+      renderActive();
+    });
+  }
 }
 
 function renderTable(rows, readOnly) {
@@ -901,12 +1020,25 @@ function rowHtml(l, readOnly) {
   const remarksCell = renderRemarksCell(l, readOnly);
 
   // Employee chip (prefers native pipeline_leads.employee_code from admin-data v20+)
+  // This is the CREATOR chip (👤) — immutable once stamped.
   const empChipLabel = l.employee_code
     ? `👤 ${esc(l.employee_code)}${l.employee_name ? ` · ${esc(l.employee_name)}` : ""}`
     : "";
   const empChip = l.employee_code
-    ? `<span title="Employee assigned to this lead (immutable)" style="display:inline-block;margin-top:4px;padding:2px 8px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>`
+    ? `<span title="Employee who created / owns this lead (immutable)" style="display:inline-block;margin-top:4px;padding:2px 8px;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${empChipLabel}</span>`
     : "";
+
+  // Assignee chip (📌) — separate from creator. Managers see a "Reassign" button.
+  const asnCode = l.assigned_employee_code || "";
+  const asnName = l.assigned_employee_name || "";
+  const asnChipInner = asnCode
+    ? `📌 ${esc(asnCode)}${asnName ? " — " + esc(asnName) : ""}`
+    : `📌 Unassigned`;
+  const asnBg = asnCode ? "#fef3c7" : "#f1f5f9";
+  const asnFg = asnCode ? "#92400e" : "#64748b";
+  const asnBorder = asnCode ? "#fde68a" : "#e2e8f0";
+  const reassignBtn = (_isManager && !readOnly) ? `<button class="reassign-btn" data-action="reassign" data-customer-key="${cur}" title="Reassign this lead to a different employee" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">Reassign</button>` : "";
+  const assigneeChip = `<span title="Employee this lead is currently assigned to" style="display:inline-flex;align-items:center;margin-top:4px;margin-left:4px;padding:2px 8px;background:${asnBg};color:${asnFg};border:1px solid ${asnBorder};border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${asnChipInner}${reassignBtn}</span>`;
 
   // Employee CELL for the dedicated column.
   //   - locked chip when lead already has employee_code (no way to edit)
@@ -929,7 +1061,7 @@ function rowHtml(l, readOnly) {
       <td>
         <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
         <span class="done-tag">${esc(bucketReason(l))}</span>
-        ${empChip ? `<div>${empChip}</div>` : ""}
+        <div>${empChip}${assigneeChip}</div>
       </td>
       <td>${contactCell}</td>
       <td>
@@ -954,7 +1086,7 @@ function rowHtml(l, readOnly) {
     <td>
       <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
-      ${empChip ? `<div>${empChip}</div>` : ""}
+      <div>${empChip}${assigneeChip}</div>
     </td>
     <td>${contactCell}</td>
     <td>
@@ -1230,6 +1362,41 @@ function wireRowHandlers() {
         mobile: target.dataset.mobile || "",
         whatsapp: target.dataset.whatsapp || "",
       });
+      return;
+    }
+    if (action === "reassign") {
+      if (!_isManager) return;
+      const list = (_allEmployeesCache || []);
+      if (list.length === 0) { alert("No active employees found. Add employees at /admin/employees/ first."); return; }
+      const listStr = list.map((e, i) => `${i + 1}. ${e.code}${e.name ? " — " + e.name : ""}`).join("\n");
+      const pick = prompt(`Reassign lead to which employee?\n\n${listStr}\n\nEnter the number (1-${list.length}) or the code:`);
+      if (pick === null) return;
+      const trimmed = String(pick).trim();
+      let toCode = "";
+      if (/^\d+$/.test(trimmed)) {
+        const idx = parseInt(trimmed, 10) - 1;
+        if (idx >= 0 && idx < list.length) toCode = list[idx].code;
+      } else {
+        const upper = trimmed.toUpperCase();
+        const match = list.find(e => e.code === upper);
+        if (match) toCode = match.code;
+      }
+      if (!toCode) { alert("Invalid selection."); return; }
+      try {
+        const res = await callAdmin("reassign_lead", { customer_key: key, to_code: toCode });
+        const chosen = list.find(e => e.code === toCode);
+        // Optimistically update local cache so the chip re-renders
+        const idx = pipelineCache.findIndex((x) => x.customer_key === key);
+        if (idx >= 0) {
+          pipelineCache[idx].assigned_employee_code = toCode;
+          pipelineCache[idx].assigned_employee_name = chosen?.name || "";
+          pipelineCache[idx].assigned_at = new Date().toISOString();
+        }
+        updateTopCounts();
+        renderActive();
+      } catch (err) {
+        alert("Reassign failed: " + err.message);
+      }
       return;
     }
     if (action === "send-quote") {
