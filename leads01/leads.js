@@ -32,6 +32,7 @@ const FOLLOW_SUBS = [
   { id: "callback",           title: "Call me later" },
   { id: "interested",         title: "Interested" },
   { id: "in_progress",        title: "Send Quote" },
+  { id: "quotation_sent",     title: "Quote Sent" },
   { id: "already_purchased",  title: "Already Purchased" },
   { id: "lost",               title: "Lost" },
   { id: "never_visited",      title: "Never visited" },
@@ -464,15 +465,15 @@ function newSubOf(lead) {
   return "lead_captured";
 }
 function followSubOf(lead) {
-  // Route quotation_sent leads back to Send Quote (Quote Sent tab removed)
-  if (lead.talk_status === "quotation_sent") return "in_progress";
+  // Quote-sent leads go to their own "Quote Sent" sub-tab so ops can track pending quotes.
+  if (lead.talk_status === "quotation_sent") return "quotation_sent";
   if (lead.talk_status) return lead.talk_status;
   if (lead.manual_status === "callback") return "callback";
   return "in_progress";
 }
 
 function updateTopCounts() {
-  const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress"]);
+  const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress", "quotation_sent"]);
   const counts = { new: 0, follow: 0, done: 0, unassigned: 0 };
   filteredPipeline().forEach((l) => {
     const b = bucketOf(l);
