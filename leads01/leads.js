@@ -478,13 +478,17 @@ async function callEmployeeLookup(code) {
 
 async function refreshAll() {
   try {
+    // v2026082102: fire the quotations-card fetch in PARALLEL with pipeline —
+    // don't wait for pipeline to finish before populating the accepted/total
+    // numbers on the top card. Otherwise the numbers show as "0" for the full
+    // pipeline load time (often 2-3s).
+    refreshQuotationsCard();
     pipelineCache = await callAdmin("pipeline");
     $("#lastRefreshed").textContent = "Last refreshed " + new Date().toLocaleTimeString();
     $("#dateActiveRange").textContent = labelForRange();
     updateTopCounts();
     renderActive();
     refreshTotalPaid();
-    refreshQuotationsCard();
     // Push date range into quotations iframe (if loaded)
     const f = $("#quotationsFrame");
     if (f && f.contentWindow) {
@@ -510,8 +514,11 @@ async function refreshQuotationsCard() {
     if (statsWrap) statsWrap.classList.remove("hidden");
     if (iconOnly)  iconOnly.classList.add("hidden");
   }
-  cntEl.textContent = "—";
-  totEl.textContent = "—";
+  // v2026082102: default to "0" / "₹0" (not em-dashes) so the card is
+  // informative even before the fetch resolves. If the caller lacks
+  // quotations perm and the fetch 403s, the 0s stay — which is truthful.
+  if (cntEl.textContent === "—") cntEl.textContent = "0";
+  if (totEl.textContent === "—") totEl.textContent = "₹0";
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
@@ -525,7 +532,11 @@ async function refreshQuotationsCard() {
       body: JSON.stringify({ op: "list" }),
     });
     const j = await res.json().catch(() => ({}));
-    if (!j || !j.ok || !Array.isArray(j.quotations)) return;
+    if (!j || !j.ok || !Array.isArray(j.quotations)) {
+      cntEl.textContent = "0";
+      totEl.textContent = "₹0";
+      return;
+    }
     const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
     const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
     let count = 0;
