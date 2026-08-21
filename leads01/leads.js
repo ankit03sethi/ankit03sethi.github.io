@@ -2390,7 +2390,7 @@ function wireRowHandlers() {
       // push the picked service into _pendingServiceAdds and re-render, so
       // it shows up as a dashed "pending" chip. The real backend call
       // happens once, in the Save + Forward handler.
-      if (!_isManager) return;
+      if (!leadsCan("add_service")) return;
       const wrap = target.closest(".add-svc-wrap");
       const sel = wrap?.querySelector(".add-svc-select");
       const svc = String(sel?.value || "").trim().toLowerCase();
@@ -2405,7 +2405,7 @@ function wireRowHandlers() {
       // Cancel a queued (not-yet-saved) service add. No backend call — just
       // drop it from the local queue and re-render so the chip disappears
       // and the option reappears in the dropdown.
-      if (!_isManager) return;
+      if (!leadsCan("add_service")) return;
       const svc = String(target.dataset.service || "").trim().toLowerCase();
       if (!svc) return;
       const list = Array.isArray(_pendingServiceAdds[key]) ? _pendingServiceAdds[key] : [];
@@ -2416,7 +2416,7 @@ function wireRowHandlers() {
       return;
     }
     if (action === "remove-service") {
-      if (!_isManager) return;
+      if (!leadsCan("remove_services")) return;
       const svc = String(target.dataset.service || "").trim().toLowerCase();
       if (!svc) return;
       if (!confirm(`Remove service "${svcLabel(svc)}" from this lead? (It will be kept as history.)`)) return;
@@ -2869,7 +2869,7 @@ function renderServicesCell(l, readOnly) {
   const availableSvcs = SERVICES.filter((s) => !activeSet.has(s.value) && !pendingSet.has(s.value));
   // + Add service dropdown gated on both 'add_service' (dedicated sub-action)
   // AND 'reassign' (adding a service can trigger a forward). Managers only.
-  const canAddSvc = _isManager && leadsCan("add_service") && leadsCan("reassign");
+  const canAddSvc = leadsCan("add_service");
   const addSvcHtml = (readOnly || !canAddSvc || availableSvcs.length === 0) ? "" : `
     <div class="add-svc-wrap" data-customer-key="${cur}" style="margin-top:4px;display:flex;align-items:center;gap:4px;">
       <select class="add-svc-select" data-customer-key="${cur}" style="padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background:#fff;max-width:140px;">
