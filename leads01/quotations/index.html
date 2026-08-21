@@ -617,6 +617,13 @@ async function openContactEditor(quoteId) {
     const input = document.getElementById(id + "Input");
     const raw = (input.value || "").trim();
     if (!raw) return;
+    // Names must be typed in ALL CAPITAL letters (policy 2026-08-21).
+    if (id === "qcName" && /[a-z]/.test(raw)) {
+      const msg = document.getElementById("qcMsg");
+      msg.style.color = "#dc2626";
+      msg.textContent = "Name must be in CAPITAL letters. Please retype in ALL CAPS.";
+      return;
+    }
     const nextCustomer = {
       name:  id === "qcName"  ? raw : (q.customer_name  || ""),
       email: id === "qcEmail" ? raw.toLowerCase() : (q.customer_email || ""),

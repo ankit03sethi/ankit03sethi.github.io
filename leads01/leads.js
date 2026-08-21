@@ -2721,6 +2721,14 @@ async function showContactUpdateModal(current) {
     const input = document.getElementById(id + "Input");
     let raw = (input.value || "").trim();
     if (!raw) return;
+    // Names must be typed in ALL CAPITAL letters (policy 2026-08-21). Reject
+    // anything containing a lowercase letter so users can't half-cap by accident.
+    if (id === "cuName" && /[a-z]/.test(raw)) {
+      const msg = document.getElementById("cuMsg");
+      msg.style.color = "#dc2626";
+      msg.textContent = "Name must be in CAPITAL letters. Please retype in ALL CAPS.";
+      return;
+    }
     const payload = { customer_key: current.customer_key };
     if (id === "cuName")     payload.name     = raw.slice(0, 120);
     if (id === "cuEmail")    payload.email    = raw.toLowerCase();
