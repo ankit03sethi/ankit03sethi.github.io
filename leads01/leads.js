@@ -505,18 +505,12 @@ async function refreshQuotationsCard() {
   const statsWrap = document.getElementById("quotStatsWrap");
   const iconOnly = document.getElementById("quotIconOnly");
   if (!cntEl || !totEl) return;
-  // Managers only (super OR leads perm). Employees see the plain 📋 icon.
-  if (!_isManager) {
-    if (statsWrap) statsWrap.classList.add("hidden");
-    if (iconOnly)  iconOnly.classList.remove("hidden");
-    return;
-  } else {
-    if (statsWrap) statsWrap.classList.remove("hidden");
-    if (iconOnly)  iconOnly.classList.add("hidden");
-  }
-  // v2026082102: default to "0" / "₹0" (not em-dashes) so the card is
-  // informative even before the fetch resolves. If the caller lacks
-  // quotations perm and the fetch 403s, the 0s stay — which is truthful.
+  // v2026082103: show accepted+total for EVERYONE with quotations access
+  // (employees too). Employees still see their own totals — we auto-filter by
+  // the caller's employee_code below when they're not a manager.
+  if (statsWrap) statsWrap.classList.remove("hidden");
+  if (iconOnly)  iconOnly.classList.add("hidden");
+  // Default 0 / ₹0 so the card is informative before/after the fetch.
   if (cntEl.textContent === "—") cntEl.textContent = "0";
   if (totEl.textContent === "—") totEl.textContent = "₹0";
   try {
@@ -539,6 +533,9 @@ async function refreshQuotationsCard() {
     }
     const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
     const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
+    // Non-manager employees: scope to their own employee_code so the card
+    // reflects THEIR pipeline, not the whole company's.
+    const scopeToOwnCode = (!_isManager && _myEmpCode) ? _myEmpCode : null;
     let count = 0;
     let totalPaise = 0;
     for (const q of j.quotations) {
@@ -549,9 +546,12 @@ async function refreshQuotationsCard() {
         if (fromT !== null && t < fromT) continue;
         if (toT !== null && t > toT) continue;
       }
-      if (employeeFilter) {
+      if (scopeToOwnCode) {
+        // case-insensitive so historical mixed-case codes still match
+        if ((q.employee_code || "").toUpperCase() !== String(scopeToOwnCode).toUpperCase()) continue;
+      } else if (employeeFilter) {
         if (employeeFilter === "__none__") { if (q.employee_code) continue; }
-        else if ((q.employee_code || "") !== employeeFilter) continue;
+        else if ((q.employee_code || "").toUpperCase() !== String(employeeFilter).toUpperCase()) continue;
       }
       count += 1;
       totalPaise += Number(q.total_paise || 0);
