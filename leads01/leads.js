@@ -1887,7 +1887,7 @@ function rowHtml(l, readOnly) {
   if (readOnly) {
     return `<tr class="done">
       <td>
-        <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
+        <!-- Row title removed — chips below (renderServicesCell) include primary + additions, all with ×. -->
         ${servicesCell}
         <span class="done-tag">${esc(bucketReason(l))}</span>
       </td>
@@ -1920,7 +1920,7 @@ function rowHtml(l, readOnly) {
   // Manual forward could do that Save + Forward doesn't already cover.
   return `<tr class="${l.is_stale ? "stale" : ""}" data-customer-key="${cur}">
     <td>
-      <div style="font-weight:600;">${esc(l.service_name || l.service_type || "—")}</div>
+      <!-- Row title removed — chips below cover primary + additions, all crossable. -->
       ${servicesCell}
       ${l.is_stale ? `<span class="stale-tag">stale</span>` : ""}
     </td>
