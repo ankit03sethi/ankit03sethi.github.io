@@ -2584,27 +2584,19 @@ function wireRowHandlers() {
         _pendingServiceAdds[key] = addErrors.map((e) => e.service);
       }
 
-      // Step 5: refresh pipeline + re-render. Any forwarded services will
-      // materialise as brand-new pipeline_leads rows, and the top counters
-      // will naturally bump when it re-reads pipelineCache.
-      // v2026082029: fetch twice with a short delay in between to sidestep
-      // any Supabase read-replica lag — the just-inserted forwarded lead
-      // rows sometimes miss the first read if the replica hasn't caught up.
-      const expectedNewRows = forwardedTo.length;
-      try {
-        pipelineCache = await callAdmin("pipeline");
-        if (expectedNewRows > 0) {
-          // Check if the fresh rows landed; if not, wait 700ms and retry once.
-          const seen = new Set(pipelineCache.map((l) => l.customer_key));
-          const missing = forwardedTo.some((f) => !seen.has(f.customerKey));
-          if (missing) {
-            await new Promise((r) => setTimeout(r, 700));
-            pipelineCache = await callAdmin("pipeline");
-          }
-        }
-      } catch {}
-      updateTopCounts();
-      renderActive();
+      // Step 5: refresh pipeline + re-render.
+      // v2026082030: If any forward actually created new leads, do a full page
+      // reload after showing the ✓ Saved animation. Sidesteps every possible
+      // cache/state mismatch and guarantees FOLLOW UPS reflects all N new
+      // forwarded leads. No forwards = in-place refresh only (fast).
+      const hadForwards = forwardedTo.length > 0;
+      if (hadForwards) {
+        setTimeout(() => location.reload(), 900);
+      } else {
+        try { pipelineCache = await callAdmin("pipeline"); } catch {}
+        updateTopCounts();
+        renderActive();
+      }
 
       // If status also failed and nothing else worked, unfreeze the button
       // so the manager can retry.
