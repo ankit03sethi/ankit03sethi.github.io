@@ -614,6 +614,45 @@ async function openContactEditor(quoteId) {
     document.getElementById(id + "Input")?.focus();
   }));
 
+  // 2026-08-21: live ALL-CAPS validation for Name + Email. Turns the input
+  // red on the fly, disables that field's Save button and the shared Save All
+  // button, and shows the error message immediately.
+  function attachQcCapsGuard(fieldId, label) {
+    const input = document.getElementById(fieldId + "Input");
+    if (!input) return;
+    const saveBtn = overlay.querySelector(`[data-savefield="${fieldId}"]`);
+    const saveAllBtn = document.getElementById("qcSaveAll");
+    const msg = document.getElementById("qcMsg");
+    const recompute = () => {
+      const v = (input.value || "").trim();
+      const bad = /[a-z]/.test(v);
+      if (bad) {
+        input.style.border = "2px solid #dc2626";
+        input.style.background = "#fef2f2";
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = "0.4"; saveBtn.style.cursor = "not-allowed"; }
+        if (saveAllBtn) { saveAllBtn.disabled = true; saveAllBtn.style.opacity = "0.4"; saveAllBtn.style.cursor = "not-allowed"; }
+        msg.style.color = "#dc2626";
+        msg.textContent = label + " must be in CAPITAL letters. Please retype in ALL CAPS.";
+      } else {
+        input.style.border = "1px solid #cbd5e1";
+        input.style.background = "";
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = "pointer"; }
+        const nameV = (document.getElementById("qcNameInput")?.value || "").trim();
+        const emailV = (document.getElementById("qcEmailInput")?.value || "").trim();
+        if (!/[a-z]/.test(nameV) && !/[a-z]/.test(emailV) && saveAllBtn) {
+          saveAllBtn.disabled = false; saveAllBtn.style.opacity = ""; saveAllBtn.style.cursor = "pointer";
+        }
+        if (msg.textContent && msg.textContent.startsWith(label + " must")) {
+          msg.textContent = ""; msg.style.color = "";
+        }
+      }
+    };
+    input.addEventListener("input", recompute);
+    input.addEventListener("blur", recompute);
+  }
+  attachQcCapsGuard("qcName", "Name");
+  attachQcCapsGuard("qcEmail", "Email");
+
   const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
     const raw = (input.value || "").trim();
@@ -1829,6 +1868,45 @@ $("#waBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 120
 $("#emailBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 1500); }, { capture: false });
 // Recreate refresh
 $("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 1500); }, { capture: false });
+
+// 2026-08-21: live ALL-CAPS validation on the main quote form's Name + Email
+// inputs. Turns the input red on the fly and disables the Save Quotation button
+// while lowercase is present.
+(function attachMainFormCapsGuard() {
+  const custName = document.getElementById("custName");
+  const custEmail = document.getElementById("custEmail");
+  const saveBtn = document.getElementById("saveBtn");
+  const guard = (input, label) => {
+    if (!input) return;
+    const recompute = () => {
+      const v = (input.value || "").trim();
+      const bad = v && v !== "Dear customer" && /[a-z]/.test(v);
+      if (bad) {
+        input.style.border = "2px solid #dc2626";
+        input.style.background = "#fef2f2";
+        input.title = label + " must be in CAPITAL letters.";
+      } else {
+        input.style.border = "";
+        input.style.background = "";
+        input.title = "";
+      }
+      // Disable Save Quotation if EITHER field has lowercase
+      const bothNameOk = !custName || !(custName.value || "").trim() || (custName.value || "").trim() === "Dear customer" || !/[a-z]/.test((custName.value || "").trim());
+      const bothEmailOk = !custEmail || !(custEmail.value || "").trim() || !/[a-z]/.test((custEmail.value || "").trim());
+      if (saveBtn) {
+        if (bothNameOk && bothEmailOk) {
+          saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = "";
+        } else {
+          saveBtn.disabled = true; saveBtn.style.opacity = "0.4"; saveBtn.style.cursor = "not-allowed";
+        }
+      }
+    };
+    input.addEventListener("input", recompute);
+    input.addEventListener("blur", recompute);
+  };
+  guard(custName, "Name");
+  guard(custEmail, "Email");
+})();
 
 // ============ INIT ============
 // Never leave the page blank — if refreshSession throws, force the login panel visible

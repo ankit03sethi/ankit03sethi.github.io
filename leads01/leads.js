@@ -2722,6 +2722,47 @@ async function showContactUpdateModal(current) {
     document.getElementById(id + "Input")?.focus();
   }));
 
+  // 2026-08-21: live ALL-CAPS validation for Name + Email. When lowercase is
+  // detected the input goes red, the row's per-field Save button is disabled
+  // and the shared Save All button is disabled with a red hint. Clears the
+  // moment the field is fully uppercase (or empty).
+  function attachCapsGuard(fieldId, label) {
+    const input = document.getElementById(fieldId + "Input");
+    if (!input) return;
+    const saveBtn = overlay.querySelector(`[data-savefield="${fieldId}"]`);
+    const saveAllBtn = document.getElementById("cuSaveAll");
+    const msg = document.getElementById("cuMsg");
+    const recompute = () => {
+      const v = (input.value || "").trim();
+      const bad = /[a-z]/.test(v);
+      if (bad) {
+        input.style.border = "2px solid #dc2626";
+        input.style.background = "#fef2f2";
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = "0.4"; saveBtn.style.cursor = "not-allowed"; }
+        if (saveAllBtn) { saveAllBtn.disabled = true; saveAllBtn.style.opacity = "0.4"; saveAllBtn.style.cursor = "not-allowed"; }
+        msg.style.color = "#dc2626";
+        msg.textContent = label + " must be in CAPITAL letters. Please retype in ALL CAPS.";
+      } else {
+        input.style.border = "1px solid #cbd5e1";
+        input.style.background = "";
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = "pointer"; }
+        // Only re-enable Save All if NEITHER name nor email have lowercase
+        const nameV = (document.getElementById("cuNameInput")?.value || "").trim();
+        const emailV = (document.getElementById("cuEmailInput")?.value || "").trim();
+        if (!/[a-z]/.test(nameV) && !/[a-z]/.test(emailV) && saveAllBtn) {
+          saveAllBtn.disabled = false; saveAllBtn.style.opacity = ""; saveAllBtn.style.cursor = "pointer";
+        }
+        if (msg.textContent && msg.textContent.startsWith(label + " must")) {
+          msg.textContent = ""; msg.style.color = "";
+        }
+      }
+    };
+    input.addEventListener("input", recompute);
+    input.addEventListener("blur", recompute);
+  }
+  attachCapsGuard("cuName", "Name");
+  attachCapsGuard("cuEmail", "Email");
+
   const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
     let raw = (input.value || "").trim();
