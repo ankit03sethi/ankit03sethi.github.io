@@ -108,41 +108,75 @@
     return isVisible(chip) || isVisible(so);
   }
 
-  // 2026-08-21: Floating "Sign out" removed. Every admin page has its own inline
-  // sign-out in the header — the floating one was redundant + visually noisy.
-  // Forgot-password floating button STILL shows when signed out (useful when a
-  // user hits an admin URL but never signed in). Sign-out button is force-hidden.
+  // 2026-08-21 v2: NO floating buttons. Sign-out lives in each page's header.
+  //                Forgot-password is injected INLINE into the visible sign-in
+  //                form so it's stable, positioned right where users need it,
+  //                and never appears when signed in.
   outBtn.style.display = "none";
   outBtn.remove?.();
-  function ensureVisible() {
-    // Hide if signed in per EITHER localStorage OR the page's own signed-in chrome.
-    if (currentEmail() || pageLooksSignedIn()) {
-      btn.style.display = "none";
-      return;
+  btn.style.display = "none";  // never show the floating one
+  btn.remove?.();
+
+  // Find a visible sign-in form. Heuristic: an element that contains BOTH an
+  // email/text input AND a password input AND is not display:none.
+  function findVisibleLoginForm() {
+    const pwds = document.querySelectorAll('input[type="password"]');
+    for (const p of pwds) {
+      if (p.offsetParent === null) continue; // not visible
+      // Walk up until we find a form or panel-like container
+      let node = p.parentElement;
+      for (let depth = 0; depth < 6 && node; depth++) {
+        if (node.tagName === "FORM" || node.classList.contains("panel") ||
+            node.classList.contains("auth-card") || node.id === "loginPanel" ||
+            node.id === "loginForm" || node.id === "loginView") {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return p.parentElement; // fallback: password field's parent
     }
-    btn.style.display = "block";
-    btn.innerHTML = "🔑 Forgot password?";
-    btn.title = "Send yourself a reset-password link";
+    return null;
   }
-  // Start hidden. Wait up to 2s + poll fast during hydration so we never flash
-  // the Forgot-password button on a page that's actually signed in.
-  btn.style.display = "none";
-  const HYDRATION_POLL_MS = 250;
-  const HYDRATION_WINDOW_MS = 2500;
-  const hydStart = Date.now();
-  const hydTimer = setInterval(() => {
+
+  function injectInlineForgot() {
+    // Signed in? Do nothing.
     if (currentEmail() || pageLooksSignedIn()) {
-      btn.style.display = "none";
-      clearInterval(hydTimer);
+      document.getElementById("cw-forgot-inline")?.remove();
       return;
     }
-    if (Date.now() - hydStart >= HYDRATION_WINDOW_MS) {
-      clearInterval(hydTimer);
-      ensureVisible(); // now safe to show if truly signed out
-    }
-  }, HYDRATION_POLL_MS);
-  // Long-term watcher so mid-session logout still surfaces the button.
-  setInterval(ensureVisible, 3000);
+    const form = findVisibleLoginForm();
+    if (!form) return; // no sign-in UI on page yet
+    if (document.getElementById("cw-forgot-inline")) return; // already injected
+
+    const wrap = document.createElement("div");
+    wrap.id = "cw-forgot-inline";
+    wrap.style.cssText = "margin-top:14px;text-align:center;";
+    wrap.innerHTML = `<a href="#" id="cw-forgot-link" style="color:#1f6feb;font-size:13px;font-weight:600;text-decoration:none;">🔑 Forgot password?</a>`;
+    form.appendChild(wrap);
+    document.getElementById("cw-forgot-link").addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const emailInput = form.querySelector('input[type="email"], input[name="email"], #loginEmail, #email');
+      let email = (emailInput?.value || "").trim().toLowerCase();
+      if (!email) {
+        email = (prompt("Enter your admin email to receive a password-reset link:") || "").trim().toLowerCase();
+      }
+      if (!email) return;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("Invalid email format", true); return; }
+      const link = document.getElementById("cw-forgot-link");
+      const old = link.innerHTML; link.innerHTML = "Sending…";
+      try {
+        const res = await sendRecovery(email);
+        if (res.ok) say("✓ Reset email sent to " + email + ". Check inbox (and spam).");
+        else say("❌ " + res.error, true);
+      } catch (e) { say("❌ Network error: " + (e.message || e), true); }
+      finally { link.innerHTML = old; }
+    });
+  }
+
+  // Watch for the sign-in form appearing (page might render it after auth
+  // check). Poll every 400ms. Clean up when signed in.
+  setInterval(injectInlineForgot, 400);
+  injectInlineForgot();
 
   async function sendRecovery(email) {
     const r = await fetch(`https://bttppihskbfmxwujyztj.supabase.co/auth/v1/recover`, {
@@ -162,24 +196,6 @@
     return { ok: false, error: j.error_description || j.msg || j.error || "Failed" };
   }
 
-  btn.addEventListener("click", async () => {
-    // Button only shows when signed out, so always prompt for email
-    const email = (prompt("Enter your admin email to receive a password-reset link:") || "").trim().toLowerCase();
-    if (!email) return;
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("Invalid email format", true); return; }
-    btn.disabled = true;
-    const oldText = btn.innerHTML;
-    btn.innerHTML = "Sending…";
-    try {
-      const res = await sendRecovery(email);
-      if (res.ok) say("✓ Reset email sent to " + email + ". Check inbox (and spam).");
-      else say("❌ " + res.error, true);
-    } catch (e) {
-      say("❌ Network error: " + (e.message || e), true);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = oldText;
-      ensureVisible();
-    }
-  });
+  // Old floating-button click handler removed — the inline link (injected by
+  // injectInlineForgot above) owns the click behaviour now.
 })();
