@@ -34,7 +34,14 @@
     .chip.technical { background:#f1f5f9; color:#334155; }
     .chip.employees { background:#ffedd5; color:#9a3412; }
     .chip.employee { background:#fef3c7; color:#92400e; }
+    .chip.add_leads { background:#dcfce7; color:#065f46; }
     .chip.inactive { background:#e2e8f0; color:#475467; }
+    .leads01-subactions { display:none; margin:6px 0 8px 22px; padding:10px 12px; background:#fefce8; border:1px dashed #facc15; border-radius:8px; }
+    .leads01-subactions.visible { display:block; }
+    .leads01-subactions label { display:inline-flex; align-items:center; gap:5px; margin:2px 8px 2px 0; padding:4px 8px; background:#fff; border:1px solid #fde68a; border-radius:6px; font-size:12px; cursor:pointer; font-weight:600; color:#78350f; }
+    .leads01-subactions label input { margin:0; accent-color:#d97706; }
+    .leads01-subactions.disabled { opacity:.55; pointer-events:none; }
+    .leads01-subactions .hint { display:block; font-size:11px; color:#92400e; margin-bottom:4px; }
     .code-chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:800; background:#eef2ff; color:#3730a3; padding:3px 8px; border-radius:6px; letter-spacing:.5px; font-size:12px; }
     .pill { display:inline-block; padding:2px 8px; border-radius:8px; font-size:10.5px; font-weight:700; margin:1px 3px 1px 0; letter-spacing:.2px; }
     .pill.role-sales      { background:#dbeafe; color:#1e40af; }
@@ -145,12 +152,24 @@
           <label class="perm-check"><input type="checkbox" value="catalog"> admin/products</label>
           <label class="perm-check"><input type="checkbox" value="invoices"> admin/invoices</label>
           <label class="perm-check"><input type="checkbox" value="leads"> leads01</label>
+          <label class="perm-check"><input type="checkbox" value="add_leads"> Add leads only (leads01 → Add Leads tab)</label>
           <label class="perm-check"><input type="checkbox" value="quotations"> leads01/quotations</label>
           <label class="perm-check"><input type="checkbox" value="pdtracker"> pdtracker/passwords</label>
           <label class="perm-check"><input type="checkbox" value="technical"> technical</label>
           <!-- Hidden — 'admin/employees' page is retired (redirects here). 'employee' perm is auto-added when any Department is ticked. Both remain valid values on the backend; existing rows keep their chips. -->
           <label class="perm-check" style="display:none;"><input type="checkbox" value="employees"> admin/employees</label>
           <label class="perm-check" style="display:none;"><input type="checkbox" value="employee"> leads01 (employee)</label>
+        </div>
+        <!-- Fine-grained leads01 sub-actions. Shown only when 'leads' is ticked. Ticking 'super' hides+forces all-on. -->
+        <div id="leads01SubActions" class="leads01-subactions">
+          <span class="hint">Fine-grained leads01 sub-actions (default: all on). Uncheck to restrict.</span>
+          <label><input type="checkbox" data-action="view" checked> View leads</label>
+          <label><input type="checkbox" data-action="add" checked> Add leads</label>
+          <label><input type="checkbox" data-action="edit_status" checked> Edit call status</label>
+          <label><input type="checkbox" data-action="add_remarks" checked> Add remarks</label>
+          <label><input type="checkbox" data-action="reassign" checked> Reassign / Forward</label>
+          <label><input type="checkbox" data-action="bulk_add" checked> Bulk add</label>
+          <label><input type="checkbox" data-action="remove_services" checked> Remove services</label>
         </div>
       </div>
       <div style="margin-bottom:10px;">
@@ -206,6 +225,7 @@ const perm_labels = {
   catalog: "admin/products",
   invoices: "admin/invoices",
   leads: "leads01",
+  add_leads: "leads01 · Add only",
   quotations: "leads01/quotations",
   pdtracker: "pdtracker/passwords",
   technical: "technical",
@@ -213,6 +233,7 @@ const perm_labels = {
   employees: "admin/employees",
   employee: "leads01 (employee)",
 };
+const LEADS_ACTION_KEYS = ["view","add","edit_status","add_remarks","reassign","bulk_add","remove_services"];
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c]);
@@ -370,6 +391,11 @@ function loadIntoForm(p) {
   $("#fEmail").value = p.email;
   $("#fName").value = p.name || p.display_name || "";
   document.querySelectorAll("#permBox input[type=checkbox]").forEach(c => { c.checked = (p.permissions || []).includes(c.value); });
+  const la = p.leads01_actions || {};
+  document.querySelectorAll("#leads01SubActions input[type=checkbox]").forEach(c => {
+    c.checked = la[c.dataset.action] === true;
+  });
+  updateLeads01SubActionsVisibility();
   renderRoleChecks($("#rolesBox"), p.roles || []);
   renderServiceChecks($("#servicesBox"), p.services || []);
   $("#formTitle").textContent = "✏️ Edit " + p.email;
@@ -377,10 +403,34 @@ function loadIntoForm(p) {
   window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
 }
 
+function updateLeads01SubActionsVisibility() {
+  const leadsCb = document.querySelector('#permBox input[type=checkbox][value="leads"]');
+  const superCb = document.querySelector('#permBox input[type=checkbox][value="super"]');
+  const box = document.getElementById("leads01SubActions");
+  if (!box) return;
+  const isSuper = !!superCb?.checked;
+  const isLeads = !!leadsCb?.checked;
+  if (isLeads || isSuper) {
+    box.classList.add("visible");
+  } else {
+    box.classList.remove("visible");
+  }
+  // Super implies all-on → force checked + disable
+  if (isSuper) {
+    box.classList.add("disabled");
+    box.querySelectorAll("input[type=checkbox]").forEach(c => { c.checked = true; });
+  } else {
+    box.classList.remove("disabled");
+  }
+}
+
 function clearForm() {
   $("#fEmail").value = "";
   $("#fName").value = "";
   document.querySelectorAll("#permBox input[type=checkbox]").forEach(c => c.checked = false);
+  // Reset sub-actions to default (all on) — they'll only be visible after leads01 is ticked.
+  document.querySelectorAll("#leads01SubActions input[type=checkbox]").forEach(c => { c.checked = true; });
+  updateLeads01SubActionsVisibility();
   renderRoleChecks($("#rolesBox"), []);
   renderServiceChecks($("#servicesBox"), []);
   $("#formTitle").textContent = "➕ Add a person";
@@ -398,13 +448,29 @@ $("#saveBtn").addEventListener("click", async () => {
   if (!email) { toast("Email required", "err"); return; }
   if (!name) { toast("Name required", "err"); return; }
   // Auto-tick employee visually if any role picked
-  const effectivePerms = (roles.length > 0 && !permissions.includes("employee")) ? [...permissions, "employee"] : permissions;
+  let effectivePerms = (roles.length > 0 && !permissions.includes("employee")) ? [...permissions, "employee"] : permissions;
+  // Ensure leads01 is present in perms when any sub-action is on (matches spec)
+  const isSuper = effectivePerms.includes("super");
+  const isLeads = effectivePerms.includes("leads");
+  const hasAddLeads = effectivePerms.includes("add_leads");
+  // Build leads01_actions from the sub-action checkboxes.
+  const leads01_actions = {};
+  LEADS_ACTION_KEYS.forEach(k => { leads01_actions[k] = false; });
+  if (isSuper) {
+    LEADS_ACTION_KEYS.forEach(k => { leads01_actions[k] = true; });
+  } else if (isLeads) {
+    document.querySelectorAll("#leads01SubActions input[type=checkbox]").forEach(c => {
+      leads01_actions[c.dataset.action] = !!c.checked;
+    });
+  }
+  // add_leads implies add=true even if 'leads' is off
+  if (hasAddLeads) leads01_actions.add = true;
   if (effectivePerms.length === 0) { toast("Pick at least one permission (or a department)", "err"); return; }
   if (email === OWNER) { toast("Owner account is locked.", "err"); return; }
   const btn = $("#saveBtn");
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = "Saving…";
-  const j = await callFn("save", { email, name, permissions: effectivePerms, roles, services });
+  const j = await callFn("save", { email, name, permissions: effectivePerms, roles, services, leads01_actions });
   btn.disabled = false; btn.textContent = orig;
   if (!j.ok) { toast(j.error || "Save failed", "err"); return; }
   if (j.is_new && j.invite_sent) {
@@ -424,6 +490,30 @@ document.addEventListener("change", (e) => {
   if (e.target?.closest?.("#rolesBox") && e.target.type === "checkbox" && e.target.checked) {
     const empCb = document.querySelector('#permBox input[type=checkbox][value="employee"]');
     if (empCb && !empCb.checked) empCb.checked = true;
+  }
+});
+
+// Show/hide + reset the leads01 sub-action panel when 'leads' or 'super' is toggled.
+// Also: ticking 'add_leads' (and NOT ticking leads01) implies add=true.
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!t || t.type !== "checkbox") return;
+  if (t.closest?.("#permBox")) {
+    if (t.value === "leads" && t.checked) {
+      // Default all 7 sub-actions ON when leads01 is first ticked.
+      document.querySelectorAll("#leads01SubActions input[type=checkbox]").forEach(c => { c.checked = true; });
+    }
+    if (t.value === "super") {
+      updateLeads01SubActionsVisibility();
+    }
+    if (t.value === "leads") {
+      updateLeads01SubActionsVisibility();
+    }
+    if (t.value === "add_leads" && t.checked) {
+      // Standalone add: also flip the 'add' sub-action so the caller can post add_manual_lead.
+      const addBox = document.querySelector('#leads01SubActions input[type=checkbox][data-action="add"]');
+      if (addBox) addBox.checked = true;
+    }
   }
 });
 

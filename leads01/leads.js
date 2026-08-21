@@ -84,6 +84,14 @@ let _isManager = false;
 let _isEmployeeOnly = false;
 let _myEmpCode = "";
 let _myEmpName = "";
+// v2026082023: per-action gates hydrated from admin-data whoami.leads01_actions.
+// Structure: { view, add, edit_status, add_remarks, reassign, bulk_add, remove_services }.
+// Empty object means "no rights"; super-admins get everything true from server.
+let _leads01Actions = { view:false, add:false, edit_status:false, add_remarks:false, reassign:false, bulk_add:false, remove_services:false };
+let _isAddLeadsOnly = false; // true when caller has 'add_leads' but neither 'leads' nor 'super' nor 'employee'
+function leadsCan(action) {
+  return !!(_leads01Actions && _leads01Actions[action] === true);
+}
 let _allEmployeesCache = [];  // [{code, name, is_active}] for reassign dropdown & assignee filter
 let assignedFilter = ""; // "" = all, "__none__" = unassigned, else employee code
 let remarkFilter = "";      // free-text contains filter
@@ -233,7 +241,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { hide($("#dashView")); show($("#loginView")); return; }
 
-  // RBAC gate — leads pipeline is open to super, leads, quotations, OR employee.
+  // RBAC gate — leads pipeline is open to super, leads, quotations, employee, OR add_leads.
   // (The quote-builder sub-page /leads01/quotations/ enforces 'quotations' or 'super' separately.)
   const { data: perms } = await sb.rpc("current_admin_permissions");
   const list = Array.isArray(perms) ? perms : [];
@@ -241,10 +249,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   const hasLeads = list.includes("leads");
   const hasQuot = list.includes("quotations");
   const hasEmp = list.includes("employee");
-  if (!hasSuper && !hasLeads && !hasQuot && !hasEmp) {
+  const hasAddLeads = list.includes("add_leads");
+  if (!hasSuper && !hasLeads && !hasQuot && !hasEmp && !hasAddLeads) {
     document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.06);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center;">
       <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">🚫 No access to <b style="color:#1f6feb;">Leads pipeline</b></h1>
-      <p style="color:#64748b;font-size:14px;line-height:1.6;">Your admin account doesn't have the <code>leads</code>, <code>quotations</code>, or <code>employee</code> permission. Ask a super-admin in <a href="/admin/users/">/admin/users/</a>.</p>
+      <p style="color:#64748b;font-size:14px;line-height:1.6;">Your admin account doesn't have the <code>leads</code>, <code>add_leads</code>, <code>quotations</code>, or <code>employee</code> permission. Ask a super-admin in <a href="/admin/users/">/admin/users/</a>.</p>
       <p style="color:#94a3b8;font-size:12px;margin-top:10px;">Your permissions: <code>${list.length ? list.join(", ") : "(none)"}</code></p>
       <a href="/home/" style="display:inline-block;margin-top:14px;padding:10px 22px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">← Home</a>
     </div>`;
@@ -252,6 +261,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
   _isManager = hasSuper || hasLeads;
   _isEmployeeOnly = hasEmp && !_isManager;
+  _isAddLeadsOnly = hasAddLeads && !hasSuper && !hasLeads && !hasEmp;
   // Track whether this admin can also access the quote builder — used to hide the "Send Quote" button etc.
   window._canQuotations = hasSuper || hasQuot;
 
@@ -354,6 +364,15 @@ async function bootDashboard() {
   const { data: { user } } = await sb.auth.getUser();
   $("#emailChip").textContent = _isEmployeeOnly ? `${_myEmpCode}` : "01";
   show($("#emailChip")); show($("#signOutBtn"));
+  // v2026082023: hydrate fine-grained action flags from whoami so every UI
+  // gate reads a single source of truth. Managers get all-true from the
+  // server; add_leads-only users get just { add:true }.
+  try {
+    const who = await callAdmin("whoami").catch(() => null);
+    if (who && who.leads01_actions && typeof who.leads01_actions === "object") {
+      _leads01Actions = Object.assign({ view:false, add:false, edit_status:false, add_remarks:false, reassign:false, bulk_add:false, remove_services:false }, who.leads01_actions);
+    }
+  } catch {}
   // Page title: employees see their own dashboard label
   if (_isEmployeeOnly) {
     try {
@@ -362,12 +381,23 @@ async function bootDashboard() {
       document.title = `My Leads · ${_myEmpCode}`;
     } catch {}
   }
-  // Unassigned tab is manager-only
+  // Unassigned tab is manager-only AND requires reassign (that's the entire purpose of that tab).
   const uTab = document.getElementById("topTabUnassigned");
-  if (uTab) uTab.classList.toggle("hidden", !_isManager);
-  // Add-leads tab is manager-only (super OR leads perm) — same gate as Unassigned.
+  if (uTab) uTab.classList.toggle("hidden", !(_isManager && leadsCan("reassign")));
+  // Add-leads tab: visible whenever caller has the 'add' sub-action (super/leads
+  // with add ticked, OR the atomic add_leads permission). Managers see it too.
   const addTab = document.getElementById("topTabAdd");
-  if (addTab) addTab.classList.toggle("hidden", !_isManager);
+  const canAdd = leadsCan("add") || _isAddLeadsOnly;
+  if (addTab) addTab.classList.toggle("hidden", !(canAdd || _isManager));
+
+  // add_leads-only users: land them on the Add Leads tab, hide every other tab.
+  if (_isAddLeadsOnly) {
+    document.querySelectorAll(".top-tab").forEach((btn) => {
+      if (btn.id !== "topTabAdd") btn.classList.add("hidden");
+    });
+    // Route the user directly to Add Leads on boot.
+    setTimeout(() => switchTop("add"), 0);
+  }
   // Load the full active-employees list so the Add-Lead form can render its
   // service-filtered "Assigned to" dropdown for both managers AND employees.
   // Managers first try the richer `list` op (needs super/employees perm), then
@@ -964,7 +994,7 @@ function renderAddLeadsPanel(el) {
         </div>
       </div>
 
-      <!-- Card B: Bulk add -->
+      ${leadsCan("bulk_add") ? `<!-- Card B: Bulk add -->
       <div style="flex:1 1 380px;min-width:320px;background:#eff6ff;border:2px solid #93c5fd;border-radius:12px;padding:18px;display:flex;flex-direction:column;">
         <div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:4px;">&#128203; Bulk add many leads</div>
         <div style="color:#1e3a8a;opacity:.85;font-size:13px;line-height:1.55;margin-bottom:14px;">
@@ -978,7 +1008,7 @@ function renderAddLeadsPanel(el) {
         <div style="margin-top:auto;">
           <a href="/leads01/bulk-add/" target="_blank" rel="noopener" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;">&#128203; Open Bulk Add page &rarr;</a>
         </div>
-      </div>
+      </div>` : ""}
     </div>`;
   wireManualAddHandlers();
 }
@@ -995,7 +1025,7 @@ function renderManualAddBar(el) {
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <button id="manualAddOpenBtn" data-type="${type}" style="background:#2563eb;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;border:0;cursor:pointer;">+ Add lead</button>
-          <a href="/leads01/bulk-add/" target="_blank" rel="noopener" style="background:#0f766e;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;text-decoration:none;display:inline-block;">📋 Bulk add</a>
+          ${leadsCan("bulk_add") ? `<a href="/leads01/bulk-add/" target="_blank" rel="noopener" style="background:#0f766e;color:#fff;padding:6px 12px;border-radius:4px;font-size:12.5px;font-weight:700;text-decoration:none;display:inline-block;">📋 Bulk add</a>` : ""}
         </div>
       </div>
       <div id="manualAddForm" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px dashed #cfe0ff;">
@@ -1902,7 +1932,7 @@ function rowHtml(l, readOnly) {
       ${quoteBtn ? `<div style="margin-top:6px;">${quoteBtn}</div>` : ""}
     </td>
     ${hideStatusCell ? "" : `<td>
-      <select class="status-select" data-customer-key="${cur}" ${isTerminal ? "disabled" : ""}>${statusOpts}</select>
+      <select class="status-select" data-customer-key="${cur}" ${(isTerminal || !leadsCan("edit_status")) ? "disabled" : ""}>${statusOpts}</select>
     </td>`}
     <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
@@ -1910,7 +1940,9 @@ function rowHtml(l, readOnly) {
       <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
         ${isTerminal
           ? `<span class="muted-small">Terminal state</span>`
-          : `<button class="row-save-btn" data-action="save-and-forward" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;padding:7px 14px;background:linear-gradient(90deg,#2563eb 0%,#f97316 100%);color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;">💾 Save + Forward</button>`}
+          : ((leadsCan("edit_status") || leadsCan("reassign"))
+             ? `<button class="row-save-btn" data-action="save-and-forward" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;padding:7px 14px;background:linear-gradient(90deg,#2563eb 0%,#f97316 100%);color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;">💾 Save + Forward</button>`
+             : `<span class="muted-small" title="You don't have edit or reassign permission">Read-only</span>`)}
       </div>
       <div class="row-save-error" style="display:none;"></div>
     </td>`}
@@ -2030,8 +2062,12 @@ function renderRemarksCell(l, readOnly) {
   }
 
   if (!readOnly) {
+    const canAddRemarks = leadsCan("add_remarks");
+    const addRemarkBtn = canAddRemarks
+      ? `<button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>`
+      : "";
     html += `<div class="add-remark-wrap">
-      <button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>
+      ${addRemarkBtn}
       <button data-action="show-star-modal" data-customer-key="${cur}" title="Add a priority star rating (or view history)" style="margin-left:6px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:3px 8px;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">⭐ Rate</button>
       <div class="add-remark-form hidden">
         <input class="add-remark-header" type="text" placeholder="Header / short caption (e.g. Called at 3pm, discussed pricing)" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;font-weight:600;margin-bottom:4px;"/>
@@ -2674,9 +2710,10 @@ function renderServicesCell(l, readOnly) {
     active = [{ service: String(l.service_type).toLowerCase(), is_active: true, is_primary: true, added_at: null }];
   }
 
+  const canRemoveSvc = leadsCan("remove_services");
   const activeChips = active.map((s) => {
     const svcVal = String(s.service || "").toLowerCase();
-    const rmBtn = readOnly ? "" : `<button data-action="remove-service" data-customer-key="${cur}" data-service="${esc(svcVal)}" title="Remove ${esc(svcLabel(svcVal))}" style="margin-left:4px;background:transparent;border:0;color:#7c2d12;font-weight:700;cursor:pointer;font-size:11px;line-height:1;">✕</button>`;
+    const rmBtn = (readOnly || !canRemoveSvc) ? "" : `<button data-action="remove-service" data-customer-key="${cur}" data-service="${esc(svcVal)}" title="Remove ${esc(svcLabel(svcVal))}" style="margin-left:4px;background:transparent;border:0;color:#7c2d12;font-weight:700;cursor:pointer;font-size:11px;line-height:1;">✕</button>`;
     return `<span title="${esc(svcVal)}${s.added_at ? ' · added ' + fmtDate(s.added_at) : ''}" style="display:inline-flex;align-items:center;margin:2px 4px 2px 0;padding:2px 6px;background:#dcfce7;color:#065f46;border:1px solid #86efac;border-radius:8px;font-size:10.5px;font-weight:700;">${esc(svcLabel(svcVal))}${rmBtn}</span>`;
   }).join("");
 
@@ -2711,7 +2748,9 @@ function renderServicesCell(l, readOnly) {
   const activeSet = new Set(active.map((s) => String(s.service || "").toLowerCase()));
   const pendingSet = new Set(pendingList.map((s) => String(s || "").toLowerCase()));
   const availableSvcs = SERVICES.filter((s) => !activeSet.has(s.value) && !pendingSet.has(s.value));
-  const addSvcHtml = (readOnly || !_isManager || availableSvcs.length === 0) ? "" : `
+  // + Add service dropdown gated on 'reassign' (adding a service can trigger a forward).
+  const canAddSvc = _isManager && leadsCan("reassign");
+  const addSvcHtml = (readOnly || !canAddSvc || availableSvcs.length === 0) ? "" : `
     <div class="add-svc-wrap" data-customer-key="${cur}" style="margin-top:4px;display:flex;align-items:center;gap:4px;">
       <select class="add-svc-select" data-customer-key="${cur}" style="padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background:#fff;max-width:140px;">
         <option value="">＋ Add service…</option>
