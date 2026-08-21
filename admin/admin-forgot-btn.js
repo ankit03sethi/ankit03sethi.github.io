@@ -124,8 +124,25 @@
     btn.innerHTML = "🔑 Forgot password?";
     btn.title = "Send yourself a reset-password link";
   }
-  ensureVisible();
-  setInterval(ensureVisible, 3000); // catch login/logout mid-session
+  // Start hidden. Wait up to 2s + poll fast during hydration so we never flash
+  // the Forgot-password button on a page that's actually signed in.
+  btn.style.display = "none";
+  const HYDRATION_POLL_MS = 250;
+  const HYDRATION_WINDOW_MS = 2500;
+  const hydStart = Date.now();
+  const hydTimer = setInterval(() => {
+    if (currentEmail() || pageLooksSignedIn()) {
+      btn.style.display = "none";
+      clearInterval(hydTimer);
+      return;
+    }
+    if (Date.now() - hydStart >= HYDRATION_WINDOW_MS) {
+      clearInterval(hydTimer);
+      ensureVisible(); // now safe to show if truly signed out
+    }
+  }, HYDRATION_POLL_MS);
+  // Long-term watcher so mid-session logout still surfaces the button.
+  setInterval(ensureVisible, 3000);
 
   async function sendRecovery(email) {
     const r = await fetch(`https://bttppihskbfmxwujyztj.supabase.co/auth/v1/recover`, {
