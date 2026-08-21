@@ -2159,6 +2159,11 @@ function bucketReason(l) {
 
 let _paneClickAttached = false;
 function wireRowHandlers() {
+  // On initial render, refresh Save-and-Forward gate for every visible row so
+  // Mode C rows (where "Interested" is auto-selected) don't stay disabled.
+  document.querySelectorAll("#paneStage tr[data-customer-key]").forEach((tr) => {
+    refreshRowSaveGate(tr);
+  });
   // Attach exactly ONCE. Without this guard, every re-render adds a new
   // listener and a single click fires multiple times (which is why one
   // add-remark click was producing 50+ rows).
