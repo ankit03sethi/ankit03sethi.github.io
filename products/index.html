@@ -575,6 +575,10 @@ function renderProductDetail(data) {
   const cat = data.category;
   const colors = data.colors || [];
   _selectedColorId = colors.length ? colors[0].id : null;
+  // Reset per-product design selection state (2-axis products only)
+  _designSelections = {};
+  // 2-axis if ANY color exposes a designs array (backend guarantees uniformity per product)
+  const _is2Axis = colors.some(c => Array.isArray(c.designs) && c.designs.length > 0);
   _lastDetailProduct = p;
   _lastDetailProductId = p.id;
   _lastDetailColors = colors;
@@ -649,10 +653,13 @@ function renderProductDetail(data) {
             <div id="varList" style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
               ${colors.map(c => {
                 // Variation row layout: [checkbox] [small thumb] [short_title (fallback name)] [qty stepper]
+                // 2-axis colors (with designs) OMIT the color-level qty stepper — qty lives on
+                // each design tile instead.
                 const firstImg = (c.image_urls && c.image_urls[0]) || (p.image_urls && p.image_urls[0]) || "";
                 const shortLabel = (c.short_title && String(c.short_title).trim()) || c.name;
+                const hasDesigns = Array.isArray(c.designs) && c.designs.length > 0;
                 return `
-                <label class="var-row" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:4px 10px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;">
+                <label class="var-row${hasDesigns ? ' has-designs' : ''}" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:4px 10px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;">
                   <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
                   ${firstImg
                     ? `<span style="width:36px;height:36px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc center/cover no-repeat url('${esc(firstImg)}');flex-shrink:0;"></span>`
@@ -660,11 +667,12 @@ function renderProductDetail(data) {
                   <div style="flex:1;min-width:0;line-height:1.2;">
                     <div style="font-weight:700;font-size:13px;color:#0f172a;">${esc(shortLabel)}${c.product_code ? ` <span style="font-size:10.5px;color:#1f6feb;font-weight:600;">· ${esc(c.product_code)}</span>` : ''}</div>
                   </div>
+                  ${hasDesigns ? '' : `
                   <div class="var-qty-wrap" data-cid="${c.id}" style="display:flex;align-items:center;gap:0;">
                     <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
                     <input class="var-qty" data-cid="${c.id}" type="number" min="10" step="5" value="10" style="width:36px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
                     <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
-                  </div>
+                  </div>`}
                 </label>`;
               }).join("")}
             </div>
@@ -779,12 +787,30 @@ function renderProductDetail(data) {
   });
 
   // Helper: get selected variations with their qty
+  // 2-axis (color + design): each checked design under a checked color becomes its own
+  // line item. Design SKU (product_code) drives billing.
+  // 1-axis (color only): each checked color contributes one line item at its .var-qty.
   function getSelectedCart() {
     const items = [];
     let totalQty = 0, totalAmt = 0;
     (colors || []).forEach(c => {
       const chk = wrap.querySelector(`.var-check[data-cid="${c.id}"]`);
-      if (chk && chk.checked) {
+      if (!chk || !chk.checked) return;
+      const hasDesigns = Array.isArray(c.designs) && c.designs.length > 0;
+      if (hasDesigns) {
+        // 2-axis: sum per-design qtys where the design tile checkbox is checked.
+        const state = _designSelections[c.id] || {};
+        (c.designs || []).forEach(d => {
+          const s = state[d.id];
+          if (s && s.checked) {
+            const q = Math.max(10, parseInt(s.qty, 10) || 10);
+            items.push({ color: c, design: d, qty: q, subtotal: p.price_inr * q });
+            totalQty += q;
+            totalAmt += p.price_inr * q;
+          }
+        });
+      } else {
+        // 1-axis: existing behavior — read color-level .var-qty.
         const qtyEl = wrap.querySelector(`.var-qty[data-cid="${c.id}"]`);
         const q = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
         items.push({ color: c, qty: q, subtotal: p.price_inr * q });
@@ -836,6 +862,11 @@ function renderProductDetail(data) {
       else buyBtn.textContent = "🔒 Pay ₹" + finalTotal + " from wallet";
     } else if (buyBtn) buyBtn.textContent = "⚡ Buy Now";
   }
+  // Expose the current-detail updateCartSummary + getSelectedCart to global
+  // scope so the (module-level) renderDesignsForColor can invoke them when
+  // design-tile checkboxes / qty steppers change.
+  window._updateCartSummary = updateCartSummary;
+  window._getSelectedCart = getSelectedCart;
   // Load wallet balance on detail render so numbers are right on first show
   if (typeof loadDsWallet === "function") { loadDsWallet().then(() => updateCartSummary()); }
 
@@ -948,8 +979,9 @@ function renderProductDetail(data) {
     wrap.querySelectorAll(".var-qty-wrap").forEach(w => {
       w.style.display = isDropship ? "none" : "flex";
     });
-    // Quick-set-qty bar visible only when per-item qty is meaningful (not dropship)
-    const aab = $("#applyAllBar"); if (aab) aab.style.display = isDropship ? "none" : "flex";
+    // Quick-set-qty bar visible only when per-item qty is meaningful (not dropship,
+    // and not 2-axis products — those set qty per design tile, not per color).
+    const aab = $("#applyAllBar"); if (aab) aab.style.display = (isDropship || _is2Axis) ? "none" : "flex";
     // Cart summary visible for Purchase and Cat+Purchase
     const cs = $("#cartSummary"); if (cs) cs.style.display = isDropship ? "none" : "block";
     // Buttons: purchase mode shows Add to Cart / Buy Now
@@ -972,7 +1004,15 @@ function renderProductDetail(data) {
     if (p.product_code) lines.push(`Product ID: ${p.product_code}`);
     lines.push(``, `Items:`);
     items.forEach((it, i) => {
-      const label = it.color ? `${it.color.name}${it.color.product_code ? ` (${it.color.product_code})` : ''}` : p.title;
+      let label;
+      if (it.design) {
+        // 2-axis: show "<Color> / <Design> (<design SKU>)"
+        label = `${it.color.name} / ${it.design.name}${it.design.product_code ? ` (${it.design.product_code})` : ''}`;
+      } else if (it.color) {
+        label = `${it.color.name}${it.color.product_code ? ` (${it.color.product_code})` : ''}`;
+      } else {
+        label = p.title;
+      }
       lines.push(`${i + 1}. ${label} × ${it.qty} = ₹${it.subtotal}`);
     });
     lines.push(``, `Total qty: ${totalQty}`, `Total: ₹${totalAmt}`);
@@ -995,7 +1035,7 @@ function renderProductDetail(data) {
     const { items } = getSelectedCart();
     if (items.length === 0) throw new Error("Please select at least one option");
     const payload = {
-      items: items.map(it => ({ product_id: p.id, color_id: it.color?.id || null, qty: it.qty })),
+      items: items.map(it => ({ product_id: p.id, color_id: it.color?.id || null, design_id: it.design?.id || null, qty: it.qty })),
       mode: mode || "purchase",
       marketplaces: marketplaces || [],
     };
@@ -1054,7 +1094,7 @@ function renderProductDetail(data) {
     btn.disabled = true; btn.textContent = "Processing…";
     try {
       await saveToCart(session, "purchase", []);
-      const payItems = items.map(it => ({ product_id: p.id, color_id: it.color?.id || null, qty: it.qty, unit_price_inr: p.price_inr || 0 }));
+      const payItems = items.map(it => ({ product_id: p.id, color_id: it.color?.id || null, design_id: it.design?.id || null, qty: it.qty, unit_price_inr: p.price_inr || 0 }));
       await window.doCatalogPayInline("purchase", payItems, [], btn);
       btn.disabled = false; btn.textContent = orig;
     } catch (e) {
@@ -1103,6 +1143,9 @@ function renderProductDetail(data) {
 let _lastDropshipItems = [];
 let _lastDropshipMode = "dropship";
 let _lastDropshipPurchaseAmt = 0;
+// Per-product design-tile selection state for 2-axis products:
+// { [colorId]: { [designId]: { checked: bool, qty: number } } }
+let _designSelections = {};
 
 function updateDsTotal() {
   const checked = document.querySelectorAll("#dsMps input:checked");
@@ -1296,7 +1339,7 @@ async function handleDsCheckout(payNow) {
   console.log("[DS] isCat=", isCat, "mode=", _lastDropshipMode, "items=", _lastDropshipItems);
   try {
     // Save to cart
-    const items = (_lastDropshipItems || []).map(it => ({ product_id: product.id, color_id: it.color?.id || null, qty: it.qty }));
+    const items = (_lastDropshipItems || []).map(it => ({ product_id: product.id, color_id: it.color?.id || null, design_id: it.design?.id || null, qty: it.qty }));
     if (items.length === 0) { alert("Step 4 FAIL: no variation items selected. Go back and pick variations first."); return; }
     const cartPayload = {
       items,
@@ -1322,6 +1365,7 @@ async function handleDsCheckout(payNow) {
     const payItems = (_lastDropshipItems || []).map(it => ({
       product_id: product.id,
       color_id: it.color?.id || null,
+      design_id: it.design?.id || null,
       qty: it.qty,
       unit_price_inr: product.price_inr || 0,
     }));
@@ -1350,21 +1394,101 @@ function renderDesignsForColor() {
     wrap.innerHTML = "";
     return;
   }
+  // Initialize persistent selection state for this color if missing.
+  // State survives switching to another color and back.
+  if (!_designSelections[clr.id]) _designSelections[clr.id] = {};
+  const state = _designSelections[clr.id];
   wrap.innerHTML = `
-    <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Designs available in ${esc(clr.name)} (${designs.length})</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;">
-      ${designs.map(d => `
-        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;cursor:pointer;" data-did="${d.id}">
-          <div style="aspect-ratio:1;background:#f1f5f9;${d.image_url?`background-image:url('${esc(d.image_url)}');`:''}background-size:cover;background-position:center;"></div>
-          <div style="padding:6px;font-size:11px;font-weight:600;text-align:center;color:#374151;">${esc(d.name)}</div>
-          ${d.product_code ? `<div style="padding:0 6px 2px;font-size:10px;color:#1f6feb;font-weight:600;text-align:center;">${esc(d.product_code)}</div>` : ''}
+    <div style="font-weight:700;font-size:13px;margin:6px 0 8px;">Designs available in ${esc(clr.name)} (${designs.length}) — pick one or more</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:14px;">
+      ${designs.map(d => {
+        const s = state[d.id] || { checked: false, qty: 10 };
+        return `
+        <label class="design-tile" data-did="${d.id}" data-cid="${clr.id}" style="border:1px solid ${s.checked ? '#1f6feb' : '#e2e8f0'};border-radius:8px;overflow:hidden;background:${s.checked ? '#eff6ff' : '#fff'};cursor:pointer;display:block;position:relative;">
+          <div style="aspect-ratio:1;background:#f1f5f9;${d.image_url?`background-image:url('${esc(d.image_url)}');`:''}background-size:cover;background-position:center;position:relative;">
+            <input type="checkbox" class="design-check" data-did="${d.id}" data-cid="${clr.id}" ${s.checked ? 'checked' : ''} style="position:absolute;top:6px;left:6px;width:18px;height:18px;accent-color:#1f6feb;cursor:pointer;margin:0;background:#fff;border-radius:3px;" />
+          </div>
+          <div style="padding:6px 6px 2px;font-size:11px;font-weight:600;text-align:center;color:#374151;line-height:1.2;">${esc(d.name)}</div>
+          ${d.product_code ? `<div style="padding:0 6px 4px;font-size:10px;color:#1f6feb;font-weight:600;text-align:center;">${esc(d.product_code)}</div>` : ''}
+          <div class="design-qty-wrap" style="padding:0 6px 6px;display:flex;justify-content:center;align-items:center;gap:0;">
+            <button type="button" class="design-qty-minus" data-did="${d.id}" data-cid="${clr.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
+            <input class="design-qty" data-did="${d.id}" data-cid="${clr.id}" type="number" min="10" step="5" value="${s.qty}" style="width:44px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
+            <button type="button" class="design-qty-plus" data-did="${d.id}" data-cid="${clr.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
+          </div>
           ${d.qty_available > 0 ? `<div style="padding:0 6px 6px;font-size:10px;color:#16a34a;text-align:center;">In stock</div>` : `<div style="padding:0 6px 6px;font-size:10px;color:#dc2626;text-align:center;">Out of stock</div>`}
-        </div>
-      `).join("")}
+        </label>
+        `;
+      }).join("")}
     </div>
   `;
-  wrap.querySelectorAll("[data-did]").forEach(el => {
-    el.addEventListener("click", () => {
+  const persist = (cid, did, patch) => {
+    if (!_designSelections[cid]) _designSelections[cid] = {};
+    if (!_designSelections[cid][did]) _designSelections[cid][did] = { checked: false, qty: 10 };
+    Object.assign(_designSelections[cid][did], patch);
+  };
+  const refresh = () => { if (typeof window._updateCartSummary === "function") window._updateCartSummary(); };
+  // Design-tile checkbox → mark the design selected; also auto-check parent color
+  // so cart calc includes it (`getSelectedCart` requires parent color to be checked).
+  wrap.querySelectorAll(".design-check").forEach(chk => chk.addEventListener("change", (e) => {
+    e.stopPropagation();
+    const cid = Number(chk.dataset.cid), did = Number(chk.dataset.did);
+    persist(cid, did, { checked: chk.checked });
+    // If any design is now checked, auto-check parent color (idempotent).
+    if (chk.checked) {
+      const varChk = document.querySelector(`.var-check[data-cid="${cid}"]`);
+      if (varChk && !varChk.checked) { varChk.checked = true; varChk.dispatchEvent(new Event("change")); }
+    }
+    // Update tile highlight
+    const tile = chk.closest(".design-tile");
+    if (tile) {
+      tile.style.borderColor = chk.checked ? "#1f6feb" : "#e2e8f0";
+      tile.style.background = chk.checked ? "#eff6ff" : "#fff";
+    }
+    refresh();
+  }));
+  wrap.querySelectorAll(".design-qty").forEach(q => {
+    q.addEventListener("click", (e) => e.stopPropagation());
+    q.addEventListener("focus", () => q.select());
+    q.addEventListener("input", () => {
+      const cid = Number(q.dataset.cid), did = Number(q.dataset.did);
+      const n = parseInt(q.value, 10);
+      if (!isNaN(n) && n >= 10) {
+        persist(cid, did, { qty: n });
+        q.style.borderColor = "#cbd5e1"; q.style.background = "#fff";
+      } else {
+        q.style.borderColor = "#dc2626"; q.style.background = "#fef2f2";
+      }
+      refresh();
+    });
+    q.addEventListener("blur", () => {
+      const n = parseInt(q.value, 10);
+      if (isNaN(n) || n < 10) { q.value = 10; }
+      const cid = Number(q.dataset.cid), did = Number(q.dataset.did);
+      persist(cid, did, { qty: parseInt(q.value, 10) || 10 });
+      q.style.borderColor = "#cbd5e1"; q.style.background = "#fff";
+      refresh();
+    });
+  });
+  const bumpQty = (b, delta) => {
+    const did = b.dataset.did, cid = b.dataset.cid;
+    const q = wrap.querySelector(`.design-qty[data-did="${did}"][data-cid="${cid}"]`);
+    q.value = Math.max(10, (parseInt(q.value, 10) || 10) + delta);
+    persist(Number(cid), Number(did), { qty: parseInt(q.value, 10) });
+    refresh();
+  };
+  wrap.querySelectorAll(".design-qty-minus").forEach(b => b.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    bumpQty(b, -5);
+  }));
+  wrap.querySelectorAll(".design-qty-plus").forEach(b => b.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    bumpQty(b, 5);
+  }));
+  // Tile click (image area) swaps main product image. Skip if user clicked a control.
+  wrap.querySelectorAll(".design-tile").forEach(el => {
+    el.addEventListener("click", (e) => {
+      if (e.target.closest(".design-check") || e.target.closest(".design-qty") ||
+          e.target.closest(".design-qty-minus") || e.target.closest(".design-qty-plus")) return;
       const design = designs.find(d => d.id === Number(el.dataset.did));
       if (design && design.image_url) {
         $("#detailMainImg").style.backgroundImage = `url('${design.image_url}')`;
