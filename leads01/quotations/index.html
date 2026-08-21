@@ -283,6 +283,24 @@
               </div>
             </div>
           </div>
+
+          <!-- Lead History / Timeline (remarks + stars + assignments + quote events) -->
+          <div class="panel" id="leadHistoryPanel" style="margin-top:14px;">
+            <h2 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span>📜 Lead History</span>
+              <span id="leadHistoryStatus" style="font-size:11px;color:#94a3b8;font-weight:500;"></span>
+            </h2>
+            <div style="display:flex;gap:6px;margin:8px 0 12px;">
+              <button id="addRemarkBtn" type="button" style="flex:1;background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;">💬 + Remark</button>
+              <button id="addStarBtn" type="button" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;">⭐ + Rating</button>
+            </div>
+            <div id="leadHistoryList" style="max-height:520px;overflow-y:auto;font-size:12.5px;border-top:1px solid #e2e8f0;padding-top:10px;">
+              <div style="color:#94a3b8;font-style:italic;padding:10px 0;">Save the quote to load history…</div>
+            </div>
+            <div style="font-size:10.5px;color:#94a3b8;margin-top:8px;line-height:1.5;">
+              This timeline is shared with the Leads screen. Every remark, star, forward, and quote-status change is preserved forever — even after Rejected or Paid.
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1560,6 +1578,118 @@ async function tryPrefillFromUrl() {
   }
   toast("✓ Customer data pre-filled from lead — review and save");
 }
+
+// ============ LEAD HISTORY (shared timeline: remarks + stars + quote events) ============
+let _currentCustomerKey = null;
+
+function fmtHistoryTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"2-digit", hour:"2-digit", minute:"2-digit" });
+  } catch { return iso || ""; }
+}
+
+function renderLeadHistoryEvents(events) {
+  const box = document.getElementById("leadHistoryList");
+  if (!box) return;
+  if (!events || events.length === 0) {
+    box.innerHTML = `<div style="color:#94a3b8;font-style:italic;padding:10px 0;">No history yet. Add a remark or star to start the timeline.</div>`;
+    return;
+  }
+  const iconMap = { remark:"💬", star:"⭐", assign:"↔️", service:"🧩", quote:"📋" };
+  const colorMap = { remark:"#0ea5e9", star:"#f59e0b", assign:"#7c3aed", service:"#059669", quote:"#1f6feb" };
+  let html = "";
+  for (const ev of events) {
+    const isQuoteRemark = ev.type === "remark" && ev.header && /^Quote /.test(ev.header);
+    const kind = isQuoteRemark ? "quote" : ev.type;
+    const icon = iconMap[kind] || "•";
+    const color = colorMap[kind] || "#64748b";
+    let body = "";
+    if (ev.type === "star") {
+      const filled = "★".repeat(ev.stars || 0);
+      const empty = "☆".repeat(5 - (ev.stars || 0));
+      body = `<span style="color:#f59e0b;font-size:14px;letter-spacing:1px;">${filled}<span style="color:#e2e8f0;">${empty}</span></span>${ev.text ? ` <span style="color:#334155;">— ${esc(ev.text)}</span>` : ""}`;
+    } else {
+      body = esc(ev.text || "");
+    }
+    const header = ev.header ? `<span style="background:${color}15;color:${color};padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;margin-right:5px;">${esc(ev.header)}</span>` : "";
+    html += `
+      <div style="border-left:3px solid ${color};padding:6px 10px;margin-bottom:8px;background:#f8fafc;border-radius:0 6px 6px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px;">
+          <span style="font-size:11px;font-weight:700;color:${color};">${icon} ${kind.toUpperCase()}</span>
+          <span style="font-size:10.5px;color:#94a3b8;">${fmtHistoryTime(ev.at)}</span>
+        </div>
+        <div style="font-size:12.5px;color:#0f172a;line-height:1.4;">${header}${body}</div>
+        ${ev.by ? `<div style="font-size:10.5px;color:#64748b;margin-top:3px;">by ${esc(ev.by)}</div>` : ""}
+      </div>`;
+  }
+  box.innerHTML = html;
+}
+
+async function refreshLeadHistory() {
+  const box = document.getElementById("leadHistoryList");
+  const status = document.getElementById("leadHistoryStatus");
+  const q = _currentQuote;
+  const payload = {};
+  if (q?.id) payload.quote_id = q.id;
+  else if (window._prefill_customer_key) payload.customer_key = window._prefill_customer_key;
+  else {
+    if (box) box.innerHTML = `<div style="color:#94a3b8;font-style:italic;padding:10px 0;">Save the quote to load history…</div>`;
+    if (status) status.textContent = "";
+    _currentCustomerKey = null;
+    return;
+  }
+  if (status) status.textContent = "loading…";
+  try {
+    const j = await callFn("admin-quotations", { op:"history", ...payload });
+    if (!j.ok) { if (status) status.textContent = "err"; return; }
+    _currentCustomerKey = j.customer_key || null;
+    if (status) status.textContent = _currentCustomerKey ? `${j.events.length} events` : "no lead link";
+    renderLeadHistoryEvents(j.events || []);
+  } catch (e) {
+    if (status) status.textContent = "err";
+    console.warn("history load failed", e);
+  }
+}
+
+// "+ Remark" — prompt then post
+document.getElementById("addRemarkBtn").addEventListener("click", async () => {
+  if (!_currentCustomerKey) { toast("This quote isn't linked to a lead yet — save it first, or open from a Follow-Up lead.", true); return; }
+  const text = (prompt("Add a remark (visible on the Leads screen too):") || "").trim();
+  if (!text) return;
+  const header = _currentQuote?.quote_number ? `Quote ${_currentQuote.quote_number}` : null;
+  const j = await callFn("admin-quotations", { op:"add_remark", customer_key: _currentCustomerKey, text, header });
+  if (j.ok) { toast("✓ Remark added"); refreshLeadHistory(); }
+  else toast(j.error || "Failed", true);
+});
+
+// "+ Rating" — prompt for 1–5 stars + optional note
+document.getElementById("addStarBtn").addEventListener("click", async () => {
+  if (!_currentCustomerKey) { toast("This quote isn't linked to a lead yet — save it first, or open from a Follow-Up lead.", true); return; }
+  const starsRaw = prompt("Star rating (1–5):");
+  if (!starsRaw) return;
+  const stars = parseInt(starsRaw, 10);
+  if (!stars || stars < 1 || stars > 5) { toast("Enter a number between 1 and 5", true); return; }
+  const note = (prompt("Note (optional):") || "").trim() || null;
+  const j = await callFn("admin-quotations", { op:"add_star", customer_key: _currentCustomerKey, stars, note });
+  if (j.ok) { toast(`✓ ${stars}-star rating added`); refreshLeadHistory(); }
+  else toast(j.error || "Failed", true);
+});
+
+// Auto-refresh history after: openBuilder, save, WhatsApp/mark_sent, any status change.
+const _origOpenBuilder = openBuilder;
+openBuilder = function(quote) { _origOpenBuilder(quote); setTimeout(refreshLeadHistory, 50); };
+const _origChangeStatusThenRefresh = changeStatusThenRefresh;
+changeStatusThenRefresh = async function(...args) { await _origChangeStatusThenRefresh(...args); refreshLeadHistory(); };
+
+// Hook Save button — refresh after each successful save
+$("#saveBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 800); }, { capture: false });
+// Hook WhatsApp — refresh a moment after mark_sent lands
+$("#waBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 1200); }, { capture: false });
+// Hook Email — same idea
+$("#emailBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 1500); }, { capture: false });
+// Recreate refresh
+$("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistory, 1500); }, { capture: false });
 
 // ============ INIT ============
 // Never leave the page blank — if refreshSession throws, force the login panel visible
