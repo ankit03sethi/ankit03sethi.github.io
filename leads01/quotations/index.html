@@ -468,17 +468,16 @@ function withinDateRange(q) {
   return true;
 }
 
-// Funnel logic: once a quote reaches a stage, it stays counted in earlier stages too
+// Strict, mutually-exclusive filters: each quote belongs to exactly ONE tab
+// based on its current status. A saved-but-not-yet-sent quote is Draft ONLY.
+// (Accepted still absorbs Paid because Paid implies Accepted in the funnel.)
 function matchesFilter(q, f) {
   if (!withinDateRange(q)) return false;
   if (f === "all") return true;
   if (f === "draft") return q.status === "draft";
-  // "Sent" = anything that has been sent (or moved further)
-  if (f === "sent") return ["sent","follow_up","regenerated","accepted","paid"].includes(q.status);
-  // "Follow Up" = sent quotes not yet accepted/paid — auto-includes sent
-  if (f === "follow_up") return ["sent","follow_up"].includes(q.status);
+  if (f === "sent") return q.status === "sent";
+  if (f === "follow_up") return q.status === "follow_up";
   if (f === "regenerated") return q.status === "regenerated";
-  // "Accepted" = accepted or paid (paid implies accepted)
   if (f === "accepted") return ["accepted","paid"].includes(q.status);
   if (f === "paid") return q.status === "paid";
   if (f === "expired") return q.status === "expired";
