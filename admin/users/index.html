@@ -170,6 +170,9 @@
           <label><input type="checkbox" data-action="reassign" checked> Reassign / Forward</label>
           <label><input type="checkbox" data-action="bulk_add" checked> Bulk add</label>
           <label><input type="checkbox" data-action="remove_services" checked> Remove services</label>
+          <label><input type="checkbox" data-action="add_service" checked> Add service</label>
+          <label><input type="checkbox" data-action="add_rating" checked> Add rating</label>
+          <label><input type="checkbox" data-action="save_forward" checked> Save + Forward</label>
         </div>
       </div>
       <div style="margin-bottom:10px;">
@@ -233,7 +236,7 @@ const perm_labels = {
   employees: "admin/employees",
   employee: "leads01 (employee)",
 };
-const LEADS_ACTION_KEYS = ["view","add","edit_status","add_remarks","reassign","bulk_add","remove_services"];
+const LEADS_ACTION_KEYS = ["view","add","edit_status","add_remarks","reassign","bulk_add","remove_services","add_service","add_rating","save_forward"];
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c]);

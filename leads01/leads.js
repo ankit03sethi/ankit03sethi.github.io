@@ -94,7 +94,7 @@ let _myEmpName = "";
 // v2026082023: per-action gates hydrated from admin-data whoami.leads01_actions.
 // Structure: { view, add, edit_status, add_remarks, reassign, bulk_add, remove_services }.
 // Empty object means "no rights"; super-admins get everything true from server.
-let _leads01Actions = { view:false, add:false, edit_status:false, add_remarks:false, reassign:false, bulk_add:false, remove_services:false };
+let _leads01Actions = { view:false, add:false, edit_status:false, add_remarks:false, reassign:false, bulk_add:false, remove_services:false, add_service:false, add_rating:false, save_forward:false };
 let _isAddLeadsOnly = false; // true when caller has 'add_leads' but neither 'leads' nor 'super' nor 'employee'
 function leadsCan(action) {
   return !!(_leads01Actions && _leads01Actions[action] === true);
@@ -1954,9 +1954,11 @@ function rowHtml(l, readOnly) {
       <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
         ${isTerminal
           ? `<span class="muted-small">Terminal state</span>`
-          : ((leadsCan("edit_status") || leadsCan("reassign"))
-             ? `<button class="row-save-btn" data-action="save-and-forward" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;padding:7px 14px;background:linear-gradient(90deg,#2563eb 0%,#f97316 100%);color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;">💾 Save + Forward</button>`
-             : `<span class="muted-small" title="You don't have edit or reassign permission">Read-only</span>`)}
+          : (!leadsCan("save_forward")
+             ? `<span class="muted-small" title="Ask a super-admin to enable the 'Save + Forward' sub-action.">🔒 Save disabled by permission</span>`
+             : ((leadsCan("edit_status") || leadsCan("reassign"))
+                ? `<button class="row-save-btn" data-action="save-and-forward" data-customer-key="${cur}" disabled style="opacity:.4;cursor:not-allowed;pointer-events:none;padding:7px 14px;background:linear-gradient(90deg,#2563eb 0%,#f97316 100%);color:#fff;border:0;border-radius:5px;font-size:12.5px;font-weight:700;">💾 Save + Forward</button>`
+                : `<span class="muted-small" title="You don't have edit or reassign permission">Read-only</span>`))}
       </div>
       <div class="row-save-error" style="display:none;"></div>
     </td>`}
@@ -2132,9 +2134,13 @@ function renderRemarksCell(l, readOnly) {
     const addRemarkBtn = canAddRemarks
       ? `<button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>`
       : "";
+    const canAddRating = leadsCan("add_rating");
+    const rateBtn = canAddRating
+      ? `<button data-action="show-star-modal" data-customer-key="${cur}" title="Add a priority star rating (or view history)" style="margin-left:6px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:3px 8px;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">⭐ Rate</button>`
+      : "";
     html += `<div class="add-remark-wrap">
       ${addRemarkBtn}
-      <button data-action="show-star-modal" data-customer-key="${cur}" title="Add a priority star rating (or view history)" style="margin-left:6px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:3px 8px;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">⭐ Rate</button>
+      ${rateBtn}
       <div class="add-remark-form hidden">
         <input class="add-remark-header" type="text" placeholder="Header / short caption (e.g. Called at 3pm, discussed pricing)" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;font-weight:600;margin-bottom:4px;"/>
         <textarea class="add-remark-input" placeholder="Full discussion / details..." rows="2" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;"></textarea>
@@ -2860,8 +2866,9 @@ function renderServicesCell(l, readOnly) {
   const activeSet = new Set(active.map((s) => String(s.service || "").toLowerCase()));
   const pendingSet = new Set(pendingList.map((s) => String(s || "").toLowerCase()));
   const availableSvcs = SERVICES.filter((s) => !activeSet.has(s.value) && !pendingSet.has(s.value));
-  // + Add service dropdown gated on 'reassign' (adding a service can trigger a forward).
-  const canAddSvc = _isManager && leadsCan("reassign");
+  // + Add service dropdown gated on both 'add_service' (dedicated sub-action)
+  // AND 'reassign' (adding a service can trigger a forward). Managers only.
+  const canAddSvc = _isManager && leadsCan("add_service") && leadsCan("reassign");
   const addSvcHtml = (readOnly || !canAddSvc || availableSvcs.length === 0) ? "" : `
     <div class="add-svc-wrap" data-customer-key="${cur}" style="margin-top:4px;display:flex;align-items:center;gap:4px;">
       <select class="add-svc-select" data-customer-key="${cur}" style="padding:3px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background:#fff;max-width:140px;">
