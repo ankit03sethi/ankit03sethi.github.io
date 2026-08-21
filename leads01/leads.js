@@ -1779,13 +1779,16 @@ function rowHtml(l, readOnly) {
     ? `<a href="mailto:${esc(latestEmail)}" style="display:inline-block;padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">✉️ Email</a>`
     : `<button data-action="edit-contact" ${contactData} title="No email yet — add one" style="padding:4px 10px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">✉️ Email</button>`;
 
-  // Contact cell HTML: latest email + mobile + WhatsApp + Add contact button (opens add-only modal)
+  // Latest customer name (v43 pipeline enrichment; empty if never set)
+  const latestName = (l.customer_name || "").trim();
+  // Contact cell HTML: latest name + email + mobile + WhatsApp + Add contact button
   const contactCell = `
     <div style="font-size:12.5px;line-height:1.4;">
+      ${latestName ? `<div style="font-weight:700;color:#0f172a;font-size:13px;">👤 ${esc(latestName)}</div>` : `<div class="muted-small" style="color:#94a3b8;">no name yet</div>`}
       ${latestEmail ? `<div><a href="mailto:${esc(latestEmail)}" style="color:#0f766e;">${esc(latestEmail)}</a></div>` : `<div class="muted-small">no email</div>`}
       ${latestMobile ? `<div class="muted-small" style="color:#0f172a;font-weight:600;">📱 ${esc(latestMobile)}</div>` : ""}
       ${(l.whatsapp && l.whatsapp !== latestMobile) ? `<div class="muted-small" style="color:#065f46;">💬 ${esc(l.whatsapp)}</div>` : ""}
-      ${readOnly ? "" : `<button data-action="edit-contact" data-customer-key="${cur}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>`}
+      ${readOnly ? "" : `<button data-action="edit-contact" data-customer-key="${cur}" data-name="${esc(latestName)}" data-email="${esc(latestEmail)}" data-mobile="${esc(latestMobile)}" data-whatsapp="${esc(l.whatsapp || '')}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>`}
     </div>`;
   // Send Quote button - appears in Send Quote sub-tab; opens Quotations tab with prefilled data
   const quotePrefill = new URLSearchParams({
@@ -2316,6 +2319,7 @@ function wireRowHandlers() {
     if (action === "edit-contact") {
       showContactUpdateModal({
         customer_key: key,
+        name: target.dataset.name || "",
         email: target.dataset.email || "",
         mobile: target.dataset.mobile || "",
         whatsapp: target.dataset.whatsapp || "",
