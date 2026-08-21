@@ -118,13 +118,9 @@
   <div id="app" class="hidden">
     <!-- LIST VIEW -->
     <div id="listView" class="panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h1 style="margin:0;">📋 Quotations</h1>
-        <button id="newBtn" class="b-primary">+ New Quotation</button>
-      </div>
-      <div style="margin-bottom:14px;">
-        <input id="listSearchBox" type="text" placeholder="🔍 Search by quote #, name, email, mobile, or GST number..." style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box;" autocomplete="off" />
-      </div>
+      <!-- Header + search bar + New Quotation button removed — this page renders inside the parent /leads01/ Quotations tab, so the duplicate chrome was redundant. New quotations are created from the leads flow (Send Quote sub-tab on a lead). #newBtn kept hidden so any existing JS wiring stays intact. -->
+      <button id="newBtn" style="display:none;"></button>
+      <input id="listSearchBox" type="text" style="display:none;" />
       <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
         <button class="filter-tab active" data-filter="all">All</button>
         <button class="filter-tab" data-filter="draft">Draft</button>
