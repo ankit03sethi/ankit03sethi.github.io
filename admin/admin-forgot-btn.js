@@ -94,16 +94,18 @@
     } catch (_) { return null; }
   }
 
-  // Show Forgot? when signed out, Sign out when signed in — never both.
+  // 2026-08-21: Floating "Sign out" removed. Every admin page has its own inline
+  // sign-out in the header — the floating one was redundant + visually noisy.
+  // Forgot-password floating button STILL shows when signed out (useful when a
+  // user hits an admin URL but never signed in). Sign-out button is force-hidden.
+  outBtn.style.display = "none";
+  outBtn.remove?.();
   function ensureVisible() {
     const email = currentEmail();
     if (email) {
       btn.style.display = "none";
-      outBtn.style.display = "block";
-      outBtn.title = "Sign out — " + email;
     } else {
       btn.style.display = "block";
-      outBtn.style.display = "none";
       btn.innerHTML = "🔑 Forgot password?";
       btn.title = "Send yourself a reset-password link";
     }
