@@ -1280,6 +1280,15 @@ function computeTotals() {
 // ============ SAVE ============
 $("#saveBtn").addEventListener("click", async () => {
   if (_items.length === 0) { toast("Add at least 1 item", true); return; }
+  // Names must be in ALL CAPITAL letters — same rule as the contact editor
+  // (policy 2026-08-21). Reject any lowercase letter to keep the customer
+  // history consistent regardless of which form the edit came from.
+  const nameRaw = $("#custName").value.trim();
+  if (nameRaw && /[a-z]/.test(nameRaw) && nameRaw !== "Dear customer") {
+    toast("Name must be in CAPITAL letters. Please retype in ALL CAPS.", true);
+    $("#custName").focus();
+    return;
+  }
   // Name is optional now — backend defaults empty to "Dear customer" so we never write
   // a blank customer_name row. Reflect the fallback in the UI too if the user left it blank.
   if (!$("#custName").value.trim()) {
