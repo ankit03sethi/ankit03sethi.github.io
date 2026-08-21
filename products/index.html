@@ -229,8 +229,12 @@
     .anon-cta { display: none; }
 
     /* Variation list — unified list style, tight rows */
-    #varList .var-row:last-child { border-bottom: 0; }
+    #varList .var-entry { border-bottom: 1px solid #e2e8f0; }
+    #varList .var-entry:last-child { border-bottom: 0; }
     #varList .var-row:hover { background: #f8fafc; }
+    #varList .var-chevron { display: inline-flex; align-items: center; gap: 4px; }
+    #varList .designs-inline { animation: slideDown .18s ease-out; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
     /* Mode tabs - normal weight */
     .mt-badge {
@@ -652,31 +656,39 @@ function renderProductDetail(data) {
             </div>
             <div id="varList" style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
               ${colors.map(c => {
-                // Variation row layout: [checkbox] [small thumb] [short_title (fallback name)] [qty stepper]
+                // Variation row layout: [checkbox] [small thumb] [short_title (fallback name)] [qty stepper OR chevron]
                 // 2-axis colors (with designs) OMIT the color-level qty stepper — qty lives on
-                // each design tile instead.
+                // each design tile instead — and show a chevron that toggles an inline designs
+                // grid that renders directly under the color row. Multiple colors can be expanded.
                 const firstImg = (c.image_urls && c.image_urls[0]) || (p.image_urls && p.image_urls[0]) || "";
                 const shortLabel = (c.short_title && String(c.short_title).trim()) || c.name;
                 const hasDesigns = Array.isArray(c.designs) && c.designs.length > 0;
+                // hasDesigns rows are <div> (not <label>) so clicking the row body doesn't
+                // toggle the checkbox — click is reserved for expand/collapse.
+                const rowTag = hasDesigns ? 'div' : 'label';
                 return `
-                <label class="var-row${hasDesigns ? ' has-designs' : ''}" data-cid="${c.id}" style="border-bottom:1px solid #e2e8f0;padding:4px 10px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;">
-                  <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
-                  ${firstImg
-                    ? `<span style="width:36px;height:36px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc center/cover no-repeat url('${esc(firstImg)}');flex-shrink:0;"></span>`
-                    : (c.hex_code ? `<span style="width:20px;height:20px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : '')}
-                  <div style="flex:1;min-width:0;line-height:1.2;">
-                    <div style="font-weight:700;font-size:13px;color:#0f172a;">${esc(shortLabel)}${c.product_code ? ` <span style="font-size:10.5px;color:#1f6feb;font-weight:600;">· ${esc(c.product_code)}</span>` : ''}</div>
-                  </div>
-                  ${hasDesigns ? '' : `
-                  <div class="var-qty-wrap" data-cid="${c.id}" style="display:flex;align-items:center;gap:0;">
-                    <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
-                    <input class="var-qty" data-cid="${c.id}" type="number" min="10" step="5" value="10" style="width:36px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
-                    <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
-                  </div>`}
-                </label>`;
+                <div class="var-entry" data-cid="${c.id}">
+                  <${rowTag} class="var-row${hasDesigns ? ' has-designs' : ''}" data-cid="${c.id}" style="padding:4px 10px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;">
+                    <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
+                    ${firstImg
+                      ? `<span style="width:36px;height:36px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc center/cover no-repeat url('${esc(firstImg)}');flex-shrink:0;"></span>`
+                      : (c.hex_code ? `<span style="width:20px;height:20px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : '')}
+                    <div style="flex:1;min-width:0;line-height:1.2;">
+                      <div style="font-weight:700;font-size:13px;color:#0f172a;">${esc(shortLabel)}${c.product_code ? ` <span style="font-size:10.5px;color:#1f6feb;font-weight:600;">· ${esc(c.product_code)}</span>` : ''}</div>
+                    </div>
+                    ${hasDesigns
+                      ? `<span class="var-chevron" data-cid="${c.id}" style="color:#1f6feb;font-size:12px;font-weight:700;user-select:none;padding:2px 6px;white-space:nowrap;"><span class="chev-arrow" style="display:inline-block;transition:transform .2s ease;">▸</span> ${c.designs.length} design${c.designs.length===1?'':'s'}</span>`
+                      : `
+                    <div class="var-qty-wrap" data-cid="${c.id}" style="display:flex;align-items:center;gap:0;">
+                      <button type="button" class="var-qty-minus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
+                      <input class="var-qty" data-cid="${c.id}" type="number" min="10" step="5" value="10" style="width:36px;height:22px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:11.5px;font-weight:700;padding:0;" />
+                      <button type="button" class="var-qty-plus" data-cid="${c.id}" style="width:22px;height:22px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:13px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
+                    </div>`}
+                  </${rowTag}>
+                  ${hasDesigns ? `<div class="designs-inline" data-cid="${c.id}" style="display:none;padding:10px;background:#f8fafc;border-top:1px solid #e2e8f0;"></div>` : ''}
+                </div>`;
               }).join("")}
             </div>
-            <div id="designsWrap"></div>
           </div>
         ` : ''}
         <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -685,8 +697,14 @@ function renderProductDetail(data) {
               <span>Selected items: <b id="cartCount">0</b></span>
               <span>Total qty: <b id="cartQty">0</b></span>
             </div>
+            <div id="purSubtotalRow" style="display:none;justify-content:space-between;margin-top:4px;color:#475467;font-size:12.5px;">
+              <span>Subtotal</span><span>₹<span id="purSubtotalAmt">0</span></span>
+            </div>
             <div id="purDiscountRow" style="display:none;justify-content:space-between;margin-top:2px;color:#16a34a;font-size:12.5px;font-weight:700;">
               <span>🎁 Volume discount (<span id="purDiscountPct">0</span>%)</span><span>−₹<span id="purDiscountAmt">0</span></span>
+            </div>
+            <div id="purGstRow" style="display:none;justify-content:space-between;margin-top:2px;color:#475467;font-size:12.5px;">
+              <span>GST <span id="purGstPctLbl" style="color:#94a3b8;font-weight:500;"></span></span><span>+₹<span id="purGstAmt">0</span></span>
             </div>
             <div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;color:#1f6feb;margin-top:4px;">
               <span>Total</span><span>₹<span id="cartTotal">0</span></span>
@@ -745,11 +763,35 @@ function renderProductDetail(data) {
   // Initial thumbnail wire — starts with hero product's images
   paintGallery(imgs);
 
+  // Local helper: expand/collapse a color's inline designs panel (2-axis only).
+  // Renders lazily on first open. Multiple colors can be expanded simultaneously —
+  // this is NOT an accordion (single-open) by design.
+  const toggleDesignsInline = (cid, forceOpen) => {
+    const panel = wrap.querySelector(`.designs-inline[data-cid="${cid}"]`);
+    if (!panel) return false;
+    const isOpen = panel.style.display !== "none" && panel.style.display !== "";
+    const willOpen = forceOpen === true ? true : (forceOpen === false ? false : !isOpen);
+    if (willOpen && !panel.dataset.rendered) {
+      const clr = colors.find(c => c.id === cid);
+      if (clr) { renderDesignsInline(panel, clr); panel.dataset.rendered = "1"; }
+    }
+    panel.style.display = willOpen ? "block" : "none";
+    const chevArrow = wrap.querySelector(`.var-chevron[data-cid="${cid}"] .chev-arrow`);
+    if (chevArrow) chevArrow.style.transform = willOpen ? "rotate(90deg)" : "rotate(0deg)";
+    return willOpen;
+  };
+
   // Clicking a variation row (signed-in OR anon) swaps BOTH the main image
   // AND the thumbnail strip to that variation's own images. Falls back to
   // hero images if the variation has none.
+  // For 2-axis (has-designs) rows the row click ALSO toggles the inline
+  // designs panel — but a click on the checkbox itself must NOT trigger toggle.
   wrap.querySelectorAll(".var-row").forEach(row => {
-    row.addEventListener("click", () => {
+    row.addEventListener("click", (e) => {
+      // Ignore clicks that originated on the checkbox (2-axis: also its label
+      // wrapper is a <div>, so checkbox stays independent; 1-axis: label
+      // behavior still toggles the checkbox natively — we just don't re-toggle).
+      if (e.target && e.target.closest && e.target.closest(".var-check")) return;
       const cid = Number(row.dataset.cid);
       const clr = colors.find(c => c.id === cid);
       const varImgs = (clr && Array.isArray(clr.image_urls)) ? clr.image_urls.filter(Boolean) : [];
@@ -757,23 +799,13 @@ function renderProductDetail(data) {
       // Highlight the clicked row so the user sees which one drives the gallery
       wrap.querySelectorAll(".var-row").forEach(r => r.style.background = "#fff");
       row.style.background = "#eff6ff";
+      // 2-axis: toggle its inline designs panel
+      if (row.classList.contains("has-designs")) toggleDesignsInline(cid);
     });
   });
 
-  // Wire up color chip clicks
-  wrap.querySelectorAll(".color-chip").forEach(btn => {
-    btn.addEventListener("click", () => {
-      _selectedColorId = Number(btn.dataset.cid);
-      wrap.querySelectorAll(".color-chip").forEach(b => b.style.borderColor = "#e2e8f0");
-      btn.style.borderColor = "#1f6feb";
-      renderDesignsForColor();
-      // Also update main image to first color image if available
-      const clr = colors.find(c => c.id === _selectedColorId);
-      if (clr && clr.image_urls && clr.image_urls[0]) {
-        $("#detailMainImg").style.backgroundImage = `url('${clr.image_urls[0]}')`;
-      }
-    });
-  });
+  // (Legacy .color-chip handler removed — colors now render as .var-row entries
+  // and expand their inline designs panel on click; see toggleDesignsInline.)
 
   // Back button
   $("#backToGrid").addEventListener("click", () => {
@@ -790,6 +822,18 @@ function renderProductDetail(data) {
   // 2-axis (color + design): each checked design under a checked color becomes its own
   // line item. Design SKU (product_code) drives billing.
   // 1-axis (color only): each checked color contributes one line item at its .var-qty.
+  // GST resolves in priority order: design → color → parent product → 0.
+  // Any of {number, numeric-string} is accepted; null/undefined skips to next.
+  const resolveGstPct = (design, color) => {
+    const pick = (v) => (v === null || v === undefined || v === '') ? null : Number(v);
+    const dg = design ? pick(design.gst_percent) : null;
+    if (dg !== null && !isNaN(dg)) return dg;
+    const cg = color ? pick(color.gst_percent) : null;
+    if (cg !== null && !isNaN(cg)) return cg;
+    const pg = pick(p.gst_percent);
+    if (pg !== null && !isNaN(pg)) return pg;
+    return 0;
+  };
   function getSelectedCart() {
     const items = [];
     let totalQty = 0, totalAmt = 0;
@@ -804,7 +848,8 @@ function renderProductDetail(data) {
           const s = state[d.id];
           if (s && s.checked) {
             const q = Math.max(10, parseInt(s.qty, 10) || 10);
-            items.push({ color: c, design: d, qty: q, subtotal: p.price_inr * q });
+            const gst = resolveGstPct(d, c);
+            items.push({ color: c, design: d, qty: q, subtotal: p.price_inr * q, gst_percent: gst });
             totalQty += q;
             totalAmt += p.price_inr * q;
           }
@@ -813,14 +858,16 @@ function renderProductDetail(data) {
         // 1-axis: existing behavior — read color-level .var-qty.
         const qtyEl = wrap.querySelector(`.var-qty[data-cid="${c.id}"]`);
         const q = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
-        items.push({ color: c, qty: q, subtotal: p.price_inr * q });
+        const gst = resolveGstPct(null, c);
+        items.push({ color: c, qty: q, subtotal: p.price_inr * q, gst_percent: gst });
         totalQty += q;
         totalAmt += p.price_inr * q;
       }
     });
     // If no variations exist, treat product itself as one item (auto-add with qty 10)
     if (colors.length === 0) {
-      items.push({ color: null, qty: 10, subtotal: p.price_inr * 10 });
+      const gst = resolveGstPct(null, null);
+      items.push({ color: null, qty: 10, subtotal: p.price_inr * 10, gst_percent: gst });
       totalQty = 10;
       totalAmt = p.price_inr * 10;
     }
@@ -834,13 +881,42 @@ function renderProductDetail(data) {
     // Volume discount on product value only
     const discountPct = totalAmt >= 100000 ? 15 : totalAmt >= 50000 ? 10 : totalAmt >= 25000 ? 5 : 0;
     const discountInr = Math.round(totalAmt * discountPct / 100);
-    const finalTotal = totalAmt - discountInr;
+    const discountedSub = totalAmt - discountInr;
+    // Per-line GST computed on discount-adjusted line subtotal.
+    // gst_percent resolves design → color → parent product → 0 (see resolveGstPct above).
+    let gstTotal = 0, gstWeightedNum = 0, gstBase = 0;
+    items.forEach(it => {
+      const gp = Number(it.gst_percent || 0);
+      const effLine = it.subtotal * (1 - discountPct / 100);
+      const lineGst = Math.round(effLine * gp / 100);
+      gstTotal += lineGst;
+      if (gp > 0) { gstWeightedNum += it.subtotal * gp; gstBase += it.subtotal; }
+    });
+    const avgGst = gstBase > 0 ? (gstWeightedNum / gstBase) : 0;
+    const finalTotal = discountedSub + gstTotal;
+    // Subtotal row visible whenever anything is selected
+    const sr = document.getElementById("purSubtotalRow");
+    const sa = document.getElementById("purSubtotalAmt");
+    if (sr && sa) {
+      if (totalAmt > 0) { sr.style.display = "flex"; sa.textContent = totalAmt.toLocaleString("en-IN"); }
+      else sr.style.display = "none";
+    }
     const dr = document.getElementById("purDiscountRow");
     const dp = document.getElementById("purDiscountPct");
     const da = document.getElementById("purDiscountAmt");
     if (dr && dp && da) {
       if (discountPct > 0) { dr.style.display = "flex"; dp.textContent = discountPct; da.textContent = discountInr.toLocaleString("en-IN"); }
       else dr.style.display = "none";
+    }
+    const gr = document.getElementById("purGstRow");
+    const ga = document.getElementById("purGstAmt");
+    const gl = document.getElementById("purGstPctLbl");
+    if (gr && ga) {
+      if (gstTotal > 0) {
+        gr.style.display = "flex";
+        ga.textContent = gstTotal.toLocaleString("en-IN");
+        if (gl) gl.textContent = avgGst > 0 ? `(${avgGst.toFixed(avgGst % 1 === 0 ? 0 : 1)}% avg)` : "";
+      } else gr.style.display = "none";
     }
     const ct = $("#cartTotal"); if (ct) ct.textContent = finalTotal.toLocaleString("en-IN");
     // Wallet + shortfall (Option 1 Purchase tab)
@@ -863,22 +939,30 @@ function renderProductDetail(data) {
     } else if (buyBtn) buyBtn.textContent = "⚡ Buy Now";
   }
   // Expose the current-detail updateCartSummary + getSelectedCart to global
-  // scope so the (module-level) renderDesignsForColor can invoke them when
+  // scope so the (module-level) renderDesignsInline can invoke them when
   // design-tile checkboxes / qty steppers change.
   window._updateCartSummary = updateCartSummary;
   window._getSelectedCart = getSelectedCart;
   // Load wallet balance on detail render so numbers are right on first show
   if (typeof loadDsWallet === "function") { loadDsWallet().then(() => updateCartSummary()); }
 
-  // Wire variation checkboxes + per-item qty
-  wrap.querySelectorAll(".var-check").forEach(chk => chk.addEventListener("change", () => {
-    const cid = Number(chk.dataset.cid);
-    const row = wrap.querySelector(`.var-row[data-cid="${cid}"]`);
-    if (row) row.style.background = chk.checked ? "#eff6ff" : "#fff";
-    // Auto-set selected color for design display
-    if (chk.checked) { _selectedColorId = cid; renderDesignsForColor(); }
-    updateCartSummary();
-  }));
+  // Wire variation checkboxes + per-item qty.
+  // Stop click bubbling so 2-axis rows (which are <div>) don't ALSO fire the
+  // row-click toggle when the user is just checking the box.
+  wrap.querySelectorAll(".var-check").forEach(chk => {
+    chk.addEventListener("click", (e) => e.stopPropagation());
+    chk.addEventListener("change", () => {
+      const cid = Number(chk.dataset.cid);
+      const row = wrap.querySelector(`.var-row[data-cid="${cid}"]`);
+      if (row) row.style.background = chk.checked ? "#eff6ff" : "#fff";
+      // 2-axis: on check, auto-expand inline designs so user sees the design
+      // grid without having to click the row separately.
+      if (row && row.classList.contains("has-designs") && chk.checked) {
+        toggleDesignsInline(cid, true);
+      }
+      updateCartSummary();
+    });
+  });
   const flagQtyError = (q, msg) => {
     q.style.borderColor = "#dc2626";
     q.style.background = "#fef2f2";
@@ -1137,7 +1221,8 @@ function renderProductDetail(data) {
     loadDsWallet();
   });
 
-  renderDesignsForColor();
+  // (No global designs render — each color's designs render inline into its
+  // own .designs-inline panel on first expand; see toggleDesignsInline above.)
 }
 
 let _lastDropshipItems = [];
@@ -1383,24 +1468,19 @@ let _lastDetailProductId = null;
 let _lastDetailProduct = null;
 let _lastDetailColors = [];
 
-function renderDesignsForColor() {
-  const wrap = $("#designsWrap");
-  if (!wrap) return;
-  const colors = _catalogGrid._colors || [];
-  const clr = colors.find(c => c.id === _selectedColorId);
-  if (!clr) { wrap.innerHTML = ""; return; }
+// Render a color's design tiles into a specific inline container (the
+// .designs-inline panel that lives directly below its .var-row). Called
+// lazily by toggleDesignsInline on first open. State (_designSelections)
+// survives collapse/re-expand.
+function renderDesignsInline(container, clr) {
+  if (!container || !clr) return;
   const designs = clr.designs || [];
-  if (designs.length === 0) {
-    wrap.innerHTML = "";
-    return;
-  }
-  // Initialize persistent selection state for this color if missing.
-  // State survives switching to another color and back.
+  if (designs.length === 0) { container.innerHTML = ""; return; }
   if (!_designSelections[clr.id]) _designSelections[clr.id] = {};
   const state = _designSelections[clr.id];
-  wrap.innerHTML = `
-    <div style="font-weight:700;font-size:13px;margin:6px 0 8px;">Designs available in ${esc(clr.name)} (${designs.length}) — pick one or more</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:14px;">
+  container.innerHTML = `
+    <div style="font-weight:700;font-size:12.5px;margin:0 0 8px;color:#0f172a;">Designs available in ${esc(clr.name)} (${designs.length}) — pick one or more</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
       ${designs.map(d => {
         const s = state[d.id] || { checked: false, qty: 10 };
         return `
@@ -1429,7 +1509,7 @@ function renderDesignsForColor() {
   const refresh = () => { if (typeof window._updateCartSummary === "function") window._updateCartSummary(); };
   // Design-tile checkbox → mark the design selected; also auto-check parent color
   // so cart calc includes it (`getSelectedCart` requires parent color to be checked).
-  wrap.querySelectorAll(".design-check").forEach(chk => chk.addEventListener("change", (e) => {
+  container.querySelectorAll(".design-check").forEach(chk => chk.addEventListener("change", (e) => {
     e.stopPropagation();
     const cid = Number(chk.dataset.cid), did = Number(chk.dataset.did);
     persist(cid, did, { checked: chk.checked });
@@ -1446,7 +1526,7 @@ function renderDesignsForColor() {
     }
     refresh();
   }));
-  wrap.querySelectorAll(".design-qty").forEach(q => {
+  container.querySelectorAll(".design-qty").forEach(q => {
     q.addEventListener("click", (e) => e.stopPropagation());
     q.addEventListener("focus", () => q.select());
     q.addEventListener("input", () => {
@@ -1471,21 +1551,21 @@ function renderDesignsForColor() {
   });
   const bumpQty = (b, delta) => {
     const did = b.dataset.did, cid = b.dataset.cid;
-    const q = wrap.querySelector(`.design-qty[data-did="${did}"][data-cid="${cid}"]`);
+    const q = container.querySelector(`.design-qty[data-did="${did}"][data-cid="${cid}"]`);
     q.value = Math.max(10, (parseInt(q.value, 10) || 10) + delta);
     persist(Number(cid), Number(did), { qty: parseInt(q.value, 10) });
     refresh();
   };
-  wrap.querySelectorAll(".design-qty-minus").forEach(b => b.addEventListener("click", (e) => {
+  container.querySelectorAll(".design-qty-minus").forEach(b => b.addEventListener("click", (e) => {
     e.preventDefault(); e.stopPropagation();
     bumpQty(b, -5);
   }));
-  wrap.querySelectorAll(".design-qty-plus").forEach(b => b.addEventListener("click", (e) => {
+  container.querySelectorAll(".design-qty-plus").forEach(b => b.addEventListener("click", (e) => {
     e.preventDefault(); e.stopPropagation();
     bumpQty(b, 5);
   }));
   // Tile click (image area) swaps main product image. Skip if user clicked a control.
-  wrap.querySelectorAll(".design-tile").forEach(el => {
+  container.querySelectorAll(".design-tile").forEach(el => {
     el.addEventListener("click", (e) => {
       if (e.target.closest(".design-check") || e.target.closest(".design-qty") ||
           e.target.closest(".design-qty-minus") || e.target.closest(".design-qty-plus")) return;
