@@ -181,8 +181,14 @@
             </div>
             <div class="row-2">
               <div>
-                <label>Employee code <span id="empCodeName" style="margin-left:6px;font-weight:700;letter-spacing:.3px;"></span></label>
-                <input id="empCode" type="text" maxlength="20" placeholder="e.g. PR73 — type your code, name auto-fills" autocomplete="off" />
+                <!-- Employee code is auto-filled from the signed-in user's account (whoami)
+                     and rendered read-only so nobody can attribute a quote to another employee.
+                     Fallback: super/admin accounts without an employee_code show their email
+                     and remain editable so the field isn't a dead-end for them. When editing
+                     an EXISTING quote we keep the quote's saved employee_code untouched — an
+                     admin viewing someone else's quote shouldn't rewrite the historical creator. -->
+                <label>Employee code (from your account — auto-filled) <span id="empCodeName" style="margin-left:6px;font-weight:700;letter-spacing:.3px;"></span></label>
+                <input id="empCode" type="text" maxlength="20" placeholder="Loading…" autocomplete="off" readonly style="background:#f8fafc; color:#334155; cursor:not-allowed;" />
               </div>
               <div></div>
             </div>
@@ -315,6 +321,13 @@ let _session = null;
 let _catalog = null; // { products, services }
 let _items = [];     // current line items
 let _currentQuote = null; // saved quote object
+// Signed-in user's employee identity (fetched via admin-data:whoami on login).
+// Used to auto-fill #empCode on NEW quotations so the code always matches
+// the logged-in user and can't be edited to attribute a quote to someone else.
+// _meIsFallback = true when the account has no employee_code (super/admin) — in that
+// case we fall back to the email and leave the field editable.
+let _me = null;             // { employee_code, employee_name, email, ... }
+let _meIsFallback = false;  // true when no employee_code (allow typing)
 
 // ============ AUTH ============
 async function refreshSession() {
@@ -326,6 +339,9 @@ async function refreshSession() {
     $("#emailChip").textContent = session.user.email;
     $("#emailChip").classList.remove("hidden");
     $("#signOutBtn").classList.remove("hidden");
+    // Fetch the signed-in user's employee identity so we can auto-fill #empCode
+    // on any NEW quotation the user creates (and prevent hand-typed impersonation).
+    await loadMyIdentity();
     await loadList();
     await loadCatalogOptions();
   } else {
@@ -347,6 +363,65 @@ $("#loginBtn").addEventListener("click", async () => {
 });
 $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refreshSession(); });
 $("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+
+// ============ WHOAMI (fetch signed-in user's employee identity) ============
+// admin-data:whoami returns { ok:true, data:{ employee_code, employee_name, email, ... } }.
+// We stash the result in _me and use it in openBuilder() to auto-fill #empCode for NEW
+// quotations. When editing an existing quote we deliberately keep whatever employee_code
+// the quote was saved with — admins editing another employee's quote must not rewrite the
+// historical creator.
+async function loadMyIdentity() {
+  try {
+    const j = await callFn("admin-data", { kind: "whoami" });
+    if (j && j.ok && j.data) {
+      _me = j.data;
+      _meIsFallback = !(_me.employee_code && String(_me.employee_code).trim());
+    } else {
+      _me = null;
+      _meIsFallback = true;
+    }
+  } catch (e) {
+    console.warn("whoami failed:", e);
+    _me = null;
+    _meIsFallback = true;
+  }
+}
+
+// Apply _me to the #empCode field (called by openBuilder for NEW quotes only).
+// - Employee with an employee_code: field is read-only, filled with the code, name shown next to label.
+// - Super/admin fallback (no employee_code): field is editable, prefilled with email.
+function applyMyIdentityToEmpCode() {
+  const input = document.getElementById("empCode");
+  const lbl = document.getElementById("empCodeName");
+  if (!input) return;
+  if (_me && !_meIsFallback) {
+    input.value = _me.employee_code || "";
+    input.readOnly = true;
+    input.style.background = "#f8fafc";
+    input.style.color = "#334155";
+    input.style.cursor = "not-allowed";
+    input.placeholder = "";
+    if (lbl) {
+      const nm = _me.employee_name || _me.email || "";
+      lbl.textContent = nm ? `✓ ${nm}` : "";
+      lbl.style.color = "#16a34a";
+    }
+    // Seed resolved cache so save() writes employee_name correctly (see #saveBtn handler).
+    _resolvedEmpCode = _me.employee_code || "";
+    _resolvedEmpName = _me.employee_name || "";
+  } else {
+    // Super/admin fallback — no employee_code on file. Prefill with email and allow typing.
+    const fallback = (_me && (_me.email || "")) || "";
+    input.value = fallback;
+    input.readOnly = false;
+    input.style.background = "";
+    input.style.color = "";
+    input.style.cursor = "";
+    input.placeholder = "e.g. PR73 — type your code, name auto-fills";
+    if (lbl) { lbl.textContent = ""; lbl.style.color = ""; }
+    _resolvedEmpCode = ""; _resolvedEmpName = "";
+  }
+}
 
 // ============ CALL EDGE ============
 async function callFn(name, body, method = "POST") {
@@ -880,7 +955,18 @@ function openBuilder(quote) {
     $("#custPhone").value = quote.customer_phone || "";
     $("#custGst").value = quote.customer_gst || "";
     $("#custAddress").value = quote.customer_address || "";
+    // Editing an EXISTING quote: preserve whatever employee_code was saved on the quote.
+    // An admin viewing another employee's quote must NOT rewrite the historical creator,
+    // so we deliberately do NOT overwrite this with the current user's identity.
+    // We also force the field read-only during edit for the same reason.
     $("#empCode").value = quote.employee_code || "";
+    const empInputEdit = document.getElementById("empCode");
+    if (empInputEdit) {
+      empInputEdit.readOnly = true;
+      empInputEdit.style.background = "#f8fafc";
+      empInputEdit.style.color = "#334155";
+      empInputEdit.style.cursor = "not-allowed";
+    }
     // Seed the "resolved name" so an unchanged code preserves employee_name on save
     if (quote.employee_code && quote.employee_name) {
       _resolvedEmpCode = quote.employee_code;
@@ -904,10 +990,11 @@ function openBuilder(quote) {
     setTimeout(updateActionButtonsVisibility, 0);
   } else {
     $("#builderTitle").textContent = "New Quotation";
-    ["custName","custEmail","custPhone","custGst","custAddress","empCode","notes"].forEach(id => $("#"+id).value = "");
-    const lbl = document.getElementById("empCodeName");
-    if (lbl) { lbl.textContent = ""; lbl.style.color = ""; }
-    _resolvedEmpCode = ""; _resolvedEmpName = "";
+    // NOTE: empCode intentionally excluded from the clear loop below — auto-filled by
+    // applyMyIdentityToEmpCode() from the signed-in user's whoami data (read-only for
+    // employees; editable fallback to email for super/admin without an employee_code).
+    ["custName","custEmail","custPhone","custGst","custAddress","notes"].forEach(id => $("#"+id).value = "");
+    applyMyIdentityToEmpCode();
     $("#validDays").value = 1;
   }
   renderItems();

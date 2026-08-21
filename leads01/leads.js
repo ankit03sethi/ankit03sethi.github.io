@@ -600,7 +600,8 @@ function followSubOf(lead) {
 function updateTopCounts() {
   // Follow Ups top-card count = only Call not picked + Call me later + Interested
   // (Send Quote and later sub-tabs are past the actionable follow-up stage.)
-  const activeFollowSubs = new Set(["not_picked", "callback", "interested"]);
+  // Include Send Quote (in_progress) in the Follow Ups top-card count.
+  const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress"]);
   const counts = { new: 0, follow: 0, done: 0, unassigned: 0 };
   filteredPipeline().forEach((l) => {
     // Cards must be mutually exclusive for managers: an unassigned lead lives
