@@ -339,6 +339,7 @@ async function reload() {
       <td style="text-align:center;">${activeToggle}</td>
       <td>
         ${isOwner ? "" : `<button class="b-outline" data-edit="${esc(p.email)}" style="font-size:11px; padding:5px 10px;">✏️ Edit</button>`}
+        ${isOwner ? "" : `<button class="b-outline" data-resend="${esc(p.email)}" style="font-size:11px; padding:5px 10px; background:#eff6ff; border-color:#93c5fd; color:#1e40af;" title="Resend invitation / password-reset email">📧 Resend invite</button>`}
         ${(isOwner || isMe) ? "" : `<button class="b-danger" data-remove="${esc(p.email)}">✕ Remove</button>`}
       </td>
     </tr>`;
@@ -346,6 +347,29 @@ async function reload() {
 
   // Edit
   tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => loadIntoForm(rows.find(x => x.email === b.dataset.edit))));
+
+  // Resend invitation (send a fresh recovery / set-password email)
+  tbody.querySelectorAll("[data-resend]").forEach(b => b.addEventListener("click", async () => {
+    const email = b.dataset.resend;
+    if (!confirm(`Resend invitation email to ${email}?\n\nThey'll receive a fresh "set password" link — the previous one (if any) still works too until it expires.`)) return;
+    b.disabled = true; const orig = b.innerHTML; b.innerHTML = "Sending…";
+    try {
+      const j = await callFn("resend_invite", { email });
+      b.innerHTML = orig; b.disabled = false;
+      if (!j.ok) { toast(j.error || j.message || "Resend failed", "err"); return; }
+      if (j.invite_sent) {
+        toast(`✓ Invite email re-sent to ${email}`, "ok");
+      } else if (j.recovery_url) {
+        console.log("Recovery link for", email, ":", j.recovery_url);
+        toast(`⚠ Email delivery failed — recovery link copied to console. Ask them to check spam or paste the link from console.`, "err");
+      } else {
+        toast(j.message || "Resend returned no confirmation", "err");
+      }
+    } catch (err) {
+      b.innerHTML = orig; b.disabled = false;
+      toast("Resend failed: " + (err.message || err), "err");
+    }
+  }));
 
   // Remove (both rows)
   tbody.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", async () => {
