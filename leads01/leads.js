@@ -3261,8 +3261,16 @@ async function showAssignmentHistoryModal(customerKey) {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:12px;padding:22px 24px;max-width:720px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 50px rgba(15,23,42,.35);">
       <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">📜 Lead history</div>
-      <div style="color:#475569;font-size:13px;margin-bottom:14px;">Contact <b>${esc(rawContact || "—")}</b> · Service <b>${esc(svcNice)}</b></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div style="color:#475569;font-size:13px;margin-bottom:12px;">Contact <b>${esc(rawContact || "—")}</b> · Service <b>${esc(svcNice)}</b></div>
+      <!-- Tabs -->
+      <div id="asnHistoryTabs" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+        <button type="button" data-asntab="all"    class="asntab active" style="padding:5px 11px;font-size:12px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#1f6feb;color:#fff;cursor:pointer;">All</button>
+        <button type="button" data-asntab="remark" class="asntab" style="padding:5px 11px;font-size:12px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">💬 Remarks</button>
+        <button type="button" data-asntab="star"   class="asntab" style="padding:5px 11px;font-size:12px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">⭐ Ratings</button>
+        <button type="button" data-asntab="assign" class="asntab" style="padding:5px 11px;font-size:12px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">↔️ Forwards</button>
+        <button type="button" data-asntab="quote"  class="asntab" style="padding:5px 11px;font-size:12px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">📋 Quote</button>
+      </div>
+      <div id="asnHistoryAddRow" style="display:flex;gap:8px;margin-bottom:12px;">
         <button id="asnAddRemarkBtn" type="button" style="flex:1;background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;">💬 + Remark</button>
         <button id="asnAddStarBtn" type="button" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;">⭐ + Rating</button>
       </div>
@@ -3343,10 +3351,42 @@ async function showAssignmentHistoryModal(customerKey) {
     listEl.innerHTML = html;
   }
 
+  // Tab state for this modal instance
+  let _asnEvents = [];
+  let _asnTab = "all";
+  function filterAsnByTab(events, tab) {
+    if (tab === "all") return events;
+    if (tab === "quote") return events.filter(ev => ev.type === "remark" && ev.header && /^Quote /.test(ev.header));
+    if (tab === "remark") return events.filter(ev => ev.type === "remark" && !(ev.header && /^Quote /.test(ev.header)));
+    return events.filter(ev => ev.type === tab);
+  }
+  function applyAsnTab(tab) {
+    _asnTab = tab;
+    overlay.querySelectorAll("#asnHistoryTabs .asntab").forEach(b => {
+      const active = b.dataset.asntab === tab;
+      b.style.background = active ? "#1f6feb" : "#fff";
+      b.style.color = active ? "#fff" : "#334155";
+    });
+    const row = overlay.querySelector("#asnHistoryAddRow");
+    const rBtn = overlay.querySelector("#asnAddRemarkBtn");
+    const sBtn = overlay.querySelector("#asnAddStarBtn");
+    if (row && rBtn && sBtn) {
+      if (tab === "all")         { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = ""; }
+      else if (tab === "remark") { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = "none"; }
+      else if (tab === "star")   { row.style.display = "flex"; rBtn.style.display = "none"; sBtn.style.display = ""; }
+      else                        { row.style.display = "none"; }
+    }
+    renderUnifiedEvents(filterAsnByTab(_asnEvents, tab));
+  }
+  overlay.querySelectorAll("#asnHistoryTabs .asntab").forEach(b => {
+    b.addEventListener("click", () => applyAsnTab(b.dataset.asntab));
+  });
+
   async function loadUnifiedHistory() {
     try {
       const res = await callAdmin("lead_unified_history", { customer_key: customerKey });
-      renderUnifiedEvents((res && res.events) || []);
+      _asnEvents = (res && res.events) || [];
+      applyAsnTab(_asnTab);
     } catch (err) {
       document.getElementById("asnHistoryList").innerHTML = `<div style="color:#991b1b;padding:12px;background:#fef2f2;border-radius:6px;">Load failed: ${esc(err.message || err)}</div>`;
     }

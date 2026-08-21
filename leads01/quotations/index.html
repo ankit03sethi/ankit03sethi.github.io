@@ -290,7 +290,16 @@
               <span>📜 Lead History</span>
               <span id="leadHistoryStatus" style="font-size:11px;color:#94a3b8;font-weight:500;"></span>
             </h2>
-            <div style="display:flex;gap:6px;margin:8px 0 12px;">
+            <!-- Tab row: All / Remarks / Ratings / Forwards / Quote events -->
+            <div id="leadHistoryTabs" style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 10px;">
+              <button type="button" data-lhtab="all"     class="lhtab active" style="padding:5px 10px;font-size:11.5px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#1f6feb;color:#fff;cursor:pointer;">All</button>
+              <button type="button" data-lhtab="remark"  class="lhtab" style="padding:5px 10px;font-size:11.5px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">💬 Remarks</button>
+              <button type="button" data-lhtab="star"    class="lhtab" style="padding:5px 10px;font-size:11.5px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">⭐ Ratings</button>
+              <button type="button" data-lhtab="assign"  class="lhtab" style="padding:5px 10px;font-size:11.5px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">↔️ Forwards</button>
+              <button type="button" data-lhtab="quote"   class="lhtab" style="padding:5px 10px;font-size:11.5px;font-weight:700;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;">📋 Quote</button>
+            </div>
+            <!-- Add buttons — only shown for tabs where user can add (All, Remarks, Ratings) -->
+            <div id="leadHistoryAddRow" style="display:flex;gap:6px;margin:0 0 10px;">
               <button id="addRemarkBtn" type="button" style="flex:1;background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;">💬 + Remark</button>
               <button id="addStarBtn" type="button" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;">⭐ + Rating</button>
             </div>
@@ -298,7 +307,7 @@
               <div style="color:#94a3b8;font-style:italic;padding:10px 0;">Save the quote to load history…</div>
             </div>
             <div style="font-size:10.5px;color:#94a3b8;margin-top:8px;line-height:1.5;">
-              This timeline is shared with the Leads screen. Every remark, star, forward, and quote-status change is preserved forever — even after Rejected or Paid.
+              Shared with the Leads screen. Every remark, star, forward, and quote-status change is preserved forever.
             </div>
           </div>
         </div>
@@ -1850,6 +1859,54 @@ function renderLeadHistoryEvents(events) {
   box.innerHTML = html;
 }
 
+// Cached last-fetched events + active tab filter so tab clicks re-render
+// without another network call.
+let _leadHistoryEvents = [];
+let _leadHistoryTab = "all";
+
+function filterEventsByTab(events, tab) {
+  if (tab === "all") return events;
+  if (tab === "quote") return events.filter(ev => ev.type === "remark" && ev.header && /^Quote /.test(ev.header));
+  if (tab === "remark") return events.filter(ev => ev.type === "remark" && !(ev.header && /^Quote /.test(ev.header)));
+  return events.filter(ev => ev.type === tab); // 'star', 'assign', 'service'
+}
+
+function applyLeadHistoryTab(tab) {
+  _leadHistoryTab = tab;
+  // Tab styling
+  document.querySelectorAll("#leadHistoryTabs .lhtab").forEach(b => {
+    const active = b.dataset.lhtab === tab;
+    b.style.background = active ? "#1f6feb" : "#fff";
+    b.style.color = active ? "#fff" : "#334155";
+    b.classList.toggle("active", active);
+  });
+  // Which add buttons to show
+  const row = document.getElementById("leadHistoryAddRow");
+  const rBtn = document.getElementById("addRemarkBtn");
+  const sBtn = document.getElementById("addStarBtn");
+  if (row && rBtn && sBtn) {
+    if (tab === "all")         { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = ""; }
+    else if (tab === "remark") { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = "none"; }
+    else if (tab === "star")   { row.style.display = "flex"; rBtn.style.display = "none"; sBtn.style.display = ""; }
+    else                        { row.style.display = "none"; }
+  }
+  // Render filtered
+  const filtered = filterEventsByTab(_leadHistoryEvents, tab);
+  renderLeadHistoryEvents(filtered);
+  const status = document.getElementById("leadHistoryStatus");
+  if (status) status.textContent = _currentCustomerKey ? `${filtered.length}/${_leadHistoryEvents.length} events` : "no lead link";
+}
+
+// Wire the tab buttons once (idempotent — checks if already wired)
+(function wireLeadHistoryTabs() {
+  const tabs = document.querySelectorAll("#leadHistoryTabs .lhtab");
+  tabs.forEach(b => {
+    if (b._wired) return;
+    b._wired = true;
+    b.addEventListener("click", () => applyLeadHistoryTab(b.dataset.lhtab));
+  });
+})();
+
 async function refreshLeadHistory() {
   const box = document.getElementById("leadHistoryList");
   const status = document.getElementById("leadHistoryStatus");
@@ -1861,6 +1918,7 @@ async function refreshLeadHistory() {
     if (box) box.innerHTML = `<div style="color:#94a3b8;font-style:italic;padding:10px 0;">Save the quote to load history…</div>`;
     if (status) status.textContent = "";
     _currentCustomerKey = null;
+    _leadHistoryEvents = [];
     return;
   }
   if (status) status.textContent = "loading…";
@@ -1868,8 +1926,8 @@ async function refreshLeadHistory() {
     const j = await callFn("admin-quotations", { op:"history", ...payload });
     if (!j.ok) { if (status) status.textContent = "err"; return; }
     _currentCustomerKey = j.customer_key || null;
-    if (status) status.textContent = _currentCustomerKey ? `${j.events.length} events` : "no lead link";
-    renderLeadHistoryEvents(j.events || []);
+    _leadHistoryEvents = j.events || [];
+    applyLeadHistoryTab(_leadHistoryTab); // re-render current tab with fresh data
   } catch (e) {
     if (status) status.textContent = "err";
     console.warn("history load failed", e);
