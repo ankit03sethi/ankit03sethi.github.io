@@ -2549,7 +2549,32 @@ function wireRowHandlers() {
         lines.push(`⚠ Status save failed: ${statusError}`);
       }
       if (lines.length === 0) lines.push("Nothing to save.");
-      alert(lines.join("\n"));
+      // v2026082028: Only ERROR cases pop an alert. Success shows an inline
+      // green tick on the button briefly (see below); no interrupting popup.
+      const hasErrors = addErrors.length > 0 || !!statusError;
+      if (hasErrors) {
+        alert(lines.join("\n"));
+      } else {
+        // Inline green tick on the button that just fired.
+        try {
+          const btn = tr.querySelector(".row-save-btn");
+          if (btn) {
+            const originalHtml = btn.innerHTML;
+            const originalStyle = btn.getAttribute("style") || "";
+            btn.innerHTML = "✓ Saved";
+            btn.style.background = "#16a34a";
+            btn.disabled = true;
+            setTimeout(() => {
+              // Row may have been re-rendered by refresh; only restore if still in DOM.
+              if (document.body.contains(btn)) {
+                btn.innerHTML = originalHtml;
+                btn.setAttribute("style", originalStyle);
+                btn.disabled = false;
+              }
+            }, 1200);
+          }
+        } catch {}
+      }
 
       // Step 4: clear pending queue for this row (only if the add call was
       // attempted — leave any items with real errors so the user can retry).
