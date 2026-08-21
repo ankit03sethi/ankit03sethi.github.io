@@ -280,7 +280,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       // Look up via admin-data whoami (server-side) so no direct table access needed
       const who = await callAdmin("whoami").catch(() => null);
       _myEmpCode = who?.employee_code || "";
-      _myEmpName = who?.email || em;
+      _myEmpName = who?.employee_name || who?.email || em;
       // Auto-redirect processing-only employees to /processing/. Managers stay put.
       const roles = Array.isArray(who?.roles) ? who.roles : [];
       if (!_isManager && roles.includes("processing") && !roles.includes("sales")) {
@@ -369,7 +369,8 @@ async function onSignOut() {
 async function bootDashboard() {
   hide($("#loginView")); show($("#dashView"));
   const { data: { user } } = await sb.auth.getUser();
-  $("#emailChip").textContent = _isEmployeeOnly ? `${_myEmpCode}` : "01";
+  $("#emailChip").textContent = _isEmployeeOnly ? `${_myEmpCode}${_myEmpName ? " · " + _myEmpName : ""}` : "01";
+  $("#emailChip").title = _isEmployeeOnly ? (user?.email || "") : "";
   show($("#emailChip")); show($("#signOutBtn"));
   // v2026082023: hydrate fine-grained action flags from whoami so every UI
   // gate reads a single source of truth. Managers get all-true from the
