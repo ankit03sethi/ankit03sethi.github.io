@@ -617,16 +617,16 @@ async function openContactEditor(quoteId) {
     const input = document.getElementById(id + "Input");
     const raw = (input.value || "").trim();
     if (!raw) return;
-    // Names must be typed in ALL CAPITAL letters (policy 2026-08-21).
-    if (id === "qcName" && /[a-z]/.test(raw)) {
+    // Names AND emails must be typed in ALL CAPITAL letters (policy 2026-08-21).
+    if ((id === "qcName" || id === "qcEmail") && /[a-z]/.test(raw)) {
       const msg = document.getElementById("qcMsg");
       msg.style.color = "#dc2626";
-      msg.textContent = "Name must be in CAPITAL letters. Please retype in ALL CAPS.";
+      msg.textContent = (id === "qcEmail" ? "Email" : "Name") + " must be in CAPITAL letters. Please retype in ALL CAPS.";
       return;
     }
     const nextCustomer = {
       name:  id === "qcName"  ? raw : (q.customer_name  || ""),
-      email: id === "qcEmail" ? raw.toLowerCase() : (q.customer_email || ""),
+      email: id === "qcEmail" ? raw : (q.customer_email || ""), // preserve CAPS as typed
       phone: id === "qcPhone" ? raw.replace(/\D/g,"") : (q.customer_phone || ""),
       gst:   id === "qcGst"   ? raw : (q.customer_gst   || ""),
       address: q.customer_address || "",
@@ -1280,13 +1280,19 @@ function computeTotals() {
 // ============ SAVE ============
 $("#saveBtn").addEventListener("click", async () => {
   if (_items.length === 0) { toast("Add at least 1 item", true); return; }
-  // Names must be in ALL CAPITAL letters — same rule as the contact editor
-  // (policy 2026-08-21). Reject any lowercase letter to keep the customer
-  // history consistent regardless of which form the edit came from.
+  // Names AND emails must be in ALL CAPITAL letters — same rule as the contact
+  // editor (policy 2026-08-21). Reject lowercase to keep history consistent
+  // regardless of which form the edit came from.
   const nameRaw = $("#custName").value.trim();
   if (nameRaw && /[a-z]/.test(nameRaw) && nameRaw !== "Dear customer") {
     toast("Name must be in CAPITAL letters. Please retype in ALL CAPS.", true);
     $("#custName").focus();
+    return;
+  }
+  const emailRaw = $("#custEmail").value.trim();
+  if (emailRaw && /[a-z]/.test(emailRaw)) {
+    toast("Email must be in CAPITAL letters. Please retype in ALL CAPS.", true);
+    $("#custEmail").focus();
     return;
   }
   // Name is optional now — backend defaults empty to "Dear customer" so we never write
