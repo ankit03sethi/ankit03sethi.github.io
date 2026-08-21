@@ -3077,13 +3077,21 @@ async function showAssignmentHistoryModal(customerKey) {
     backfill_scraped:         "🛠 Backfilled (existing lead)",
   };
 
+  // Unified timeline (v2026082102): identical style/data to the Quotations page —
+  // remarks + stars + assignments + service events + quote-status logs merged in
+  // one feed. Uses lead_unified_history from admin-data v41 which enriches every
+  // event with the actor's CODE+Name so we never display raw emails.
   const overlay = document.createElement("div");
   overlay.id = "asnHistoryOverlay";
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:12px;padding:22px 24px;max-width:680px;width:100%;max-height:82vh;overflow-y:auto;box-shadow:0 20px 50px rgba(15,23,42,.35);">
-      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Lead history</div>
+    <div style="background:#fff;border-radius:12px;padding:22px 24px;max-width:720px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 50px rgba(15,23,42,.35);">
+      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">📜 Lead history</div>
       <div style="color:#475569;font-size:13px;margin-bottom:14px;">Contact <b>${esc(rawContact || "—")}</b> · Service <b>${esc(svcNice)}</b></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button id="asnAddRemarkBtn" type="button" style="flex:1;background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;">💬 + Remark</button>
+        <button id="asnAddStarBtn" type="button" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;">⭐ + Rating</button>
+      </div>
       <div id="asnHistoryList" style="font-size:13px;color:#334155;">Loading…</div>
       <div style="display:flex;justify-content:flex-end;margin-top:16px;">
         <button id="asnHistoryClose" style="background:#1f6feb;color:#fff;padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
@@ -3094,67 +3102,106 @@ async function showAssignmentHistoryModal(customerKey) {
   overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(); });
   overlay.querySelector("#asnHistoryClose").onclick = cleanup;
 
-  try {
-    // v2026082019: fetch the merged timeline — assignment history + service
-    // add/remove events — so managers see the full story in one place.
-    const full = await callAdmin("lead_full_history", { customer_key: customerKey });
-    const asnRows = (full && full.assignments)     || [];
-    const svcRows = (full && full.service_events)  || [];
+  // Emp chip (CODE — Name), matching quotations page. `info` = {code, name} | null.
+  const empChipUnified = (info, tone) => {
+    if (!info || (!info.code && !info.name)) {
+      return `<span style="color:#94a3b8;font-style:italic;">Admin</span>`;
+    }
+    const bg = tone === "to"   ? "background:#dcfce7;color:#166534;border:1px solid #86efac;"
+             : tone === "from" ? "background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;"
+             : "background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;";
+    const code = info.code ? `<b>${esc(info.code)}</b>` : "";
+    const name = info.name ? ` — ${esc(info.name)}` : "";
+    return `<span style="display:inline-block;${bg}padding:2px 8px;border-radius:5px;font-size:12px;font-weight:600;white-space:nowrap;">${code}${name}</span>`;
+  };
+  const niceSvc = (code) => {
+    if (!code) return "—";
+    const hit = (typeof SERVICES !== "undefined" ? SERVICES : []).find(s => String(s.value).toLowerCase() === String(code).toLowerCase());
+    return hit ? hit.label : String(code);
+  };
+  const fmtWhen = (iso) => `${esc(fmtDate(iso))} · ${esc(fmtTime(iso))}`;
+
+  function renderUnifiedEvents(events) {
     const listEl = document.getElementById("asnHistoryList");
-    if (asnRows.length === 0 && svcRows.length === 0) {
-      listEl.innerHTML = `<div style="padding:16px;color:#94a3b8;text-align:center;background:#f8fafc;border-radius:6px;">No history yet.</div>`;
+    if (!events || events.length === 0) {
+      listEl.innerHTML = `<div style="padding:16px;color:#94a3b8;text-align:center;background:#f8fafc;border-radius:6px;">No history yet. Add a remark or star to start the timeline.</div>`;
       return;
     }
-    // Tag each row with its kind then merge & sort oldest-first.
-    const merged = []
-      .concat(asnRows.map((r) => ({ kind: "assignment", at: r.at, data: r })))
-      .concat(svcRows.map((r) => ({ kind: "service",    at: r.at, data: r })))
-      .sort((a, b) => new Date(a.at) - new Date(b.at));
-
-    const renderAssignment = (r) => {
-      const why = reasonPretty[r.reason] || `↪ ${esc(r.reason || "changed")}`;
-      const byLine = `<div style="color:#64748b;font-size:11.5px;margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">Done by ${byActorChip(r.by_email)}</div>`;
-      return `
-        <div style="padding:10px 12px;margin-bottom:8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;position:relative;">
-          <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:#1f6feb;border-radius:50%;border:2px solid #fff;"></div>
-          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:6px;">${why}</div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;">
-            <span style="color:#64748b;">From</span> ${empChip(r.from_code, "from")}
+    const iconMap = { remark:"💬", star:"⭐", assign:"↔️", service:"🧩", quote:"📋" };
+    const colorMap = { remark:"#0ea5e9", star:"#f59e0b", assign:"#7c3aed", service:"#059669", quote:"#1f6feb" };
+    let html = "";
+    for (const ev of events) {
+      const isQuoteRemark = ev.type === "remark" && ev.header && /^Quote /.test(ev.header);
+      const kind = isQuoteRemark ? "quote" : ev.type;
+      const icon = iconMap[kind] || "•";
+      const color = colorMap[kind] || "#64748b";
+      let body = "";
+      if (ev.type === "star") {
+        const filled = "★".repeat(ev.stars || 0);
+        const empty = "☆".repeat(5 - (ev.stars || 0));
+        body = `<span style="color:#f59e0b;font-size:16px;letter-spacing:1px;">${filled}<span style="color:#e2e8f0;">${empty}</span></span>${ev.text ? ` <span style="color:#334155;">— ${esc(ev.text)}</span>` : ""}`;
+      } else if (ev.type === "assign") {
+        body = `
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+            ${empChipUnified(ev.from, "from")}
             <span style="color:#64748b;">→</span>
-            <span style="color:#64748b;">To</span> ${empChip(r.to_code, "to")}
+            ${empChipUnified(ev.to, "to")}
           </div>
-          <div style="color:#475569;font-size:11.5px;margin-top:4px;">📅 ${esc(fmtDate(r.at))} · ${esc(fmtTime(r.at))}</div>
+          <div style="font-size:12px;color:#475569;">${esc(ev.reason_label || ev.reason_code || "changed")}</div>`;
+      } else if (ev.type === "service") {
+        const isAdd = ev.action === "added";
+        body = `<span style="font-weight:700;color:${isAdd?"#059669":"#dc2626"};">${isAdd?"➕ Added":"✖ Removed"}</span> service: <b>${esc(niceSvc(ev.service))}</b>`;
+      } else {
+        body = esc(ev.text || "");
+      }
+      const header = ev.header ? `<span style="background:${color}15;color:${color};padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px;">${esc(ev.header)}</span>` : "";
+      const byLine = ev.by ? `<div style="font-size:11.5px;color:#64748b;margin-top:5px;">by ${empChipUnified(ev.by, null)}</div>` : "";
+      html += `
+        <div style="border-left:3px solid ${color};padding:8px 12px;margin-bottom:10px;background:#f8fafc;border-radius:0 8px 8px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:3px;">
+            <span style="font-size:11.5px;font-weight:700;color:${color};">${icon} ${kind.toUpperCase()}</span>
+            <span style="font-size:11px;color:#94a3b8;">${fmtWhen(ev.at)}</span>
+          </div>
+          <div style="font-size:13px;color:#0f172a;line-height:1.45;">${header}${body}</div>
           ${byLine}
         </div>`;
-    };
-    const renderServiceEvent = (r) => {
-      const isAdd = r.action === "added";
-      const icon  = isAdd ? "➕" : "✖";
-      const verb  = isAdd ? "Added service" : "Removed service";
-      const dot   = isAdd ? "#059669" : "#dc2626";
-      const bg    = isAdd ? "#f0fdf4" : "#fef2f2";
-      const bd    = isAdd ? "#bbf7d0" : "#fecaca";
-      const svcNiceLabel = (function () {
-        const hit = (typeof SERVICES !== "undefined" ? SERVICES : []).find(s => String(s.value).toLowerCase() === String(r.service || "").toLowerCase());
-        return hit ? hit.label : (r.service || "—");
-      })();
-      const byLine = `<div style="color:#64748b;font-size:11.5px;margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${isAdd ? "Added" : "Cancelled"} by ${byActorChip(r.by_email)}</div>`;
-      return `
-        <div style="padding:10px 12px;margin-bottom:8px;background:${bg};border-radius:6px;border:1px solid ${bd};position:relative;">
-          <div style="position:absolute;left:-20px;top:14px;width:11px;height:11px;background:${dot};border-radius:50%;border:2px solid #fff;"></div>
-          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:4px;">${icon} ${esc(verb)}: <span style="color:${dot};">${esc(svcNiceLabel)}</span></div>
-          <div style="color:#475569;font-size:11.5px;margin-top:4px;">📅 ${esc(fmtDate(r.at))} · ${esc(fmtTime(r.at))}</div>
-          ${byLine}
-        </div>`;
-    };
-
-    listEl.innerHTML = `
-      <div style="border-left:3px solid #cbd5e1;padding-left:14px;margin-left:4px;">
-      ${merged.map((entry) => entry.kind === "assignment" ? renderAssignment(entry.data) : renderServiceEvent(entry.data)).join("")}
-      </div>`;
-  } catch (err) {
-    document.getElementById("asnHistoryList").innerHTML = `<div style="color:#991b1b;padding:12px;background:#fef2f2;border-radius:6px;">Load failed: ${esc(err.message)}</div>`;
+    }
+    listEl.innerHTML = html;
   }
+
+  async function loadUnifiedHistory() {
+    try {
+      const res = await callAdmin("lead_unified_history", { customer_key: customerKey });
+      renderUnifiedEvents((res && res.events) || []);
+    } catch (err) {
+      document.getElementById("asnHistoryList").innerHTML = `<div style="color:#991b1b;padding:12px;background:#fef2f2;border-radius:6px;">Load failed: ${esc(err.message || err)}</div>`;
+    }
+  }
+
+  // + Remark
+  overlay.querySelector("#asnAddRemarkBtn").onclick = async () => {
+    const text = (prompt("Add a remark (visible on the Quotations screen too):") || "").trim();
+    if (!text) return;
+    try {
+      await callAdmin("add_remark", { customer_key: customerKey, remark: text });
+      loadUnifiedHistory();
+    } catch (e) { alert("Failed: " + (e.message || e)); }
+  };
+
+  // + Rating (1–5)
+  overlay.querySelector("#asnAddStarBtn").onclick = async () => {
+    const raw = prompt("Star rating (1–5):");
+    if (!raw) return;
+    const stars = parseInt(raw, 10);
+    if (!stars || stars < 1 || stars > 5) { alert("Enter a number between 1 and 5"); return; }
+    const note = (prompt("Note (optional):") || "").trim() || null;
+    try {
+      await callAdmin("add_star_rating", { customer_key: customerKey, stars, note });
+      loadUnifiedHistory();
+    } catch (e) { alert("Failed: " + (e.message || e)); }
+  };
+
+  loadUnifiedHistory();
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }

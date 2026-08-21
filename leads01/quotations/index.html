@@ -462,7 +462,15 @@ async function loadList() {
   $("#listWrap").innerHTML = `<div class="helper" style="padding:20px;text-align:center;">Loading...</div>`;
   const j = await callFn("admin-quotations", { op:"list" });
   if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error||"")}</div>`; return; }
-  _allQuotes = j.quotations || [];
+  // v2026082102: sort quotes by max_stars DESC (highest-priority customer first),
+  // same behaviour as the Leads pipeline. Ties fall back to created_at DESC
+  // which is the order the server already returned.
+  _allQuotes = (j.quotations || []).slice().sort((a, b) => {
+    const sa = Number(a.max_stars || 0);
+    const sb = Number(b.max_stars || 0);
+    if (sb !== sa) return sb - sa;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
   refreshEmpFilterOptions();
   updateFilterCounts();
   renderFilteredList();
@@ -730,8 +738,11 @@ function renderFilteredList() {
       ? (q.employee_name ? `Emp: ${esc(q.employee_code)} (${esc(q.employee_name)})` : `Emp: ${esc(q.employee_code)}`)
       : "";
     const empChip = q.employee_code ? `<span title="Employee code" style="display:inline-block;margin-left:6px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">${empChipLabel}</span>` : "";
+    // Priority star chip: shows max star rating for this customer (same idea as Leads)
+    const st = Number(q.max_stars || 0);
+    const starChip = st > 0 ? `<span title="Priority: ${st}-star customer" style="display:inline-block;margin-left:6px;padding:1px 6px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:11px;font-weight:800;vertical-align:middle;letter-spacing:0.5px;">${"★".repeat(st)}</span>` : "";
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
-      <td><b>${esc(q.quote_number)}</b>${empChip}</td>
+      <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}</td>
       <td style="font-size:12.5px;line-height:1.4;">
         <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
         ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
