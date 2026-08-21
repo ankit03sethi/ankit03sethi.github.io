@@ -2763,6 +2763,51 @@ async function showContactUpdateModal(current) {
   attachCapsGuard("cuName", "Name");
   attachCapsGuard("cuEmail", "Email");
 
+  // 2026-08-21: live 10-digit guard for Mobile + WhatsApp. Anything other than
+  // exactly 10 digits turns the input red and disables that field's Save +
+  // the shared Save All button.
+  function attachTenDigitGuard(fieldId, label) {
+    const input = document.getElementById(fieldId + "Input");
+    if (!input) return;
+    const saveBtn = overlay.querySelector(`[data-savefield="${fieldId}"]`);
+    const saveAllBtn = document.getElementById("cuSaveAll");
+    const msg = document.getElementById("cuMsg");
+    const recompute = () => {
+      const digits = (input.value || "").replace(/\D/g, "");
+      const raw = (input.value || "").trim();
+      const bad = raw && digits.length !== 10;
+      if (bad) {
+        input.style.border = "2px solid #dc2626";
+        input.style.background = "#fef2f2";
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = "0.4"; saveBtn.style.cursor = "not-allowed"; }
+        if (saveAllBtn) { saveAllBtn.disabled = true; saveAllBtn.style.opacity = "0.4"; saveAllBtn.style.cursor = "not-allowed"; }
+        msg.style.color = "#dc2626";
+        msg.textContent = label + " must be exactly 10 digits (got " + digits.length + ").";
+      } else {
+        input.style.border = "1px solid #cbd5e1";
+        input.style.background = "";
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = "pointer"; }
+        // Re-enable Save All only if every guarded field is clean.
+        const mV = (document.getElementById("cuMobileInput")?.value || "").replace(/\D/g, "");
+        const wV = (document.getElementById("cuWhatsappInput")?.value || "").replace(/\D/g, "");
+        const nameV = (document.getElementById("cuNameInput")?.value || "").trim();
+        const emailV = (document.getElementById("cuEmailInput")?.value || "").trim();
+        const mobOk = !(document.getElementById("cuMobileInput")?.value || "").trim() || mV.length === 10;
+        const waOk  = !(document.getElementById("cuWhatsappInput")?.value || "").trim() || wV.length === 10;
+        if (!/[a-z]/.test(nameV) && !/[a-z]/.test(emailV) && mobOk && waOk && saveAllBtn) {
+          saveAllBtn.disabled = false; saveAllBtn.style.opacity = ""; saveAllBtn.style.cursor = "pointer";
+        }
+        if (msg.textContent && msg.textContent.startsWith(label + " must be exactly")) {
+          msg.textContent = ""; msg.style.color = "";
+        }
+      }
+    };
+    input.addEventListener("input", recompute);
+    input.addEventListener("blur", recompute);
+  }
+  attachTenDigitGuard("cuMobile", "Mobile");
+  attachTenDigitGuard("cuWhatsapp", "WhatsApp");
+
   const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
     let raw = (input.value || "").trim();

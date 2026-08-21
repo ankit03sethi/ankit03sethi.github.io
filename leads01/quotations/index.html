@@ -653,6 +653,45 @@ async function openContactEditor(quoteId) {
   attachQcCapsGuard("qcName", "Name");
   attachQcCapsGuard("qcEmail", "Email");
 
+  // 2026-08-21: live 10-digit guard for Mobile.
+  function attachQcTenDigitGuard(fieldId, label) {
+    const input = document.getElementById(fieldId + "Input");
+    if (!input) return;
+    const saveBtn = overlay.querySelector(`[data-savefield="${fieldId}"]`);
+    const saveAllBtn = document.getElementById("qcSaveAll");
+    const msg = document.getElementById("qcMsg");
+    const recompute = () => {
+      const digits = (input.value || "").replace(/\D/g, "");
+      const raw = (input.value || "").trim();
+      const bad = raw && digits.length !== 10;
+      if (bad) {
+        input.style.border = "2px solid #dc2626";
+        input.style.background = "#fef2f2";
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = "0.4"; saveBtn.style.cursor = "not-allowed"; }
+        if (saveAllBtn) { saveAllBtn.disabled = true; saveAllBtn.style.opacity = "0.4"; saveAllBtn.style.cursor = "not-allowed"; }
+        msg.style.color = "#dc2626";
+        msg.textContent = label + " must be exactly 10 digits (got " + digits.length + ").";
+      } else {
+        input.style.border = "1px solid #cbd5e1";
+        input.style.background = "";
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = "pointer"; }
+        const pV = (document.getElementById("qcPhoneInput")?.value || "").replace(/\D/g, "");
+        const nameV = (document.getElementById("qcNameInput")?.value || "").trim();
+        const emailV = (document.getElementById("qcEmailInput")?.value || "").trim();
+        const phoneOk = !(document.getElementById("qcPhoneInput")?.value || "").trim() || pV.length === 10;
+        if (!/[a-z]/.test(nameV) && !/[a-z]/.test(emailV) && phoneOk && saveAllBtn) {
+          saveAllBtn.disabled = false; saveAllBtn.style.opacity = ""; saveAllBtn.style.cursor = "pointer";
+        }
+        if (msg.textContent && msg.textContent.startsWith(label + " must be exactly")) {
+          msg.textContent = ""; msg.style.color = "";
+        }
+      }
+    };
+    input.addEventListener("input", recompute);
+    input.addEventListener("blur", recompute);
+  }
+  attachQcTenDigitGuard("qcPhone", "Mobile");
+
   const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
     const raw = (input.value || "").trim();
@@ -1382,6 +1421,13 @@ $("#saveBtn").addEventListener("click", async () => {
     $("#custEmail").focus();
     return;
   }
+  const phoneRaw = $("#custPhone").value.trim();
+  const phoneDigits = phoneRaw.replace(/\D/g, "");
+  if (phoneRaw && phoneDigits.length !== 10) {
+    toast("Mobile must be exactly 10 digits (got " + phoneDigits.length + ").", true);
+    $("#custPhone").focus();
+    return;
+  }
   // Name is optional now — backend defaults empty to "Dear customer" so we never write
   // a blank customer_name row. Reflect the fallback in the UI too if the user left it blank.
   if (!$("#custName").value.trim()) {
@@ -1906,6 +1952,37 @@ $("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistor
   };
   guard(custName, "Name");
   guard(custEmail, "Email");
+
+  // 10-digit guard on the main form's mobile field.
+  const custPhone = document.getElementById("custPhone");
+  if (custPhone) {
+    const recomputePhone = () => {
+      const raw = (custPhone.value || "").trim();
+      const digits = raw.replace(/\D/g, "");
+      const bad = raw && digits.length !== 10;
+      if (bad) {
+        custPhone.style.border = "2px solid #dc2626";
+        custPhone.style.background = "#fef2f2";
+        custPhone.title = "Mobile must be exactly 10 digits (got " + digits.length + ").";
+      } else {
+        custPhone.style.border = "";
+        custPhone.style.background = "";
+        custPhone.title = "";
+      }
+      const bothNameOk = !custName || !(custName.value || "").trim() || (custName.value || "").trim() === "Dear customer" || !/[a-z]/.test((custName.value || "").trim());
+      const bothEmailOk = !custEmail || !(custEmail.value || "").trim() || !/[a-z]/.test((custEmail.value || "").trim());
+      const phoneOk = !raw || digits.length === 10;
+      if (saveBtn) {
+        if (bothNameOk && bothEmailOk && phoneOk) {
+          saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = "";
+        } else {
+          saveBtn.disabled = true; saveBtn.style.opacity = "0.4"; saveBtn.style.cursor = "not-allowed";
+        }
+      }
+    };
+    custPhone.addEventListener("input", recomputePhone);
+    custPhone.addEventListener("blur", recomputePhone);
+  }
 })();
 
 // ============ INIT ============
