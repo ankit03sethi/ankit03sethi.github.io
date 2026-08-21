@@ -670,14 +670,19 @@ async function openContactEditor(quoteId) {
 
 async function loadQuoteContactHistory(email, phone) {
   try {
-    // Compute a customer_key using manual|<mobile-or-email> convention used by leads01
-    const key = (String(phone||"").replace(/\D/g,"") || String(email||"").toLowerCase()) + "|manual";
+    // Try the actual customer_key stored on this quote first (v19+ backend);
+    // fall back to the legacy manual|<contact> guess for older quotes.
+    const q = _currentQuote;
+    let key = q?.customer_key || null;
+    if (!key) key = (String(phone||"").replace(/\D/g,"") || String(email||"").toLowerCase()) + "|manual";
     const j = await callFn("admin-data", { kind: "contact_history", customer_key: key });
     const history = (j && j.data) || [];
-    const byField = { email: [], mobile: [], whatsapp: [] };
+    const byField = { name: [], email: [], mobile: [], whatsapp: [], gst: [] };
     history.forEach((h) => { if (byField[h.field]) byField[h.field].push(h); });
-    renderQuoteHistoryList("qcEmailHistory",  byField.email);
-    renderQuoteHistoryList("qcPhoneHistory",  byField.mobile);
+    renderQuoteHistoryList("qcNameHistory",  byField.name);
+    renderQuoteHistoryList("qcEmailHistory", byField.email);
+    renderQuoteHistoryList("qcPhoneHistory", byField.mobile);
+    renderQuoteHistoryList("qcGstHistory",   byField.gst);
   } catch (e) {
     console.warn("history load failed:", e);
   }

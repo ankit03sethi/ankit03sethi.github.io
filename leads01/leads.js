@@ -2697,6 +2697,7 @@ async function showContactUpdateModal(current) {
     <div style="background:#fff;border-radius:10px;padding:22px 24px;max-width:560px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
       <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:4px;">Customer contact</div>
       <div class="muted-small" style="margin-bottom:14px;color:#64748b;">Contact info is <b>add-only</b> — every old value is always kept in history below each field. Click <b>+ Add new</b> to save a newer value. Newer value is used for Call / WhatsApp / Email going forward.</div>
+      ${fieldRow("Name",     "👤", current.name || "", "cuName",  "Customer name",       "")}
       ${fieldRow("Email",    "📧", current.email,    "cuEmail",    "customer@email.com",  "")}
       ${fieldRow("Mobile",   "📱", current.mobile,   "cuMobile",   "10-digit mobile",     "")}
       ${fieldRow("WhatsApp", "💬", current.whatsapp || current.mobile, "cuWhatsapp", "10-digit WhatsApp number", current.whatsapp ? "" : "Currently defaulting to mobile. Add here to use a separate WhatsApp number going forward.")}
@@ -2721,6 +2722,7 @@ async function showContactUpdateModal(current) {
     let raw = (input.value || "").trim();
     if (!raw) return;
     const payload = { customer_key: current.customer_key };
+    if (id === "cuName")     payload.name     = raw.slice(0, 120);
     if (id === "cuEmail")    payload.email    = raw.toLowerCase();
     if (id === "cuMobile")   payload.mobile   = raw.replace(/\D/g, "");
     if (id === "cuWhatsapp") payload.whatsapp = raw.replace(/\D/g, "");
@@ -2753,8 +2755,18 @@ async function showContactUpdateModal(current) {
 async function loadAndRenderHistory(customerKey) {
   try {
     const history = await callAdmin("contact_history", { customer_key: customerKey });
-    const byField = { email: [], mobile: [], whatsapp: [] };
+    const byField = { name: [], email: [], mobile: [], whatsapp: [] };
     (history || []).forEach((h) => { if (byField[h.field]) byField[h.field].push(h); });
+    // If a name has been saved, update the "latest" label AND the visible
+    // value at the top of the Name row (initial value is empty in the DB).
+    const newestName = byField.name[0];
+    if (newestName?.new_value) {
+      const nameHeaderRow = document.querySelector("#cuNameLatestTs")?.parentElement;
+      if (nameHeaderRow) {
+        const strong = nameHeaderRow.querySelector("div:nth-child(2)");
+        if (strong) strong.textContent = newestName.new_value;
+      }
+    }
     // Latest timestamp per field goes next to the LATEST value at top
     const setLatestTs = (elId, list) => {
       const el = document.getElementById(elId);
@@ -2762,9 +2774,11 @@ async function loadAndRenderHistory(customerKey) {
       const newest = list[0];
       el.innerHTML = newest ? `Updated ${esc(fmtDate(newest.changed_at))} ${esc(fmtTime(newest.changed_at))}` : "(initial value — never updated)";
     };
+    setLatestTs("cuNameLatestTs",     byField.name);
     setLatestTs("cuEmailLatestTs",    byField.email);
     setLatestTs("cuMobileLatestTs",   byField.mobile);
     setLatestTs("cuWhatsappLatestTs", byField.whatsapp);
+    renderHistoryList("cuNameHistory",     byField.name);
     renderHistoryList("cuEmailHistory",    byField.email);
     renderHistoryList("cuMobileHistory",   byField.mobile);
     renderHistoryList("cuWhatsappHistory", byField.whatsapp);
