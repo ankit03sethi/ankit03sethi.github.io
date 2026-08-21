@@ -2500,7 +2500,7 @@ function wireRowHandlers() {
           const newLeads = res?.new_leads || [];
           if (kind === "forwarded" || kind === "split") {
             const first = newLeads[0] || {};
-            forwardedTo.push({ service: svc, empCode: first.employee_code || "?" });
+            forwardedTo.push({ service: svc, empCode: first.employee_code || "?", customerKey: first.customer_key || "" });
           } else {
             stayedSvcs.push(svc);
           }
@@ -2585,10 +2585,23 @@ function wireRowHandlers() {
       }
 
       // Step 5: refresh pipeline + re-render. Any forwarded services will
-      // materialise as brand-new pipeline_leads rows, and the top NEW LEADS
-      // counter will naturally bump when it re-reads pipelineCache.
+      // materialise as brand-new pipeline_leads rows, and the top counters
+      // will naturally bump when it re-reads pipelineCache.
+      // v2026082029: fetch twice with a short delay in between to sidestep
+      // any Supabase read-replica lag — the just-inserted forwarded lead
+      // rows sometimes miss the first read if the replica hasn't caught up.
+      const expectedNewRows = forwardedTo.length;
       try {
         pipelineCache = await callAdmin("pipeline");
+        if (expectedNewRows > 0) {
+          // Check if the fresh rows landed; if not, wait 700ms and retry once.
+          const seen = new Set(pipelineCache.map((l) => l.customer_key));
+          const missing = forwardedTo.some((f) => !seen.has(f.customerKey));
+          if (missing) {
+            await new Promise((r) => setTimeout(r, 700));
+            pipelineCache = await callAdmin("pipeline");
+          }
+        }
       } catch {}
       updateTopCounts();
       renderActive();
