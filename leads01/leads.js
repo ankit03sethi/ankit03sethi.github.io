@@ -2707,6 +2707,7 @@ async function showContactUpdateModal(current) {
       ${fieldRow("WhatsApp", "💬", current.whatsapp || current.mobile, "cuWhatsapp", "10-digit WhatsApp number", current.whatsapp ? "" : "Currently defaulting to mobile. Add here to use a separate WhatsApp number going forward.")}
       <div id="cuMsg" style="font-size:12px;margin-top:6px;"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button id="cuSaveAll" style="background:#059669;color:#fff;padding:8px 16px;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">💾 Save All</button>
         <button id="cuClose" style="background:#e5e7eb;color:#111;padding:8px 14px;border:none;border-radius:5px;font-size:13px;cursor:pointer;">Close</button>
       </div>
     </div>`;
@@ -2759,6 +2760,56 @@ async function showContactUpdateModal(current) {
     }
   };
   overlay.querySelectorAll("[data-savefield]").forEach(btn => btn.addEventListener("click", () => doSave(btn.dataset.savefield, btn)));
+
+  // 2026-08-21: Save All — batch-save every field whose input has a non-empty
+  // value. Runs the same validation (ALL-CAPS name/email) and hits the same
+  // update_lead_contact op in one call.
+  document.getElementById("cuSaveAll").addEventListener("click", async () => {
+    const msg = document.getElementById("cuMsg");
+    msg.textContent = ""; msg.style.color = "";
+    const payload = { customer_key: current.customer_key };
+    const errs = [];
+    const getVal = (id) => (document.getElementById(id + "Input")?.value || "").trim();
+    const nameV = getVal("cuName");
+    const emailV = getVal("cuEmail");
+    const mobV = getVal("cuMobile");
+    const waV  = getVal("cuWhatsapp");
+    if (nameV) {
+      if (/[a-z]/.test(nameV)) errs.push("Name must be in CAPITAL letters.");
+      else payload.name = nameV.slice(0, 120);
+    }
+    if (emailV) {
+      if (/[a-z]/.test(emailV)) errs.push("Email must be in CAPITAL letters.");
+      else payload.email = emailV;
+    }
+    if (mobV) payload.mobile = mobV.replace(/\D/g, "");
+    if (waV)  payload.whatsapp = waV.replace(/\D/g, "");
+    if (errs.length) { msg.style.color = "#dc2626"; msg.textContent = errs.join(" "); return; }
+    // Nothing typed? Nothing to save.
+    if (!payload.name && !payload.email && !payload.mobile && !payload.whatsapp) {
+      msg.style.color = "#64748b"; msg.textContent = "Nothing to save — type into at least one field."; return;
+    }
+    const btn = document.getElementById("cuSaveAll");
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      await callAdmin("update_lead_contact", payload);
+      pipelineCache = await callAdmin("pipeline");
+      updateTopCounts();
+      renderActive();
+      // Reload history and clear inputs
+      await loadAndRenderHistory(current.customer_key);
+      ["cuName","cuEmail","cuMobile","cuWhatsapp"].forEach(id => {
+        const inp = document.getElementById(id + "Input");
+        if (inp) inp.value = "";
+        document.getElementById(id + "Wrap")?.classList.add("hidden");
+      });
+      msg.style.color = "#059669"; msg.textContent = "✓ Saved all fields. History updated below.";
+    } catch (err) {
+      msg.style.color = "#dc2626"; msg.textContent = "Save failed: " + (err.message || err);
+    } finally {
+      btn.disabled = false; btn.innerHTML = "💾 Save All";
+    }
+  });
 
   // Load and render history under each field
   await loadAndRenderHistory(current.customer_key);
