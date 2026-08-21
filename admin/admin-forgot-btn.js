@@ -85,13 +85,27 @@
   // need to import supabase-js just to know who's signed in.
   function currentEmail() {
     try {
-      // Supabase v2 storage key we use across all admin pages
-      const raw = localStorage.getItem("sb-bttppihskbfmxwujyztj-auth-token")
-               || localStorage.getItem("pd_tracker_auth");
-      if (!raw) return null;
-      const j = JSON.parse(raw);
-      return j?.user?.email || j?.currentSession?.user?.email || null;
+      // Try every plausible Supabase storage key first.
+      const keys = Object.keys(localStorage);
+      for (const k of keys) {
+        if (k === "pd_tracker_auth" || /^sb-.*-auth-token$/.test(k)) {
+          try {
+            const j = JSON.parse(localStorage.getItem(k));
+            const em = j?.user?.email || j?.currentSession?.user?.email;
+            if (em) return em;
+          } catch (_) {}
+        }
+      }
+      return null;
     } catch (_) { return null; }
+  }
+  // Also treat "the page shows its own signed-in chrome" as signed in — belt-and
+  // suspenders when localStorage lookup misses (e.g. session in memory only).
+  function pageLooksSignedIn() {
+    const chip = document.getElementById("emailChip");
+    const so   = document.getElementById("signOutBtn");
+    const isVisible = (el) => el && !el.classList.contains("hidden") && el.offsetParent !== null;
+    return isVisible(chip) || isVisible(so);
   }
 
   // 2026-08-21: Floating "Sign out" removed. Every admin page has its own inline
@@ -101,14 +115,14 @@
   outBtn.style.display = "none";
   outBtn.remove?.();
   function ensureVisible() {
-    const email = currentEmail();
-    if (email) {
+    // Hide if signed in per EITHER localStorage OR the page's own signed-in chrome.
+    if (currentEmail() || pageLooksSignedIn()) {
       btn.style.display = "none";
-    } else {
-      btn.style.display = "block";
-      btn.innerHTML = "🔑 Forgot password?";
-      btn.title = "Send yourself a reset-password link";
+      return;
     }
+    btn.style.display = "block";
+    btn.innerHTML = "🔑 Forgot password?";
+    btn.title = "Send yourself a reset-password link";
   }
   ensureVisible();
   setInterval(ensureVisible, 3000); // catch login/logout mid-session
