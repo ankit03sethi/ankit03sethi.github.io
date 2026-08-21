@@ -32,13 +32,12 @@ const FOLLOW_SUBS = [
   { id: "callback",           title: "Call me later" },
   { id: "interested",         title: "Interested" },
   { id: "in_progress",        title: "Send Quote" },
-  { id: "forwarded_away",     title: "↪ Forwarded away" },
-  { id: "already_purchased",  title: "Already Purchased" },
   { id: "lost",               title: "Lost" },
   { id: "never_visited",      title: "Never visited" },
   { id: "dont_call_again",    title: "Don't call again" },
   { id: "not_interested",     title: "Not interested" },
   { id: "not_a_lead",         title: "Not A Lead" },
+  { id: "already_purchased",  title: "Already Purchased" },
 ];
 
 const TALK_STATUS_OPTIONS = [
@@ -47,30 +46,28 @@ const TALK_STATUS_OPTIONS = [
   { value: "callback",          label: "Call me later" },
   { value: "interested",        label: "Interested" },
   { value: "in_progress",       label: "Send Quote" },
-  { value: "already_purchased", label: "Already Purchased" },
   { value: "lost",              label: "Lost" },
   { value: "never_visited",     label: "Never visited" },
   { value: "dont_call_again",   label: "Don't call again" },
   { value: "not_interested",    label: "Not interested" },
   { value: "not_a_lead",        label: "Not A Lead" },
-  { value: "won_offline",       label: "Won (paid offline)" },
-  { value: "forwarded_away",    label: "↪ Forwarded away" },
+  { value: "already_purchased", label: "Already Purchased" },
 ];
 
-// v2026082025: 3-mode status dropdown constants.
+// v2026082026: 3-mode status dropdown constants.
 // Mode A (normal working state): show positives only.
-// Mode B (dropped lead — all services crossed): show negatives + won_offline.
-// Mode C (reassigning via forward): synthetic single option __forward__.
-const STATUS_MODE_A = ["not_picked", "callback", "interested", "in_progress", "already_purchased"];
-const STATUS_MODE_B = ["lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead", "won_offline"];
-const FORWARD_SENTINEL = "__forward__";
+// Mode B (dropped lead — all services crossed): show negatives (incl. already_purchased).
+// Mode C (pending forwards queued): show ONLY the Interested option. The
+//   Save + Forward flow still routes per-service forwards under the hood.
+const STATUS_MODE_A = ["not_picked", "callback", "interested", "in_progress"];
+const STATUS_MODE_B = ["lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead", "already_purchased"];
 
 // State machine: from each sub-tab, these are the valid next moves.
 const STATUS_TRANSITIONS = {
-  not_picked:        ["callback", "interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead"],
-  callback:          ["interested", "in_progress", "already_purchased", "lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead"],
-  interested:        ["in_progress", "already_purchased", "lost", "not_a_lead"],
-  in_progress:       ["already_purchased", "won_offline", "lost", "not_a_lead"],
+  not_picked:        ["callback", "interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead", "already_purchased"],
+  callback:          ["interested", "in_progress", "lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead", "already_purchased"],
+  interested:        ["in_progress", "lost", "not_a_lead", "already_purchased"],
+  in_progress:       ["lost", "not_a_lead", "already_purchased"],
   already_purchased: [],
   lost:              [],
   never_visited:     [],
@@ -573,8 +570,8 @@ async function refreshTotalPaid() {
 // ---------- Bucket logic ----------
 function bucketOf(lead) {
   if (["payment_completed","wallet_recharged","wallet_debited"].includes(lead.latest_event)) return "done";
-  if (lead.manual_status === "won" || lead.talk_status === "won_offline") return "done";
-  if (lead.talk_status && lead.talk_status !== "won_offline") return "follow";
+  if (lead.manual_status === "won") return "done";
+  if (lead.talk_status) return "follow";
   if (lead.manual_status === "callback") return "follow";
   return "new";
 }
@@ -594,8 +591,6 @@ function newSubOf(lead) {
 function followSubOf(lead) {
   // Quote-sent leads route back to Send Quote (no dedicated tab).
   if (lead.talk_status === "quotation_sent") return "in_progress";
-  // v2026082025: forwarded_away has its own sub-tab under Follow Ups.
-  if (lead.talk_status === "forwarded_away") return "forwarded_away";
   if (lead.talk_status) return lead.talk_status;
   if (lead.manual_status === "callback") return "callback";
   return "in_progress";
@@ -2021,43 +2016,31 @@ function activeServicesCount(lead) {
   return 0;
 }
 
-// v2026082025: 3-mode status dropdown decision.
+// v2026082026: 3-mode status dropdown decision.
 // Mode A — activeCount > 0 AND pendingCount === 0. Positives.
-// Mode B — activeCount === 0 AND pendingCount === 0. Negatives + won_offline.
-// Mode C — pendingCount > 0 AND at least one pending service NOT handled by
-//   the current assignee. Synthetic "↪ Forward" only.
-// Fall-through — pendingCount > 0 but all pendings handled → default to A.
+// Mode B — activeCount === 0 AND pendingCount === 0. Negatives (incl. already_purchased).
+// Mode C — pendingCount > 0. Only the Interested option is shown; Save + Forward
+//   still per-service routes any pendings the assignee doesn't handle to the
+//   receiving employee under the hood.
 function statusModeForRow(lead) {
   const activeCount = activeServicesCount(lead);
-  const pendingList = Array.isArray(_pendingServiceAdds[lead.customer_key])
-    ? _pendingServiceAdds[lead.customer_key].slice()
-    : [];
-  const pendingCount = pendingList.length;
-  if (pendingCount > 0) {
-    const asnCode = String(lead.assigned_employee_code || "").toUpperCase();
-    const emp = (_allEmployeesCache || []).find(
-      (e) => String(e.code || "").toUpperCase() === asnCode
-    );
-    const empSvcs = new Set(
-      (Array.isArray(emp?.services) ? emp.services : []).map((s) => String(s).toLowerCase())
-    );
-    const hasUnhandled = pendingList.some((svc) => !empSvcs.has(String(svc).toLowerCase()));
-    if (hasUnhandled) return "C";
-    // All pendings handled by assignee → fall through to A.
-  }
-  if (activeCount === 0 && pendingCount === 0) return "B";
+  const pendingCount = Array.isArray(_pendingServiceAdds[lead.customer_key])
+    ? _pendingServiceAdds[lead.customer_key].length
+    : 0;
+  if (pendingCount > 0) return "C";
+  if (activeCount === 0) return "B";
   return "A";
 }
 
-// v2026082025: build the row status dropdown options based on the 3 modes.
-// Mode C emits the synthetic ↪ Forward option only. Modes A/B emit their
-// respective allow-lists. The lead's current talk_status is preserved as a
-// disabled "(current)" entry when it's not in the allowed set — this keeps
-// the dropdown non-empty for legacy rows that already sit on hidden statuses.
+// v2026082026: build the row status dropdown options based on the 3 modes.
+// Mode C shows ONLY the "Interested" option (the save handler still per-service
+// forwards pending adds under the hood). Modes A/B emit their respective
+// allow-lists. The lead's current talk_status is preserved as a disabled
+// "(current)" entry when it's not in the allowed set — this keeps the dropdown
+// non-empty for legacy rows that already sit on hidden statuses.
 function buildModeStatusOptionsHtml(mode, currentValue) {
   if (mode === "C") {
-    // Synthetic single option — no placeholder, no current-value line.
-    return `<option value="${FORWARD_SENTINEL}" selected>↪ Forward</option>`;
+    return `<option value="interested" selected>Interested</option>`;
   }
   const allowed = (mode === "B") ? STATUS_MODE_B : STATUS_MODE_A;
   const opts = [`<option value="">— select —</option>`];
@@ -2168,7 +2151,6 @@ function renderRemarksCell(l, readOnly) {
 }
 
 function bucketReason(l) {
-  if (l.talk_status === "won_offline") return "won (offline)";
   if (l.manual_status === "won") return "won";
   if (l.latest_event === "payment_completed") return "paid via Razorpay";
   if (l.latest_event === "wallet_recharged") return "wallet recharged";
@@ -2471,13 +2453,12 @@ function wireRowHandlers() {
       const sel = tr.querySelector("select.status-select");
       const errBox = tr.querySelector(".row-save-error");
       errBox.style.display = "none";
-      // v2026082025: Mode C emits the synthetic "__forward__" option — treat
-      // it as "no explicit talk_status yet; will become 'forwarded_away' after
-      // the forwards succeed" (see step 2 below).
+      // v2026082026: Mode C locks the dropdown to "interested" (the save
+      // handler still per-service forwards pending adds under the hood). All
+      // three modes now emit a real talk_status value — no synthetic sentinel.
       const rawStatus = sel ? sel.value : "";
-      const isForwardOnly = (rawStatus === FORWARD_SENTINEL);
-      let talk_status = isForwardOnly ? null : (rawStatus || null);
-      if (!isForwardOnly && !talk_status) {
+      let talk_status = rawStatus || null;
+      if (!talk_status) {
         errBox.textContent = "Pick a status before saving.";
         errBox.style.display = "block";
         return;
@@ -2523,21 +2504,14 @@ function wireRowHandlers() {
         }
       }
 
-      // v2026082025: If the user picked "↪ Forward" (Mode C) OR any of the
-      // pending service adds actually resulted in a forward (backend returned
-      // "forwarded"/"split"), stamp this lead's talk_status as "forwarded_away"
-      // so it moves under Follow Ups → "↪ Forwarded away" sub-tab. This
-      // overrides whatever the user picked in Mode A/B, on purpose — a
-      // successful forward is the source of truth for the sub-tab routing.
-      const anyForwards = forwardedTo.length > 0;
-      if (isForwardOnly || anyForwards) {
-        talk_status = "forwarded_away";
-      }
+      // v2026082026: No more special "forwarded_away" routing — whatever the
+      // user picked in the dropdown (Mode A/B) or the locked "interested"
+      // (Mode C) is the source of truth. Per-service forwards happened above
+      // and produce their own new pipeline rows; the current lead just keeps
+      // the chosen talk_status.
 
       // Step 2: save the call-status. If this fails we still want the toast
       // to reflect anything that already happened above, so we don't bail early.
-      // Skip the write entirely when there's still nothing to save (e.g. Mode C
-      // where every pending add errored so we didn't earn a forwarded_away).
       let statusSaved = false;
       let statusError = null;
       if (talk_status) {
