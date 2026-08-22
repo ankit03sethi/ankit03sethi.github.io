@@ -227,6 +227,14 @@
             </div>
           </a>
 
+          <a class="svc-card" href="#" onclick="openServiceModal('gst_filing'); return false;">
+            <div class="svc-icon" style="background:#ea580c;">GST</div>
+            <div style="flex:1;min-width:0;">
+              <div class="svc-name">GST Filing</div>
+              <div class="svc-desc">Monthly GSTR-1 + GSTR-3B &middot; &#8377;999/mo</div>
+            </div>
+          </a>
+
           <a class="svc-card" href="#" onclick="openServiceModal('trademark'); return false;">
             <div class="svc-icon" style="background:#a855f7;">&reg;</div>
             <div style="flex:1;min-width:0;">
@@ -478,6 +486,7 @@ const SERVICE_LABEL = {
   referral: ["Referral", "pill-recharge"],
   // Legal / registration services
   gst: ["GST Registration", "pill-svc-legal"],
+  gst_filing: ["GST Filing (monthly)", "pill-svc-legal"],
   trademark: ["Trademark", "pill-svc-legal"],
   udyam: ["Udyam (MSME)", "pill-svc-legal"],
   iec: ["IEC Code", "pill-svc-legal"],
@@ -1357,6 +1366,7 @@ $("#cartPayBtn").addEventListener("click", async () => {
 const SVC_CATALOG = {
   analyst:          { name: "Cursive Analyst (30 days)",          price: 4999 },
   gst:              { name: "GST Registration",                  price: 999  },
+  gst_filing:       { name: "GST Filing (monthly)",              price: 999  },
   trademark:        { name: "Trademark Registration",            price: 6999 },
   udyam:            { name: "Udyam (MSME) Certificate",          price: 999  },
   iec:              { name: "IEC (Import-Export Code)",          price: 1499 },
