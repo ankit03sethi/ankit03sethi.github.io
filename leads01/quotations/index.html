@@ -127,6 +127,7 @@
         <button class="filter-tab" data-filter="regenerated">🔄 Regenerated</button>
         <button class="filter-tab active" data-filter="follow_up">📞 Follow Up</button>
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
+        <button class="filter-tab" data-filter="paid">💰 Paid</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
         <div style="flex:1;"></div>
@@ -514,7 +515,9 @@ function matchesFilter(q, f) {
   if (f === "sent") return q.status === "follow_up" || q.status === "sent";
   if (f === "follow_up") return q.status === "follow_up" || q.status === "sent";
   if (f === "regenerated") return q.status === "regenerated";
-  if (f === "accepted") return ["accepted","paid"].includes(q.status);
+  // v2026082218: Accepted and Paid are strictly separate tabs. A paid quote
+  // shows in Paid ONLY, not in Accepted anymore.
+  if (f === "accepted") return q.status === "accepted";
   if (f === "paid") return q.status === "paid";
   if (f === "expired") return q.status === "expired";
   if (f === "rejected") return q.status === "rejected";

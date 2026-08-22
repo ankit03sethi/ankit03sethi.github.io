@@ -546,7 +546,7 @@ async function refreshQuotationsCard() {
     const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
     const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
     const scopeToOwnCode = (!_isManager && _myEmpCode) ? _myEmpCode : null;
-    let sent = 0, draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0;
+    let sent = 0, draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0, paidCount = 0, paidPaise = 0;
     for (const q of j.quotations) {
       const ts = q.created_at || q.updated_at;
       if (ts) {
@@ -568,7 +568,10 @@ async function refreshQuotationsCard() {
       if (st === "draft") draft += 1;
       else if (st === "follow_up" || st === "sent") follow += 1;
       else if (st === "regenerated") regen += 1;
-      else if (st === "accepted" || st === "paid") { accepted += 1; acceptedPaise += Number(q.total_paise || 0); }
+      // v2026082218: separate Accepted from Paid — Accepted card ONLY counts
+      // status='accepted'; Paid card counts status='paid' with its own ₹ total.
+      else if (st === "accepted") { accepted += 1; acceptedPaise += Number(q.total_paise || 0); }
+      else if (st === "paid") { paidCount += 1; paidPaise += Number(q.total_paise || 0); }
       else if (st === "expired") expired += 1;
       else if (st === "rejected") rejected += 1;
     }
@@ -579,6 +582,12 @@ async function refreshQuotationsCard() {
     const rcvTotalEl = document.getElementById("receivableTotal");
     if (rcvCountEl) rcvCountEl.textContent = String(accepted);
     if (rcvTotalEl) rcvTotalEl.textContent = "₹" + Math.round(acceptedPaise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    // v2026082218: Paid / Received top card. Uses PAID quotes as source of
+    // truth (completed_payments is a legacy sink that may be empty).
+    const doneCntEl = document.getElementById("topcnt_done");
+    const rcvdEl    = document.getElementById("receivedTotal");
+    if (doneCntEl) doneCntEl.textContent = String(paidCount);
+    if (rcvdEl)    rcvdEl.textContent    = "₹" + Math.round(paidPaise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 });
     followEl.textContent = String(follow);
     regenEl.textContent = String(regen);
     acceptedEl.textContent = String(accepted);
