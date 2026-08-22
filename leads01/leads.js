@@ -593,6 +593,9 @@ async function refreshTotalPaid() {
   try {
     const data = await callAdmin("total_paid", { from: dateRange.from, to: dateRange.to });
     const total = Number(data?.total || 0);
+    // v2026082212: Paid top card now shows big ₹ Received amount too.
+    const rcvEl = document.getElementById("receivedTotal");
+    if (rcvEl) rcvEl.textContent = "₹" + total.toLocaleString("en-IN", { maximumFractionDigits: 0 });
     const chip = $("#totalPaidChip");
     if (chip) {
       chip.textContent = "💰 ₹" + total.toLocaleString("en-IN");
