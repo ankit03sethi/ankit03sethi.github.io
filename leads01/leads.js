@@ -3371,8 +3371,8 @@ async function showAssignmentHistoryModal(customerKey) {
     const rBtn = overlay.querySelector("#asnAddRemarkBtn");
     const sBtn = overlay.querySelector("#asnAddStarBtn");
     if (row && rBtn && sBtn) {
-      if (tab === "all")         { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = ""; }
-      else if (tab === "remark") { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = "none"; }
+      // Add buttons only appear when the relevant tab is selected — 'All' hides them.
+      if (tab === "remark")      { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = "none"; }
       else if (tab === "star")   { row.style.display = "flex"; rBtn.style.display = "none"; sBtn.style.display = ""; }
       else                        { row.style.display = "none"; }
     }

@@ -1880,13 +1880,13 @@ function applyLeadHistoryTab(tab) {
     b.style.color = active ? "#fff" : "#334155";
     b.classList.toggle("active", active);
   });
-  // Which add buttons to show
+  // Which add buttons to show — only when the relevant tab is selected.
+  // On 'All' we hide them entirely (the tabs themselves are the entry point).
   const row = document.getElementById("leadHistoryAddRow");
   const rBtn = document.getElementById("addRemarkBtn");
   const sBtn = document.getElementById("addStarBtn");
   if (row && rBtn && sBtn) {
-    if (tab === "all")         { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = ""; }
-    else if (tab === "remark") { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = "none"; }
+    if (tab === "remark")      { row.style.display = "flex"; rBtn.style.display = ""; sBtn.style.display = "none"; }
     else if (tab === "star")   { row.style.display = "flex"; rBtn.style.display = "none"; sBtn.style.display = ""; }
     else                        { row.style.display = "none"; }
   }
