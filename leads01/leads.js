@@ -648,6 +648,24 @@ function updateTopCounts() {
   $("#topcnt_follow").textContent = counts.follow;
   $("#topcnt_done").textContent   = counts.done;
   const uEl = $("#topcnt_unassigned"); if (uEl) uEl.textContent = counts.unassigned;
+
+  // v2026082203: Total-Leads card = Manual + Website = Total.
+  //   Manual  = latest_event starts with "manual_add" (added via Call/WA/Ref tab OR bulk-add)
+  //   Website = everything else (auto-captured / scraped / no-assignee inbound)
+  //   Unassigned leads are counted as Website (per user policy 2026-08-22).
+  let totalManual = 0, totalWebsite = 0;
+  (pipelineCache || []).forEach((l) => {
+    const ev = String(l.latest_event || "");
+    if (ev.startsWith("manual_add")) totalManual += 1;
+    else totalWebsite += 1;
+  });
+  const totalAll = totalManual + totalWebsite;
+  const mEl = document.getElementById("topcnt_totmanual");
+  const wEl = document.getElementById("topcnt_totwebsite");
+  const tEl = document.getElementById("topcnt_totall");
+  if (mEl) mEl.textContent = totalManual;
+  if (wEl) wEl.textContent = totalWebsite;
+  if (tEl) tEl.textContent = totalAll;
 }
 
 // v2026082019: Origin filter is exposed only on Follow Ups / Quotations / Paid.
