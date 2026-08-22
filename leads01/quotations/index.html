@@ -122,11 +122,10 @@
       <button id="newBtn" style="display:none;"></button>
       <input id="listSearchBox" type="text" style="display:none;" />
       <div id="filterTabs" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
-        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="all">All</button>
         <button class="filter-tab" data-filter="draft">Draft</button>
         <button class="filter-tab" data-filter="regenerated">🔄 Regenerated</button>
-        <button class="filter-tab" data-filter="sent">Sent</button>
-        <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
+        <button class="filter-tab active" data-filter="follow_up">📞 Follow Up</button>
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
@@ -464,7 +463,7 @@ async function callFn(name, body, method = "POST") {
 
 // ============ LIST ============
 let _allQuotes = [];
-let _currentFilter = "all";
+let _currentFilter = "follow_up";
 let _currentEmpFilter = "__all__";
 
 async function loadList() {
@@ -510,8 +509,10 @@ function matchesFilter(q, f) {
   if (!withinDateRange(q)) return false;
   if (f === "all") return true;
   if (f === "draft") return q.status === "draft";
-  if (f === "sent") return q.status === "sent";
-  if (f === "follow_up") return q.status === "follow_up";
+  // v2026082213: 'sent' status is legacy — sending now moves quote straight
+  // into Follow Up. Treat any legacy 'sent' row as Follow Up.
+  if (f === "sent") return q.status === "follow_up" || q.status === "sent";
+  if (f === "follow_up") return q.status === "follow_up" || q.status === "sent";
   if (f === "regenerated") return q.status === "regenerated";
   if (f === "accepted") return ["accepted","paid"].includes(q.status);
   if (f === "paid") return q.status === "paid";

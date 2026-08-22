@@ -561,10 +561,12 @@ async function refreshQuotationsCard() {
         else if ((q.employee_code || "").toUpperCase() !== String(employeeFilter).toUpperCase()) continue;
       }
       const st = q.status;
-      // Sent = anything past Draft (Sent, Follow_up, Regenerated, Accepted, Paid, Expired, Rejected)
-      if (st !== "draft" && st !== "cancelled") sent += 1;
+      // v2026082213: Sent = every quote that reached the customer AND is still
+      // "in play" (Follow Up / Accepted / Paid / Expired / Rejected + legacy
+      // "sent"). Draft (never sent) and Regenerated (superseded) are excluded.
+      if (st !== "draft" && st !== "regenerated" && st !== "cancelled") sent += 1;
       if (st === "draft") draft += 1;
-      else if (st === "follow_up") follow += 1;
+      else if (st === "follow_up" || st === "sent") follow += 1;
       else if (st === "regenerated") regen += 1;
       else if (st === "accepted" || st === "paid") { accepted += 1; acceptedPaise += Number(q.total_paise || 0); }
       else if (st === "expired") expired += 1;
