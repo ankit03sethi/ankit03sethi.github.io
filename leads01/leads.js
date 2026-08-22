@@ -3447,7 +3447,13 @@ async function showAssignmentHistoryModal(customerKey, initialTab = "all") {
       } else {
         body = esc(ev.text || "");
       }
-      const header = ev.header ? `<span style="background:${color}15;color:${color};padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px;">${esc(ev.header)}</span>` : "";
+      // v2026082223: Quote-tagged events now show the quote amount inline.
+      let headerText = ev.header || "";
+      if (isQuoteRemark && ev.quote_total_paise != null) {
+        const fmtAmt = "₹" + (Math.round(ev.quote_total_paise) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        headerText = `${ev.header} · ${fmtAmt}`;
+      }
+      const header = ev.header ? `<span style="background:${color}15;color:${color};padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px;">${esc(headerText)}</span>` : "";
       const byLine = ev.by ? `<div style="font-size:11.5px;color:#64748b;margin-top:5px;">by ${empChipUnified(ev.by, null)}</div>` : "";
       html += `
         <div style="border-left:3px solid ${color};padding:8px 12px;margin-bottom:10px;background:#f8fafc;border-radius:0 8px 8px 0;">

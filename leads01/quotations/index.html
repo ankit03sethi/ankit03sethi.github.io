@@ -951,7 +951,7 @@ function renderFilteredList() {
       </div>`;
     }
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
-      <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}<div style="margin-top:3px;font-size:14px;font-weight:800;color:#0f172a;">${fmt(q.total_paise)}</div></td>
+      <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}</td>
       <td style="font-size:12.5px;line-height:1.4;">
         <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
         ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
@@ -1917,7 +1917,13 @@ function renderLeadHistoryEvents(events) {
       body = esc(ev.text || "");
     }
 
-    const header = ev.header ? `<span style="background:${color}15;color:${color};padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;margin-right:5px;">${esc(ev.header)}</span>` : "";
+    // v2026082223: for Quote history events, show the quote amount in bold
+    // right next to the quote number so users don't have to hunt for it.
+    let headerText = ev.header || "";
+    if (isQuoteRemark && ev.quote_total_paise != null) {
+      headerText = `${ev.header} · ${fmt(ev.quote_total_paise)}`;
+    }
+    const header = ev.header ? `<span style="background:${color}15;color:${color};padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;margin-right:5px;">${esc(headerText)}</span>` : "";
 
     // "by" line — resolve to CODE — Name; hide entirely if we can't resolve
     // (i.e. system-generated with no email tie) OR if the actor is Admin and
