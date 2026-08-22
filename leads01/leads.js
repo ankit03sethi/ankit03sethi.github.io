@@ -32,6 +32,9 @@ const FOLLOW_SUBS = [
   { id: "callback",           title: "Call me later" },
   { id: "interested",         title: "Interested" },
   { id: "in_progress",        title: "Send Quote" },
+  // v2026082206: Forwarded sub-tab — leads born from another lead's forward
+  // (pipeline_leads.is_forwarded = true). Sits just before Lost.
+  { id: "forwarded",          title: "↪ Forwarded" },
   { id: "lost",               title: "Lost" },
   { id: "never_visited",      title: "Never visited" },
   { id: "dont_call_again",    title: "Don't call again" },
@@ -601,6 +604,11 @@ function newSubOf(lead) {
   return "lead_captured";
 }
 function followSubOf(lead) {
+  // v2026082206: Forwarded leads (created from another lead's forward) land
+  // in the dedicated Forwarded sub-tab UNLESS the user has already moved
+  // them past that first triage step (any explicit talk_status other than the
+  // Send-Quote route wins).
+  if (lead.is_forwarded && !lead.talk_status && lead.manual_status !== "callback") return "forwarded";
   // Quote-sent leads route back to Send Quote (no dedicated tab).
   if (lead.talk_status === "quotation_sent") return "in_progress";
   if (lead.talk_status) return lead.talk_status;
@@ -609,11 +617,13 @@ function followSubOf(lead) {
 }
 
 function updateTopCounts() {
-  // Follow Ups top-card count = only Call not picked + Call me later + Interested
-  // (Send Quote and later sub-tabs are past the actionable follow-up stage.)
-  // Include Send Quote (in_progress) in the Follow Ups top-card count.
-  const activeFollowSubs = new Set(["not_picked", "callback", "interested", "in_progress"]);
-  const counts = { new: 0, follow: 0, done: 0, unassigned: 0 };
+  // v2026082206: Follow Ups top-card now counts EVERY sub-tab (big number),
+  // and breaks the total into Right (positive path) and Wrong (dropped path).
+  //   Right = not_picked + callback + interested + in_progress + forwarded
+  //   Wrong = lost + never_visited + dont_call_again + not_interested + not_a_lead + already_purchased
+  const RIGHT_SUBS = new Set(["not_picked", "callback", "interested", "in_progress", "forwarded"]);
+  const WRONG_SUBS = new Set(["lost", "never_visited", "dont_call_again", "not_interested", "not_a_lead", "already_purchased"]);
+  const counts = { new: 0, follow: 0, followRight: 0, followWrong: 0, done: 0, unassigned: 0 };
   filteredPipeline().forEach((l) => {
     // Cards must be mutually exclusive for managers: an unassigned lead lives
     // in the Unassigned card, NOT double-counted in New/Follow/Done. Employees
@@ -630,7 +640,10 @@ function updateTopCounts() {
       if (originFilter === "direct"    &&  l.is_forwarded) return;
     }
     if (b === "follow") {
-      if (activeFollowSubs.has(followSubOf(l))) counts.follow += 1;
+      const sub = followSubOf(l);
+      counts.follow += 1; // total Follow Ups (all sub-tabs)
+      if (RIGHT_SUBS.has(sub)) counts.followRight += 1;
+      else if (WRONG_SUBS.has(sub)) counts.followWrong += 1;
     } else {
       counts[b] += 1;
     }
@@ -648,24 +661,32 @@ function updateTopCounts() {
   $("#topcnt_follow").textContent = counts.follow;
   $("#topcnt_done").textContent   = counts.done;
   const uEl = $("#topcnt_unassigned"); if (uEl) uEl.textContent = counts.unassigned;
+  const frEl = document.getElementById("topcnt_followright"); if (frEl) frEl.textContent = counts.followRight;
+  const fwEl = document.getElementById("topcnt_followwrong"); if (fwEl) fwEl.textContent = counts.followWrong;
 
-  // v2026082204: Total-Leads card respects the currently applied filters
-  //   (date range / service). Big number = Total, small breakdown = Manual + Website.
-  //   Manual  = latest_event starts with "manual_add" (Call/WA/Ref tab OR bulk-add)
-  //   Website = everything else (unassigned inbound counts as Website).
-  let totalManual = 0, totalWebsite = 0;
+  // v2026082206: Total-Leads card = Manual + Website + Forwarded (mutually exclusive).
+  //   Forwarded = pipeline_leads.is_forwarded (new lead born from another's forward)
+  //   Manual    = !is_forwarded AND latest_event starts with "manual_add"
+  //   Website   = everything else (unassigned inbound + all other origins)
+  // Also drives the standalone "Forwarded" top card between Unassigned and New leads.
+  let totalManual = 0, totalWebsite = 0, totalForwarded = 0;
   filteredPipeline().forEach((l) => {
+    if (l.is_forwarded) { totalForwarded += 1; return; }
     const ev = String(l.latest_event || "");
     if (ev.startsWith("manual_add")) totalManual += 1;
     else totalWebsite += 1;
   });
-  const totalAll = totalManual + totalWebsite;
+  const totalAll = totalManual + totalWebsite + totalForwarded;
   const mEl = document.getElementById("topcnt_totmanual");
   const wEl = document.getElementById("topcnt_totwebsite");
+  const fEl = document.getElementById("topcnt_totforwarded");
   const tEl = document.getElementById("topcnt_totall");
   if (mEl) mEl.textContent = totalManual;
   if (wEl) wEl.textContent = totalWebsite;
+  if (fEl) fEl.textContent = totalForwarded;
   if (tEl) tEl.textContent = totalAll;
+  const fwdCardEl = document.getElementById("topcnt_forwarded");
+  if (fwdCardEl) fwdCardEl.textContent = totalForwarded;
 }
 
 // v2026082019: Origin filter is exposed only on Follow Ups / Quotations / Paid.
@@ -782,12 +803,14 @@ function renderSubTabs() {
   if (activeTop === "follow") subs = FOLLOW_SUBS;
   if (activeTop === "done")   subs = [{ id: "all", title: "All paid" }];
   if (activeTop === "unassigned") subs = [{ id: "all", title: "All unassigned" }];
+  if (activeTop === "forwarded") subs = [{ id: "all", title: "All forwarded" }];
 
   // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
   // Employees only see leads assigned to them anyway.
-  let inBucket = activeTop === "unassigned"
-    ? filteredPipeline().filter((l) => !l.assigned_employee_code)
-    : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
+  let inBucket;
+  if (activeTop === "unassigned")      inBucket = filteredPipeline().filter((l) => !l.assigned_employee_code);
+  else if (activeTop === "forwarded")  inBucket = filteredPipeline().filter((l) => !!l.is_forwarded);
+  else                                  inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
   // v2026082019: sub-tab counts also honour the Origin filter on tabs that expose it.
   if (isOriginFilterTab(activeTop)) inBucket = applyOriginFilter(inBucket);
   const counts = {};
@@ -798,6 +821,7 @@ function renderSubTabs() {
     if (activeTop === "follow") k = followSubOf(l);
     if (activeTop === "done")   k = "all";
     if (activeTop === "unassigned") k = "all";
+    if (activeTop === "forwarded")  k = "all";
     if (k in counts) counts[k] += 1;
   });
 
@@ -1412,9 +1436,10 @@ function wireManualAddHandlers() {
 function renderRows() {
   // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
   // Employees only see leads assigned to them anyway.
-  let inBucket = activeTop === "unassigned"
-    ? filteredPipeline().filter((l) => !l.assigned_employee_code)
-    : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
+  let inBucket;
+  if (activeTop === "unassigned")     inBucket = filteredPipeline().filter((l) => !l.assigned_employee_code);
+  else if (activeTop === "forwarded") inBucket = filteredPipeline().filter((l) => !!l.is_forwarded);
+  else                                 inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
   // v2026082019: Origin filter — only meaningful on Follow / Quotations / Paid.
   if (isOriginFilterTab(activeTop)) inBucket = applyOriginFilter(inBucket);
   let rows;
@@ -1422,6 +1447,7 @@ function renderRows() {
   if (activeTop === "follow") rows = inBucket.filter((l) => followSubOf(l) === activeSub);
   if (activeTop === "done")   rows = inBucket;
   if (activeTop === "unassigned") rows = inBucket;
+  if (activeTop === "forwarded")  rows = inBucket;
 
   const qq = (remarkFilter || "").trim().toLowerCase();
   if (qq) rows = rows.filter((l) =>
@@ -1472,9 +1498,10 @@ function buildRemarkOptions() {
 function leadsInCurrentSubTab() {
   // Managers: New/Follow/Paid tabs must EXCLUDE unassigned leads (those live on Unassigned tab).
   // Employees only see leads assigned to them anyway.
-  let inBucket = activeTop === "unassigned"
-    ? filteredPipeline().filter((l) => !l.assigned_employee_code)
-    : filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
+  let inBucket;
+  if (activeTop === "unassigned")     inBucket = filteredPipeline().filter((l) => !l.assigned_employee_code);
+  else if (activeTop === "forwarded") inBucket = filteredPipeline().filter((l) => !!l.is_forwarded);
+  else                                 inBucket = filteredPipeline().filter((l) => bucketOf(l) === activeTop && (!_isManager || !!l.assigned_employee_code));
   // v2026082019: Origin filter on tabs that expose it.
   if (isOriginFilterTab(activeTop)) inBucket = applyOriginFilter(inBucket);
   if (activeTop === "new")    return inBucket.filter((l) => newSubOf(l) === activeSub);

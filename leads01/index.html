@@ -81,17 +81,25 @@
       <span class="big-count" id="topcnt_unassigned" style="color:#9a3412;">0</span>
       <span class="stage-title" style="color:#9a3412;">Unassigned</span>
     </button>
+    <button class="tab top-tab" id="topTabForwarded" data-top="forwarded" style="background:#f5f3ff;border:2px solid #a78bfa;">
+      <span class="big-count" id="topcnt_forwarded" style="color:#6d28d9;">0</span>
+      <span class="stage-title" style="color:#6d28d9;">↪ Forwarded</span>
+    </button>
     <button class="tab top-tab" id="topTabTotal" data-top="total" style="background:#eef2ff;border:2px solid #6366f1;cursor:default;">
       <span class="big-count" id="topcnt_totall" style="color:#3730a3;">0</span>
       <span class="stage-title" style="color:#3730a3;">Total leads</span>
-      <div style="display:flex;justify-content:center;gap:14px;margin-top:6px;">
+      <div style="display:flex;justify-content:center;gap:10px;margin-top:6px;">
         <div style="display:flex;flex-direction:column;align-items:center;">
-          <span id="topcnt_totmanual" style="color:#4338ca;font-size:15px;font-weight:800;">0</span>
+          <span id="topcnt_totmanual" style="color:#4338ca;font-size:14px;font-weight:800;">0</span>
           <span style="font-size:9px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:0.3px;margin-top:1px;">Manual</span>
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;">
-          <span id="topcnt_totwebsite" style="color:#4338ca;font-size:15px;font-weight:800;">0</span>
+          <span id="topcnt_totwebsite" style="color:#4338ca;font-size:14px;font-weight:800;">0</span>
           <span style="font-size:9px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:0.3px;margin-top:1px;">Website</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <span id="topcnt_totforwarded" style="color:#6d28d9;font-size:14px;font-weight:800;">0</span>
+          <span style="font-size:9px;font-weight:700;color:#6d28d9;text-transform:uppercase;letter-spacing:0.3px;margin-top:1px;">Forwarded</span>
         </div>
       </div>
     </button>
@@ -102,6 +110,16 @@
     <button class="tab top-tab" data-top="follow">
       <span class="big-count" id="topcnt_follow">0</span>
       <span class="stage-title">Follow ups</span>
+      <div style="display:flex;justify-content:center;gap:14px;margin-top:6px;">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <span id="topcnt_followright" style="color:#059669;font-size:14px;font-weight:800;">0</span>
+          <span style="font-size:9px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.3px;margin-top:1px;">Right</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <span id="topcnt_followwrong" style="color:#dc2626;font-size:14px;font-weight:800;">0</span>
+          <span style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.3px;margin-top:1px;">Wrong</span>
+        </div>
+      </div>
     </button>
     <button class="tab top-tab" data-top="quotations">
       <!-- Manager view: accepted count + total value. Employee view: plain 📋 icon (see leads.js). -->
@@ -138,7 +156,7 @@
   </p>
 </main>
 
-<script type="module" src="leads.js?v=2026082205"></script>
+<script type="module" src="leads.js?v=2026082206"></script>
 <script src="/admin/admin-forgot-btn.js?v=2026082102" defer></script>
 </body>
 </html>
