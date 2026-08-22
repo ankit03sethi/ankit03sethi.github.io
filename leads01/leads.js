@@ -582,6 +582,10 @@ async function refreshQuotationsCard() {
     const rcvTotalEl = document.getElementById("receivableTotal");
     if (rcvCountEl) rcvCountEl.textContent = String(accepted);
     if (rcvTotalEl) rcvTotalEl.textContent = "₹" + Math.round(acceptedPaise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    // v2026082222: also fill the new Received (paid) count in the Quotations
+    // top card breakdown.
+    const quotPaidEl = document.getElementById("quotPaidCount");
+    if (quotPaidEl) quotPaidEl.textContent = String(paidCount);
     // v2026082218: Paid / Received top card. Uses PAID quotes as source of
     // truth (completed_payments is a legacy sink that may be empty).
     const doneCntEl = document.getElementById("topcnt_done");
