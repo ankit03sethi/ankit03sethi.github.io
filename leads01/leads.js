@@ -2107,7 +2107,12 @@ function buildModeStatusOptionsHtml(mode, currentValue) {
   if (mode === "C") {
     return `<option value="interested" selected>Interested</option>`;
   }
-  const allowed = (mode === "B") ? STATUS_MODE_B : STATUS_MODE_A;
+  let allowed = (mode === "B") ? STATUS_MODE_B : STATUS_MODE_A;
+  // v2026082208: on the Interested sub-tab, only show Interested + Send Quote —
+  // hide Call not picked / Call me later since the lead is already past that step.
+  if (activeTop === "follow" && activeSub === "interested" && mode !== "B") {
+    allowed = ["interested", "in_progress"];
+  }
   const opts = [`<option value="">— select —</option>`];
   const currentOpt = TALK_STATUS_OPTIONS.find((o) => o.value === currentValue);
   if (currentOpt && currentOpt.value && !allowed.includes(currentValue)) {
