@@ -806,19 +806,22 @@ function switchTop(top) {
     if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/?v=" + Date.now();
     return;
   }
-  // v2026082220: Received card (data-top="done") routes into Quotations iframe
-  // pre-filtered to Paid so the user sees paid leads with invoice actions.
-  if (top === "done") {
+  // v2026082220-1: Received (data-top="done") + Expected Receivable
+  // (data-top="receivable") both route into the Quotations iframe pre-filtered.
+  //   Received    → filter=paid
+  //   Receivable  → filter=accepted
+  // Both views auto-sort latest-first (see quotations page loadList).
+  if (top === "done" || top === "receivable") {
+    const filterName = (top === "done") ? "paid" : "accepted";
     const f = $("#quotationsFrame");
     if (f) {
-      const target = "/leads01/quotations/?filter=paid&v=" + Date.now();
+      const target = `/leads01/quotations/?filter=${filterName}&v=${Date.now()}`;
       if (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations")) f.src = target;
-      else { try { f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: "paid" }, "*"); } catch {} }
+      else { try { f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: filterName }, "*"); } catch {} }
     }
-    // Show the quotations iframe
     paneStage?.classList.add("hidden");
     paneQuot?.classList.remove("hidden");
-    document.querySelectorAll(".top-tab").forEach(b => b.classList.toggle("active", b.dataset.top === "done"));
+    document.querySelectorAll(".top-tab").forEach(b => b.classList.toggle("active", b.dataset.top === top));
     return;
   }
 

@@ -474,10 +474,17 @@ async function loadList() {
   $("#listWrap").innerHTML = `<div class="helper" style="padding:20px;text-align:center;">Loading...</div>`;
   const j = await callFn("admin-quotations", { op:"list" });
   if (!j.ok) { $("#listWrap").innerHTML = `<div style="color:#dc2626;">Error: ${esc(j.error||"")}</div>`; return; }
-  // v2026082102: sort quotes by max_stars DESC (highest-priority customer first),
-  // same behaviour as the Leads pipeline. Ties fall back to created_at DESC
-  // which is the order the server already returned.
+  // v2026082102: default sort = max_stars DESC then created_at DESC.
+  // v2026082221: on Received (paid) + Receivable (accepted) filters, sort by
+  // updated_at DESC — latest quotation first, then older, so payment/acceptance
+  // recency drives ordering (per user policy 2026-08-22).
+  const timeSortFilters = new Set(["paid", "accepted"]);
   _allQuotes = (j.quotations || []).slice().sort((a, b) => {
+    if (timeSortFilters.has(_currentFilter)) {
+      const ta = new Date(a.updated_at || a.created_at || 0).getTime();
+      const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+      return tb - ta;
+    }
     const sa = Number(a.max_stars || 0);
     const sb = Number(b.max_stars || 0);
     if (sb !== sa) return sb - sa;
@@ -884,15 +891,26 @@ function renderQuoteHistoryList(elId, list) {
 
 function renderFilteredList() {
   const term = ($("#listSearchBox")?.value || "");
-  const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter) && matchesEmpFilter(q));
-  // v2026082221: banner when we're in the Received (Paid) view, since the tab
-  // itself is hidden — this tells the user why they're seeing paid quotes only.
-  const receivedBanner = _currentFilter === "paid"
-    ? `<div style="background:#ecfdf5;border:1.5px solid #34d399;color:#065f46;padding:10px 14px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+  let qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter) && matchesEmpFilter(q));
+  // v2026082221: for time-based filters, sort by updated_at DESC even when
+  // filter is switched at runtime (loadList already sorts, but a filter change
+  // triggered by postMessage doesn't re-run loadList).
+  if (_currentFilter === "paid" || _currentFilter === "accepted") {
+    qs = qs.slice().sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+  }
+  // v2026082221: banner for the two card-entry filters (paid + accepted).
+  let receivedBanner = "";
+  if (_currentFilter === "paid") {
+    receivedBanner = `<div style="background:#ecfdf5;border:1.5px solid #34d399;color:#065f46;padding:10px 14px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
          <span>💰 Received Payments &mdash; ${qs.length} paid ${qs.length === 1 ? 'quotation' : 'quotations'}</span>
          <span style="font-size:12px;font-weight:600;color:#047857;">Total ₹${Math.round(qs.reduce((s,q)=>s+(q.total_paise||0),0)/100).toLocaleString("en-IN")}</span>
-       </div>`
-    : "";
+       </div>`;
+  } else if (_currentFilter === "accepted") {
+    receivedBanner = `<div style="background:#f0fdf4;border:1.5px solid #86efac;color:#166534;padding:10px 14px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+         <span>✅ Expected Receivable &mdash; ${qs.length} accepted ${qs.length === 1 ? 'quotation' : 'quotations'}</span>
+         <span style="font-size:12px;font-weight:600;color:#15803d;">Total ₹${Math.round(qs.reduce((s,q)=>s+(q.total_paise||0),0)/100).toLocaleString("en-IN")}</span>
+       </div>`;
+  }
   if (qs.length === 0) {
     $("#listWrap").innerHTML = receivedBanner + `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : (_currentFilter === "paid" ? 'No payments received yet.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.')}</div>`;
     return;
