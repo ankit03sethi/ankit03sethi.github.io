@@ -604,9 +604,9 @@ async function refreshTotalPaid() {
   try {
     const data = await callAdmin("total_paid", { from: dateRange.from, to: dateRange.to });
     const total = Number(data?.total || 0);
-    // v2026082212: Paid top card now shows big ₹ Received amount too.
-    const rcvEl = document.getElementById("receivedTotal");
-    if (rcvEl) rcvEl.textContent = "₹" + total.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    // v2026082219: Received card is owned by refreshQuotationsCard() (uses paid
+    // quote totals). Don't overwrite it from total_paid — that reads the empty
+    // completed_payments table and would stomp the correct value to ₹0.
     const chip = $("#totalPaidChip");
     if (chip) {
       chip.textContent = "💰 ₹" + total.toLocaleString("en-IN");
