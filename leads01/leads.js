@@ -1825,7 +1825,9 @@ function rowHtml(l, readOnly) {
   // "Forward" action button placed right before Save (see below). The chip is now
   // purely a display of the current assignee + a tiny "History" click that opens
   // a modal listing lead_assignment_history.
-  const historyBtn = (_isManager && !readOnly) ? `<button class="asn-history-btn" data-action="show-asn-history" data-customer-key="${cur}" title="Show past assignees" style="margin-left:6px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;">History</button>` : "";
+  // v2026082201: legacy inline "History" chip removed — the 5 tab pills in
+  // the Remarks cell now cover the full history including forwards.
+  const historyBtn = "";
   const assigneeChip = `<span title="Employee this lead is currently assigned to" style="display:inline-flex;align-items:center;margin-top:4px;margin-left:4px;padding:2px 8px;background:${asnBg};color:${asnFg};border:1px solid ${asnBorder};border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;">${asnChipInner}${historyBtn}</span>`;
 
   // Employee CELL for the dedicated column (v2026082015).
@@ -1842,9 +1844,8 @@ function rowHtml(l, readOnly) {
   const creatorLine = l.employee_code
     ? `<div class="muted-small" style="font-size:10.5px;color:#9a3412;">👤 creator: ${esc(l.employee_code)}${l.employee_name ? " · " + esc(l.employee_name) : ""}</div>`
     : "";
-  const historyBtnInCell = (_isManager && !readOnly)
-    ? `<button data-action="show-asn-history" data-customer-key="${cur}" title="Show past assignees" style="margin-top:3px;padding:1px 6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer;color:#334155;align-self:flex-start;">History</button>`
-    : "";
+  // v2026082201: legacy History chip removed — 5-tab pills in Remarks cell cover it.
+  const historyBtnInCell = "";
   // v2026082019: Forwarded chip. Shown on every row (any tab) whose backing
   // lead_overrides row has is_forwarded=true — i.e. this pipeline lead was
   // auto-created when a manager added a service that the previous assignee
@@ -2146,26 +2147,18 @@ function renderRemarksCell(l, readOnly) {
   }
 
   if (!readOnly) {
-    const canAddRemarks = leadsCan("add_remarks");
-    const addRemarkBtn = canAddRemarks
-      ? `<button class="add-remark-btn" data-action="show-add-remark" data-customer-key="${cur}">+ Add remark</button>`
-      : "";
-    const canAddRating = leadsCan("add_rating");
-    const rateBtn = canAddRating
-      ? `<button data-action="show-star-modal" data-customer-key="${cur}" title="Add a priority star rating (or view history)" style="margin-left:6px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:3px 8px;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;">⭐ Rate</button>`
-      : "";
-    html += `<div class="add-remark-wrap">
-      ${addRemarkBtn}
-      ${rateBtn}
-      <div class="add-remark-form hidden">
-        <input class="add-remark-header" type="text" placeholder="Header / short caption (e.g. Called at 3pm, discussed pricing)" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;font-weight:600;margin-bottom:4px;"/>
-        <textarea class="add-remark-input" placeholder="Full discussion / details..." rows="2" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:12.5px;"></textarea>
-        <div class="add-remark-actions" style="margin-top:4px;">
-          <button class="add-remark-save" data-action="add-remark-save" data-customer-key="${cur}">Save</button>
-          <button class="add-remark-cancel" data-action="add-remark-cancel" data-customer-key="${cur}">Cancel</button>
-        </div>
-        <div class="add-remark-error" style="display:none;color:#dc2626;font-size:11.5px;margin-top:3px;"></div>
-      </div>
+    // v2026082201: Per-row Lead History tab pills replace the old
+    // "+ Add remark" / "Rate" buttons and the redundant "History" chip.
+    // Every pill opens the History modal focused on that filter — All,
+    // Remarks, Ratings, Forwards, or Quote.
+    const tabPill = (label, tab, bg = "#fff", fg = "#334155", bd = "#cbd5e1") =>
+      `<button type="button" data-action="show-lead-history-tab" data-tab="${tab}" data-customer-key="${cur}" style="padding:3px 9px;font-size:11px;font-weight:700;border-radius:12px;border:1px solid ${bd};background:${bg};color:${fg};cursor:pointer;">${label}</button>`;
+    html += `<div class="add-remark-wrap" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">
+      ${tabPill("All", "all", "#1f6feb", "#fff", "#1f6feb")}
+      ${tabPill("💬 Remarks", "remark")}
+      ${tabPill("⭐ Ratings", "star")}
+      ${tabPill("↔️ Forwards", "assign")}
+      ${tabPill("📋 Quote", "quote")}
     </div>`;
   }
 
@@ -2448,6 +2441,13 @@ function wireRowHandlers() {
     }
     if (action === "show-asn-history") {
       await showAssignmentHistoryModal(key);
+      return;
+    }
+    if (action === "show-lead-history-tab") {
+      // v2026082201: per-row tab pills open the same history modal focused
+      // on the clicked tab (all / remark / star / assign / quote).
+      const tab = target.dataset.tab || "all";
+      await showAssignmentHistoryModal(key, tab);
       return;
     }
     if (action === "show-star-modal") {
@@ -3199,7 +3199,7 @@ async function loadStarHistory(customerKey) {
 }
 
 // Modal that lists lead_assignment_history for a lead
-async function showAssignmentHistoryModal(customerKey) {
+async function showAssignmentHistoryModal(customerKey, initialTab = "all") {
   document.getElementById("asnHistoryOverlay")?.remove();
 
   // Parse "9111000006|gst" → { contact: "9111000006", service: "gst" }
@@ -3353,7 +3353,7 @@ async function showAssignmentHistoryModal(customerKey) {
 
   // Tab state for this modal instance
   let _asnEvents = [];
-  let _asnTab = "all";
+  let _asnTab = initialTab || "all";
   function filterAsnByTab(events, tab) {
     if (tab === "all") return events;
     if (tab === "quote") return events.filter(ev => ev.type === "remark" && ev.header && /^Quote /.test(ev.header));
