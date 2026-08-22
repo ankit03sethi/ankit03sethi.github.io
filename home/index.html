@@ -392,6 +392,51 @@
         </div>
       </div>
 
+      <!-- GST FILING PLAN PICKER (only shown for gst_filing) -->
+      <div id="svcGSTPlans" style="display:none;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:8px;">Choose a plan:</div>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+          <label class="gst-plan-opt" data-plan="monthly" style="display:block;border:2px solid #ea580c;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;background:#fff7ed;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:14px;">Monthly</div>
+                <div style="font-size:11.5px;color:#64748b;margin-top:1px;">1 month of filing</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:18px;font-weight:800;color:#ea580c;">₹999</div>
+                <div style="font-size:10.5px;color:#94a3b8;">₹999/mo</div>
+              </div>
+            </div>
+          </label>
+          <label class="gst-plan-opt" data-plan="quarterly" style="display:block;border:2px solid #e5e7eb;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;position:relative;">
+            <div style="position:absolute;top:-9px;right:12px;background:#0ea5e9;color:#fff;font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;">SAVE ~17%</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:14px;">Quarterly</div>
+                <div style="font-size:11.5px;color:#64748b;margin-top:1px;">3 months of filing</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:18px;font-weight:800;color:#0ea5e9;">₹2,499</div>
+                <div style="font-size:10.5px;color:#0ea5e9;">₹833/mo · save ₹498</div>
+              </div>
+            </div>
+          </label>
+          <label class="gst-plan-opt" data-plan="yearly" style="display:block;border:2px solid #e5e7eb;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;position:relative;">
+            <div style="position:absolute;top:-9px;right:12px;background:#16a34a;color:#fff;font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;">SAVE ~25%</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:14px;">Yearly</div>
+                <div style="font-size:11.5px;color:#64748b;margin-top:1px;">12 months of filing</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:18px;font-weight:800;color:#16a34a;">₹8,999</div>
+                <div style="font-size:10.5px;color:#16a34a;">₹749/mo · save ₹2,989</div>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- ACCOUNT MGMT PLATFORMS (only shown for service) -->
       <div id="svcAMPlatforms" style="display:none;margin-bottom:14px;">
         <div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:8px;">Pick platforms &amp; qty (₹4,999 per platform/month):</div>
@@ -1366,7 +1411,7 @@ $("#cartPayBtn").addEventListener("click", async () => {
 const SVC_CATALOG = {
   analyst:          { name: "Cursive Analyst (30 days)",          price: 4999 },
   gst:              { name: "GST Registration",                  price: 999  },
-  gst_filing:       { name: "GST Filing (monthly)",              price: 999  },
+  gst_filing:       { name: "GST Filing",                        price: 999  },
   trademark:        { name: "Trademark Registration",            price: 6999 },
   udyam:            { name: "Udyam (MSME) Certificate",          price: 999  },
   iec:              { name: "IEC (Import-Export Code)",          price: 1499 },
@@ -1400,6 +1445,14 @@ let _currentBLTier = "growth"; // default selection
 function rupees(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
 function paiseToRupees(p) { return "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// GST Filing plan tiers (monthly / quarterly / yearly). Kept alongside BL_TIERS.
+const GST_FILING_PLANS = {
+  monthly:   { price: 999,  months: 1,  label: "Monthly"   },
+  quarterly: { price: 2499, months: 3,  label: "Quarterly" },
+  yearly:    { price: 8999, months: 12, label: "Yearly"    },
+};
+let _currentGSTPlan = "monthly";
+
 function recalcSvcModal() {
   if (!_currentSvc) return;
   let sub = 0, unit = 0, qtyDisplay = 1;
@@ -1407,6 +1460,11 @@ function recalcSvcModal() {
   if (_currentSvc.tag === "business_launcher") {
     const t = BL_TIERS[_currentBLTier] || BL_TIERS.growth;
     unit = t.price;
+    qtyDisplay = 1;
+    sub = unit;
+  } else if (_currentSvc.tag === "gst_filing") {
+    const p = GST_FILING_PLANS[_currentGSTPlan] || GST_FILING_PLANS.monthly;
+    unit = p.price;
     qtyDisplay = 1;
     sub = unit;
   } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
@@ -1474,6 +1532,18 @@ function recalcSvcModal() {
 }
 
 let _svcWalletPaise = 0;
+
+function selectGSTPlan(plan) {
+  _currentGSTPlan = plan;
+  document.querySelectorAll(".gst-plan-opt").forEach(el => {
+    const isSel = el.dataset.plan === plan;
+    const color = plan === "monthly" ? "#ea580c" : plan === "quarterly" ? "#0ea5e9" : "#16a34a";
+    const bg    = plan === "monthly" ? "#fff7ed" : plan === "quarterly" ? "#f0f9ff" : "#f0fdf4";
+    if (isSel) { el.style.borderColor = color; el.style.background = bg; }
+    else       { el.style.borderColor = "#e5e7eb"; el.style.background = "#fff"; }
+  });
+  recalcSvcModal();
+}
 
 function selectBLTier(tier) {
   _currentBLTier = tier;
@@ -1577,16 +1647,23 @@ window.openServiceModal = async function (tag) {
   const blSection = $("#svcBLTiers");
   const amSection = $("#svcAMPlatforms");
   const qtySection = $("#svcQtyRow");
+  const gstSection = $("#svcGSTPlans");
 
   blSection.style.display = "none";
   amSection.style.display = "none";
   qtySection.style.display = "";
+  if (gstSection) gstSection.style.display = "none";
 
   if (tag === "business_launcher") {
     blSection.style.display = "";
     qtySection.style.display = "none";
     _currentBLTier = "growth";
     selectBLTier("growth"); // default to Growth (most picked)
+  } else if (tag === "gst_filing") {
+    if (gstSection) gstSection.style.display = "";
+    qtySection.style.display = "none";
+    _currentGSTPlan = "monthly";
+    selectGSTPlan("monthly");
   } else if (tag === "service") {
     amSection.style.display = "";
     qtySection.style.display = "none";
@@ -1628,6 +1705,10 @@ document.addEventListener("click", (e) => {
   if (opt && opt.dataset.tier) {
     selectBLTier(opt.dataset.tier);
   }
+  const gstOpt = e.target.closest(".gst-plan-opt");
+  if (gstOpt && gstOpt.dataset.plan) {
+    selectGSTPlan(gstOpt.dataset.plan);
+  }
 });
 
 // Qty +/- buttons
@@ -1651,6 +1732,9 @@ function buildPayBody(qty, ref) {
   const body = { service_tag: _currentSvc.tag, referral_code: ref || null };
   if (_currentSvc.tag === "business_launcher") {
     body.variant = _currentBLTier;
+  } else if (_currentSvc.tag === "gst_filing") {
+    body.variant = _currentGSTPlan;
+    body.qty = 1;
   } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
     const platforms = [];
     document.querySelectorAll(".am-qty-input").forEach(i => {
