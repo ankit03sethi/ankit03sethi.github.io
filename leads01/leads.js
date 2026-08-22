@@ -572,6 +572,11 @@ async function refreshQuotationsCard() {
     }
     sentEl.textContent = String(sent);
     if (draftEl) draftEl.textContent = String(draft);
+    // v2026082211: Expected Receivable card = accepted count + accepted ₹ total
+    const rcvCountEl = document.getElementById("topcnt_receivable");
+    const rcvTotalEl = document.getElementById("receivableTotal");
+    if (rcvCountEl) rcvCountEl.textContent = String(accepted);
+    if (rcvTotalEl) rcvTotalEl.textContent = "₹" + Math.round(acceptedPaise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 });
     followEl.textContent = String(follow);
     regenEl.textContent = String(regen);
     acceptedEl.textContent = String(accepted);
