@@ -2005,11 +2005,12 @@ function rowHtml(l, readOnly) {
       <div>${esc(ageStr)} ago</div>
       <div class="muted-small">${esc(fmtDate(l.last_event_at))} ${esc(fmtTime(l.last_event_at))}</div>
       <div style="margin-top:6px;">${callBtn}${waBtn}</div>
-      ${quoteBtn ? `<div style="margin-top:6px;">${quoteBtn}</div>` : ""}
     </td>
-    ${hideStatusCell ? "" : `<td>
+    ${hideStatusCell ? "" : (showQuoteBtn
+      ? `<td style="text-align:center;">${quoteBtn}</td>`
+      : `<td>
       <select class="status-select" data-customer-key="${cur}" ${(isTerminal || !leadsCan("edit_status")) ? "disabled" : ""}>${statusOpts}</select>
-    </td>`}
+    </td>`)}
     <td>${empCellHtml}</td>
     <td>${remarksCell}</td>
     ${hideStatusCell ? "" : `<td>
