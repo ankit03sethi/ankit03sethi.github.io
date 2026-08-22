@@ -924,13 +924,17 @@ function renderProductDetail(data) {
     const wb = document.getElementById("purWalletBal");
     if (wb) wb.textContent = "₹" + (walletPaise/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const shortfall = Math.max(0, finalTotal * 100 - walletPaise);
-    const sr = document.getElementById("purShortfallRow");
-    const sa = document.getElementById("purShortfallAmt");
-    if (sr && sa) {
+    // v2026082214: rename these two consts — 'sr' + 'sa' collide with the
+    // subtotal-row consts declared earlier in the same block, which was a
+    // module-level syntax error that blocked the entire products script
+    // from executing (blank catalog page).
+    const shfRow = document.getElementById("purShortfallRow");
+    const shfAmt = document.getElementById("purShortfallAmt");
+    if (shfRow && shfAmt) {
       if (shortfall > 0 && finalTotal > 0) {
-        sr.style.display = "flex";
-        sa.textContent = "₹" + (shortfall/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else sr.style.display = "none";
+        shfRow.style.display = "flex";
+        shfAmt.textContent = "₹" + (shortfall/100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else shfRow.style.display = "none";
     }
     const buyBtn = document.getElementById("buyNowBtn");
     if (buyBtn && finalTotal > 0) {
