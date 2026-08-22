@@ -506,6 +506,7 @@ async function refreshQuotationsCard() {
   // v2026082209: card now shows big SENT number + breakdown for
   // Follow Up / Regen / Accepted / Expired / Rejected + ₹ total of Accepted.
   const sentEl = document.getElementById("quotSentCount");
+  const draftEl = document.getElementById("quotDraftCount");
   const followEl = document.getElementById("quotFollowCount");
   const regenEl = document.getElementById("quotRegenCount");
   const acceptedEl = document.getElementById("quotAcceptedCount");
@@ -519,6 +520,7 @@ async function refreshQuotationsCard() {
   if (iconOnly)  iconOnly.classList.add("hidden");
   const zero = () => {
     sentEl.textContent = "0";
+    if (draftEl) draftEl.textContent = "0";
     followEl.textContent = "0";
     regenEl.textContent = "0";
     acceptedEl.textContent = "0";
@@ -544,7 +546,7 @@ async function refreshQuotationsCard() {
     const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
     const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
     const scopeToOwnCode = (!_isManager && _myEmpCode) ? _myEmpCode : null;
-    let sent = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0;
+    let sent = 0, draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0;
     for (const q of j.quotations) {
       const ts = q.created_at || q.updated_at;
       if (ts) {
@@ -561,13 +563,15 @@ async function refreshQuotationsCard() {
       const st = q.status;
       // Sent = anything past Draft (Sent, Follow_up, Regenerated, Accepted, Paid, Expired, Rejected)
       if (st !== "draft" && st !== "cancelled") sent += 1;
-      if (st === "follow_up") follow += 1;
+      if (st === "draft") draft += 1;
+      else if (st === "follow_up") follow += 1;
       else if (st === "regenerated") regen += 1;
       else if (st === "accepted" || st === "paid") { accepted += 1; acceptedPaise += Number(q.total_paise || 0); }
       else if (st === "expired") expired += 1;
       else if (st === "rejected") rejected += 1;
     }
     sentEl.textContent = String(sent);
+    if (draftEl) draftEl.textContent = String(draft);
     followEl.textContent = String(follow);
     regenEl.textContent = String(regen);
     acceptedEl.textContent = String(accepted);
