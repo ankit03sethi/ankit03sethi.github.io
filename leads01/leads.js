@@ -806,6 +806,21 @@ function switchTop(top) {
     if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/?v=" + Date.now();
     return;
   }
+  // v2026082220: Received card (data-top="done") routes into Quotations iframe
+  // pre-filtered to Paid so the user sees paid leads with invoice actions.
+  if (top === "done") {
+    const f = $("#quotationsFrame");
+    if (f) {
+      const target = "/leads01/quotations/?filter=paid&v=" + Date.now();
+      if (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations")) f.src = target;
+      else { try { f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: "paid" }, "*"); } catch {} }
+    }
+    // Show the quotations iframe
+    paneStage?.classList.add("hidden");
+    paneQuot?.classList.remove("hidden");
+    document.querySelectorAll(".top-tab").forEach(b => b.classList.toggle("active", b.dataset.top === "done"));
+    return;
+  }
 
   if (top === "add") {
     expandedRows.clear();

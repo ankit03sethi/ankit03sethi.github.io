@@ -125,7 +125,7 @@
         <button class="filter-tab" data-filter="all">All</button>
         <button class="filter-tab" data-filter="draft">Draft</button>
         <button class="filter-tab" data-filter="regenerated">🔄 Regenerated</button>
-        <button class="filter-tab active" data-filter="follow_up">📞 Follow Up</button>
+        <button class="filter-tab" data-filter="follow_up">📞 Follow Up</button>
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
@@ -464,7 +464,7 @@ async function callFn(name, body, method = "POST") {
 
 // ============ LIST ============
 let _allQuotes = [];
-let _currentFilter = "follow_up";
+let _currentFilter = (new URLSearchParams(location.search).get("filter") || "follow_up");
 let _currentEmpFilter = "__all__";
 
 async function loadList() {
@@ -481,6 +481,9 @@ async function loadList() {
     return new Date(b.created_at || 0) - new Date(a.created_at || 0);
   });
   refreshEmpFilterOptions();
+  // v2026082220: reflect _currentFilter (URL ?filter=... or default) in the
+  // active tab styling on first load.
+  document.querySelectorAll(".filter-tab").forEach(t => t.classList.toggle("active", t.dataset.filter === _currentFilter));
   updateFilterCounts();
   renderFilteredList();
 }
@@ -488,6 +491,14 @@ async function loadList() {
 // Date range filter (received from parent leads01 via postMessage)
 let _dateRangeFilter = { from: null, to: null };
 window.addEventListener("message", (ev) => {
+  // v2026082220: parent leads01 sends set-filter (e.g. clicking Received card).
+  if (ev?.data?.type === "cursive:set-filter" && ev.data.filter) {
+    _currentFilter = ev.data.filter;
+    document.querySelectorAll(".filter-tab").forEach(t => t.classList.toggle("active", t.dataset.filter === _currentFilter));
+    if (typeof updateFilterCounts === "function") updateFilterCounts();
+    if (typeof renderFilteredList === "function") renderFilteredList();
+    return;
+  }
   if (ev?.data?.type === "cursive:date-range") {
     _dateRangeFilter = { from: ev.data.from || null, to: ev.data.to || null };
     if (typeof updateFilterCounts === "function") updateFilterCounts();
@@ -892,6 +903,25 @@ function renderFilteredList() {
     // Priority star chip: shows max star rating for this customer (same idea as Leads)
     const st = Number(q.max_stars || 0);
     const starChip = st > 0 ? `<span title="Priority: ${st}-star customer" style="display:inline-block;margin-left:6px;padding:1px 6px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:11px;font-weight:800;vertical-align:middle;letter-spacing:0.5px;">${"★".repeat(st)}</span>` : "";
+    // v2026082220: Paid rows show invoice actions inline — View / Download / WA share / Email.
+    let invoiceCell = "";
+    if ((q.status === "paid" || q.status === "accepted") && q.invoice) {
+      const inv = q.invoice;
+      const invUrl = `${location.origin}/invoice/?t=${inv.share_token}`;
+      const dlUrl  = invUrl + "&print=1";
+      const waMsg  = encodeURIComponent(`Hi ${q.customer_name || "there"}, your invoice ${inv.invoice_number} from Cursive — ${invUrl}`);
+      const waNum  = ((q.customer_phone || "").replace(/\D/g, "").length === 10 ? "91" + (q.customer_phone || "").replace(/\D/g, "") : (q.customer_phone || "").replace(/\D/g, ""));
+      const waLink = waNum ? `https://wa.me/${waNum}?text=${waMsg}` : `https://wa.me/?text=${waMsg}`;
+      invoiceCell = `<div style="display:flex;flex-direction:column;gap:2px;margin-top:4px;">
+        <div style="font-size:11px;color:#166534;font-weight:800;">📄 ${esc(inv.invoice_number)}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <a href="${invUrl}" target="_blank" rel="noopener" data-nopropagate="1" title="View invoice" style="padding:3px 7px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;font-size:10.5px;font-weight:700;text-decoration:none;">👁 View</a>
+          <a href="${dlUrl}" target="_blank" rel="noopener" data-nopropagate="1" title="Download / Print invoice" style="padding:3px 7px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:4px;font-size:10.5px;font-weight:700;text-decoration:none;">⬇ Download</a>
+          <a href="${waLink}" target="_blank" rel="noopener" data-nopropagate="1" title="Share via WhatsApp" style="padding:3px 7px;background:#dcfce7;color:#065f46;border:1px solid #86efac;border-radius:4px;font-size:10.5px;font-weight:700;text-decoration:none;">💬 WA</a>
+          <button data-inv-email="${q.id}" data-nopropagate="1" title="Email invoice to customer" style="padding:3px 7px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:4px;font-size:10.5px;font-weight:700;cursor:pointer;">✉ Email</button>
+        </div>
+      </div>`;
+    }
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
       <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}</td>
       <td style="font-size:12.5px;line-height:1.4;">
@@ -901,7 +931,7 @@ function renderFilteredList() {
         ${q.customer_gst ? `<div style="color:#64748b;font-size:11px;">GST: ${esc(q.customer_gst)}</div>` : ""}
         <button data-editcontact="${q.id}" style="margin-top:4px;background:transparent;border:1px dashed #94a3b8;color:#475569;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">＋ Add / Update contact</button>
       </td>
-      <td>${callBtn}${waBtn}${emlBtn}</td>
+      <td>${callBtn}${waBtn}${emlBtn}${invoiceCell}</td>
       <td><b>${fmt(q.total_paise)}</b></td>
       <td><span class="status-badge st-${q.status}">${q.status.replace("_"," ")}</span></td>
       <td style="font-size:12px;color:#64748b;">${fmtDate(q.valid_until)}</td>
@@ -927,6 +957,22 @@ function renderFilteredList() {
   // Prevent Call/WhatsApp/Email anchor clicks from bubbling up to row-click (which opens the quote)
   $("#listWrap").querySelectorAll("[data-nopropagate]").forEach(a => {
     a.addEventListener("click", (e) => e.stopPropagation());
+  });
+  // v2026082220: Email-invoice button → call send-invoice-email edge function
+  $("#listWrap").querySelectorAll("[data-inv-email]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const qid = Number(btn.dataset.invEmail);
+      if (!confirm("Email this invoice to the customer now?")) return;
+      const oldText = btn.textContent; btn.disabled = true; btn.textContent = "Sending…";
+      try {
+        const j = await callFn("send-invoice-email", { quotation_id: qid });
+        if (j.ok) { btn.textContent = "✓ Sent"; setTimeout(() => { btn.textContent = oldText; btn.disabled = false; }, 2000); toast("✓ Invoice emailed"); }
+        else { btn.textContent = oldText; btn.disabled = false; toast(j.error || "Email failed", true); }
+      } catch (err) {
+        btn.textContent = oldText; btn.disabled = false; toast("Failed: " + (err.message || err), true);
+      }
+    });
   });
 }
 
