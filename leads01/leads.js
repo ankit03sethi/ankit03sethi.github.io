@@ -695,7 +695,9 @@ function updateTopCounts() {
   }
   $("#topcnt_new").textContent    = counts.new;
   $("#topcnt_follow").textContent = counts.follow;
-  $("#topcnt_done").textContent   = counts.done;
+  // v2026082218: Received/Paid card is owned by refreshQuotationsCard() (uses
+  // quote-based paid data). Do NOT overwrite it from the leads pipeline bucket,
+  // otherwise the paid count keeps getting stomped to 0.
   const uEl = $("#topcnt_unassigned"); if (uEl) uEl.textContent = counts.unassigned;
   const frEl = document.getElementById("topcnt_followright"); if (frEl) frEl.textContent = counts.followRight;
   const fwEl = document.getElementById("topcnt_followwrong"); if (fwEl) fwEl.textContent = counts.followWrong;
