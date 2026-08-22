@@ -669,7 +669,7 @@ function renderProductDetail(data) {
                 return `
                 <div class="var-entry" data-cid="${c.id}">
                   <${rowTag} class="var-row${hasDesigns ? ' has-designs' : ''}" data-cid="${c.id}" style="padding:4px 10px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;">
-                    <input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />
+                    ${hasDesigns ? '' : `<input type="checkbox" class="var-check" data-cid="${c.id}" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1f6feb;margin:0;" />`}
                     ${firstImg
                       ? `<span style="width:36px;height:36px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc center/cover no-repeat url('${esc(firstImg)}');flex-shrink:0;"></span>`
                       : (c.hex_code ? `<span style="width:20px;height:20px;border-radius:50%;background:${esc(c.hex_code)};border:1px solid #cbd5e1;flex-shrink:0;"></span>` : '')}
@@ -763,14 +763,44 @@ function renderProductDetail(data) {
   // Initial thumbnail wire — starts with hero product's images
   paintGallery(imgs);
 
+  // v2026082215: auto-expand the first color's designs so the page opens with
+  // one grid already visible (no click needed to see any design).
+  if (_is2Axis) {
+    const firstColorWithDesigns = colors.find(c => Array.isArray(c.designs) && c.designs.length > 0);
+    if (firstColorWithDesigns) {
+      setTimeout(() => {
+        const row = wrap.querySelector(`.var-row[data-cid="${firstColorWithDesigns.id}"]`);
+        if (row) row.style.background = "#eff6ff";
+        toggleDesignsInline(firstColorWithDesigns.id, true);
+        // Also swap the main gallery to the first color's images
+        const varImgs = (firstColorWithDesigns.image_urls || []).filter(Boolean);
+        if (varImgs.length) paintGallery(varImgs);
+      }, 0);
+    }
+  }
+
   // Local helper: expand/collapse a color's inline designs panel (2-axis only).
-  // Renders lazily on first open. Multiple colors can be expanded simultaneously —
-  // this is NOT an accordion (single-open) by design.
+  // v2026082215: now behaves as an ACCORDION — opening one color closes the
+  // others so the user only ever sees one design grid at a time.
   const toggleDesignsInline = (cid, forceOpen) => {
     const panel = wrap.querySelector(`.designs-inline[data-cid="${cid}"]`);
     if (!panel) return false;
     const isOpen = panel.style.display !== "none" && panel.style.display !== "";
     const willOpen = forceOpen === true ? true : (forceOpen === false ? false : !isOpen);
+    // Accordion: close every OTHER designs panel first so only one is open.
+    if (willOpen) {
+      wrap.querySelectorAll(".designs-inline").forEach(p => {
+        if (p !== panel && p.style.display === "block") {
+          p.style.display = "none";
+          const other = wrap.querySelector(`.var-chevron[data-cid="${p.dataset.cid}"] .chev-arrow`);
+          if (other) other.style.transform = "rotate(0deg)";
+        }
+      });
+      // Also un-highlight other rows
+      wrap.querySelectorAll(".var-row").forEach(r => {
+        if (Number(r.dataset.cid) !== cid) r.style.background = "#fff";
+      });
+    }
     if (willOpen && !panel.dataset.rendered) {
       const clr = colors.find(c => c.id === cid);
       if (clr) { renderDesignsInline(panel, clr); panel.dataset.rendered = "1"; }
