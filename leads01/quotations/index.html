@@ -951,7 +951,7 @@ function renderFilteredList() {
       </div>`;
     }
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
-      <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}</td>
+      <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}<div style="margin-top:3px;font-size:14px;font-weight:800;color:#0f172a;">${fmt(q.total_paise)}</div></td>
       <td style="font-size:12.5px;line-height:1.4;">
         <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
         ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
