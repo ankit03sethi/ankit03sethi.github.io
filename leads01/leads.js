@@ -503,19 +503,30 @@ async function refreshAll() {
 }
 
 async function refreshQuotationsCard() {
-  const cntEl = document.getElementById("quotAcceptedCount");
+  // v2026082209: card now shows big SENT number + breakdown for
+  // Follow Up / Regen / Accepted / Expired / Rejected + ₹ total of Accepted.
+  const sentEl = document.getElementById("quotSentCount");
+  const followEl = document.getElementById("quotFollowCount");
+  const regenEl = document.getElementById("quotRegenCount");
+  const acceptedEl = document.getElementById("quotAcceptedCount");
+  const expiredEl = document.getElementById("quotExpiredCount");
+  const rejectedEl = document.getElementById("quotRejectedCount");
   const totEl = document.getElementById("quotAcceptedTotal");
   const statsWrap = document.getElementById("quotStatsWrap");
   const iconOnly = document.getElementById("quotIconOnly");
-  if (!cntEl || !totEl) return;
-  // v2026082103: show accepted+total for EVERYONE with quotations access
-  // (employees too). Employees still see their own totals — we auto-filter by
-  // the caller's employee_code below when they're not a manager.
+  if (!sentEl || !totEl) return;
   if (statsWrap) statsWrap.classList.remove("hidden");
   if (iconOnly)  iconOnly.classList.add("hidden");
-  // Default 0 / ₹0 so the card is informative before/after the fetch.
-  if (cntEl.textContent === "—") cntEl.textContent = "0";
-  if (totEl.textContent === "—") totEl.textContent = "₹0";
+  const zero = () => {
+    sentEl.textContent = "0";
+    followEl.textContent = "0";
+    regenEl.textContent = "0";
+    acceptedEl.textContent = "0";
+    expiredEl.textContent = "0";
+    rejectedEl.textContent = "0";
+    totEl.textContent = "₹0";
+  };
+  zero();
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
@@ -529,20 +540,12 @@ async function refreshQuotationsCard() {
       body: JSON.stringify({ op: "list" }),
     });
     const j = await res.json().catch(() => ({}));
-    if (!j || !j.ok || !Array.isArray(j.quotations)) {
-      cntEl.textContent = "0";
-      totEl.textContent = "₹0";
-      return;
-    }
+    if (!j || !j.ok || !Array.isArray(j.quotations)) return;
     const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
     const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
-    // Non-manager employees: scope to their own employee_code so the card
-    // reflects THEIR pipeline, not the whole company's.
     const scopeToOwnCode = (!_isManager && _myEmpCode) ? _myEmpCode : null;
-    let count = 0;
-    let totalPaise = 0;
+    let sent = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0;
     for (const q of j.quotations) {
-      if (q.status !== "accepted") continue;
       const ts = q.created_at || q.updated_at;
       if (ts) {
         const t = new Date(ts).getTime();
@@ -550,17 +553,27 @@ async function refreshQuotationsCard() {
         if (toT !== null && t > toT) continue;
       }
       if (scopeToOwnCode) {
-        // case-insensitive so historical mixed-case codes still match
         if ((q.employee_code || "").toUpperCase() !== String(scopeToOwnCode).toUpperCase()) continue;
       } else if (employeeFilter) {
         if (employeeFilter === "__none__") { if (q.employee_code) continue; }
         else if ((q.employee_code || "").toUpperCase() !== String(employeeFilter).toUpperCase()) continue;
       }
-      count += 1;
-      totalPaise += Number(q.total_paise || 0);
+      const st = q.status;
+      // Sent = anything past Draft (Sent, Follow_up, Regenerated, Accepted, Paid, Expired, Rejected)
+      if (st !== "draft" && st !== "cancelled") sent += 1;
+      if (st === "follow_up") follow += 1;
+      else if (st === "regenerated") regen += 1;
+      else if (st === "accepted" || st === "paid") { accepted += 1; acceptedPaise += Number(q.total_paise || 0); }
+      else if (st === "expired") expired += 1;
+      else if (st === "rejected") rejected += 1;
     }
-    const rupees = Math.round(totalPaise / 100);
-    cntEl.textContent = String(count);
+    sentEl.textContent = String(sent);
+    followEl.textContent = String(follow);
+    regenEl.textContent = String(regen);
+    acceptedEl.textContent = String(accepted);
+    expiredEl.textContent = String(expired);
+    rejectedEl.textContent = String(rejected);
+    const rupees = Math.round(acceptedPaise / 100);
     totEl.textContent = "₹" + rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 });
   } catch (e) {
     console.warn("quotations card fetch failed:", e);

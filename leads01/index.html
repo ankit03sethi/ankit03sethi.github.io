@@ -122,19 +122,34 @@
       </div>
     </button>
     <button class="tab top-tab" data-top="quotations">
-      <!-- Manager view: accepted count + total value. Employee view: plain 📋 icon (see leads.js). -->
-      <div id="quotStatsWrap" style="display:flex;gap:10px;width:100%;justify-content:center;align-items:flex-end;">
-        <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;">
-          <span class="big-count" id="quotAcceptedCount" style="color:#7c3aed;font-size:22px;">0</span>
-          <span style="font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.3px;margin-top:2px;">Accepted</span>
+      <div id="quotStatsWrap" style="display:flex;flex-direction:column;align-items:center;width:100%;">
+        <span class="big-count" id="quotSentCount" style="color:#7c3aed;">0</span>
+        <span class="stage-title" style="color:#7c3aed;">Sent</span>
+        <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:6px;">
+          <div style="display:flex;flex-direction:column;align-items:center;">
+            <span id="quotFollowCount" style="color:#f59e0b;font-size:13px;font-weight:800;">0</span>
+            <span style="font-size:8.5px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.3px;">Follow Up</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;">
+            <span id="quotRegenCount" style="color:#7c3aed;font-size:13px;font-weight:800;">0</span>
+            <span style="font-size:8.5px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.3px;">Regen</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;">
+            <span id="quotAcceptedCount" style="color:#059669;font-size:13px;font-weight:800;">0</span>
+            <span style="font-size:8.5px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.3px;">Accepted</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;">
+            <span id="quotExpiredCount" style="color:#64748b;font-size:13px;font-weight:800;">0</span>
+            <span style="font-size:8.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Expired</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;">
+            <span id="quotRejectedCount" style="color:#dc2626;font-size:13px;font-weight:800;">0</span>
+            <span style="font-size:8.5px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.3px;">Rejected</span>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;border-left:1px solid #e5e7eb;padding-left:10px;">
-          <span class="big-count" id="quotAcceptedTotal" style="color:#7c3aed;font-size:22px;white-space:nowrap;">₹0</span>
-          <span style="font-size:9px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.3px;margin-top:2px;">Total</span>
-        </div>
+        <div style="font-size:10.5px;color:#7c3aed;margin-top:4px;font-weight:700;">💰 <span id="quotAcceptedTotal">₹0</span></div>
       </div>
       <span id="quotIconOnly" class="big-count hidden" style="color:#7c3aed;">📋</span>
-      <span class="stage-title" style="margin-top:6px;">Quotations</span>
     </button>
     <button class="tab top-tab" data-top="done">
       <span class="big-count" id="topcnt_done">0</span>
@@ -156,7 +171,7 @@
   </p>
 </main>
 
-<script type="module" src="leads.js?v=2026082208"></script>
+<script type="module" src="leads.js?v=2026082209"></script>
 <script src="/admin/admin-forgot-btn.js?v=2026082102" defer></script>
 </body>
 </html>
