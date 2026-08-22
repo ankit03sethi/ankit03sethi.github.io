@@ -649,12 +649,12 @@ function updateTopCounts() {
   $("#topcnt_done").textContent   = counts.done;
   const uEl = $("#topcnt_unassigned"); if (uEl) uEl.textContent = counts.unassigned;
 
-  // v2026082203: Total-Leads card = Manual + Website = Total.
-  //   Manual  = latest_event starts with "manual_add" (added via Call/WA/Ref tab OR bulk-add)
-  //   Website = everything else (auto-captured / scraped / no-assignee inbound)
-  //   Unassigned leads are counted as Website (per user policy 2026-08-22).
+  // v2026082204: Total-Leads card respects the currently applied filters
+  //   (date range / service). Big number = Total, small breakdown = Manual + Website.
+  //   Manual  = latest_event starts with "manual_add" (Call/WA/Ref tab OR bulk-add)
+  //   Website = everything else (unassigned inbound counts as Website).
   let totalManual = 0, totalWebsite = 0;
-  (pipelineCache || []).forEach((l) => {
+  filteredPipeline().forEach((l) => {
     const ev = String(l.latest_event || "");
     if (ev.startsWith("manual_add")) totalManual += 1;
     else totalWebsite += 1;
