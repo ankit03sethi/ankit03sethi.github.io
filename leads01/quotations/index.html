@@ -129,7 +129,10 @@
         <button class="filter-tab" data-filter="accepted">✅ Accepted</button>
         <button class="filter-tab" data-filter="expired">Expired</button>
         <button class="filter-tab" data-filter="rejected">❌ Rejected</button>
-        <button class="filter-tab" data-filter="paid">💰 Paid</button>
+        <!-- v2026082221: Paid tab hidden from the row. Only reachable via the
+             Received card on leads01 (postMessage / ?filter=paid). Rendered as
+             a hidden tab so the styling + count code still targets it. -->
+        <button class="filter-tab" data-filter="paid" style="display:none;">💰 Received</button>
         <div style="flex:1;"></div>
         <label style="font-size:12px;color:#475467;font-weight:600;margin-right:4px;">Employee:</label>
         <select id="empFilter" style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;background:#fff;">
@@ -882,8 +885,16 @@ function renderQuoteHistoryList(elId, list) {
 function renderFilteredList() {
   const term = ($("#listSearchBox")?.value || "");
   const qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter) && matchesEmpFilter(q));
+  // v2026082221: banner when we're in the Received (Paid) view, since the tab
+  // itself is hidden — this tells the user why they're seeing paid quotes only.
+  const receivedBanner = _currentFilter === "paid"
+    ? `<div style="background:#ecfdf5;border:1.5px solid #34d399;color:#065f46;padding:10px 14px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+         <span>💰 Received Payments &mdash; ${qs.length} paid ${qs.length === 1 ? 'quotation' : 'quotations'}</span>
+         <span style="font-size:12px;font-weight:600;color:#047857;">Total ₹${Math.round(qs.reduce((s,q)=>s+(q.total_paise||0),0)/100).toLocaleString("en-IN")}</span>
+       </div>`
+    : "";
   if (qs.length === 0) {
-    $("#listWrap").innerHTML = `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.'}</div>`;
+    $("#listWrap").innerHTML = receivedBanner + `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : (_currentFilter === "paid" ? 'No payments received yet.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.')}</div>`;
     return;
   }
   let html = `<table><thead><tr>
@@ -940,7 +951,7 @@ function renderFilteredList() {
     </tr>`;
   }
   html += `</tbody></table>`;
-  $("#listWrap").innerHTML = html;
+  $("#listWrap").innerHTML = receivedBanner + html;
   $("#listWrap").querySelectorAll("[data-open]").forEach(b => {
     b.addEventListener("click", e => { e.stopPropagation(); openQuote(Number(b.dataset.open)); });
   });
