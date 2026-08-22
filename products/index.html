@@ -689,6 +689,20 @@ function renderProductDetail(data) {
                 </div>`;
               }).join("")}
             </div>
+            ${_is2Axis ? `
+            <!-- v2026082216: master Select-All + qty bar for 2-axis products -->
+            <div id="selectAllBar" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;font-size:13px;color:#0f172a;">
+                <input id="selectAllCheck" type="checkbox" style="width:18px;height:18px;accent-color:#1f6feb;cursor:pointer;margin:0;" />
+                <span>Select all variations</span>
+              </label>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:12px;color:#475569;font-weight:600;">Qty per variation:</span>
+                <button type="button" id="selectAllQtyMinus" style="width:24px;height:24px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px 0 0 4px;font-size:14px;font-weight:700;cursor:pointer;padding:0;line-height:1;">−</button>
+                <input id="selectAllQty" type="number" min="10" step="5" value="10" style="width:52px;height:24px;text-align:center;border:1px solid #cbd5e1;border-left:0;border-right:0;font-size:12px;font-weight:700;padding:0;" />
+                <button type="button" id="selectAllQtyPlus" style="width:24px;height:24px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:0 4px 4px 0;font-size:14px;font-weight:700;cursor:pointer;padding:0;line-height:1;">+</button>
+              </div>
+            </div>` : ''}
           </div>
         ` : ''}
         <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
@@ -829,10 +843,52 @@ function renderProductDetail(data) {
       // Highlight the clicked row so the user sees which one drives the gallery
       wrap.querySelectorAll(".var-row").forEach(r => r.style.background = "#fff");
       row.style.background = "#eff6ff";
-      // 2-axis: toggle its inline designs panel
-      if (row.classList.contains("has-designs")) toggleDesignsInline(cid);
+      // v2026082216: 2-axis click FORCES OPEN — never toggle-close on the
+      // same color. Accordion inside toggleDesignsInline still closes the
+      // previously-open one when we switch to a new color.
+      if (row.classList.contains("has-designs")) toggleDesignsInline(cid, true);
     });
   });
+
+  // v2026082216: Select All + master qty control (2-axis only).
+  //   Checked  → every design across every color becomes selected at master qty.
+  //   Unchecked → every design becomes UN-selected (qty preserved for later).
+  //   Master qty change (any time it's checked) → propagate to every design.
+  const saCheck = document.getElementById("selectAllCheck");
+  const saQty   = document.getElementById("selectAllQty");
+  const saMinus = document.getElementById("selectAllQtyMinus");
+  const saPlus  = document.getElementById("selectAllQtyPlus");
+  function applySelectAll(checked, qty) {
+    for (const c of colors) {
+      const designs = c.designs || [];
+      if (!designs.length) continue;
+      if (!_designSelections[c.id]) _designSelections[c.id] = {};
+      for (const d of designs) {
+        if (!_designSelections[c.id][d.id]) _designSelections[c.id][d.id] = { checked: false, qty: 10 };
+        _designSelections[c.id][d.id].checked = checked;
+        if (checked) _designSelections[c.id][d.id].qty = qty;
+      }
+      // Force re-render if the panel is open so tile checkboxes reflect state
+      const panel = wrap.querySelector(`.designs-inline[data-cid="${c.id}"]`);
+      if (panel && panel.dataset.rendered && panel.style.display === "block") {
+        panel.dataset.rendered = "";
+        renderDesignsInline(panel, c);
+        panel.dataset.rendered = "1";
+      }
+      // Also auto-check the parent color's var-check (if it still exists — 2-axis
+      // rows have no checkbox now, so this is a no-op there but harmless).
+      const varChk = wrap.querySelector(`.var-check[data-cid="${c.id}"]`);
+      if (varChk) varChk.checked = checked;
+    }
+    if (typeof window._updateCartSummary === "function") window._updateCartSummary();
+  }
+  if (saCheck) saCheck.addEventListener("change", () => applySelectAll(saCheck.checked, Math.max(10, parseInt(saQty.value, 10) || 10)));
+  if (saQty) {
+    saQty.addEventListener("input", () => { if (saCheck && saCheck.checked) applySelectAll(true, Math.max(10, parseInt(saQty.value, 10) || 10)); });
+    saQty.addEventListener("blur",  () => { const n = parseInt(saQty.value, 10); if (isNaN(n) || n < 10) saQty.value = 10; });
+  }
+  if (saMinus) saMinus.addEventListener("click", () => { saQty.value = Math.max(10, (parseInt(saQty.value, 10) || 10) - 5); saQty.dispatchEvent(new Event("input")); });
+  if (saPlus)  saPlus.addEventListener("click",  () => { saQty.value = (parseInt(saQty.value, 10) || 10) + 5; saQty.dispatchEvent(new Event("input")); });
 
   // (Legacy .color-chip handler removed — colors now render as .var-row entries
   // and expand their inline designs panel on click; see toggleDesignsInline.)
