@@ -3381,6 +3381,9 @@ async function showAssignmentHistoryModal(customerKey, initialTab = "all") {
   overlay.querySelectorAll("#asnHistoryTabs .asntab").forEach(b => {
     b.addEventListener("click", () => applyAsnTab(b.dataset.asntab));
   });
+  // v2026082202: apply the initial tab BEFORE the async fetch so we never
+  // flash the wrong add-row / active pill for the loading window.
+  applyAsnTab(_asnTab);
 
   async function loadUnifiedHistory() {
     try {
