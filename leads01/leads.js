@@ -319,7 +319,8 @@ function wireDateRangeHandlers() {
   const urlPreset = urlParams.get("date");
   const urlFrom = urlParams.get("from");
   const urlTo = urlParams.get("to");
-  let seedPreset = "last30";
+  // v2026082235: default to Today (was Last 30 days).
+  let seedPreset = "today";
   let seedRange;
   if (urlPreset === "custom" && urlFrom && urlTo) {
     seedPreset = "custom";
@@ -337,7 +338,7 @@ function wireDateRangeHandlers() {
     seedPreset = urlPreset;
     seedRange = computePreset(urlPreset);
   } else {
-    seedRange = computePreset("last30");
+    seedRange = computePreset("today");
   }
   preset.value = seedPreset;
   dateRange = { from: seedRange.from, to: seedRange.to, preset: seedPreset };
