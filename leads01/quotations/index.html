@@ -1335,57 +1335,13 @@ async function openQuote(id) {
     hsn_code: it.hsn_code || "",
     discount_inr: it.discount_paise ? it.discount_paise / 100 : 0,
   }));
-  // Auto-refresh prices from current catalog (fixes stale prices from earlier saves)
-  // Legacy key mapping: OLD service keys → CURRENT keys
-  const LEGACY_KEYS = {
-    "gst_registration": "gst",
-    "marketplace_setup": "platform_account",
-    "product_imaging": "imaging",
-    "product_listing": "listing",
-    "account_management": "service",
-    "business_launcher": "bl_growth",
-    "current_account": "platform_account",
-  };
-  if (_catalog) {
-    let changed = 0;
-    const changes = [];
-    for (const it of _items) {
-      let catPrice = null, catGst = null;
-      if (it.item_type === "service") {
-        // Try current key, then legacy key, then match by description
-        const currentKey = LEGACY_KEYS[it.item_ref_key] || it.item_ref_key;
-        let s = (_catalog.services || []).find(x => x.key === currentKey);
-        if (!s && it.description) {
-          const descLower = String(it.description).toLowerCase().replace(/[-_\s]/g, "");
-          s = (_catalog.services || []).find(x =>
-            descLower.includes(x.key.replace(/[-_\s]/g, "")) ||
-            x.name.toLowerCase().replace(/[-_\s()]/g, "").includes(descLower.slice(0, 6))
-          );
-        }
-        if (s) {
-          catPrice = Number(s.price_inr);
-          catGst = Number(s.gst_percent) || 18;
-          // Also fix legacy ref_key for future
-          it.item_ref_key = s.key;
-        }
-      } else if (it.item_type === "product" && it.item_ref_id) {
-        const p = (_catalog.products || []).find(x => x.id === Number(it.item_ref_id));
-        if (p) { catPrice = Number(p.price_inr); catGst = Number(p.effective_gst_percent) || 18; }
-      }
-      if (catPrice !== null && catPrice !== it.unit_price_inr) {
-        changes.push(`${it.description}: ₹${it.unit_price_inr} → ₹${catPrice}`);
-        it.unit_price_inr = catPrice;
-        changed++;
-      }
-      if (catGst !== null && catGst !== it.gst_percent) {
-        it.gst_percent = catGst;
-      }
-    }
-    if (changed > 0) {
-      toast(`✓ Refreshed ${changed} price(s) from catalog. Click Save to persist.`);
-      console.log("Price changes:", changes);
-    }
-  }
+  // v2026082228: DO NOT auto-overwrite stored line-item prices with the current
+  // catalog price when editing. It caused a discrepancy where the admin edit
+  // screen showed a completely different (and much bigger) total than the
+  // quote the customer actually received — because free-priced items (e.g.
+  // IMAGING @ ₹0, LISTING @ ₹0) were being replaced by today's catalog rate
+  // (₹299, ₹50 etc.). Render exactly what was saved. Prices are only ever
+  // changed by the admin editing the line manually.
   renderItems();
 }
 
