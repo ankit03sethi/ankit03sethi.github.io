@@ -502,24 +502,24 @@ function applyDateFilterOnly() {
   renderActive();                   // re-renders the lead list from cached pipeline
   refreshTotalPaid();
   const f = $("#quotationsFrame");
-  if (f) {
-    // If the iframe is currently the visible pane (Quotations / Received /
-    // Receivable), reload it with a fresh URL so the latest quotations code
-    // picks up the new date range in lockstep with the top cards.
-    const paneQuot = document.getElementById("paneQuotations");
-    const paneVisible = paneQuot && !paneQuot.classList.contains("hidden");
-    if (paneVisible && f.src && f.src.includes("/leads01/quotations")) {
-      const currentFilter = (function () { try { return new URL(f.src).searchParams.get("filter") || ""; } catch { return ""; } })();
-      f.onload = () => {
-        try {
-          f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*");
-          if (currentFilter) f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: currentFilter }, "*");
-        } catch {}
-      };
-      f.src = `/leads01/quotations/?${currentFilter ? "filter=" + currentFilter + "&" : ""}v=${Date.now()}`;
-    } else if (f.contentWindow) {
-      try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
-    }
+  if (f && f.src && f.src.includes("/leads01/quotations")) {
+    // v2026082229: ALWAYS force-reload the iframe on any date change (whether
+    // it's the visible pane or not) so cards + list truly move together the
+    // instant the user picks a new date range.
+    let currentFilter = "";
+    try { currentFilter = new URL(f.src).searchParams.get("filter") || ""; } catch {}
+    const params = new URLSearchParams();
+    if (currentFilter) params.set("filter", currentFilter);
+    if (dateRange.from) params.set("from", dateRange.from);
+    if (dateRange.to) params.set("to", dateRange.to);
+    params.set("v", String(Date.now()));
+    f.onload = () => {
+      try {
+        f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*");
+        if (currentFilter) f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: currentFilter }, "*");
+      } catch {}
+    };
+    f.src = `/leads01/quotations/?${params.toString()}`;
   }
 }
 
@@ -852,11 +852,14 @@ function switchTop(top) {
   if (top === "quotations") {
     const f = $("#quotationsFrame");
     if (f) {
-      // v2026082227: ALWAYS reload iframe so it picks up the latest quotations
-      // code (including the date-range handshake) instead of using a stale
-      // cached copy from an earlier session.
+      // v2026082229: always reload iframe + carry date range in the URL so
+      // the iframe applies it deterministically even if postMessage races.
+      const params = new URLSearchParams();
+      if (dateRange.from) params.set("from", dateRange.from);
+      if (dateRange.to) params.set("to", dateRange.to);
+      params.set("v", String(Date.now()));
       f.onload = () => { try { f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {} };
-      f.src = "/leads01/quotations/?v=" + Date.now();
+      f.src = "/leads01/quotations/?" + params.toString();
     }
     return;
   }
@@ -869,15 +872,20 @@ function switchTop(top) {
     const filterName = (top === "done") ? "paid" : "accepted";
     const f = $("#quotationsFrame");
     if (f) {
-      // v2026082227: ALWAYS reload iframe (see comment above) so the latest
-      // quotations code + the intended filter + date range are guaranteed.
+      // v2026082229: carry date range in the URL so iframe applies it even
+      // if the postMessage races with the iframe's own script boot.
+      const params = new URLSearchParams();
+      params.set("filter", filterName);
+      if (dateRange.from) params.set("from", dateRange.from);
+      if (dateRange.to) params.set("to", dateRange.to);
+      params.set("v", String(Date.now()));
       f.onload = () => {
         try {
           f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*");
           f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: filterName }, "*");
         } catch {}
       };
-      f.src = `/leads01/quotations/?filter=${filterName}&v=${Date.now()}`;
+      f.src = "/leads01/quotations/?" + params.toString();
     }
     paneStage?.classList.add("hidden");
     paneQuot?.classList.remove("hidden");

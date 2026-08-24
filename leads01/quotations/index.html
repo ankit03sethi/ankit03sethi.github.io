@@ -502,8 +502,13 @@ async function loadList() {
   renderFilteredList();
 }
 
-// Date range filter (received from parent leads01 via postMessage)
-let _dateRangeFilter = { from: null, to: null };
+// Date range filter — seed from URL params (?from=...&to=...) as a bulletproof
+// fallback for when the parent hasn't yet delivered its postMessage. Parent
+// keeps pushing updates via postMessage after that.
+let _dateRangeFilter = (function () {
+  const p = new URLSearchParams(location.search);
+  return { from: p.get("from") || null, to: p.get("to") || null };
+})();
 window.addEventListener("message", (ev) => {
   // v2026082220: parent leads01 sends set-filter (e.g. clicking Received card).
   if (ev?.data?.type === "cursive:set-filter" && ev.data.filter) {
