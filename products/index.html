@@ -872,11 +872,11 @@ function renderProductDetail(data) {
     const items = [];
     let totalQty = 0, totalAmt = 0;
     (colors || []).forEach(c => {
-      const chk = wrap.querySelector(`.var-check[data-cid="${c.id}"]`);
-      if (!chk || !chk.checked) return;
       const hasDesigns = Array.isArray(c.designs) && c.designs.length > 0;
       if (hasDesigns) {
-        // 2-axis: sum per-design qtys where the design tile checkbox is checked.
+        // v2026082224: 2-axis colors no longer have a color-level checkbox
+        // (removed by user request). Iterate any design tile whose checkbox
+        // is checked and sum its qty directly.
         const state = _designSelections[c.id] || {};
         (c.designs || []).forEach(d => {
           const s = state[d.id];
@@ -889,7 +889,9 @@ function renderProductDetail(data) {
           }
         });
       } else {
-        // 1-axis: existing behavior — read color-level .var-qty.
+        // 1-axis: existing behavior — needs the color-level checkbox + qty.
+        const chk = wrap.querySelector(`.var-check[data-cid="${c.id}"]`);
+        if (!chk || !chk.checked) return;
         const qtyEl = wrap.querySelector(`.var-qty[data-cid="${c.id}"]`);
         const q = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
         const gst = resolveGstPct(null, c);
