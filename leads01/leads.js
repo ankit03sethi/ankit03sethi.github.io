@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082234";
+const LEADS_JS_VERSION = "2026082236";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -88,6 +88,11 @@ const NEW_BUCKET_STATUS_OPTIONS = [
 ];
 
 let pipelineCache = [];
+// v2026082236: set of customer_keys that have at least one quotation. Any lead
+// NOT in this set + marked "won" is treated as a site-direct purchase (bought
+// straight from cursive.world without a quotation) — those should NOT appear
+// in the leads01 pipeline; the customer + invoice live only in /invoices.
+let _quotedCustomerKeys = new Set();
 let activeTop = "new";
 let activeSub = "lead_captured";
 // Populated in bootDashboard(). _isManager = super || leads. _myEmpCode is the caller's
@@ -628,6 +633,9 @@ async function refreshQuotationsCard() {
     const fromT = dateRange.from ? new Date(dateRange.from).getTime() : null;
     const toT = dateRange.to ? new Date(dateRange.to).getTime() : null;
     const scopeToOwnCode = (!_isManager && _myEmpCode) ? _myEmpCode : null;
+    // v2026082236: rebuild the "customer_keys that have a quotation" set so
+    // filteredPipeline() can suppress site-direct purchases.
+    _quotedCustomerKeys = new Set(j.quotations.map(q => q.customer_key).filter(Boolean));
     let sent = 0, draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0, paidCount = 0, paidPaise = 0;
     for (const q of j.quotations) {
       const ts = q.created_at || q.updated_at;
@@ -832,6 +840,15 @@ function applyOriginFilter(rows) {
 // counting a tab that exposes the Origin filter.
 function filteredPipeline() {
   let rows = pipelineCache;
+  // v2026082236: hide site-direct purchases from the leads01 pipeline. A lead
+  // whose manual_status is 'won' but has NO quotation ever raised for them =
+  // customer signed up + paid on cursive.world directly. Their invoice lives
+  // in /invoices; they should NOT clutter the sales pipeline.
+  rows = rows.filter((l) => {
+    if ((l.manual_status || "") !== "won") return true;
+    if (!l.customer_key) return true;
+    return _quotedCustomerKeys.has(l.customer_key);
+  });
   if (dateRange.from || dateRange.to) rows = rows.filter((l) => withinRange(l.last_event_at));
   if (serviceFilter) rows = rows.filter((l) => (l.service_type || "").toLowerCase() === serviceFilter.toLowerCase());
   if (employeeFilter) {
