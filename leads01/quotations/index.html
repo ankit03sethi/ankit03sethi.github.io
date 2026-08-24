@@ -937,8 +937,14 @@ function renderFilteredList() {
          <span style="font-size:12px;font-weight:600;color:#15803d;">Total ₹${Math.round(qs.reduce((s,q)=>s+(q.total_paise||0),0)/100).toLocaleString("en-IN")}</span>
        </div>`;
   }
+  // v2026082230: diagnostic chip so we can always see what date filter the
+  // iframe THINKS it has. Delete once the sync issue is fully proven fixed.
+  const dbgFmt = (v) => v ? new Date(v).toLocaleDateString("en-IN", { day:"2-digit", month:"short" }) : "—";
+  const dateChip = `<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:600;margin-bottom:10px;display:inline-block;">
+    📅 Iframe date filter: ${dbgFmt(_dateRangeFilter.from)} → ${dbgFmt(_dateRangeFilter.to)}
+  </div>`;
   if (qs.length === 0) {
-    $("#listWrap").innerHTML = receivedBanner + `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : (_currentFilter === "paid" ? 'No payments received yet.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.')}</div>`;
+    $("#listWrap").innerHTML = dateChip + receivedBanner + `<div class="helper" style="padding:30px;text-align:center;">${_currentFilter === "all" ? 'No quotations yet. Click <b>+ New Quotation</b> to create one.' : (_currentFilter === "paid" ? 'No payments received yet.' : 'No quotations with status <b>' + _currentFilter.replace("_"," ") + '</b>.')}</div>`;
     return;
   }
   let html = `<table><thead><tr>
@@ -995,7 +1001,7 @@ function renderFilteredList() {
     </tr>`;
   }
   html += `</tbody></table>`;
-  $("#listWrap").innerHTML = receivedBanner + html;
+  $("#listWrap").innerHTML = dateChip + receivedBanner + html;
   $("#listWrap").querySelectorAll("[data-open]").forEach(b => {
     b.addEventListener("click", e => { e.stopPropagation(); openQuote(Number(b.dataset.open)); });
   });
