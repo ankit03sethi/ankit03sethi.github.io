@@ -1509,7 +1509,16 @@ function recalcSvcModal() {
   const adjRupees = adjPaise / 100;
   const dueRupees = duePaise / 100;
 
-  $("#svcPayUnit").textContent = rupees(unit);
+  // v2026082232: for the multi-platform modals (Account Mgmt + Marketplace
+  // Setup) the "Unit price" line is misleading — different platforms cost
+  // different amounts. Show "—" when nothing is selected; when at least one
+  // qty is set, show the average per line.
+  const isMulti = _currentSvc && (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account");
+  if (isMulti && qtyDisplay === 0) {
+    $("#svcPayUnit").textContent = "—";
+  } else {
+    $("#svcPayUnit").textContent = rupees(unit);
+  }
   $("#svcPayQtyEcho").textContent = qtyDisplay;
   $("#svcPaySubtotal").textContent = rupees(sub);
   $("#svcPayGst").textContent = rupees(gst);
@@ -1578,13 +1587,21 @@ function selectBLTier(tier) {
 function buildAMRows(platformList) {
   const wrap = $("#svcAMRows");
   wrap.innerHTML = "";
+  // v2026082232: show the per-tag price next to each platform so the customer
+  // always knows what rate they'll be charged (esp. for the Marketplace Account
+  // Opening modal where Etsy / eBay cost ₹3,999 vs ₹999 for others).
+  const isAcctMgmt = _currentSvc && _currentSvc.tag === "service";
+  const isMarketplaceOpen = _currentSvc && _currentSvc.tag === "platform_account";
+  const priceFor = (tag) => isAcctMgmt ? 4999 : (isMarketplaceOpen ? (MP_UNIT_PER_TAG[tag] || 999) : 0);
   for (const p of platformList) {
+    const per = priceFor(p.tag);
+    const priceChip = per ? ' <span style="font-size:11px;color:#64748b;font-weight:600;margin-left:6px;">₹' + per.toLocaleString("en-IN") + '</span>' : '';
     const row = document.createElement("div");
     row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;";
     row.innerHTML =
       '<div style="display:flex;align-items:center;gap:8px;">' +
         '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + p.color + ';"></span>' +
-        '<span style="font-size:13px;font-weight:600;color:#0f172a;">' + p.name + '</span>' +
+        '<span style="font-size:13px;font-weight:600;color:#0f172a;">' + p.name + priceChip + '</span>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
         '<button type="button" class="am-minus" data-tag="' + p.tag + '" style="width:26px;height:26px;border:1px solid #d0d7de;background:#fff;border-radius:5px;cursor:pointer;font-weight:700;">−</button>' +
