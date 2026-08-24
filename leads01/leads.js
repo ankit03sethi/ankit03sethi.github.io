@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082236";
+const LEADS_JS_VERSION = "2026082237";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -716,6 +716,12 @@ async function refreshTotalPaid() {
 function bucketOf(lead) {
   if (["payment_completed","wallet_recharged","wallet_debited"].includes(lead.latest_event)) return "done";
   if (lead.manual_status === "won") return "done";
+  // v2026082237: once the quote has been Sent (talk_status='quotation_sent'),
+  // the lead lives in the Quotations iframe — take it OUT of Follow Ups and
+  // route it into the 'quotations' bucket (that top-tab shows the iframe, not
+  // the pipeline table, so the lead effectively disappears from the sales
+  // pipeline until it comes back as Accepted / Paid).
+  if (lead.talk_status === "quotation_sent") return "quotations";
   if (lead.talk_status) return "follow";
   if (lead.manual_status === "callback") return "follow";
   return "new";
@@ -774,9 +780,11 @@ function updateTopCounts() {
       counts.follow += 1; // total Follow Ups (all sub-tabs)
       if (RIGHT_SUBS.has(sub)) counts.followRight += 1;
       else if (WRONG_SUBS.has(sub)) counts.followWrong += 1;
-    } else {
+    } else if (b in counts) {
       counts[b] += 1;
     }
+    // v2026082237: 'quotations' bucket has no pipeline card — the count lives
+    // on the Sent card driven by admin-quotations (refreshQuotationsCard).
   });
   // Unassigned count is manager-only: total leads without an assigned_employee_code.
   // Use the raw pipeline (date-range only, no assignee-filter) so switching the
