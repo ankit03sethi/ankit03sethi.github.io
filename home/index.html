@@ -1447,6 +1447,9 @@ const MP_PLATFORMS = [
   { tag: "ebay",     name: "eBay",     color: "#e53238" },
 ];
 const MP_UNIT_PER_TAG = { amazon: 999, flipkart: 999, meesho: 999, etsy: 3999, ebay: 3999 };
+// v2026082233: Account Management per-tag override — Etsy / eBay = ₹3,999.
+// Everything else (Amazon / Flipkart / Meesho / Myntra / FirstCry) = ₹4,999.
+const AM_UNIT_PER_TAG = { amazon: 4999, flipkart: 4999, meesho: 4999, myntra: 4999, firstcry: 4999, etsy: 3999, ebay: 3999 };
 let _currentSvc = null;
 let _currentBLTier = "growth"; // default selection
 
@@ -1476,20 +1479,21 @@ function recalcSvcModal() {
     qtyDisplay = 1;
     sub = unit;
   } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
-    // v2026082232: Account Mgmt = flat ₹4,999 per platform × qty.
-    // Marketplace Setup now has per-tag rates (Amazon/Flipkart/Meesho ₹999,
-    // Etsy / eBay ₹3,999) so subtotal must sum per row.
+    // v2026082233: Both modals now use per-tag pricing.
+    //   Account Management: Amazon/Flipkart/Meesho/Myntra/FirstCry ₹4,999,
+    //                       Etsy / eBay ₹3,999.
+    //   Marketplace Setup:  Amazon/Flipkart/Meesho ₹999,
+    //                       Etsy / eBay ₹3,999.
     qtyDisplay = 0;
     sub = 0;
     document.querySelectorAll(".am-qty-input").forEach(i => {
       const q = Math.max(0, Math.min(120, parseInt(i.value, 10) || 0));
       const perTag = _currentSvc.tag === "service"
-        ? 4999
+        ? (AM_UNIT_PER_TAG[i.dataset.tag] || 4999)
         : (MP_UNIT_PER_TAG[i.dataset.tag] || 999);
       qtyDisplay += q;
       sub += perTag * q;
     });
-    // unit shown = average per line item (or 0 when empty)
     unit = qtyDisplay > 0 ? Math.round(sub / qtyDisplay) : (_currentSvc.tag === "service" ? 4999 : 999);
   } else {
     unit = _currentSvc.price;
@@ -1592,7 +1596,9 @@ function buildAMRows(platformList) {
   // Opening modal where Etsy / eBay cost ₹3,999 vs ₹999 for others).
   const isAcctMgmt = _currentSvc && _currentSvc.tag === "service";
   const isMarketplaceOpen = _currentSvc && _currentSvc.tag === "platform_account";
-  const priceFor = (tag) => isAcctMgmt ? 4999 : (isMarketplaceOpen ? (MP_UNIT_PER_TAG[tag] || 999) : 0);
+  const priceFor = (tag) => isAcctMgmt
+    ? (AM_UNIT_PER_TAG[tag] || 4999)
+    : (isMarketplaceOpen ? (MP_UNIT_PER_TAG[tag] || 999) : 0);
   for (const p of platformList) {
     const per = priceFor(p.tag);
     const priceChip = per ? ' <span style="font-size:11px;color:#64748b;font-weight:600;margin-left:6px;">₹' + per.toLocaleString("en-IN") + '</span>' : '';
@@ -1700,7 +1706,7 @@ window.openServiceModal = async function (tag) {
   } else if (tag === "service") {
     amSection.style.display = "";
     qtySection.style.display = "none";
-    amSection.querySelector("div").innerHTML = "Pick platforms &amp; qty (&#8377;4,999 per platform/month):";
+    amSection.querySelector("div").innerHTML = "Pick platforms &amp; qty (Amazon / Flipkart / Meesho / Myntra / FirstCry: &#8377;4,999 &middot; Etsy / eBay: &#8377;3,999 &mdash; per month):";
     buildAMRows(AM_PLATFORMS);
   } else if (tag === "platform_account") {
     amSection.style.display = "";
