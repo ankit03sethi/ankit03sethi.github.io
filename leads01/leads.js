@@ -1,4 +1,6 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
+const LEADS_JS_VERSION = "2026082234";
+console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
 const SUPABASE_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -310,9 +312,35 @@ function wireDateRangeHandlers() {
   const apply = $("#dateApply");
   if (!preset) return;
 
-  // Default = last30
-  const def = computePreset("last30");
-  dateRange = { from: def.from, to: def.to, preset: "last30" };
+  // v2026082234: seed from URL params first, then fall back to Last 30 days.
+  // ?date=today|yesterday|last7|last30|thismonth|lastmonth|all|custom
+  //   +  ?from=YYYY-MM-DD&to=YYYY-MM-DD  when date=custom
+  const urlParams = new URLSearchParams(location.search);
+  const urlPreset = urlParams.get("date");
+  const urlFrom = urlParams.get("from");
+  const urlTo = urlParams.get("to");
+  let seedPreset = "last30";
+  let seedRange;
+  if (urlPreset === "custom" && urlFrom && urlTo) {
+    seedPreset = "custom";
+    seedRange = {
+      from: iso(new Date(urlFrom + "T00:00:00")),
+      to: iso(new Date(urlTo + "T23:59:59.999")),
+    };
+    from.value = urlFrom;
+    to.value = urlTo;
+    from.style.display = "";
+    to.style.display = "";
+    sep.style.display = "";
+    apply.style.display = "";
+  } else if (urlPreset && urlPreset !== "custom") {
+    seedPreset = urlPreset;
+    seedRange = computePreset(urlPreset);
+  } else {
+    seedRange = computePreset("last30");
+  }
+  preset.value = seedPreset;
+  dateRange = { from: seedRange.from, to: seedRange.to, preset: seedPreset };
 
   preset.addEventListener("change", async () => {
     const v = preset.value;
@@ -331,20 +359,24 @@ function wireDateRangeHandlers() {
     to.style.display = "none";
     sep.style.display = "none";
     apply.style.display = "none";
-    const r = computePreset(v);
-    dateRange = { from: r.from, to: r.to, preset: v };
-    // v2026082225: fast client-side filter — no server round-trip.
-    // Cards + list + iframe all move together, instantly.
-    applyDateFilterOnly();
+    // v2026082234: reload the whole parent with the preset in the URL. This
+    // is the bulletproof path — no dependence on cached iframe HTML, cached
+    // leads.js, or postMessage timing. Cards + list + iframe are all rebuilt
+    // from scratch with the new date filter.
+    const url = new URL(location.href);
+    url.searchParams.set("date", v);
+    url.searchParams.delete("from");
+    url.searchParams.delete("to");
+    location.href = url.toString();
   });
 
   apply.addEventListener("click", async () => {
     if (!from.value || !to.value) { alert("Pick both dates"); return; }
-    const fromISO = iso(new Date(from.value + "T00:00:00"));
-    const toISO = iso(new Date(to.value + "T23:59:59.999"));
-    if (new Date(fromISO) > new Date(toISO)) { alert("From date must be before To date"); return; }
-    dateRange = { from: fromISO, to: toISO, preset: "custom" };
-    applyDateFilterOnly();
+    const url = new URL(location.href);
+    url.searchParams.set("date", "custom");
+    url.searchParams.set("from", from.value);
+    url.searchParams.set("to", to.value);
+    location.href = url.toString();
   });
 }
 
@@ -496,7 +528,11 @@ window.addEventListener("message", (ev) => {
 // Also force-reloads the Quotations iframe so its list refreshes together with
 // the top cards (postMessage-only was landing in stale cached iframe code).
 function applyDateFilterOnly() {
-  console.log("[leads.js v2026082232] applyDateFilterOnly()", dateRange);
+  console.log("[leads.js v" + LEADS_JS_VERSION + "] applyDateFilterOnly()", dateRange);
+  // Stamp the visible version marker in the DOM (updated in initTopbar too),
+  // so user can look at page and immediately confirm which build is running.
+  const vm = document.getElementById("leadsJsVerMark");
+  if (vm) vm.textContent = "v" + LEADS_JS_VERSION;
   $("#dateActiveRange").textContent = labelForRange();
   refreshQuotationsCard();          // recomputes card counts from admin-quotations cache-of-1 fetch
   updateTopCounts();                // recomputes top cards from cached pipeline
