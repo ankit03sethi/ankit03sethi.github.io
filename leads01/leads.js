@@ -333,8 +333,9 @@ function wireDateRangeHandlers() {
     apply.style.display = "none";
     const r = computePreset(v);
     dateRange = { from: r.from, to: r.to, preset: v };
-    $("#dateActiveRange").textContent = labelForRange();
-    await refreshAll();
+    // v2026082225: fast client-side filter — no server round-trip.
+    // Cards + list + iframe all move together, instantly.
+    applyDateFilterOnly();
   });
 
   apply.addEventListener("click", async () => {
@@ -343,8 +344,7 @@ function wireDateRangeHandlers() {
     const toISO = iso(new Date(to.value + "T23:59:59.999"));
     if (new Date(fromISO) > new Date(toISO)) { alert("From date must be before To date"); return; }
     dateRange = { from: fromISO, to: toISO, preset: "custom" };
-    $("#dateActiveRange").textContent = labelForRange();
-    await refreshAll();
+    applyDateFilterOnly();
   });
 }
 
@@ -477,6 +477,20 @@ async function callEmployeeLookup(code) {
     body: JSON.stringify({ op: "lookup", code }),
   });
   return await res.json().catch(() => ({ ok: false, error: "bad_response" }));
+}
+
+// v2026082225: fast path — re-render cards + list from cached pipeline WITHOUT
+// hitting the server. Called from date-range change so the UI moves instantly.
+function applyDateFilterOnly() {
+  $("#dateActiveRange").textContent = labelForRange();
+  refreshQuotationsCard();          // recomputes card counts from admin-quotations cache-of-1 fetch
+  updateTopCounts();                // recomputes top cards from cached pipeline
+  renderActive();                   // re-renders the lead list from cached pipeline
+  refreshTotalPaid();
+  const f = $("#quotationsFrame");
+  if (f && f.contentWindow) {
+    try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
+  }
 }
 
 async function refreshAll() {
