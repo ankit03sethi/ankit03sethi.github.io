@@ -491,8 +491,10 @@ window.addEventListener("message", (ev) => {
   }
 });
 
-// v2026082225: fast path — re-render cards + list from cached pipeline WITHOUT
+// v2026082228: fast path — re-render cards + list from cached pipeline WITHOUT
 // hitting the server. Called from date-range change so the UI moves instantly.
+// Also force-reloads the Quotations iframe so its list refreshes together with
+// the top cards (postMessage-only was landing in stale cached iframe code).
 function applyDateFilterOnly() {
   $("#dateActiveRange").textContent = labelForRange();
   refreshQuotationsCard();          // recomputes card counts from admin-quotations cache-of-1 fetch
@@ -500,8 +502,24 @@ function applyDateFilterOnly() {
   renderActive();                   // re-renders the lead list from cached pipeline
   refreshTotalPaid();
   const f = $("#quotationsFrame");
-  if (f && f.contentWindow) {
-    try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
+  if (f) {
+    // If the iframe is currently the visible pane (Quotations / Received /
+    // Receivable), reload it with a fresh URL so the latest quotations code
+    // picks up the new date range in lockstep with the top cards.
+    const paneQuot = document.getElementById("paneQuotations");
+    const paneVisible = paneQuot && !paneQuot.classList.contains("hidden");
+    if (paneVisible && f.src && f.src.includes("/leads01/quotations")) {
+      const currentFilter = (function () { try { return new URL(f.src).searchParams.get("filter") || ""; } catch { return ""; } })();
+      f.onload = () => {
+        try {
+          f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*");
+          if (currentFilter) f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: currentFilter }, "*");
+        } catch {}
+      };
+      f.src = `/leads01/quotations/?${currentFilter ? "filter=" + currentFilter + "&" : ""}v=${Date.now()}`;
+    } else if (f.contentWindow) {
+      try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
+    }
   }
 }
 
