@@ -857,7 +857,7 @@ function catalogCartTotals() {
       let imagingAmt = 0, listingAmt = 0;
       if (mode === "cat_purchase" || mode === "dropship") {
         imagingAmt = 300 * items.length;
-        for (const it of items) listingAmt += 50 * ((it.marketplaces || []).length);
+        for (const it of items) listingAmt += 30 * ((it.marketplaces || []).length);
       }
       const groupSum = (includePurchase ? discountedProductValue : 0) + imagingAmt + listingAmt;
       productValueTotal += includePurchase ? productValue : 0;
@@ -905,7 +905,7 @@ function renderCatalogCartHtml() {
     let imagingAmt = 0, listingAmt = 0;
     if (mode === "cat_purchase" || mode === "dropship") {
       imagingAmt = 300 * items.length;
-      for (const it of items) listingAmt += 50 * ((it.marketplaces || []).length);
+      for (const it of items) listingAmt += 30 * ((it.marketplaces || []).length);
     }
     const groupSum = (includePurchase ? discountedProductValue : 0) + imagingAmt + listingAmt;
     const gid = "cat-" + mode;
@@ -946,7 +946,7 @@ function renderCatalogCartHtml() {
       html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 90px 8px 10px;margin:4px 0 6px;font-size:12px;color:#475467;">
         ${productLine}
         <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Imaging (₹300 × ${items.length} products)</span><span>₹${imagingAmt.toLocaleString("en-IN")}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Listing (₹50 × ${totalMktListings} marketplace listing${totalMktListings === 1 ? "" : "s"})</span><span>₹${listingAmt.toLocaleString("en-IN")}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Listing (₹30 × ${totalMktListings} marketplace listing${totalMktListings === 1 ? "" : "s"})</span><span>₹${listingAmt.toLocaleString("en-IN")}</span></div>
         <div style="display:flex;justify-content:space-between;padding:4px 0 2px;border-top:1px dashed #cbd5e1;margin-top:4px;font-weight:600;color:#334155;"><span>Amount (services subtotal)</span><span>₹${servicesBase.toLocaleString("en-IN")}</span></div>
         <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>+ GST @ 18% on services</span><span>₹${gstAmt.toLocaleString("en-IN")}</span></div>
         <div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #e2e8f0;margin-top:4px;font-weight:800;color:#0f172a;font-size:13px;"><span>Total (incl. GST)</span><span>₹${totalInclGst.toLocaleString("en-IN")}</span></div>
@@ -1413,13 +1413,13 @@ const SVC_CATALOG = {
   analyst:          { name: "Cursive Analyst (30 days)",          price: 4999 },
   gst:              { name: "GST Registration",                  price: 999  },
   gst_filing:       { name: "GST Filing",                        price: 999  },
-  trademark:        { name: "Trademark Registration",            price: 6999 },
+  trademark:        { name: "Trademark Registration",            price: 6499 },
   udyam:            { name: "Udyam (MSME) Certificate",          price: 999  },
   iec:              { name: "IEC (Import-Export Code)",          price: 1499 },
   platform_account: { name: "Marketplace Seller Account Opening",price: 999  },
-  imaging:          { name: "Product Imaging",                   price: 299  },
+  imaging:          { name: "Product Imaging",                   price: 149  },
   website:          { name: "Website Creation",                  price: 4999 },
-  listing:          { name: "Product Listing",                   price: 50   },
+  listing:          { name: "Product Listing",                   price: 30   },
   service:          { name: "Account Management",                price: 4999 },
   business_launcher:{ name: "Business Launcher",                 price: 0    }, // variant-priced
 };

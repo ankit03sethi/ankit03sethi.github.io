@@ -1377,7 +1377,11 @@ function renderItems() {
     const gstOpts = GST_OPTS.map(g => `<option value="${g}"${g===gstPct?" selected":""}>${g}%</option>`).join("");
     // GST locked for products and services (custom editable); Unit price ALWAYS editable so admin can override
     const isCustom = (it.item_type || "custom") === "custom";
-    const lockAttr = "";
+    // v2026082228: unit-price locked from admin edit. Prices are driven by the
+    // service/product catalog only. If a price needs to change, do it in the
+    // catalog (or add a Custom line item). This prevents accidental
+    // per-quote pricing drift.
+    const lockAttr = "readonly";
     const disabledAttr = isCustom ? "" : "disabled";
     // Discount calc
     const discInr = Number(it.discount_inr || 0);
