@@ -68,6 +68,11 @@
     .qnum-badge { display:inline-block; background:#1f6feb; color:#fff; padding:4px 10px; border-radius:6px; font-weight:700; font-size:13px; letter-spacing:.5px; }
     .col-wrap { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
     @media (max-width:900px) { .col-wrap { grid-template-columns:1fr; } .row-4 { grid-template-columns:1fr; } }
+    /* v2026082228: kill the browser's up/down spinner arrows on every number
+       input in the quote builder — user wants to type values manually. */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    input[type="number"] { -moz-appearance:textfield; appearance:textfield; }
   </style>
 </head>
 <body>
