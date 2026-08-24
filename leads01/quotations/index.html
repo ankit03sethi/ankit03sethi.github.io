@@ -510,10 +510,27 @@ window.addEventListener("message", (ev) => {
   }
   if (ev?.data?.type === "cursive:date-range") {
     _dateRangeFilter = { from: ev.data.from || null, to: ev.data.to || null };
+    console.log("[quotations iframe] date-range received:", _dateRangeFilter);
     if (typeof updateFilterCounts === "function") updateFilterCounts();
     if (typeof renderFilteredList === "function") renderFilteredList();
   }
 });
+
+// v2026082226: on page load, ask the parent for the current date range so we
+// don't have to rely on the parent racing us with the initial postMessage.
+try {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: "cursive:request-date-range" }, "*");
+    // Belt-and-braces: also ask again shortly after DOMContentLoaded in case
+    // the parent hasn't yet finished wiring its own message listener.
+    document.addEventListener("DOMContentLoaded", () => {
+      try { window.parent.postMessage({ type: "cursive:request-date-range" }, "*"); } catch {}
+    });
+    window.addEventListener("load", () => {
+      try { window.parent.postMessage({ type: "cursive:request-date-range" }, "*"); } catch {}
+    });
+  }
+} catch {}
 function withinDateRange(q) {
   const ts = q.created_at || q.updated_at;
   if (!ts) return true;

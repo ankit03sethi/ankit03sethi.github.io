@@ -479,6 +479,18 @@ async function callEmployeeLookup(code) {
   return await res.json().catch(() => ({ ok: false, error: "bad_response" }));
 }
 
+// v2026082226: iframe explicitly asks the parent for the current date range
+// on its own load — race-free replacement for the parent's fire-and-hope
+// postMessage during refreshAll. This is the reliable channel.
+window.addEventListener("message", (ev) => {
+  if (ev?.data?.type === "cursive:request-date-range") {
+    const f = document.getElementById("quotationsFrame");
+    if (f && f.contentWindow) {
+      try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
+    }
+  }
+});
+
 // v2026082225: fast path — re-render cards + list from cached pipeline WITHOUT
 // hitting the server. Called from date-range change so the UI moves instantly.
 function applyDateFilterOnly() {
