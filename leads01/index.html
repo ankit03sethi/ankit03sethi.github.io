@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
+  <!-- v2026082231: force browsers to always fetch a fresh copy of this admin
+       page so cached UI code never sits on top of newer server logic. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>cursive &mdash; Start. Track. Grow. Your e-commerce business.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -186,7 +191,7 @@
   </p>
 </main>
 
-<script type="module" src="leads.js?v=2026082231"></script>
+<script type="module" src="leads.js?v=2026082232"></script>
 <script src="/admin/admin-forgot-btn.js?v=2026082102" defer></script>
 </body>
 </html>

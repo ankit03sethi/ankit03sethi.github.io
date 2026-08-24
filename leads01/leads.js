@@ -496,6 +496,7 @@ window.addEventListener("message", (ev) => {
 // Also force-reloads the Quotations iframe so its list refreshes together with
 // the top cards (postMessage-only was landing in stale cached iframe code).
 function applyDateFilterOnly() {
+  console.log("[leads.js v2026082232] applyDateFilterOnly()", dateRange);
   $("#dateActiveRange").textContent = labelForRange();
   refreshQuotationsCard();          // recomputes card counts from admin-quotations cache-of-1 fetch
   updateTopCounts();                // recomputes top cards from cached pipeline
