@@ -807,7 +807,14 @@ function switchTop(top) {
 
   if (top === "quotations") {
     const f = $("#quotationsFrame");
-    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) f.src = "/leads01/quotations/?v=" + Date.now();
+    if (f && (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations"))) {
+      // v2026082224: hook onload so the iframe receives the current date range
+      // BEFORE it renders — otherwise it opens showing every quote ever.
+      f.onload = () => { try { f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {} };
+      f.src = "/leads01/quotations/?v=" + Date.now();
+    } else if (f && f.contentWindow) {
+      try { f.contentWindow.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*"); } catch {}
+    }
     return;
   }
   // v2026082220-1: Received (data-top="done") + Expected Receivable
@@ -820,8 +827,22 @@ function switchTop(top) {
     const f = $("#quotationsFrame");
     if (f) {
       const target = `/leads01/quotations/?filter=${filterName}&v=${Date.now()}`;
-      if (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations")) f.src = target;
-      else { try { f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: filterName }, "*"); } catch {} }
+      if (!f.src || f.src === "about:blank" || !f.src.includes("/leads01/quotations")) {
+        // v2026082224: hook onload so date range + filter reach the iframe
+        // BEFORE it renders on cold-load routing from a top card.
+        f.onload = () => {
+          try {
+            f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*");
+            f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: filterName }, "*");
+          } catch {}
+        };
+        f.src = target;
+      } else {
+        try {
+          f.contentWindow?.postMessage({ type: "cursive:date-range", from: dateRange.from, to: dateRange.to }, "*");
+          f.contentWindow?.postMessage({ type: "cursive:set-filter", filter: filterName }, "*");
+        } catch {}
+      }
     }
     paneStage?.classList.add("hidden");
     paneQuot?.classList.remove("hidden");
