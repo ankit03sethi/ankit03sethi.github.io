@@ -1434,12 +1434,19 @@ const AM_PLATFORMS = [
   { tag: "meesho",   name: "Meesho",   color: "#ec4899" },
   { tag: "myntra",   name: "Myntra",   color: "#a855f7" },
   { tag: "firstcry", name: "FirstCry", color: "#22c55e" },
+  { tag: "etsy",     name: "Etsy",     color: "#f2542d" },
+  { tag: "ebay",     name: "eBay",     color: "#e53238" },
 ];
+// v2026082232: Etsy + eBay added to Marketplace Account Opening (₹3,999 each).
+// The base MP price stays ₹999; the AM_UNIT/MP_UNIT logic picks per-tag rate.
 const MP_PLATFORMS = [
   { tag: "amazon",   name: "Amazon",   color: "#f97316" },
   { tag: "flipkart", name: "Flipkart", color: "#1f6feb" },
   { tag: "meesho",   name: "Meesho",   color: "#ec4899" },
+  { tag: "etsy",     name: "Etsy",     color: "#f2542d" },
+  { tag: "ebay",     name: "eBay",     color: "#e53238" },
 ];
+const MP_UNIT_PER_TAG = { amazon: 999, flipkart: 999, meesho: 999, etsy: 3999, ebay: 3999 };
 let _currentSvc = null;
 let _currentBLTier = "growth"; // default selection
 
@@ -1469,13 +1476,21 @@ function recalcSvcModal() {
     qtyDisplay = 1;
     sub = unit;
   } else if (_currentSvc.tag === "service" || _currentSvc.tag === "platform_account") {
-    // Multi-platform with per-platform qty (Account Mgmt: 5 plats @ ₹4999, Marketplace Setup: 3 plats @ ₹999)
-    unit = _currentSvc.tag === "service" ? 4999 : 999;
+    // v2026082232: Account Mgmt = flat ₹4,999 per platform × qty.
+    // Marketplace Setup now has per-tag rates (Amazon/Flipkart/Meesho ₹999,
+    // Etsy / eBay ₹3,999) so subtotal must sum per row.
     qtyDisplay = 0;
+    sub = 0;
     document.querySelectorAll(".am-qty-input").forEach(i => {
-      qtyDisplay += Math.max(0, Math.min(120, parseInt(i.value, 10) || 0));
+      const q = Math.max(0, Math.min(120, parseInt(i.value, 10) || 0));
+      const perTag = _currentSvc.tag === "service"
+        ? 4999
+        : (MP_UNIT_PER_TAG[i.dataset.tag] || 999);
+      qtyDisplay += q;
+      sub += perTag * q;
     });
-    sub = unit * qtyDisplay;
+    // unit shown = average per line item (or 0 when empty)
+    unit = qtyDisplay > 0 ? Math.round(sub / qtyDisplay) : (_currentSvc.tag === "service" ? 4999 : 999);
   } else {
     unit = _currentSvc.price;
     qtyDisplay = Math.max(1, Math.min(100, parseInt($("#svcQty").value, 10) || 1));
@@ -1673,7 +1688,7 @@ window.openServiceModal = async function (tag) {
   } else if (tag === "platform_account") {
     amSection.style.display = "";
     qtySection.style.display = "none";
-    amSection.querySelector("div").innerHTML = "Pick platforms &amp; qty (&#8377;999 per platform):";
+    amSection.querySelector("div").innerHTML = "Pick platforms &amp; qty (Amazon / Flipkart / Meesho: &#8377;999 &middot; Etsy / eBay: &#8377;3,999):";
     buildAMRows(MP_PLATFORMS);
   } else {
     $("#svcQty").value = 1;
