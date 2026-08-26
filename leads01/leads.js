@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082237";
+const LEADS_JS_VERSION = "2026082238";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -93,6 +93,21 @@ let pipelineCache = [];
 // straight from cursive.world without a quotation) — those should NOT appear
 // in the leads01 pipeline; the customer + invoice live only in /invoices.
 let _quotedCustomerKeys = new Set();
+// v2026082237: customer_key → { from_code, at } for leads that were
+// automatically reassigned because the previous assignee lost the service.
+// Populated by refreshReassignedChips() on every refreshAll.
+let _reassignedFromMap = new Map();
+async function refreshReassignedChips() {
+  try {
+    const { data, error } = await sb.rpc("latest_service_removed_reassigns");
+    if (error) { console.warn("reassigned chip fetch failed:", error); return; }
+    const m = new Map();
+    for (const r of (data || [])) {
+      if (r.customer_key) m.set(r.customer_key, { from_code: r.from_code || "", at: r.at });
+    }
+    _reassignedFromMap = m;
+  } catch (e) { console.warn("reassigned chip rpc failed:", e); }
+}
 let activeTop = "new";
 let activeSub = "lead_captured";
 // Populated in bootDashboard(). _isManager = super || leads. _myEmpCode is the caller's
@@ -573,6 +588,7 @@ async function refreshAll() {
     // numbers on the top card. Otherwise the numbers show as "0" for the full
     // pipeline load time (often 2-3s).
     refreshQuotationsCard();
+    refreshReassignedChips(); // v2026082237: parallel fetch, non-blocking
     pipelineCache = await callAdmin("pipeline");
     $("#lastRefreshed").textContent = "Last refreshed " + new Date().toLocaleTimeString();
     $("#dateActiveRange").textContent = labelForRange();
@@ -2086,9 +2102,19 @@ function rowHtml(l, readOnly) {
   const forwardedChip = l.is_forwarded
     ? `<span title="This lead was auto-forwarded from another service." style="display:inline-block;margin-top:3px;padding:2px 7px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;align-self:flex-start;">&#8618; Forwarded</span>`
     : "";
+  // v2026082237: chip shown when the lead was moved to this employee because
+  // the previous assignee lost this service (admin removed the service from
+  // their profile → DB trigger reassigns → history row w/ reason
+  // 'service_removed_from_employee'). Data comes from _reassignedFromMap
+  // (populated on each refreshAll via RPC latest_service_removed_reassigns).
+  const reassignedInfo = _reassignedFromMap.get(l.customer_key);
+  const reassignedChip = reassignedInfo && reassignedInfo.from_code
+    ? `<span title="Reassigned automatically: previous assignee (${esc(reassignedInfo.from_code)}) lost this service." style="display:inline-block;margin-top:3px;padding:2px 7px;background:#f5f3ff;color:#6d28d9;border:1px solid #c4b5fd;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.2px;align-self:flex-start;">&#128257; Reassigned from ${esc(reassignedInfo.from_code)}</span>`
+    : "";
   let empCellHtml = `<div style="display:flex;flex-direction:column;gap:3px;">
       <span title="Assigned employee (read-only — use Forward to reassign)" style="display:inline-block;padding:3px 9px;background:${asnChipBg};color:${asnChipFg};border:1px solid ${asnChipBd};border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.2px;">${esc(asnDisplay)}</span>
       ${forwardedChip}
+      ${reassignedChip}
       ${creatorLine}
       ${historyBtnInCell}
     </div>`;
