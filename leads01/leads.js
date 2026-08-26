@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082244";
+const LEADS_JS_VERSION = "2026082245";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -503,6 +503,14 @@ async function bootDashboard() {
   await refreshAll();
 }
 
+// v2026082245: any mutation kind auto-triggers a soft refresh after success —
+// admin no longer has to click Refresh to see the effect of Save / status
+// change / remark / rating / add-lead / reassign / add-service, etc.
+const MUTATION_KINDS = new Set([
+  "set_lead_status", "add_manual_lead", "reassign_lead",
+  "add_service_to_lead", "remove_service_from_lead",
+  "update_lead_contact", "add_remark", "add_star_rating",
+]);
 async function callAdmin(kind, extra = {}) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) throw new Error("Not signed in.");
@@ -517,6 +525,13 @@ async function callAdmin(kind, extra = {}) {
   });
   const json = await res.json().catch(() => ({ ok: false, message: "Bad response." }));
   if (!json.ok) throw new Error(json.message || "Request failed.");
+  if (MUTATION_KINDS.has(kind)) {
+    // Debounced auto-refresh so ten fast mutations trigger ONE refetch.
+    if (window._autoRefreshTimer) clearTimeout(window._autoRefreshTimer);
+    window._autoRefreshTimer = setTimeout(() => {
+      try { if (typeof refreshAll === "function") refreshAll(); } catch (e) { console.warn("[auto-refresh] failed:", e); }
+    }, 350);
+  }
   return json.data;
 }
 
@@ -541,6 +556,13 @@ async function callEmployeeLookup(code) {
 // on its own load — race-free replacement for the parent's fire-and-hope
 // postMessage during refreshAll. This is the reliable channel.
 window.addEventListener("message", (ev) => {
+  // v2026082245: iframe fires this after any quotation mutation so leads01
+  // cards + lead list refresh without user hitting the Refresh button.
+  if (ev?.data?.type === "cursive:mutation") {
+    if (window._autoRefreshTimer) clearTimeout(window._autoRefreshTimer);
+    window._autoRefreshTimer = setTimeout(() => { try { refreshAll(); } catch (e) { console.warn(e); } }, 350);
+    return;
+  }
   if (ev?.data?.type === "cursive:request-date-range") {
     const f = document.getElementById("quotationsFrame");
     if (f && f.contentWindow) {

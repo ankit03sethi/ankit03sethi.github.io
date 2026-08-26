@@ -462,6 +462,11 @@ function applyMyIdentityToEmpCode() {
 }
 
 // ============ CALL EDGE ============
+// v2026082245: after any admin-quotations mutation (save / mark_sent /
+// update_status / delete / duplicate / add_remark / add_star), tell the
+// parent leads01 window to re-refresh its cards + list so the admin doesn't
+// have to hit Refresh manually.
+const _MUTATING_OPS = new Set(["save","mark_sent","update_status","delete","duplicate","add_remark","add_star"]);
 async function callFn(name, body, method = "POST") {
   const url = `${SUPABASE_URL}/functions/v1/${name}`;
   const r = await fetch(url, {
@@ -473,7 +478,17 @@ async function callFn(name, body, method = "POST") {
     },
     body: method === "GET" ? undefined : JSON.stringify(body || {}),
   });
-  return await r.json();
+  const j = await r.json();
+  try {
+    if (r.ok && j && j.ok !== false && name === "admin-quotations" && body && _MUTATING_OPS.has(body.op)) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "cursive:mutation" }, "*");
+      }
+      // Also self-refresh the iframe list.
+      if (typeof loadList === "function") setTimeout(loadList, 250);
+    }
+  } catch {}
+  return j;
 }
 
 // ============ LIST ============
