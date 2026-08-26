@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082238";
+const LEADS_JS_VERSION = "2026082239";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -93,6 +93,11 @@ let pipelineCache = [];
 // straight from cursive.world without a quotation) — those should NOT appear
 // in the leads01 pipeline; the customer + invoice live only in /invoices.
 let _quotedCustomerKeys = new Set();
+// v2026082239: customer_keys whose ANY quotation has been sent (status !=
+// draft/regenerated/cancelled). Once a lead is quoted, they belong to the
+// Quotations card FOREVER — even if talk_status later flips back to callback/
+// interested/etc. Keeps Sent card and Follow Ups from double-claiming them.
+let _sentQuotedCustomerKeys = new Set();
 // v2026082237: customer_key → { from_code, at } for leads that were
 // automatically reassigned because the previous assignee lost the service.
 // Populated by refreshReassignedChips() on every refreshAll.
@@ -652,6 +657,15 @@ async function refreshQuotationsCard() {
     // v2026082236: rebuild the "customer_keys that have a quotation" set so
     // filteredPipeline() can suppress site-direct purchases.
     _quotedCustomerKeys = new Set(j.quotations.map(q => q.customer_key).filter(Boolean));
+    // v2026082239: rebuild the "customer_keys that received at least ONE sent
+    // quotation" set. bucketOf() uses it to keep those leads in the Quotations
+    // card forever, even if the admin later flips their talk_status back to
+    // not_picked / callback / interested etc.
+    _sentQuotedCustomerKeys = new Set(
+      j.quotations
+        .filter(q => q.customer_key && q.status !== "draft" && q.status !== "regenerated" && q.status !== "cancelled")
+        .map(q => q.customer_key)
+    );
     let sent = 0, draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0, paidCount = 0, paidPaise = 0;
     for (const q of j.quotations) {
       const ts = q.created_at || q.updated_at;
@@ -732,11 +746,12 @@ async function refreshTotalPaid() {
 function bucketOf(lead) {
   if (["payment_completed","wallet_recharged","wallet_debited"].includes(lead.latest_event)) return "done";
   if (lead.manual_status === "won") return "done";
-  // v2026082237: once the quote has been Sent (talk_status='quotation_sent'),
-  // the lead lives in the Quotations iframe — take it OUT of Follow Ups and
-  // route it into the 'quotations' bucket (that top-tab shows the iframe, not
-  // the pipeline table, so the lead effectively disappears from the sales
-  // pipeline until it comes back as Accepted / Paid).
+  // v2026082239: If the customer has EVER received a sent quotation, they live
+  // in the Quotations card permanently — even if the admin later switches the
+  // talk_status back to callback / not_picked / interested / etc. The
+  // quotation itself is the source of truth for what tab they belong on.
+  if (lead.customer_key && _sentQuotedCustomerKeys.has(lead.customer_key)) return "quotations";
+  // v2026082237: fallback — legacy talk_status='quotation_sent' rows.
   if (lead.talk_status === "quotation_sent") return "quotations";
   if (lead.talk_status) return "follow";
   if (lead.manual_status === "callback") return "follow";
