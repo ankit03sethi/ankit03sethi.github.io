@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082242";
+const LEADS_JS_VERSION = "2026082244";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -588,6 +588,10 @@ function applyDateFilterOnly() {
 
 async function refreshAll() {
   try {
+    // v2026082244: fire-and-forget reconciliation kick so any Razorpay payment
+    // that landed in the last minute gets marked paid + invoiced BEFORE the
+    // quotations card fetch runs. Non-blocking — doesn't slow anything.
+    fetch(SUPABASE_URL + "/functions/v1/quote-payment-reconcile-cron", { method: "POST" }).catch(() => {});
     // v2026082102: fire the quotations-card fetch in PARALLEL with pipeline —
     // don't wait for pipeline to finish before populating the accepted/total
     // numbers on the top card. Otherwise the numbers show as "0" for the full
