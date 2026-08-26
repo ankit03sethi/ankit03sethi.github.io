@@ -236,8 +236,20 @@ function render() {
       <td style="font-size:12px;color:#64748b;">${fmtDate(inv.created_at)}</td>
       <td style="font-size:12px;color:${inv.emailed_at?"#16a34a":"#94a3b8"};">${inv.emailed_at?"✓ "+fmtDate(inv.emailed_at):"Not sent"}</td>
       <td style="white-space:nowrap;">
-        <a href="/invoice/?t=${esc(inv.share_token)}" target="_blank" class="b-outline" style="padding:5px 10px;font-size:11.5px;border-radius:5px;text-decoration:none;">View</a>
-        <button class="b-primary email-btn" data-id="${inv.id}" style="padding:5px 10px;font-size:11.5px;margin-left:4px;">📧 Email</button>
+        ${(function () {
+          const invUrl = `/invoice/?t=${esc(inv.share_token)}`;
+          const dlUrl  = invUrl + "&print=1";
+          const phone  = (inv.customer_phone || inv.mobile || "").replace(/\D/g, "");
+          const waNum  = phone.length === 10 ? "91" + phone : phone;
+          const waMsg  = encodeURIComponent(`Hi ${inv.customer_name || "there"}, your invoice ${inv.invoice_number} from Cursive Private Limited — ${location.origin}${invUrl}`);
+          const waLink = waNum ? `https://wa.me/${waNum}?text=${waMsg}` : `https://wa.me/?text=${waMsg}`;
+          return `
+            <a href="${invUrl}" target="_blank" class="b-outline" style="padding:5px 10px;font-size:11.5px;border-radius:5px;text-decoration:none;" title="View invoice">👁 View</a>
+            <a href="${dlUrl}" target="_blank" class="b-outline" style="padding:5px 10px;font-size:11.5px;margin-left:4px;border-radius:5px;text-decoration:none;background:#f0fdf4;color:#166534;border-color:#bbf7d0;" title="Download / Print">⬇ Download</a>
+            <a href="${waLink}" target="_blank" rel="noopener" class="b-outline" style="padding:5px 10px;font-size:11.5px;margin-left:4px;border-radius:5px;text-decoration:none;background:#dcfce7;color:#065f46;border-color:#86efac;" title="Share via WhatsApp">💬 Share</a>
+            <button class="b-primary email-btn" data-id="${inv.id}" style="padding:5px 10px;font-size:11.5px;margin-left:4px;">📧 Email</button>
+          `;
+        })()}
       </td>
     </tr>`;
   }
