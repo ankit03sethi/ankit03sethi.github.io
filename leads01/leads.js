@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082241";
+const LEADS_JS_VERSION = "2026082242";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -720,6 +720,13 @@ async function refreshQuotationsCard() {
     rejectedEl.textContent = String(rejected);
     const rupees = Math.round(acceptedPaise / 100);
     totEl.textContent = "₹" + rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    // v2026082242: race-fix — once _sentQuotedCustomerKeys is populated, force
+    // a re-render of top counts + row list so leads that should live in the
+    // Quotations bucket don't briefly appear in Follow Ups (81 vs 84 flicker).
+    if (typeof updateTopCounts === "function" && pipelineCache && pipelineCache.length) {
+      updateTopCounts();
+      if (typeof renderActive === "function") renderActive();
+    }
   } catch (e) {
     console.warn("quotations card fetch failed:", e);
   }
