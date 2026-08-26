@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082239";
+const LEADS_JS_VERSION = "2026082240";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -666,7 +666,11 @@ async function refreshQuotationsCard() {
         .filter(q => q.customer_key && q.status !== "draft" && q.status !== "regenerated" && q.status !== "cancelled")
         .map(q => q.customer_key)
     );
-    let sent = 0, draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0, paidCount = 0, paidPaise = 0;
+    let draft = 0, follow = 0, regen = 0, accepted = 0, expired = 0, rejected = 0, acceptedPaise = 0, paidCount = 0, paidPaise = 0;
+    // v2026082240: Sent = unique LEADS (customer_keys) with any live quotation,
+    // NOT total quotation count. Keeps top-row math clean:
+    //   New + Follow Ups + Sent = Total Leads.
+    const sentLeadKeys = new Set();
     for (const q of j.quotations) {
       const ts = q.created_at || q.updated_at;
       if (ts) {
@@ -681,10 +685,7 @@ async function refreshQuotationsCard() {
         else if ((q.employee_code || "").toUpperCase() !== String(employeeFilter).toUpperCase()) continue;
       }
       const st = q.status;
-      // v2026082213: Sent = every quote that reached the customer AND is still
-      // "in play" (Follow Up / Accepted / Paid / Expired / Rejected + legacy
-      // "sent"). Draft (never sent) and Regenerated (superseded) are excluded.
-      if (st !== "draft" && st !== "regenerated" && st !== "cancelled") sent += 1;
+      if (st !== "draft" && st !== "regenerated" && st !== "cancelled" && q.customer_key) sentLeadKeys.add(q.customer_key);
       if (st === "draft") draft += 1;
       else if (st === "follow_up" || st === "sent") follow += 1;
       else if (st === "regenerated") regen += 1;
@@ -695,7 +696,7 @@ async function refreshQuotationsCard() {
       else if (st === "expired") expired += 1;
       else if (st === "rejected") rejected += 1;
     }
-    sentEl.textContent = String(sent);
+    sentEl.textContent = String(sentLeadKeys.size);
     if (draftEl) draftEl.textContent = String(draft);
     // v2026082211: Expected Receivable card = accepted count + accepted ₹ total
     const rcvCountEl = document.getElementById("topcnt_receivable");
