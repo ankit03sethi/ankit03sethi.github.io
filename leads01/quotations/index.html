@@ -610,16 +610,33 @@ function matchesOriginFilter(q) {
   if (_currentOriginFilter === "direct")     return !_forwardedKeys.has(key);
   return true;
 }
+// v2026082241: services summary shown under each quote number in the list.
+let _servicesSummary = new Map();
+async function loadServicesSummary() {
+  try {
+    const { data, error } = await sb.rpc("quotation_services_summary");
+    if (error) { console.warn("[quotations] services_summary error:", error); return; }
+    const m = new Map();
+    for (const r of (data || [])) m.set(r.quotation_id, r.summary || "");
+    _servicesSummary = m;
+  } catch (e) { console.warn("[quotations] services_summary threw:", e); }
+}
+
 async function loadOriginSets() {
+  // v2026082241b: single RPC returns both sets (works from the browser with
+  // just the anon key + user session — no RLS friction on pipeline_leads).
   try {
-    const r1 = await sb.rpc("latest_service_removed_reassigns");
-    if (!r1.error) _reassignedKeys = new Set((r1.data || []).map(x => x.customer_key));
-  } catch {}
-  try {
-    // Forwarded = pipeline_leads.is_forwarded=true. Fetch directly from view.
-    const { data, error } = await sb.from("pipeline_leads").select("customer_key").eq("is_forwarded", true);
-    if (!error) _forwardedKeys = new Set((data || []).map(x => x.customer_key));
-  } catch {}
+    const { data, error } = await sb.rpc("origin_filter_sets");
+    if (error) { console.warn("[quotations] origin_filter_sets error:", error); return; }
+    const fwd = new Set(), reas = new Set();
+    for (const r of (data || [])) {
+      if (r.kind === "forwarded") fwd.add(r.customer_key);
+      else if (r.kind === "reassigned") reas.add(r.customer_key);
+    }
+    _forwardedKeys = fwd;
+    _reassignedKeys = reas;
+    console.log("[quotations] origin sets loaded:", { forwarded: fwd.size, reassigned: reas.size });
+  } catch (e) { console.warn("[quotations] loadOriginSets threw:", e); }
 }
 
 function refreshEmpFilterOptions() {
@@ -994,6 +1011,15 @@ function renderFilteredList() {
       ? (q.employee_name ? `Emp: ${esc(q.employee_code)} (${esc(q.employee_name)})` : `Emp: ${esc(q.employee_code)}`)
       : "";
     const empChip = q.employee_code ? `<span title="Employee code" style="display:inline-block;margin-left:6px;padding:1px 7px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">${empChipLabel}</span>` : "";
+    // v2026082241: reassigned chip on every quotation row whose backing lead
+    // was auto-reassigned because the previous assignee lost the service.
+    const reassignedChipQ = (q.customer_key && _reassignedKeys.has(q.customer_key))
+      ? `<span title="Reassigned automatically — previous assignee lost this service." style="display:inline-block;margin-left:6px;padding:1px 7px;background:#f5f3ff;color:#6d28d9;border:1px solid #c4b5fd;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">🔁 Reassigned</span>`
+      : "";
+    // Forwarded chip similarly
+    const forwardedChipQ = (q.customer_key && _forwardedKeys.has(q.customer_key))
+      ? `<span title="Lead was forwarded from another service." style="display:inline-block;margin-left:6px;padding:1px 7px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:10px;font-size:10.5px;font-weight:700;letter-spacing:.3px;vertical-align:middle;">↪ Forwarded</span>`
+      : "";
     // Priority star chip: shows max star rating for this customer (same idea as Leads)
     const st = Number(q.max_stars || 0);
     const starChip = st > 0 ? `<span title="Priority: ${st}-star customer" style="display:inline-block;margin-left:6px;padding:1px 6px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:11px;font-weight:800;vertical-align:middle;letter-spacing:0.5px;">${"★".repeat(st)}</span>` : "";
@@ -1017,7 +1043,10 @@ function renderFilteredList() {
       </div>`;
     }
     html += `<tr data-id="${q.id}" style="cursor:pointer;">
-      <td><b>${esc(q.quote_number)}</b>${starChip}${empChip}</td>
+      <td>
+        <b>${esc(q.quote_number)}</b>${starChip}${empChip}${reassignedChipQ}${forwardedChipQ}
+        ${_servicesSummary.has(q.id) ? `<div style="font-size:11px;color:#475467;margin-top:3px;line-height:1.35;">${esc(_servicesSummary.get(q.id))}</div>` : ""}
+      </td>
       <td style="font-size:12.5px;line-height:1.4;">
         <div style="font-weight:600;color:#0f172a;">${esc(q.customer_name || "—")}</div>
         ${q.customer_email ? `<div style="color:#0f766e;">${esc(q.customer_email)}</div>` : `<div style="color:#94a3b8;font-size:11px;">no email</div>`}
@@ -1158,6 +1187,7 @@ document.getElementById("originFilter")?.addEventListener("change", (e) => {
 // Kick off the RPC fetch (non-blocking) so the origin dropdown works as soon
 // as the sets arrive. Re-run after loadList so newly-added leads are counted.
 loadOriginSets().then(() => { updateFilterCounts(); renderFilteredList(); });
+loadServicesSummary().then(() => { renderFilteredList(); });
 
 // ============ CATALOG PICKER (search + list) ============
 async function loadCatalogOptions() {
