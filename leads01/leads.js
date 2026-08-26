@@ -1,5 +1,5 @@
 // cursive /leads/ — 3-bucket pipeline with append-only remarks log
-const LEADS_JS_VERSION = "2026082240";
+const LEADS_JS_VERSION = "2026082241";
 console.log("%c[leads.js] version:", "background:#1f6feb;color:#fff;padding:2px 6px;border-radius:3px;", LEADS_JS_VERSION);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
 
@@ -804,8 +804,9 @@ function updateTopCounts() {
     // see when they click through). New/Unassigned tabs never expose it, so we
     // don't apply it there.
     if (originFilter && isOriginFilterTab(b)) {
-      if (originFilter === "forwarded" && !l.is_forwarded) return;
-      if (originFilter === "direct"    &&  l.is_forwarded) return;
+      if (originFilter === "forwarded"  && !l.is_forwarded) return;
+      if (originFilter === "direct"     &&  l.is_forwarded) return;
+      if (originFilter === "reassigned" && !(l.customer_key && _reassignedFromMap.has(l.customer_key))) return;
     }
     if (b === "follow") {
       const sub = followSubOf(l);
@@ -869,8 +870,9 @@ function isOriginFilterTab(top) {
 }
 function applyOriginFilter(rows) {
   if (!originFilter) return rows;
-  if (originFilter === "forwarded") return rows.filter((l) => !!l.is_forwarded);
-  if (originFilter === "direct")    return rows.filter((l) => !l.is_forwarded);
+  if (originFilter === "forwarded")  return rows.filter((l) => !!l.is_forwarded);
+  if (originFilter === "direct")     return rows.filter((l) => !l.is_forwarded);
+  if (originFilter === "reassigned") return rows.filter((l) => l.customer_key && _reassignedFromMap.has(l.customer_key));
   return rows;
 }
 
@@ -1758,9 +1760,10 @@ function renderToolbarInto(el) {
     ${isOriginFilterTab(activeTop) ? `
     <span class="filter-lbl" style="margin-left:12px;" title="Filter by whether the lead was auto-forwarded from another service">Origin:</span>
     <select id="originFilterSelect" class="remark-filter-select" title="Only affects Follow Ups, Quotations and Paid tabs">
-      <option value=""          ${originFilter === ""          ? "selected" : ""}>All</option>
-      <option value="direct"    ${originFilter === "direct"    ? "selected" : ""}>Direct only</option>
-      <option value="forwarded" ${originFilter === "forwarded" ? "selected" : ""}>Forwarded only</option>
+      <option value=""           ${originFilter === ""           ? "selected" : ""}>All</option>
+      <option value="direct"     ${originFilter === "direct"     ? "selected" : ""}>Direct only</option>
+      <option value="forwarded"  ${originFilter === "forwarded"  ? "selected" : ""}>Forwarded only</option>
+      <option value="reassigned" ${originFilter === "reassigned" ? "selected" : ""}>&#128257; Reassigned only</option>
     </select>
     <button id="originFilterClear" class="remark-filter-clear" style="display:${originFilter ? "inline-block" : "none"};">Clear origin</button>
     ` : ""}

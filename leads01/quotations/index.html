@@ -138,6 +138,13 @@
              Reachable from filter row OR from the Received card on leads01. -->
         <button class="filter-tab" data-filter="paid">💰 Received</button>
         <div style="flex:1;"></div>
+        <label style="font-size:12px;color:#475467;font-weight:600;margin-right:4px;">Origin:</label>
+        <select id="originFilter" style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;background:#fff;margin-right:10px;">
+          <option value="">All</option>
+          <option value="direct">Direct only</option>
+          <option value="forwarded">Forwarded only</option>
+          <option value="reassigned">&#128257; Reassigned only</option>
+        </select>
         <label style="font-size:12px;color:#475467;font-weight:600;margin-right:4px;">Employee:</label>
         <select id="empFilter" style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px;background:#fff;">
           <option value="__all__">All employees</option>
@@ -589,6 +596,32 @@ function matchesEmpFilter(q) {
   return (q.employee_code || "") === _currentEmpFilter;
 }
 
+// v2026082241: origin filter — parallels the leads01 pipeline dropdown.
+// _reassignedKeys + _forwardedKeys are populated by loadOriginSets() below
+// via Supabase RPCs.
+let _currentOriginFilter = "";
+let _reassignedKeys = new Set();
+let _forwardedKeys = new Set();
+function matchesOriginFilter(q) {
+  if (!_currentOriginFilter) return true;
+  const key = q.customer_key || "";
+  if (_currentOriginFilter === "reassigned") return _reassignedKeys.has(key);
+  if (_currentOriginFilter === "forwarded")  return _forwardedKeys.has(key);
+  if (_currentOriginFilter === "direct")     return !_forwardedKeys.has(key);
+  return true;
+}
+async function loadOriginSets() {
+  try {
+    const r1 = await sb.rpc("latest_service_removed_reassigns");
+    if (!r1.error) _reassignedKeys = new Set((r1.data || []).map(x => x.customer_key));
+  } catch {}
+  try {
+    // Forwarded = pipeline_leads.is_forwarded=true. Fetch directly from view.
+    const { data, error } = await sb.from("pipeline_leads").select("customer_key").eq("is_forwarded", true);
+    if (!error) _forwardedKeys = new Set((data || []).map(x => x.customer_key));
+  } catch {}
+}
+
 function refreshEmpFilterOptions() {
   const sel = document.getElementById("empFilter");
   if (!sel) return;
@@ -917,7 +950,7 @@ function renderQuoteHistoryList(elId, list) {
 
 function renderFilteredList() {
   const term = ($("#listSearchBox")?.value || "");
-  let qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter) && matchesEmpFilter(q));
+  let qs = _allQuotes.filter(q => searchMatches(q, term) && matchesFilter(q, _currentFilter) && matchesEmpFilter(q) && matchesOriginFilter(q));
   // v2026082221: for time-based filters, sort by updated_at DESC even when
   // filter is switched at runtime (loadList already sorts, but a filter change
   // triggered by postMessage doesn't re-run loadList).
@@ -1114,6 +1147,17 @@ document.getElementById("empFilter")?.addEventListener("change", (e) => {
   updateFilterCounts();
   renderFilteredList();
 });
+
+// v2026082241: origin filter — same options as leads01 (All / Direct only /
+// Forwarded only / Reassigned only). Filters every tab's counts + rows.
+document.getElementById("originFilter")?.addEventListener("change", (e) => {
+  _currentOriginFilter = e.target.value || "";
+  updateFilterCounts();
+  renderFilteredList();
+});
+// Kick off the RPC fetch (non-blocking) so the origin dropdown works as soon
+// as the sets arrive. Re-run after loadList so newly-added leads are counted.
+loadOriginSets().then(() => { updateFilterCounts(); renderFilteredList(); });
 
 // ============ CATALOG PICKER (search + list) ============
 async function loadCatalogOptions() {
