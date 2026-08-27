@@ -524,9 +524,10 @@
       counts.set(k, cur);
     }
     if (counts.size === 0) return;          // nothing to go on — leave the guess
-    // Real courier names only, no "All" entry: packing happens one carrier at a
-    // time. Selection survives a reload when that courier is still present.
-    fillSelectWithCounts(sel, counts, null);
+    // Same shape as the Companies and Platform lists: an "All" entry first, then
+    // each courier with its count. Selection survives a reload when that courier
+    // is still present.
+    fillSelectWithCounts(sel, counts, "All couriers");
   }
   document.getElementById("platformSel").addEventListener("change", () => { updateCourierOptions(); triggerAutoLoad(); });
 
