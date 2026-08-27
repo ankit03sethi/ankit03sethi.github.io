@@ -496,9 +496,11 @@
       counts.set(k, cur);
     }
     if (counts.size === 0) return;          // nothing to go on — leave the guess
+    // Ordered by how many shipments each has, but the count itself is not shown —
+    // the dropdown reads as a list of courier names, nothing else.
     const opts = [...counts].sort((a, b) => b[1].n - a[1].n);
-    sel.innerHTML = `<option value="">All couriers (${rows.length})</option>` +
-      opts.map(([k, v]) => `<option value="${k}">${escapeHtml(v.name)} (${v.n})</option>`).join("");
+    sel.innerHTML = `<option value="">All couriers</option>` +
+      opts.map(([k, v]) => `<option value="${k}">${escapeHtml(v.name)}</option>`).join("");
     // Keep the user's choice if it still exists in the new data.
     sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
   }
