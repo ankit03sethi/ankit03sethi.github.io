@@ -455,14 +455,25 @@
     const COLS = [
       "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
       "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku",
-      "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price"
+      "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price",
+      // Listing-health columns. They fill in from the uploaded master file when it
+      // carries these headers, and show a dash until then.
+      "Site Price","Ratings","Count","Seller","Link",
+      "1day","3day","7day","15day","30day","60day","Focus"
     ];
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
+    // Uploaded headers are matched case- and spacing-insensitively, so "1 Day",
+    // "1day" and "1DAY" all land in the same column.
+    const normHdr = h => String(h || "").toLowerCase().replace(/[\s_\-.]+/g, "");
     const cell = (r, i, col) => {
       const rd = r.raw_data || {};
       // If the raw uploaded file had this exact header, use that value verbatim
       if (Object.prototype.hasOwnProperty.call(rd, col)) return safeCell(rd[col]);
+      const want = normHdr(col);
+      for (const k of Object.keys(rd)) {
+        if (normHdr(k) === want) return safeCell(rd[k]);
+      }
       // Otherwise fall back to the parsed DB columns
       switch (col) {
         case "S.NO":              return String(i + 1);
@@ -485,6 +496,10 @@
       const v = cell(r, i, c);
       // Bold the two anchor columns for scannability
       if (c === "Master Sku" || c === "SKU") return `<td><b>${escapeHtml(v)}</b></td>`;
+      // A listing URL is only useful if you can click it.
+      if (c === "Link" && /^https?:\/\//i.test(v)) {
+        return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">Open</a></td>`;
+      }
       return `<td>${escapeHtml(v)}</td>`;
     }).join("") + "</tr>").join("");
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
