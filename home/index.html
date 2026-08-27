@@ -1643,7 +1643,20 @@ window.openAnalystService = async function () {
       location.href = "/home/?return=%2Fanalyst%2F";
       return;
     }
-    // Look for a debit_service on the analyst tag within the last 30 days
+    // Check for a LIFETIME grant first (never expires — no 30-day cap).
+    const { data: lifetimeRows } = await sb
+      .from("analytics_wallet_transactions")
+      .select("id")
+      .eq("user_id", session.user.id)
+      .eq("type", "debit_service")
+      .eq("service_tag", "analyst")
+      .eq("reference", "LIFETIME_FREE_GRANT")
+      .limit(1);
+    if (lifetimeRows && lifetimeRows.length > 0) {
+      location.href = "/analyst/?days=lifetime";
+      return;
+    }
+    // Otherwise look for a debit_service on the analyst tag within the last 30 days
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data: rows, error } = await sb
       .from("analytics_wallet_transactions")
