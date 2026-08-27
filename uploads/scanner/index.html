@@ -315,6 +315,51 @@
   }
 
   // Per-platform courier options + Tracking-ID prefix mapping (used to filter after Load)
+  // ---- Meesho: the manifest is the dispatch list ---------------------------
+  // Meesho data lands twice. The orders CSV carries the rich detail (product,
+  // customer state, price) for every order in the date range; the Supplier
+  // Manifest carries only what is actually going out today, with the AWB and the
+  // courier it ships under. For packing, the manifest is the truth — so on Meesho
+  // we scan against the manifest rows and merge the CSV's columns onto them,
+  // keyed on Sub Order No (the two formats match exactly). Other platforms are
+  // left exactly as they were.
+  function joinMeeshoManifest(rows) {
+    const isMeesho   = r => String(r.platform || "").toLowerCase() === "meesho";
+    const isManifest = r => (r.raw_data || {}).__file_tag === "manifest";
+    const subOf      = r => String((r.raw_data || {})["Sub Order No"] || "").trim();
+
+    const meesho = rows.filter(isMeesho);
+    if (meesho.length === 0) return { rows, note: "" };
+
+    const manifest = meesho.filter(isManifest);
+    // No manifest uploaded for this range — fall back to the CSV rather than
+    // showing the packer an empty list.
+    if (manifest.length === 0) {
+      return { rows, note: "No Meesho manifest in this range — using the orders CSV." };
+    }
+
+    const csvBySub = new Map();
+    for (const r of meesho) {
+      if (isManifest(r)) continue;
+      const k = subOf(r);
+      if (k && !csvBySub.has(k)) csvBySub.set(k, r);
+    }
+
+    let enriched = 0;
+    const merged = manifest.map(r => {
+      const csv = csvBySub.get(subOf(r));
+      if (!csv) return r;
+      enriched++;
+      // Manifest fields win — its AWB, Courier and Qty describe this dispatch.
+      return { ...r, raw_data: { ...(csv.raw_data || {}), ...(r.raw_data || {}) } };
+    });
+
+    return {
+      rows: rows.filter(r => !isMeesho(r)).concat(merged),
+      note: `Meesho: ${merged.length} manifest rows, ${enriched} matched to the orders CSV.`,
+    };
+  }
+
   const COURIERS_BY_PLATFORM = {
     "":         [], // "All" → no courier filter
     flipkart:   [{ id:"ekart", name:"Ekart",       prefixes:["FMPP","FMPC","FMPR","FMPF","FMFC","FMFR"] },
@@ -392,14 +437,25 @@
         if (chunk.length < PAGE) break;
         from_i += PAGE;
       }
-      // Apply courier filter — restrict to rows whose Tracking ID starts with one of the courier prefixes
+      // On Meesho, swap the orders CSV for the manifest and carry the CSV's
+      // columns across. Must run before the courier filter, which now prefers the
+      // manifest's own Courier field.
+      const joined = joinMeeshoManifest(orders);
+      orders = joined.rows;
+
+      // Apply courier filter. Manifest rows name their courier outright; for
+      // everything else fall back to matching the Tracking ID prefix.
       const courierId = $("#courierSel").value;
       if (courierId && platform) {
         const cfg = (COURIERS_BY_PLATFORM[platform] || []).find(c => c.id === courierId);
-        if (cfg && cfg.prefixes && cfg.prefixes.length) {
-          const upperPrefixes = cfg.prefixes.map(p => p.toUpperCase());
+        if (cfg) {
+          const upperPrefixes = (cfg.prefixes || []).map(p => p.toUpperCase());
+          const wantName = String(cfg.name || "").toLowerCase().replace(/\s+/g, "");
           orders = orders.filter(r => {
             const rd = r.raw_data || {};
+            const named = String(rd["Courier"] || rd["Courier Partner"] || "").toLowerCase().replace(/\s+/g, "");
+            if (named) return named === wantName;
+            if (!upperPrefixes.length) return true;
             const tid = String(rd["Tracking ID"] || rd["Tracking Id"] || rd["AWB No"] || rd["AWB"] || rd["Waybill"] || rd["Tracking Number"] || "").toUpperCase();
             return upperPrefixes.some(p => tid.startsWith(p));
           });
@@ -412,7 +468,8 @@
         btn.disabled = false; btn.textContent = "Load orders →";
         return;
       }
-      $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable).`;
+      $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable).`
+        + (joined.note ? " " + joined.note : "");
       $("#scanArea").style.display = "block";
       refreshCounters();
       // Reset button so user can re-load (e.g. after changing filters)

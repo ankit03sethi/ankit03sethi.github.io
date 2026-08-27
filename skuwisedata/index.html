@@ -291,12 +291,85 @@
   document.getElementById("reloadBtn").addEventListener("click", refresh);
 
   // ---- 3. Fetch + render ----
+  // ---- Meesho: the manifest is the dispatch list ---------------------------
+  // Meesho data lands twice: the orders CSV (rich detail, every order in range)
+  // and the Supplier Manifest (only what actually shipped, with AWB and courier).
+  // With the Meesho chip selected we show the manifest and merge the CSV's
+  // columns onto it, keyed on Sub Order No — the two use the same format. Same
+  // rule the scanner uses. Other platforms are unaffected.
+  async function loadMeeshoManifestOrders() {
+    const PAGE = 1000, CAP = 6000;
+    const all = [];
+    for (let from = 0; from < CAP; from += PAGE) {
+      let q = sb.from("seller_orders").select("*")
+        .eq("user_id", state.session.user.id)
+        .eq("platform", "meesho")
+        .order("order_date", { ascending: false, nullsFirst: false })
+        .range(from, from + PAGE - 1);
+      if (state.company) q = q.eq("company_name", state.company);
+      const { data, error } = await q;
+      if (error) throw error;
+      const chunk = data || [];
+      all.push(...chunk);
+      if (chunk.length < PAGE) break;
+    }
+
+    const isManifest = r => (r.raw_data || {}).__file_tag === "manifest";
+    const subOf      = r => String((r.raw_data || {})["Sub Order No"] || "").trim();
+
+    const manifest = all.filter(isManifest);
+    // Nothing dispatched yet in what we fetched — show the CSV rather than an
+    // empty table, and say so.
+    if (manifest.length === 0) {
+      return { rows: all.slice(0, 200), enriched: 0, fellBack: true };
+    }
+
+    const csvBySub = new Map();
+    for (const r of all) {
+      if (isManifest(r)) continue;
+      const k = subOf(r);
+      if (k && !csvBySub.has(k)) csvBySub.set(k, r);
+    }
+
+    let enriched = 0;
+    const rows = manifest.map(r => {
+      const csv = csvBySub.get(subOf(r));
+      if (!csv) return r;
+      enriched++;
+      // Manifest fields win — its AWB, Courier and Qty describe the dispatch.
+      return { ...r, raw_data: { ...(csv.raw_data || {}), ...(r.raw_data || {}) } };
+    });
+    return { rows: rows.slice(0, 200), enriched, fellBack: false };
+  }
+
   async function refresh() {
     if (state.view === "uploads") return;
     $("#tableWrap").innerHTML = '<div class="empty">Loading&hellip;</div>';
     $("#kpis").innerHTML = "";
     const table = KIND_TABLE[state.view];
     const dateCol = DATE_COL[state.view];
+
+    if (state.view === "orders" && state.platform === "meesho") {
+      try {
+        const { rows, enriched, fellBack } = await loadMeeshoManifestOrders();
+        $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
+        $("#rowCount").textContent = fellBack
+          ? rows.length + " rows (no manifest yet — showing the orders CSV)"
+          : rows.length + " manifest rows \u00b7 " + enriched + " matched to the orders CSV";
+        renderKpis(rows, rows.length);
+        $("#tableWrap").innerHTML = rows.length
+          ? renderTable(rows)
+          : `<div class="empty">
+               <h3>No Meesho orders yet</h3>
+               <p>Install the Cursive Analyst app and drop your Meesho manifest and orders CSV into the SellerOps folder.</p>
+               <a class="empty-cta" href="/analyst/">Install Cursive Analyst</a>
+             </div>`;
+        return;
+      } catch (e) {
+        $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(e.message || String(e))}</div>`;
+        return;
+      }
+    }
     let q = sb.from(table).select("*", { count: "exact" })
       .eq("user_id", state.session.user.id)
       .order(dateCol, { ascending: false, nullsFirst: false })
