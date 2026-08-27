@@ -354,9 +354,57 @@
       return { ...r, raw_data: { ...(csv.raw_data || {}), ...(r.raw_data || {}) } };
     });
 
+    // One AWB can cover several sub-orders — Meesho combines them into a single
+    // packet with one label. The packer scans that label once, so a shipment, not
+    // a sub-order, is the unit here: group by AWB and carry the members along.
+    const byAwb = new Map();
+    for (const r of merged) {
+      const awb = String((r.raw_data || {})["AWB No"] || "").trim();
+      const k = awb || ("nosub:" + subOf(r));   // no AWB — keep it on its own
+      if (!byAwb.has(k)) byAwb.set(k, []);
+      byAwb.get(k).push(r);
+    }
+
+    const shipments = [];
+    for (const [awb, items] of byAwb) {
+      const first = items[0];
+      if (items.length === 1) {
+        shipments.push({ ...first, __unit: "awb:" + awb });
+        continue;
+      }
+      const rd = items.map(r => r.raw_data || {});
+      const qty = rd.reduce((n, d) => n + (parseInt(d["Quantity"], 10) || 0), 0);
+      const skus = rd.map(d => String(d["SKU"] || "").trim()).filter(Boolean);
+      const skuCounts = new Map();
+      skus.forEach(k => skuCounts.set(k, (skuCounts.get(k) || 0) + 1));
+      const subs = rd.map(d => String(d["Sub Order No"] || "").trim()).filter(Boolean);
+      shipments.push({
+        ...first,
+        __unit: "awb:" + awb,
+        // Scanning any of the packet's sub-order barcodes must land on this same
+        // shipment, not report "not found".
+        __extraKeys: subs,
+        raw_data: {
+          "AWB No":      (first.raw_data || {})["AWB No"] || "",
+          "Courier":     (first.raw_data || {})["Courier"] || "",
+          "Order Date":  (first.raw_data || {})["Order Date"] || "",
+          "Items":       String(items.length),
+          "Quantity":    String(qty),
+          "SKU":         [...skuCounts].map(([k, n]) => n > 1 ? `${k} x${n}` : k).join(", "),
+          // Deliberately NOT called "Sub Order No" — that name is a scannable
+          // field, and these are already indexed through __extraKeys.
+          "Sub Orders":  subs.join(", "),
+          "__file_tag":  "manifest",
+        },
+      });
+    }
+
+    const multi = shipments.filter(r => r.__extraKeys).length;
     return {
-      rows: rows.filter(r => !isMeesho(r)).concat(merged),
-      note: `Meesho: ${merged.length} manifest rows, ${enriched} matched to the orders CSV.`,
+      rows: rows.filter(r => !isMeesho(r)).concat(shipments),
+      note: `Meesho: ${shipments.length} shipments from ${merged.length} manifest rows`
+            + (multi ? ` (${multi} multi-order)` : "")
+            + `, ${enriched} matched to the orders CSV.`,
     };
   }
 
@@ -533,7 +581,15 @@
         const s = String(v).trim();
         if (!s || s.length < 4) continue;
         const key = s.toLowerCase();
-        if (!map.has(key)) { map.set(key, { row, field: k, value: s }); indexed = true; }
+        if (!map.has(key)) { map.set(key, { row, field: k, value: s, unit: row.__unit || key }); indexed = true; }
+      }
+      // A grouped shipment also answers to each of its sub-order barcodes, all
+      // pointing at the same unit so the second scan reads as a duplicate.
+      for (const extra of (row.__extraKeys || [])) {
+        const key = String(extra).trim().toLowerCase();
+        if (!key || map.has(key)) continue;
+        map.set(key, { row, field: "Sub Order No", value: String(extra).trim(), unit: row.__unit || key });
+        indexed = true;
       }
       // Row had no tracking field at all → skip silently (won't be scannable)
       if (!indexed) row._noTracking = true;
@@ -694,6 +750,9 @@
       }
     }
 
+    // A shipment is done once, however it was identified — scanning its AWB and
+    // then one of its sub-order barcodes is a duplicate, not a second parcel.
+    if (match && match.unit) matchKey = match.unit;
     const already = state.scanned.get(matchKey);
     let status;
     if (match && !already) {
@@ -733,9 +792,12 @@
     // Remaining = tracking ids that haven't been scanned OK yet
     const scannedOkKeys = new Set();
     for (const [k, v] of state.scanned) if (v.status === "ok") scannedOkKeys.add(k);
-    const remaining = [];
+    const remaining = [], seenUnits = new Set();
     for (const [key, entry] of state.barcodeIndex) {
-      if (!scannedOkKeys.has(key)) remaining.push(entry);
+      const unit = entry.unit || key;
+      if (seenUnits.has(unit)) continue;    // same shipment, another barcode
+      seenUnits.add(unit);
+      if (!scannedOkKeys.has(unit)) remaining.push(entry);
     }
     $("#kpiRem").textContent = remaining.length;
 
