@@ -42,7 +42,7 @@
     .plat-chip { padding:6px 12px; font-size:12px; font-weight:700; border-radius:999px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; color:#0f172a; }
     .plat-chip.active { background:#0f172a; color:#fff; border-color:#0f172a; }
 
-    .cell-edit { font:inherit; font-size:12px; width:96px; padding:4px 6px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; }
+    .cell-edit { font:inherit; font-size:12px; width:110px; padding:4px 6px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; }
     .cell-edit:focus { outline:none; border-color:#1f6feb; box-shadow:0 0 0 2px rgba(31,111,235,.12); }
     .cell-edit.saved { border-color:#22c55e; }
     .cell-edit.failed { border-color:#ef4444; background:#fef2f2; }
@@ -61,6 +61,13 @@
     table.data th, table.data td { padding:9px 12px; text-align:left; border-bottom:1px solid #f1f5f9; }
     table.data thead th { background:#f8fafc; color:#64748b; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.5px; position:sticky; top:0; }
     table.data tbody tr:hover { background:#eff6ff; }
+    table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+    table.data thead th.sortable:hover { color:#1f6feb; }
+    table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
+    table.data thead tr.filter-row th { position:sticky; top:33px; background:#fff; padding:5px 8px; border-bottom:1px solid #e5e7eb; }
+    .col-filter { font:inherit; font-size:12px; width:100%; min-width:70px; padding:3px 6px; border:1px solid #e5e7eb; border-radius:5px; }
+    .col-filter:focus { outline:none; border-color:#1f6feb; }
+    .col-filter.on { border-color:#1f6feb; background:#eff6ff; }
     .muted { color:#94a3b8; font-style:italic; }
     .empty { padding:36px 20px; text-align:center; color:#64748b; }
     .empty h3 { margin:0 0 8px; color:#0f172a; }
@@ -230,6 +237,7 @@
     companies: [],
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
     rowsById: new Map(),       // id -> row, so an edited cell can find its row
+    tools: {},                 // per view: { filters: {colName: text}, sort: {col, dir} }
   };
   const DATE_COL = { orders: "order_date", returns: "return_date", payments: "payment_date", stock: "snapshot_date", sku_master: "updated_at" };
   const KIND_TABLE = { orders: "seller_orders", returns: "seller_returns", payments: "seller_payments", stock: "seller_stock", sku_master: "seller_sku_master" };
@@ -372,6 +380,7 @@
                <p>Install the Cursive Analyst app and drop your Meesho manifest and orders CSV into the SellerOps folder.</p>
                <a class="empty-cta" href="/analyst/">Install Cursive Analyst</a>
              </div>`;
+        installTableTools();
         return;
       } catch (e) {
         $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(e.message || String(e))}</div>`;
@@ -421,6 +430,7 @@
       return;
     }
     $("#tableWrap").innerHTML = renderTable(data);
+    installTableTools();
   }
 
   function renderKpis(rows, total) {
@@ -512,14 +522,23 @@
         default:                  return "—";
       }
     };
-    // Typed here on the page, stored in listing_data so a master-file re-upload
-    // (which rewrites raw_data wholesale) cannot wipe them.
-    const EDITABLE = { "Site Price":"number", "Ratings":"number", "Count":"number",
-                       "Seller":"text", "Link":"url", "Focus":"check" };
+    // Everything except the keys and the computed columns can be typed here.
+    // Edits are stored in listing_data, never in raw_data: a master-file upload
+    // rewrites raw_data wholesale and would wipe them. A column you have not
+    // typed into still shows whatever the sheet or the parsed DB column had.
+    const READONLY = new Set(["S.NO", "Date", "Company", "Platform", "SKU", "Master Sku"]);
+    const NUMERIC  = new Set(["COP", "Tax %", "Final COP", "Expected Settlement",
+                              "Selling Price", "Site Price", "Ratings", "Count"]);
+    const EDITABLE = {};
+    for (const c of COLS) {
+      if (READONLY.has(c) || DAY_COLS_NAMES.has(c)) continue;
+      EDITABLE[c] = c === "Focus" ? "check" : c === "Link" ? "url" : NUMERIC.has(c) ? "number" : "text";
+    }
     // Counted from orders instead — 1day is today, 3day is today plus the two
-    // days before it, and so on.
+    // days before it, and so on. Not typed.
     const DAY_COLS = { "1day":"d1", "3day":"d3", "7day":"d7",
                        "15day":"d15", "30day":"d30", "60day":"d60" };
+    const DAY_COLS_NAMES = new Set(Object.keys(DAY_COLS));
 
     const editVal = (r, col) => {
       const ld = r.listing_data || {};
@@ -583,6 +602,137 @@
     el.classList.add("saved");
     setTimeout(() => el.classList.remove("saved"), 1200);
   });
+
+  // ---- Per-column filter + sort, applied to whatever table is on screen -----
+  // Works on the rendered DOM rather than the data, so it covers every column of
+  // every view — including the editable cells, whose value lives in an input.
+  function cellText(td) {
+    if (!td) return "";
+    const inp = td.querySelector("input");
+    if (inp) return inp.type === "checkbox" ? (inp.checked ? "yes" : "") : inp.value;
+    return td.textContent.trim();
+  }
+
+  // "> 5", ">=5", "<10", "=0" compare as numbers; anything else is a substring.
+  function matchFilter(text, term) {
+    const t = term.trim();
+    if (!t) return true;
+    const m = /^(>=|<=|>|<|=)\s*(-?\d+(?:\.\d+)?)$/.exec(t);
+    if (m) {
+      const n = parseFloat(String(text).replace(/[^\d.-]/g, ""));
+      if (isNaN(n)) return false;
+      const v = parseFloat(m[2]);
+      switch (m[1]) {
+        case ">":  return n >  v;
+        case "<":  return n <  v;
+        case ">=": return n >= v;
+        case "<=": return n <= v;
+        default:   return n === v;
+      }
+    }
+    return String(text).toLowerCase().includes(t.toLowerCase());
+  }
+
+  function toolsFor(view) {
+    if (!state.tools[view]) state.tools[view] = { filters: {}, sort: null };
+    return state.tools[view];
+  }
+
+  function applyTableTools() {
+    const table = $("#tableWrap").querySelector("table.data");
+    if (!table) return;
+    const t = toolsFor(state.view);
+    const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
+    const body = table.querySelector("tbody");
+    const rows = [...body.rows];
+
+    // Filter
+    let shown = 0;
+    for (const tr of rows) {
+      const ok = heads.every((name, i) => matchFilter(cellText(tr.cells[i]), t.filters[name] || ""));
+      tr.style.display = ok ? "" : "none";
+      if (ok) shown++;
+    }
+
+    // Sort — numeric when both sides are numbers, otherwise plain text.
+    if (t.sort) {
+      const i = heads.indexOf(t.sort.col);
+      if (i >= 0) {
+        const dir = t.sort.dir === "asc" ? 1 : -1;
+        rows.sort((a, b) => {
+          const x = cellText(a.cells[i]), y = cellText(b.cells[i]);
+          const nx = parseFloat(String(x).replace(/[^\d.-]/g, ""));
+          const ny = parseFloat(String(y).replace(/[^\d.-]/g, ""));
+          const bothNum = !isNaN(nx) && !isNaN(ny) && String(x).trim() !== "" && String(y).trim() !== "";
+          if (bothNum) return (nx - ny) * dir;
+          return String(x).localeCompare(String(y), undefined, { numeric: true }) * dir;
+        });
+        rows.forEach(tr => body.appendChild(tr));
+      }
+    }
+
+    const info = document.getElementById("filterInfo");
+    if (info) {
+      const active = Object.values(t.filters).filter(v => v && v.trim()).length;
+      info.textContent = active ? `${shown} of ${rows.length} rows` : "";
+    }
+  }
+
+  // Adds the filter row and makes the headers clickable. Called after every render.
+  function installTableTools() {
+    const table = $("#tableWrap").querySelector("table.data");
+    if (!table) return;
+    const thead = table.tHead;
+    if (!thead || thead.querySelector(".filter-row")) return;
+    const t = toolsFor(state.view);
+    const headRow = thead.rows[0];
+    const names = [...headRow.cells].map(th => th.textContent.trim());
+
+    headRow.querySelectorAll("th").forEach((th, i) => {
+      th.dataset.col = names[i];
+      th.classList.add("sortable");
+      if (t.sort && t.sort.col === names[i]) {
+        th.innerHTML = escapeHtml(names[i]) + `<span class="sort-caret">${t.sort.dir === "asc" ? "\u2191" : "\u2193"}</span>`;
+      }
+      th.addEventListener("click", () => {
+        // First click on a new column sorts high to low, which is what you want
+        // on counts and prices; clicking again flips it.
+        if (t.sort && t.sort.col === names[i]) t.sort.dir = t.sort.dir === "asc" ? "desc" : "asc";
+        else t.sort = { col: names[i], dir: "desc" };
+        installedRefresh(table);
+      });
+    });
+
+    const fr = document.createElement("tr");
+    fr.className = "filter-row";
+    fr.innerHTML = names.map(n =>
+      `<th><input class="col-filter" data-col="${escapeHtml(n)}" placeholder="Filter" value="${escapeHtml(t.filters[n] || "")}"></th>`
+    ).join("");
+    thead.appendChild(fr);
+    fr.querySelectorAll(".col-filter").forEach(inp => {
+      if (inp.value.trim()) inp.classList.add("on");
+      inp.addEventListener("input", () => {
+        t.filters[inp.dataset.col] = inp.value;
+        inp.classList.toggle("on", !!inp.value.trim());
+        applyTableTools();
+      });
+      // Clicking a filter box must not sort the column it sits under.
+      inp.addEventListener("click", e => e.stopPropagation());
+    });
+
+    applyTableTools();
+  }
+
+  // Re-draw carets after a sort change, then re-apply.
+  function installedRefresh(table) {
+    const t = toolsFor(state.view);
+    [...table.querySelectorAll("thead tr:first-child th")].forEach(th => {
+      const name = th.dataset.col;
+      th.innerHTML = escapeHtml(name) + (t.sort && t.sort.col === name
+        ? `<span class="sort-caret">${t.sort.dir === "asc" ? "\u2191" : "\u2193"}</span>` : "");
+    });
+    applyTableTools();
+  }
 
   const wcKey = (co, plat, sku) =>
     [co, plat, sku].map(x => String(x || "").trim().toLowerCase()).join("|");
