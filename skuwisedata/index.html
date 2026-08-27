@@ -654,7 +654,7 @@
     const fr = document.createElement("tr");
     fr.className = "filter-row";
     fr.innerHTML = names.map(n =>
-      `<th><input class="col-filter" data-col="${escapeHtml(n)}" placeholder="Filter" value="${escapeHtml(t.filters[n] || "")}"></th>`
+      `<th><input class="col-filter" data-col="${escapeHtml(n)}" placeholder="Search" value="${escapeHtml(t.filters[n] || "")}"></th>`
     ).join("");
     thead.appendChild(fr);
     fr.querySelectorAll(".col-filter").forEach(inp => {
