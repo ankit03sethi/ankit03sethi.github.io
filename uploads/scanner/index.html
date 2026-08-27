@@ -9,7 +9,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
-  <script src="https://unpkg.com/[email protected]/html5-qrcode.min.js"></script>
+  <!-- unpkg goes down / gets blocked often enough that a single source meant the
+       scanner just said "library did not load". Fall back to jsDelivr, then to
+       cdnjs, before giving up. -->
+  <script>
+    window.__qrSources = [
+      "https://unpkg.com/[email protected]/html5-qrcode.min.js",
+      "https://cdn.jsdelivr.net/npm/[email protected]/html5-qrcode.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"
+    ];
+    window.__qrLoad = function (i) {
+      i = i || 0;
+      if (window.Html5Qrcode || i >= window.__qrSources.length) return;
+      var el = document.createElement("script");
+      el.src = window.__qrSources[i];
+      el.onerror = function () { window.__qrLoad(i + 1); };
+      el.onload  = function () { if (!window.Html5Qrcode) window.__qrLoad(i + 1); };
+      document.head.appendChild(el);
+    };
+    window.__qrLoad(0);
+  </script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
@@ -32,6 +51,11 @@
     .field { display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
     .field label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
     .field select, .field input[type="date"], .field input[type="text"] { font:inherit; padding:9px 12px; border:1px solid #e5e7eb; border-radius:8px; }
+    .dt-wrap { position:relative; display:flex; align-items:stretch; gap:6px; }
+    .dt-wrap input[type="text"] { flex:1 1 auto; min-width:0; }
+    .dt-btn { font-size:15px; line-height:1; padding:0 11px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc; cursor:pointer; }
+    .dt-btn:hover { background:#eff6ff; border-color:#bfdbfe; }
+    .dt-native { position:absolute; right:10px; bottom:0; width:1px; height:1px; padding:0; border:0; opacity:0; pointer-events:none; }
     .field-row { display:flex; gap:10px; flex-wrap:wrap; }
     .field-row .field { flex:1 1 200px; }
     .btn { font:inherit; padding:10px 18px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:14px; font-weight:700; color:#0f172a; }
@@ -190,11 +214,23 @@
     <div class="field-row">
       <div class="field">
         <label>From date</label>
-        <input type="date" id="dateFrom">
+        <!-- Native date inputs render in the browser's own locale, which shows
+             MM/DD/YYYY here. The visible field is plain text in DD/MM/YYYY; the
+             native input is kept (hidden) purely for the calendar picker and as
+             the ISO value every other bit of code already reads. -->
+        <div class="dt-wrap">
+          <input type="text" id="dateFromText" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" maxlength="10">
+          <button type="button" class="dt-btn" data-for="dateFrom" title="Pick a date">&#128197;</button>
+          <input type="date" id="dateFrom" class="dt-native" tabindex="-1" aria-hidden="true">
+        </div>
       </div>
       <div class="field">
         <label>To date</label>
-        <input type="date" id="dateTo">
+        <div class="dt-wrap">
+          <input type="text" id="dateToText" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" maxlength="10">
+          <button type="button" class="dt-btn" data-for="dateTo" title="Pick a date">&#128197;</button>
+          <input type="date" id="dateTo" class="dt-native" tabindex="-1" aria-hidden="true">
+        </div>
       </div>
     </div>
     <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
@@ -299,6 +335,9 @@
     const today = new Date().toISOString().slice(0, 10);
     $("#dateFrom").value = today;
     $("#dateTo").value   = today;
+    // Push the defaults into the visible DD/MM/YYYY fields as well.
+    $("#dateFrom").dispatchEvent(new Event("input"));
+    $("#dateTo").dispatchEvent(new Event("input"));
     // Auto-click Load so the user doesn't have to
     document.getElementById("loadBtn").click();
   })();
@@ -446,6 +485,61 @@
   ["companySel","courierSel","dateFrom","dateTo"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", triggerAutoLoad);
+  });
+
+  // ---- Dates shown as DD/MM/YYYY -------------------------------------------
+  // #dateFrom / #dateTo stay the source of truth in ISO form, so the query code
+  // and the auto-load listeners above are untouched. These just keep a readable
+  // text field in sync with them in both directions.
+  const isoToDmy = iso => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+  };
+  const dmyToIso = txt => {
+    const m = /^(\d{1,2})\s*[\/\-. ]\s*(\d{1,2})\s*[\/\-. ]\s*(\d{2,4})$/.exec(String(txt || "").trim());
+    if (!m) return "";
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = "20" + y;
+    const dt = new Date(+y, +mo - 1, +d);
+    // Rejects 31/02 and friends — Date rolls those over instead of failing.
+    if (dt.getFullYear() !== +y || dt.getMonth() !== +mo - 1 || dt.getDate() !== +d) return "";
+    return `${y}-${String(+mo).padStart(2, "0")}-${String(+d).padStart(2, "0")}`;
+  };
+
+  function bindDateField(nativeId, textId) {
+    const nat = document.getElementById(nativeId);
+    const txt = document.getElementById(textId);
+    if (!nat || !txt) return;
+    // native -> text (covers the picker and the defaults set on load)
+    const sync = () => { txt.value = isoToDmy(nat.value); txt.style.borderColor = ""; };
+    nat.addEventListener("change", sync);
+    nat.addEventListener("input", sync);
+    // text -> native, only once it parses; a half-typed date must not reload
+    txt.addEventListener("input", () => {
+      const iso = dmyToIso(txt.value);
+      if (!iso) { txt.style.borderColor = txt.value.trim() ? "#fca5a5" : ""; return; }
+      txt.style.borderColor = "";
+      if (nat.value === iso) return;
+      nat.value = iso;
+      nat.dispatchEvent(new Event("change"));
+    });
+    // on blur, put a bad value back to whatever the native input still holds
+    txt.addEventListener("blur", () => { if (!dmyToIso(txt.value)) sync(); });
+    sync();
+  }
+  bindDateField("dateFrom", "dateFromText");
+  bindDateField("dateTo",   "dateToText");
+
+  document.querySelectorAll(".dt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const nat = document.getElementById(btn.dataset.for);
+      if (!nat) return;
+      // showPicker needs the input to be interactive for the moment it opens.
+      nat.style.pointerEvents = "auto";
+      try { nat.showPicker ? nat.showPicker() : nat.focus(); }
+      catch { nat.focus(); }
+      setTimeout(() => { nat.style.pointerEvents = "none"; }, 0);
+    });
   });
 
   // ---- Load orders ----
@@ -605,6 +699,14 @@
     if (state.scanner) return;
     const modeEl = document.getElementById("scanMode");
     try {
+      // The library may still be coming down from a fallback CDN — wait for it
+      // rather than declaring failure the instant the page is ready.
+      if (!window.Html5Qrcode) {
+        if (modeEl) modeEl.textContent = "Loading scanner\u2026";
+        for (let i = 0; i < 40 && !window.Html5Qrcode; i++) {
+          await new Promise(r => setTimeout(r, 250));
+        }
+      }
       if (!window.Html5Qrcode) {
         if (modeEl) modeEl.textContent = "Scanner library missing";
         throw new Error("Html5Qrcode library did not load");
