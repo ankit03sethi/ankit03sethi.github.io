@@ -466,12 +466,41 @@
                  { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
                  { id:"bluedart", name:"Blue Dart", prefixes:["BD"] }],
   };
+  // Courier names are compared by this, so "Ecom Express" from a manifest and
+  // "ecomexpress" from the static list are the same courier.
+  const normCourier = v => String(v || "").toLowerCase().replace(/\s+/g, "");
+
+  // Before anything is loaded, offer the couriers this platform is known to use.
   function updateCourierOptions() {
     const platform = $("#platformSel").value;
     const list = COURIERS_BY_PLATFORM[platform] || [];
     const sel = $("#courierSel");
+    const keep = sel.value;
     sel.innerHTML = "<option value=''>All couriers</option>" +
-      list.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+      list.map(c => `<option value="${normCourier(c.name)}">${escapeHtml(c.name)}</option>`).join("");
+    if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+  }
+
+  // Once rows are loaded, replace that guess with the couriers actually present,
+  // and show how many shipments each one has.
+  function refreshCourierOptions(rows) {
+    const sel = $("#courierSel");
+    const keep = sel.value;
+    const counts = new Map();
+    for (const r of rows) {
+      const name = courierOf(r);
+      if (!name) continue;
+      const k = normCourier(name);
+      const cur = counts.get(k) || { name, n: 0 };
+      cur.n++;
+      counts.set(k, cur);
+    }
+    if (counts.size === 0) return;          // nothing to go on — leave the guess
+    const opts = [...counts].sort((a, b) => b[1].n - a[1].n);
+    sel.innerHTML = `<option value="">All couriers (${rows.length})</option>` +
+      opts.map(([k, v]) => `<option value="${k}">${escapeHtml(v.name)} (${v.n})</option>`).join("");
+    // Keep the user's choice if it still exists in the new data.
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
   }
   document.getElementById("platformSel").addEventListener("change", () => { updateCourierOptions(); triggerAutoLoad(); });
 
@@ -585,23 +614,13 @@
       const joined = joinMeeshoManifest(orders);
       orders = joined.rows;
 
-      // Apply courier filter. Manifest rows name their courier outright; for
-      // everything else fall back to matching the Tracking ID prefix.
-      const courierId = $("#courierSel").value;
-      if (courierId && platform) {
-        const cfg = (COURIERS_BY_PLATFORM[platform] || []).find(c => c.id === courierId);
-        if (cfg) {
-          const upperPrefixes = (cfg.prefixes || []).map(p => p.toUpperCase());
-          const wantName = String(cfg.name || "").toLowerCase().replace(/\s+/g, "");
-          orders = orders.filter(r => {
-            const rd = r.raw_data || {};
-            const named = String(rd["Courier"] || rd["Courier Partner"] || "").toLowerCase().replace(/\s+/g, "");
-            if (named) return named === wantName;
-            if (!upperPrefixes.length) return true;
-            const tid = String(rd["Tracking ID"] || rd["Tracking Id"] || rd["AWB No"] || rd["AWB"] || rd["Waybill"] || rd["Tracking Number"] || "").toUpperCase();
-            return upperPrefixes.some(p => tid.startsWith(p));
-          });
-        }
+      // Rebuild the courier list from what actually came back, then filter by it.
+      // courierOf() reads the manifest's own Courier field and falls back to the
+      // tracking-ID prefix, so this works on every platform.
+      refreshCourierOptions(orders);
+      const wantCourier = $("#courierSel").value;
+      if (wantCourier) {
+        orders = orders.filter(r => normCourier(courierOf(r)) === wantCourier);
       }
       state.orders = orders;
       buildBarcodeIndex();
