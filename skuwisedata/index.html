@@ -42,6 +42,12 @@
     .plat-chip { padding:6px 12px; font-size:12px; font-weight:700; border-radius:999px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; color:#0f172a; }
     .plat-chip.active { background:#0f172a; color:#fff; border-color:#0f172a; }
 
+    .cell-edit { font:inherit; font-size:12px; width:96px; padding:4px 6px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; }
+    .cell-edit:focus { outline:none; border-color:#1f6feb; box-shadow:0 0 0 2px rgba(31,111,235,.12); }
+    .cell-edit.saved { border-color:#22c55e; }
+    .cell-edit.failed { border-color:#ef4444; background:#fef2f2; }
+    .cell-link { margin-left:6px; font-size:12px; text-decoration:none; }
+    .cell-focus { width:16px; height:16px; cursor:pointer; }
     .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; padding:16px 28px 8px; }
     .kpi { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
     .kpi .label { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
@@ -222,6 +228,8 @@
     platform: "",
     company: "",
     companies: [],
+    windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
+    rowsById: new Map(),       // id -> row, so an edited cell can find its row
   };
   const DATE_COL = { orders: "order_date", returns: "return_date", payments: "payment_date", stock: "snapshot_date", sku_master: "updated_at" };
   const KIND_TABLE = { orders: "seller_orders", returns: "seller_returns", payments: "seller_payments", stock: "seller_stock", sku_master: "seller_sku_master" };
@@ -379,6 +387,16 @@
     const { data, count, error } = await q;
     if (error) { $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(error.message)}</div>`; return; }
 
+    if (state.view === "sku_master") {
+      // Rolling order counts per SKU, computed in the database — pulling 60 days
+      // of orders into the browser just to count them would be far heavier.
+      state.windowCounts = new Map();
+      const { data: wc, error: wcErr } = await sb.rpc("sku_order_window_counts");
+      if (wcErr) console.warn("sku_order_window_counts failed", wcErr);
+      for (const r of (wc || [])) state.windowCounts.set(r.sku, r);
+      state.rowsById = new Map((data || []).map(r => [String(r.id), r]));
+    }
+
     $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
     $("#rowCount").textContent = (count ?? 0) + " total rows";
     renderKpis(data || [], count ?? 0);
@@ -492,18 +510,77 @@
         default:                  return "—";
       }
     };
+    // Typed here on the page, stored in listing_data so a master-file re-upload
+    // (which rewrites raw_data wholesale) cannot wipe them.
+    const EDITABLE = { "Site Price":"number", "Ratings":"number", "Count":"number",
+                       "Seller":"text", "Link":"url", "Focus":"check" };
+    // Counted from orders instead — 1day is today, 3day is today plus the two
+    // days before it, and so on.
+    const DAY_COLS = { "1day":"d1", "3day":"d3", "7day":"d7",
+                       "15day":"d15", "30day":"d30", "60day":"d60" };
+
+    const editVal = (r, col) => {
+      const ld = r.listing_data || {};
+      if (Object.prototype.hasOwnProperty.call(ld, col)) return ld[col] == null ? "" : String(ld[col]);
+      // Nothing typed yet — fall back to whatever the uploaded sheet had.
+      const fromSheet = cell(r, 0, col);
+      return fromSheet === "—" ? "" : fromSheet;
+    };
+
     const tr = rows.map((r, i) => "<tr>" + COLS.map(c => {
+      if (DAY_COLS[c]) {
+        const wc = state.windowCounts.get(String(r.seller_sku || "").trim().toLowerCase());
+        const n = wc ? wc[DAY_COLS[c]] : 0;
+        return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}</td>`;
+      }
+      if (EDITABLE[c]) {
+        const kind = EDITABLE[c];
+        const v = editVal(r, c);
+        if (kind === "check") {
+          const on = v && v !== "0" && v.toLowerCase() !== "false" && v.toLowerCase() !== "no";
+          return `<td><input type="checkbox" class="cell-focus" data-id="${escapeHtml(String(r.id))}" data-col="${escapeHtml(c)}"${on ? " checked" : ""}></td>`;
+        }
+        const type = kind === "number" ? "number" : "text";
+        const open = (kind === "url" && /^https?:\/\//i.test(v))
+          ? ` <a class="cell-link" href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer" title="Open listing">&#8599;</a>` : "";
+        return `<td><input type="${type}" class="cell-edit" data-id="${escapeHtml(String(r.id))}" data-col="${escapeHtml(c)}" value="${escapeHtml(v)}">${open}</td>`;
+      }
       const v = cell(r, i, c);
       // Bold the two anchor columns for scannability
       if (c === "Master Sku" || c === "SKU") return `<td><b>${escapeHtml(v)}</b></td>`;
-      // A listing URL is only useful if you can click it.
-      if (c === "Link" && /^https?:\/\//i.test(v)) {
-        return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">Open</a></td>`;
-      }
       return `<td>${escapeHtml(v)}</td>`;
     }).join("") + "</tr>").join("");
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
   }
+
+  // One delegated listener for the whole table: cells are re-rendered on every
+  // refresh, so binding per input would leak handlers and miss new rows.
+  document.getElementById("tableWrap").addEventListener("change", async (e) => {
+    const el = e.target;
+    if (!el.matches(".cell-edit, .cell-focus")) return;
+    const id  = el.dataset.id;
+    const col = el.dataset.col;
+    const row = state.rowsById.get(id);
+    if (!row) return;
+    const value = el.type === "checkbox" ? (el.checked ? "yes" : "") : el.value.trim();
+
+    const next = { ...(row.listing_data || {}) };
+    if (value === "") delete next[col]; else next[col] = value;
+
+    el.classList.remove("saved", "failed");
+    const { error } = await sb.from("seller_sku_master")
+      .update({ listing_data: next }).eq("id", row.id);
+    if (error) {
+      el.classList.add("failed");
+      el.title = "Not saved: " + error.message;
+      console.warn("listing_data update failed", error);
+      return;
+    }
+    row.listing_data = next;          // keep the in-memory row in step
+    el.title = "";
+    el.classList.add("saved");
+    setTimeout(() => el.classList.remove("saved"), 1200);
+  });
 
   function labelForDate(v) {
     return { orders:"Order date", returns:"Return date", payments:"Payment date", stock:"Snapshot date", sku_master:"Updated" }[v] || "Date";
