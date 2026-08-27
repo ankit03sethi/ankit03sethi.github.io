@@ -116,7 +116,12 @@
        out down the list. minmax(0,…) lets the columns hold their width and the
        text wrap inside them instead, which lines every row up in every picker
        - orders, returns, inventory, the lot. */
-    .combo-row { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr) auto;
+    /* Column 3 holds one small button when idle and a stamp + badge + filename
+       + remove when staged. On "auto" that second state won a fight it should
+       not have been in, squeezing company and platform until their text
+       collided. Floors on the first two columns, and a column 3 that is allowed
+       to shrink instead (the filename already ellipsises). */
+    .combo-row { display:grid; grid-template-columns: minmax(130px,1.15fr) minmax(110px,1fr) minmax(0,auto);
                  align-items:center; gap:14px; padding:10px 14px; background:#fff;
                  border-bottom:1px solid #f1f5f9; }
     .combo-row:last-child { border-bottom:none; }
@@ -129,7 +134,7 @@
     .combo-row .up-mini { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid #1f6feb; background:#1f6feb; color:#fff; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .combo-row .up-mini:hover { background:#1651a8; }
     .combo-row.staged { background:#f0fdf4; }
-    .combo-row .staged-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:#dcfce7; color:#166534; font-size:12px; font-weight:700; }
+    .combo-row .staged-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:#dcfce7; color:#166534; font-size:12px; font-weight:700; white-space:nowrap; flex:0 0 auto; }
     .combo-row .staged-name { color:#64748b; font-size:11px; font-weight:600; margin-left:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; display:inline-block; }
     .combo-row .up-remove { background:transparent; border:none; color:#dc2626; font-size:16px; cursor:pointer; margin-left:6px; }
     @media (max-width: 600px) {
@@ -752,7 +757,12 @@
   // File describe the same thing - the rows are stored once, untagged, and the
   // Orders File slot mirrors them instead of showing "Never". Add a platform
   // here the moment a genuine second export for it turns up.
-  const PLATFORMS_WITH_SEPARATE_ORDERS_FILE = ["amazon", "myntra"];
+  // Flipkart joined them: order-csv*.csv is the CSV export, and the
+  // <id>_<epoch>.xlsx workbook is a different 39-column report. While it was
+  // missing from this list a Flipkart orders workbook was stored untagged, which
+  // made it show under BOTH CSV File and Orders File - one upload, counted in
+  // two places.
+  const PLATFORMS_WITH_SEPARATE_ORDERS_FILE = ["amazon", "myntra", "flipkart"];
   // Shown under the platform name, only where a platform has more than one file.
   const ROW_SUBLABEL = {
     returns: "MDirect Returns", returns_delivery: "Return Delivery",
@@ -1221,8 +1231,7 @@
         setStatus("Reading " + inner.name + " from " + f.name + " …", false);
       }
       const wb = repairSheetRanges(XLSX.read(buf, { type: "array", cellDates: true }));
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      let rows = sheetRowsWithHeader(sheet);
+      let rows = sheetRowsWithHeader(pickDataSheet(wb));
 
       // The upload slot is a label. What the file IS comes from its columns, so
       // a settled export dropped into the Upcoming slot still files as settled
@@ -1420,6 +1429,27 @@
       }
     }
     return wb;
+  }
+
+  // Taking sheet 0 is only safe while every export has one sheet. Flipkart's
+  // orders workbook puts a 54-row "Help" sheet FIRST and the 2,633 real orders
+  // second, so sheet 0 gave 44 rows of instructions that parsed cleanly and
+  // saved without a word of complaint. Skip the sheets that are never the data
+  // and take the first one that actually looks like a table - the same rule the
+  // desktop watcher has used since that file first turned up.
+  function looksLikeDataSheet(arr) {
+    if (!arr || arr.length < 2) return false;
+    const head = (arr[0] || []).filter(v => v != null && String(v).trim() !== "");
+    if (head.length < 3) return false;
+    return arr.slice(1).some(r => r && r.some(v => v != null && String(v).trim() !== ""));
+  }
+  function pickDataSheet(wb) {
+    for (const name of wb.SheetNames) {
+      if (/^(dropdown|help|report help|instructions?|readme|notes?|disclaimer)$/i.test(String(name).trim())) continue;
+      const arr = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null });
+      if (looksLikeDataSheet(arr)) return wb.Sheets[name];
+    }
+    return wb.Sheets[wb.SheetNames[0]];
   }
 
   function sheetRowsWithHeader(sheet) {
