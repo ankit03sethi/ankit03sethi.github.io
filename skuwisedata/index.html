@@ -393,7 +393,9 @@
       state.windowCounts = new Map();
       const { data: wc, error: wcErr } = await sb.rpc("sku_order_window_counts");
       if (wcErr) console.warn("sku_order_window_counts failed", wcErr);
-      for (const r of (wc || [])) state.windowCounts.set(r.sku, r);
+      // Keyed on company + platform + SKU: the same SKU can sell under more than
+      // one company or platform, and those are different rows here.
+      for (const r of (wc || [])) state.windowCounts.set(wcKey(r.company_name, r.platform, r.sku), r);
       state.rowsById = new Map((data || []).map(r => [String(r.id), r]));
     }
 
@@ -529,7 +531,7 @@
 
     const tr = rows.map((r, i) => "<tr>" + COLS.map(c => {
       if (DAY_COLS[c]) {
-        const wc = state.windowCounts.get(String(r.seller_sku || "").trim().toLowerCase());
+        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const n = wc ? wc[DAY_COLS[c]] : 0;
         return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}</td>`;
       }
@@ -581,6 +583,9 @@
     el.classList.add("saved");
     setTimeout(() => el.classList.remove("saved"), 1200);
   });
+
+  const wcKey = (co, plat, sku) =>
+    [co, plat, sku].map(x => String(x || "").trim().toLowerCase()).join("|");
 
   function labelForDate(v) {
     return { orders:"Order date", returns:"Return date", payments:"Payment date", stock:"Snapshot date", sku_master:"Updated" }[v] || "Date";
