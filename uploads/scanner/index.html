@@ -876,13 +876,40 @@
     const card = $("#resultCard");
     card.className = "result-card show " + status;
     let title, sub = "";
-    if (status === "ok")        { title = "✅ OK";           sub = `${match.field}: ${match.value}${match.row.company_name ? " · " + match.row.company_name : ""}`; }
+    if (status === "ok")        { const c = courierOf(match.row);
+                                  title = "✅ OK";           sub = `${match.field}: ${match.value}${c ? " · " + c : ""}${match.row.company_name ? " · " + match.row.company_name : ""}`; }
     if (status === "duplicate") { title = "⚠ Duplicate";     sub = `Already scanned: ${match.field}: ${match.value}`; }
     if (status === "not_found") { title = "✕ Not Found";     sub = `Barcode: ${barcode}`; }
     if (status === "nf_dup")    { title = "✕ NF-Duplicate";  sub = `Barcode: ${barcode}`; }
     card.innerHTML = `${title}<span class="sub">${escapeHtml(sub)}</span>`;
     // Auto-hide OK after 2s so next scan feels responsive
     if (status === "ok") setTimeout(() => { if (card.classList.contains("ok")) card.classList.remove("show"); }, 1600);
+  }
+
+  // Courier for a row. Manifest rows name it outright; everything else has to be
+  // inferred from the tracking-ID prefix, longest match winning so a two-letter
+  // prefix can't shadow a four-letter one.
+  function courierOf(row) {
+    const rd = (row && row.raw_data) || {};
+    const named = String(rd["Courier"] || rd["Courier Partner"] || "").trim();
+    if (named) return named;
+    const tid = String(rd["Tracking ID"] || rd["Tracking Id"] || rd["AWB No"] || rd["AWB"]
+                    || rd["Waybill"] || rd["Tracking Number"] || "").toUpperCase();
+    if (!tid) return "";
+    const list = COURIERS_BY_PLATFORM[String((row && row.platform) || "").toLowerCase()] || [];
+    let best = "", bestLen = 0;
+    for (const c of list) {
+      for (const pfx of (c.prefixes || [])) {
+        const P = String(pfx).toUpperCase();
+        if (P.length > bestLen && tid.startsWith(P)) { best = c.name; bestLen = P.length; }
+      }
+    }
+    return best;
+  }
+
+  function rowTrail(row) {
+    return [courierOf(row), (row && row.platform) || "", (row && row.company_name) || ""]
+      .filter(Boolean).map(escapeHtml).join(" \u00b7 ");
   }
 
   function refreshCounters() {
@@ -910,11 +937,11 @@
       else if (v.status === "not_found") nfList.push(v);
       else                                dupList.push(v);
     }
-    fillList("listOk",  okList.slice(-50).reverse(),  v => `<b>${escapeHtml(v.match?.value || v.value)}</b> <span style="color:#64748b;">· ${escapeHtml(v.match?.row?.company_name || "")} · ${escapeHtml(v.match?.row?.platform || "")}</span>`);
+    fillList("listOk",  okList.slice(-50).reverse(),  v => `<b>${escapeHtml(v.match?.value || v.value)}</b> <span style="color:#64748b;">· ${rowTrail(v.match?.row)}</span>`);
     fillList("listNF",  nfList.slice(-50).reverse(),  v => escapeHtml(v.value));
     fillList("listDup", dupList.slice(-50).reverse(), v => escapeHtml(v.match?.value || v.value));
     fillList("listRem", remaining.slice(0, 50), entry =>
-      `<b>${escapeHtml(entry.value)}</b> <span style="color:#64748b;">· ${escapeHtml(entry.row.platform || "")} · ${escapeHtml(entry.row.company_name || "")}</span>`
+      `<b>${escapeHtml(entry.value)}</b> <span style="color:#64748b;">· ${rowTrail(entry.row)}</span>`
     );
     $("#cntOk").textContent  = okList.length;
     $("#cntNF").textContent  = nfList.length;
