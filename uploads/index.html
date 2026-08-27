@@ -292,6 +292,25 @@
       </div>
     </div>
 
+    <div class="up-item kind-row" data-kind="inventory">
+      <div class="up-left">
+        <div class="up-icon" style="background:#ede9fe; color:#6d28d9;">&#128200;</div>
+        <div>
+          <div class="up-name">Inventory File</div>
+          <div class="up-desc">Marketplace stock / inventory snapshot per company &amp; platform.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none kind-stamp" data-kind="inventory">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary kind-upload-btn" data-kind="inventory">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+
     <div class="up-item kind-row" data-kind="payments">
       <div class="up-left">
         <div class="up-icon" style="background:#dcfce7; color:#166534;">&#128176;</div>
@@ -621,13 +640,14 @@
     orders_file: { title:"Upload Orders File",            table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"], tag:"file" },
     manifest:    { title:"Upload Orders Manifest (Meesho)", table:"seller_orders", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
     returns:     { title:"Upload Returns File",           table:"seller_returns",  dateCol:"return_date",  dateAliases:["return date","return-date","returndate","date","rto date","cancel date","reverse date"] },
+    inventory:   { title:"Upload Inventory File",         table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","snapshot-date","inventory date","stock date","as on date","as-on date","report date","date"] },
     payments:    { title:"Upload Payments File",          table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
   };
   let currentKind = "orders";
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
-  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, payments: {} };
+  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, inventory: {}, payments: {} };
   // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
   let pickerLastByCombo = {};
 
