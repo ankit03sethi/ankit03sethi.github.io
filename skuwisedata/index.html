@@ -522,6 +522,11 @@
         default:                  return "—";
       }
     };
+    // Counted from orders instead — 1day is today, 3day is today plus the two
+    // days before it, and so on. Not typed.
+    const DAY_COLS = { "1day":"d1", "3day":"d3", "7day":"d7",
+                       "15day":"d15", "30day":"d30", "60day":"d60" };
+    const DAY_COLS_NAMES = new Set(Object.keys(DAY_COLS));
     // Everything except the keys and the computed columns can be typed here.
     // Edits are stored in listing_data, never in raw_data: a master-file upload
     // rewrites raw_data wholesale and would wipe them. A column you have not
@@ -534,11 +539,6 @@
       if (READONLY.has(c) || DAY_COLS_NAMES.has(c)) continue;
       EDITABLE[c] = c === "Focus" ? "check" : c === "Link" ? "url" : NUMERIC.has(c) ? "number" : "text";
     }
-    // Counted from orders instead — 1day is today, 3day is today plus the two
-    // days before it, and so on. Not typed.
-    const DAY_COLS = { "1day":"d1", "3day":"d3", "7day":"d7",
-                       "15day":"d15", "30day":"d30", "60day":"d60" };
-    const DAY_COLS_NAMES = new Set(Object.keys(DAY_COLS));
 
     const editVal = (r, col) => {
       const ld = r.listing_data || {};
