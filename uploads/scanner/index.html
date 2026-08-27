@@ -481,11 +481,39 @@
     if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
   }
 
+  // Fills a <select> from a name -> count map. Counts follow the name with a
+  // separator rather than brackets. `allLabel` adds a leading "everything" entry;
+  // pass null to leave it out (the courier list does).
+  function fillSelectWithCounts(sel, counts, allLabel) {
+    if (!sel) return;
+    const keep = sel.value;
+    const opts = [...counts.entries()].sort((a, b) => b[1].n - a[1].n || a[1].name.localeCompare(b[1].name));
+    if (opts.length === 0) return;
+    const total = opts.reduce((n, [, v]) => n + v.n, 0);
+    let html = allLabel ? `<option value="">${escapeHtml(allLabel)} \u00b7 ${total}</option>` : "";
+    html += opts.map(([k, v]) => `<option value="${escapeHtml(k)}">${escapeHtml(v.name)} \u00b7 ${v.n}</option>`).join("");
+    sel.innerHTML = html;
+    if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+    else sel.value = allLabel ? "" : opts[0][0];
+  }
+
+  // Counts rows by a key function, remembering the first spelling of each name.
+  function countBy(rows, keyFn, nameFn) {
+    const m = new Map();
+    for (const r of rows) {
+      const k = keyFn(r);
+      if (!k) continue;
+      const cur = m.get(k) || { name: nameFn(r), n: 0 };
+      cur.n++;
+      m.set(k, cur);
+    }
+    return m;
+  }
+
   // Once rows are loaded, replace that guess with the couriers actually present,
   // and show how many shipments each one has.
   function refreshCourierOptions(rows) {
     const sel = $("#courierSel");
-    const keep = sel.value;
     const counts = new Map();
     for (const r of rows) {
       const name = courierOf(r);
@@ -496,14 +524,9 @@
       counts.set(k, cur);
     }
     if (counts.size === 0) return;          // nothing to go on — leave the guess
-    // Real courier names only: no "All couriers" entry, because packing happens
-    // one carrier at a time. Ordered by how many shipments each has, with the
-    // count itself left out.
-    const opts = [...counts].sort((a, b) => b[1].n - a[1].n);
-    sel.innerHTML = opts.map(([k, v]) => `<option value="${k}">${escapeHtml(v.name)}</option>`).join("");
-    // Keep the user's choice if that courier is still in the data, otherwise fall
-    // to the one with the most shipments.
-    sel.value = [...sel.options].some(o => o.value === keep) ? keep : opts[0][0];
+    // Real courier names only, no "All" entry: packing happens one carrier at a
+    // time. Selection survives a reload when that courier is still present.
+    fillSelectWithCounts(sel, counts, null);
   }
   document.getElementById("platformSel").addEventListener("change", () => { updateCourierOptions(); triggerAutoLoad(); });
 
@@ -581,6 +604,9 @@
     try {
       const company = $("#companySel").value;
       const platform = $("#platformSel").value;
+      // Company and platform are filtered in the browser rather than in the query,
+      // so the dropdowns can show how many shipments each option actually holds.
+      // The date range still narrows the query, which is what keeps this small.
       const from = $("#dateFrom").value;
       const to = $("#dateTo").value;
       // Scanner filters by dispatch_date (WHEN the seller packs these), not order_date.
@@ -598,8 +624,6 @@
         let q = sb.from("seller_orders").select("id, order_date, dispatch_date, company_name, platform, raw_data")
           .eq("user_id", state.session.user.id)
           .range(from_i, from_i + PAGE - 1);
-        if (company)  q = q.eq("company_name", company);
-        if (platform) q = q.eq("platform", platform);
         if (from) q = q.gte("dispatch_date", from);
         if (to)   q = q.lte("dispatch_date", to);
         // Live progress: show "Loading 1000, 2000…" so user knows it's still working
@@ -617,7 +641,23 @@
       const joined = joinMeeshoManifest(orders);
       orders = joined.rows;
 
-      // Rebuild the courier list from what actually came back, then filter by it.
+      // Every dropdown is now rebuilt from the shipments in range. Each list is
+      // counted against the OTHER filters, so the numbers say what you would get
+      // by picking that option, not what exists overall.
+      const platName = p => ({ amazon:"Amazon", flipkart:"Flipkart", meesho:"Meesho",
+                               myntra:"Myntra", firstcry:"FirstCry" })[p] || p;
+      fillSelectWithCounts($("#companySel"),
+        countBy(orders.filter(r => !platform || r.platform === platform),
+                r => r.company_name, r => r.company_name),
+        "All companies");
+      fillSelectWithCounts($("#platformSel"),
+        countBy(orders.filter(r => !company || r.company_name === company),
+                r => r.platform, r => platName(r.platform)),
+        "All platforms");
+
+      if (company)  orders = orders.filter(r => r.company_name === company);
+      if (platform) orders = orders.filter(r => r.platform === platform);
+
       // courierOf() reads the manifest's own Courier field and falls back to the
       // tracking-ID prefix, so this works on every platform.
       refreshCourierOptions(orders);
