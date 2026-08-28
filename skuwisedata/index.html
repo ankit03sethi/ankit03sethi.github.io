@@ -151,10 +151,12 @@
 <!-- Data view (orders/returns/payments/stock/sku_master) -->
 <div id="dataView">
   <div class="controls">
-    <span class="ctrl-lbl">Company</span>
-    <select id="companyPicker"><option value="">Loading&hellip;</option></select>
     <button class="btn" id="reloadBtn">Reload</button>
     <span id="lastLoadAt" style="font-size:12px; color:#94a3b8;"></span>
+  </div>
+
+  <div class="platform-row" id="companyRow">
+    <div class="plat-chip active" data-c="">All companies</div>
   </div>
 
   <div class="platform-row" id="platformRow">
@@ -276,15 +278,15 @@
       .select("name").eq("user_id", state.session.user.id).order("name");
     if (error) { console.warn(error); return; }
     state.companies = (data || []).map(x => x.name);
-    const sel = $("#companyPicker");
+    const row = $("#companyRow");
+    state.company = "";
     if (state.companies.length === 0) {
-      sel.innerHTML = "<option value=''>(no companies yet)</option>";
-      state.company = "";
+      row.innerHTML = `<div class="plat-chip active" data-c="">(no companies yet)</div>`;
       return;
     }
-    sel.innerHTML = "<option value=''>All companies</option>" +
-      state.companies.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-    state.company = "";
+    // Same chips as the platform row — one click, no dropdown to open first.
+    row.innerHTML = `<div class="plat-chip active" data-c="">All companies</div>` +
+      state.companies.map(n => `<div class="plat-chip" data-c="${escapeHtml(n)}">${escapeHtml(n)}</div>`).join("");
   }
 
   // ---- 2. Tabs + platform chips ----
@@ -312,8 +314,12 @@
     state.platform = c.dataset.p || "";
     refresh();
   });
-  document.getElementById("companyPicker").addEventListener("change", (e) => {
-    state.company = e.target.value; refresh();
+  document.getElementById("companyRow").addEventListener("click", (e) => {
+    const c = e.target.closest(".plat-chip"); if (!c) return;
+    document.querySelectorAll("#companyRow .plat-chip").forEach(x => x.classList.remove("active"));
+    c.classList.add("active");
+    state.company = c.dataset.c || "";
+    refresh();
   });
   document.getElementById("reloadBtn").addEventListener("click", refresh);
 
@@ -625,6 +631,14 @@
     const cell = (r, i, col) => {
       const rd = r.raw_data || {};
       const blank = v => v == null || String(v).trim() === "";
+      // Amazon and FirstCry have exactly one identifier and it is already in the
+      // ASIN column. This has to come before the uploaded file is consulted:
+      // the master file carries a stray "3" here on 1,789 Amazon rows, which is
+      // junk rather than a listing id.
+      if (col === "Other Listing Id") {
+        const plat = String(r.platform || "").toLowerCase();
+        if (plat === "amazon" || plat === "firstcry") return "\u2014";
+      }
       // If the raw uploaded file had this exact header, use that value verbatim.
       // An empty cell is not a value — fall through to what we can work out, or
       // an ASIN column present-but-blank in the master file would hide the ASIN.
@@ -668,6 +682,12 @@
     // saved in listing_data by the earlier editable version still take priority
     // so nothing already entered disappears.
     const shownVal = (r, i, col) => {
+      // Same rule as in cell(): these two platforms have no second listing id,
+      // so nothing saved earlier should resurrect one.
+      if (col === "Other Listing Id") {
+        const plat = String(r.platform || "").toLowerCase();
+        if (plat === "amazon" || plat === "firstcry") return "\u2014";
+      }
       const ld = r.listing_data || {};
       if (Object.prototype.hasOwnProperty.call(ld, col) && ld[col] !== "" && ld[col] != null) {
         return String(ld[col]);
