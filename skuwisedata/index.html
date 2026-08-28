@@ -22,20 +22,30 @@
       --shadow-md:0 4px 12px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.06);
       --shadow-lg:0 12px 28px rgba(15,23,42,.10), 0 3px 8px rgba(15,23,42,.06);
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0; color: var(--text);
-      background:
-        radial-gradient(ellipse 70% 45% at 50% 0%, rgba(31,111,235,.10), transparent 70%),
-        radial-gradient(circle at 12% 40%, rgba(139,92,246,.07), transparent 45%),
-        radial-gradient(circle at 92% 25%, rgba(245,158,11,.07), transparent 45%),
-        #f8fafc;
-      background-attachment: fixed;
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           margin:0; color:var(--text); background:#f1f5f9; }
+    /* One card treatment, lifted from the services grid on the home page:
+       white card on light grey, hairline border, soft shadow, lifts and turns
+       blue on hover. Colour lives in the small rounded tiles, not in washes
+       across whole panels. */
+    .card-surface {
+      background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+      border:1px solid #e2e8f0; border-radius:11px;
+      box-shadow:0 4px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04), inset 0 1px 0 rgba(255,255,255,.9);
+      transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
+    .card-surface:hover {
+      border-color:var(--primary); transform:translateY(-3px); background:#f5f9ff;
+      box-shadow:0 10px 24px rgba(31,111,235,.18), 0 4px 8px rgba(15,23,42,.08), inset 0 1px 0 #fff;
+    }
+    .tile { width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+            font-size:17px; color:#fff; flex:none; font-weight:700;
+            box-shadow:0 3px 6px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.25); }
     a { color: inherit; }
     .topbar { display:flex; align-items:center; justify-content:space-between; padding: 14px 28px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:10; }
     .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
-    .brand-box { width:40px; height:40px; background:linear-gradient(135deg,var(--primary),var(--purple)); border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-md); }
+    .brand-box { width:40px; height:40px; background:var(--primary); border-radius:10px; display:flex; align-items:center; justify-content:center;
+                 box-shadow:0 3px 6px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.25); }
     .brand-wordmark { font-family:'Dancing Script', cursive; font-size:22px; color:#0f172a; line-height:1; }
     .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
     .topbar-right { display:flex; align-items:center; gap:14px; font-size:13px; }
@@ -43,9 +53,7 @@
     .btn-link { color:#1f6feb; text-decoration:none; font-weight:600; }
 
     .hero { padding:28px 28px 8px; }
-    .hero h1 { margin:0 0 4px; font-size:26px; font-weight:800;
-               background:linear-gradient(135deg,var(--primary) 0%,var(--purple) 55%,var(--pink) 100%);
-               -webkit-background-clip:text; background-clip:text; color:transparent; width:fit-content; }
+    .hero h1 { margin:0 0 4px; font-size:25px; font-weight:800; color:var(--text); }
     .hero .sub { color:#64748b; font-size:14px; margin:0; }
 
     .controls { display:flex; align-items:center; gap:12px; padding:14px 28px 6px; flex-wrap:wrap; }
@@ -53,53 +61,52 @@
     select, button.btn { font: inherit; padding:8px 12px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
     select, button.btn { box-shadow:var(--shadow-sm); transition:transform .12s, box-shadow .15s, border-color .15s; }
     select:hover, button.btn:hover { transform:translateY(-1px); box-shadow:var(--shadow-md); border-color:#cbd5e1; }
-    button.btn.primary { background:linear-gradient(135deg,var(--primary),var(--purple)); color:#fff; border-color:transparent; font-weight:700; }
-    button.btn.primary:hover { filter:brightness(1.06); }
+    button.btn.primary { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:700; }
+    button.btn.primary:hover { background:var(--primary-dark); }
 
     .tabs { display:flex; gap:4px; padding:14px 28px 0; border-bottom:1px solid #e5e7eb; overflow-x:auto; }
-    .tab { padding:10px 16px; font-size:14px; font-weight:600; color:var(--muted); cursor:pointer;
-           border-bottom:3px solid transparent; white-space:nowrap; border-radius:8px 8px 0 0;
-           transition:color .15s, background .15s; }
-    .tab:hover { color:var(--text); background:rgba(31,111,235,.06); }
-    .tab.active { color:var(--primary); border-image:linear-gradient(90deg,var(--primary),var(--purple)) 1;
-                  border-bottom-color:var(--primary); background:rgba(31,111,235,.06); }
+    .tab { padding:10px 16px; font-size:14px; font-weight:700; color:var(--muted); cursor:pointer;
+           border-bottom:2px solid transparent; white-space:nowrap; transition:color .15s, border-color .15s; }
+    .tab:hover { color:var(--text); }
+    .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
 
     .platform-row { display:flex; gap:6px; padding:12px 28px 0; flex-wrap:wrap; }
-    .plat-chip { padding:6px 13px; font-size:12px; font-weight:700; border-radius:999px;
-                 border:1px solid var(--border); background:#fff; cursor:pointer; color:var(--text);
-                 box-shadow:var(--shadow-sm); transition:transform .12s, box-shadow .15s, background .15s, color .15s; }
-    .plat-chip:hover { transform:translateY(-1px); box-shadow:var(--shadow-md); border-color:#cbd5e1; }
-    .plat-chip.active { background:linear-gradient(135deg,var(--primary),var(--purple)); color:#fff; border-color:transparent; box-shadow:var(--shadow-md); }
-    /* Each marketplace keeps its own colour when selected, so you can tell
-       which one is on without reading the label. */
-    #platformRow .plat-chip[data-p="amazon"].active   { background:linear-gradient(135deg,#f59e0b,#d97706); }
-    #platformRow .plat-chip[data-p="flipkart"].active { background:linear-gradient(135deg,#2874f0,#1651a8); }
-    #platformRow .plat-chip[data-p="meesho"].active   { background:linear-gradient(135deg,#ec4899,#a21caf); }
-    #platformRow .plat-chip[data-p="myntra"].active   { background:linear-gradient(135deg,#f43f5e,#be123c); }
-    #platformRow .plat-chip[data-p="firstcry"].active { background:linear-gradient(135deg,#14b8a6,#0f766e); }
+    .plat-chip { padding:7px 14px; font-size:12.5px; font-weight:700; border-radius:10px;
+                 border:1px solid #e2e8f0; background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+                 cursor:pointer; color:var(--text);
+                 box-shadow:0 2px 5px rgba(15,23,42,.05), inset 0 1px 0 rgba(255,255,255,.9);
+                 transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .plat-chip:hover { border-color:var(--primary); transform:translateY(-2px); background:#eff6ff; color:var(--primary);
+                       box-shadow:0 8px 18px rgba(31,111,235,.16); }
+    .plat-chip.active:hover { color:#fff; }
+    .plat-chip.active { background:var(--primary); color:#fff; border-color:var(--primary);
+                        box-shadow:0 4px 10px rgba(31,111,235,.28), inset 0 1px 0 rgba(255,255,255,.25); }
+    /* Each marketplace keeps its own colour when on, so the active filter reads
+       without checking the label. Flat, like the service tiles. */
+    #platformRow .plat-chip[data-p="amazon"].active   { background:#f59e0b; border-color:#f59e0b; box-shadow:0 4px 10px rgba(245,158,11,.30); }
+    #platformRow .plat-chip[data-p="flipkart"].active { background:#2874f0; border-color:#2874f0; box-shadow:0 4px 10px rgba(40,116,240,.30); }
+    #platformRow .plat-chip[data-p="meesho"].active   { background:#ec4899; border-color:#ec4899; box-shadow:0 4px 10px rgba(236,72,153,.30); }
+    #platformRow .plat-chip[data-p="myntra"].active   { background:#f43f5e; border-color:#f43f5e; box-shadow:0 4px 10px rgba(244,63,94,.30); }
+    #platformRow .plat-chip[data-p="firstcry"].active { background:#14b8a6; border-color:#14b8a6; box-shadow:0 4px 10px rgba(20,184,166,.30); }
 
     .cell-link { margin-left:6px; font-size:12px; text-decoration:none; }
     .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; padding:16px 28px 8px; }
-    .kpi { position:relative; background:#fff; border:1px solid var(--border); border-radius:14px;
-           padding:14px 14px 14px 18px; box-shadow:var(--shadow-sm); overflow:hidden;
-           transition:transform .15s, box-shadow .2s; }
-    .kpi:hover { transform:translateY(-2px); box-shadow:var(--shadow-lg); }
-    /* A coloured spine per card — the eye finds the number faster than it reads
-       the label above it. */
-    .kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
-                   background:linear-gradient(180deg,var(--primary),var(--purple)); }
-    .kpi:nth-child(2)::before { background:linear-gradient(180deg,var(--green),var(--teal)); }
-    .kpi:nth-child(3)::before { background:linear-gradient(180deg,var(--accent),#d97706); }
-    .kpi:nth-child(4)::before { background:linear-gradient(180deg,var(--pink),var(--purple)); }
+    .kpi { display:flex; gap:11px; align-items:center; padding:13px 14px;
+           background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+           border:1px solid #e2e8f0; border-radius:11px;
+           box-shadow:0 4px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04), inset 0 1px 0 rgba(255,255,255,.9);
+           transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .kpi:hover { border-color:var(--primary); transform:translateY(-3px); background:#f5f9ff;
+                 box-shadow:0 10px 24px rgba(31,111,235,.18), 0 4px 8px rgba(15,23,42,.08); }
     .kpi .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
-    .kpi .value { font-size:23px; font-weight:800; margin-top:4px; color:var(--text); }
-    .kpi .foot { font-size:11px; color:#94a3b8; margin-top:4px; }
+    .kpi .value { font-size:22px; font-weight:800; margin-top:2px; color:var(--text); line-height:1.1; }
+    .kpi .foot { font-size:11px; color:#94a3b8; margin-top:2px; }
 
-    .panel { background:#fff; border:1px solid var(--border); border-radius:14px; margin:12px 28px 24px;
-             overflow:hidden; box-shadow:var(--shadow-md); }
-    .panel-head { padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700;
-                  display:flex; align-items:center; justify-content:space-between;
-                  background:linear-gradient(90deg, rgba(31,111,235,.06), rgba(139,92,246,.05) 55%, rgba(236,72,153,.04)); }
+    .panel { background:#fff; border:1px solid #e2e8f0; border-radius:11px; margin:12px 28px 24px;
+             overflow:hidden;
+             box-shadow:0 4px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04); }
+    .panel-head { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700;
+                  display:flex; align-items:center; justify-content:space-between; background:#fff; }
     .panel-body { max-height:calc(100vh - 300px); min-height:420px; overflow:auto; }
     /* A second horizontal scrollbar pinned above the header row. The table is
        wider than the screen and the real one sits at the very bottom of a very
@@ -133,12 +140,11 @@
        more room and a little more weight. */
     table.data tbody td { font-weight:600; color:#1e293b; }
     table.data tbody td.muted { font-weight:500; }
-    table.data thead th { background:linear-gradient(180deg,#f1f5f9,#e9eef6); color:#475569; font-weight:700;
-                          text-transform:uppercase; font-size:11px; letter-spacing:.5px; position:sticky; top:0;
-                          border-bottom:1px solid var(--border); }
+    table.data thead th { background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase;
+                          font-size:11px; letter-spacing:.5px; position:sticky; top:0;
+                          border-bottom:1px solid #e2e8f0; }
     table.data tbody tr { transition:background .12s; }
-    table.data tbody tr:nth-child(even) { background:#fbfdff; }
-    table.data tbody tr:hover { background:linear-gradient(90deg, rgba(31,111,235,.10), rgba(139,92,246,.07)); }
+    table.data tbody tr:hover { background:#eff6ff; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -717,16 +723,16 @@
     const latestStr = latestIso ? new Date(latestIso).toLocaleString("en-IN") : "—";
     if (state.view === "sku_master") {
       $("#kpis").innerHTML = `
-        <div class="kpi"><div class="label">Total mappings</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div>
-        <div class="kpi"><div class="label">Platforms mapped</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div>
-        <div class="kpi"><div class="label">Latest update</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div>
+        <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total mappings</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
       `;
     } else {
       $("#kpis").innerHTML = `
-        <div class="kpi"><div class="label">Total rows</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div>
-        <div class="kpi"><div class="label">Companies in view</div><div class="value">${companies.size}</div><div class="foot">${[...companies].slice(0,3).join(", ") || "—"}</div></div>
-        <div class="kpi"><div class="label">Platforms in view</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div>
-        <div class="kpi"><div class="label">Latest ${state.view === "stock" ? "snapshot" : state.view.slice(0,-1)}</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div>
+        <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128202;</div><div><div class="label">Total rows</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#8b5cf6;">&#127970;</div><div><div class="label">Companies in view</div><div class="value">${companies.size}</div><div class="foot">${[...companies].slice(0,3).join(", ") || "—"}</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#14b8a6;">&#128717;</div><div><div class="label">Platforms in view</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest ${state.view === "stock" ? "snapshot" : state.view.slice(0,-1)}</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
       `;
     }
   }
