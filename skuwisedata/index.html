@@ -401,8 +401,9 @@
     } else {
       $("#dataView").style.display = "";
       $("#uploadsView").style.display = "none";
-      // SKU Master doesn't need platform chips
-      $("#platformRow").style.display = state.view === "sku_master" ? "none" : "";
+      // The platform chips were hidden on SKU Master back when they did nothing
+      // there. They filter it now, so they belong on every view.
+      $("#platformRow").style.display = "";
       refresh();
     }
   });
