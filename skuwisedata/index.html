@@ -1208,7 +1208,10 @@
   function startScrapeBar() {
     if (_scrapeTimer) clearInterval(_scrapeTimer);
     refreshScrapeBar();
-    _scrapeTimer = setInterval(refreshScrapeBar, 20000);
+    // 60s, not 20s. Three times fewer calls for a strip whose whole job is to
+    // say "still moving" — at a thousand customers with a tab open, the 20s
+    // version was 4,300 requests a day each.
+    _scrapeTimer = setInterval(refreshScrapeBar, 60000);
   }
 
   function labelForDate(v) {
