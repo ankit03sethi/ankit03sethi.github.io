@@ -764,44 +764,33 @@ function renderProductDetail(data) {
   // Initial thumbnail wire — starts with hero product's images
   paintGallery(imgs);
 
-  // v2026082215: auto-expand the first color's designs so the page opens with
-  // one grid already visible (no click needed to see any design).
+  // Open EVERY color's designs on load. Hiding them behind a click meant the
+  // page opened showing one design out of however many the product has, and the
+  // rest read as empty rows.
   if (_is2Axis) {
-    const firstColorWithDesigns = colors.find(c => Array.isArray(c.designs) && c.designs.length > 0);
-    if (firstColorWithDesigns) {
+    const withDesigns = colors.filter(c => Array.isArray(c.designs) && c.designs.length > 0);
+    if (withDesigns.length) {
       setTimeout(() => {
-        const row = wrap.querySelector(`.var-row[data-cid="${firstColorWithDesigns.id}"]`);
+        for (const c of withDesigns) toggleDesignsInline(c.id, true);
+        // The first color still drives the main gallery and stays highlighted.
+        const first = withDesigns[0];
+        const row = wrap.querySelector(`.var-row[data-cid="${first.id}"]`);
         if (row) row.style.background = "#eff6ff";
-        toggleDesignsInline(firstColorWithDesigns.id, true);
-        // Also swap the main gallery to the first color's images
-        const varImgs = (firstColorWithDesigns.image_urls || []).filter(Boolean);
+        const varImgs = (first.image_urls || []).filter(Boolean);
         if (varImgs.length) paintGallery(varImgs);
       }, 0);
     }
   }
 
   // Local helper: expand/collapse a color's inline designs panel (2-axis only).
-  // v2026082215: now behaves as an ACCORDION — opening one color closes the
-  // others so the user only ever sees one design grid at a time.
+  // No longer an accordion: every color can be open at once, so the whole
+  // variation matrix is visible without clicking through it one color at a time.
+  // The chevron still collapses an individual color for anyone who wants that.
   const toggleDesignsInline = (cid, forceOpen) => {
     const panel = wrap.querySelector(`.designs-inline[data-cid="${cid}"]`);
     if (!panel) return false;
     const isOpen = panel.style.display !== "none" && panel.style.display !== "";
     const willOpen = forceOpen === true ? true : (forceOpen === false ? false : !isOpen);
-    // Accordion: close every OTHER designs panel first so only one is open.
-    if (willOpen) {
-      wrap.querySelectorAll(".designs-inline").forEach(p => {
-        if (p !== panel && p.style.display === "block") {
-          p.style.display = "none";
-          const other = wrap.querySelector(`.var-chevron[data-cid="${p.dataset.cid}"] .chev-arrow`);
-          if (other) other.style.transform = "rotate(0deg)";
-        }
-      });
-      // Also un-highlight other rows
-      wrap.querySelectorAll(".var-row").forEach(r => {
-        if (Number(r.dataset.cid) !== cid) r.style.background = "#fff";
-      });
-    }
     if (willOpen && !panel.dataset.rendered) {
       const clr = colors.find(c => c.id === cid);
       if (clr) { renderDesignsInline(panel, clr); panel.dataset.rendered = "1"; }
@@ -830,9 +819,7 @@ function renderProductDetail(data) {
       // Highlight the clicked row so the user sees which one drives the gallery
       wrap.querySelectorAll(".var-row").forEach(r => r.style.background = "#fff");
       row.style.background = "#eff6ff";
-      // v2026082216: 2-axis click FORCES OPEN — never toggle-close on the
-      // same color. Accordion inside toggleDesignsInline still closes the
-      // previously-open one when we switch to a new color.
+      // Clicking a row keeps its designs open; other colors stay open too.
       if (row.classList.contains("has-designs")) toggleDesignsInline(cid, true);
     });
   });
