@@ -653,23 +653,24 @@
 
   // Load the latest pushed_at per (company, platform) for the given kind. Used to
   // annotate each combo row so packers can see when that combo was last updated.
+  //
+  // This used to pull the newest 2000 rows and fold them in the browser, but
+  // PostgREST caps a response at 1000 rows — one 1014-row FirstCry inventory
+  // push filled the entire response, so every other company and platform read
+  // "Never" even though their data was right there. seller_last_uploads()
+  // aggregates in the database and returns one row per kind+company+platform,
+  // for every kind at once.
   async function loadPickerLastMap(kind) {
     pickerLastByCombo = {};
     if (!session) return;
-    const cfg = KIND_CFG[kind];
     try {
-      let q = sb.from(cfg.table)
-        .select("company_name, platform, pushed_at")
-        .eq("user_id", session.user.id)
-        .order("pushed_at", { ascending: false })
-        .limit(2000);
-      if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
-      else         q = q.is("raw_data->>__file_tag", null);
-      const { data } = await q;
+      const { data, error } = await sb.rpc("seller_last_uploads");
+      if (error) { console.warn("loadPickerLastMap rpc err:", error); return; }
       (data || []).forEach(r => {
+        if (r.kind !== kind) return;
         const key = (r.company_name || "") + "::" + (r.platform || "");
-        // Since ordered desc, first hit wins
-        if (!pickerLastByCombo[key]) pickerLastByCombo[key] = r.pushed_at;
+        const prev = pickerLastByCombo[key];
+        if (!prev || new Date(r.last_pushed) > new Date(prev)) pickerLastByCombo[key] = r.last_pushed;
       });
     } catch (e) { console.warn("loadPickerLastMap err:", e); }
   }
