@@ -1129,7 +1129,7 @@
       const when = d.toLocaleString("en-IN", {
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
       });
-      txt.innerHTML = `Row <b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> ${escapeHtml(when)}`;
+      txt.innerHTML = `<b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> ${escapeHtml(when)}`;
     } catch (e) { /* the strip is decoration; never break the page over it */ }
   }
   function startScrapeBar() {
