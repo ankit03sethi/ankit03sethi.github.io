@@ -63,6 +63,18 @@
     .allsearch input:focus { outline:none; border-color:#1f6feb; }
     .allsearch .clear { position:absolute; right:8px; top:50%; transform:translateY(-50%); cursor:pointer; color:#94a3b8; font-size:14px; display:none; }
     .allsearch.on .clear { display:block; }
+    /* Live scrape strip under the table. The table shows 500 of 25,747 rows, so
+       a freshly scraped row is almost never on screen — without this there is
+       no way to tell from the website whether the desktop app is working. */
+    .scrape-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+                  padding:8px 16px; border-top:1px solid #e5e7eb; background:#f8fafc;
+                  font-size:12px; color:#475569; }
+    .scrape-bar .dot { width:8px; height:8px; border-radius:50%; background:#cbd5e1; flex:none; }
+    .scrape-bar.live .dot { background:#16a34a; animation:pulse 1.6s ease-in-out infinite; }
+    .scrape-bar.stale .dot { background:#f59e0b; }
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.25 } }
+    .scrape-bar b { color:#0f172a; }
+    .scrape-bar .sep { color:#cbd5e1; }
     .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
     table.data { width:100%; border-collapse:collapse; font-size:13px; }
     table.data th, table.data td { padding:9px 12px; text-align:left; border-bottom:1px solid #f1f5f9; }
@@ -195,6 +207,9 @@
     <div class="panel-body" id="tableWrap">
       <div class="empty">Loading&hellip;</div>
     </div>
+    <div class="scrape-bar" id="scrapeBar" style="display:none;">
+      <span class="dot"></span><span id="scrapeText">Checking listing scrape&hellip;</span>
+    </div>
   </div>
 </div>
 
@@ -286,6 +301,7 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await loadCompanies();
+    startScrapeBar();
     await refreshMasterStamp();
     await refresh();
   })();
@@ -416,6 +432,7 @@
 
   async function refresh() {
     syncSearchVisibility();
+    refreshScrapeBar();
     if (state.view === "uploads") return;
     $("#tableWrap").innerHTML = '<div class="empty">Loading&hellip;</div>';
     $("#kpis").innerHTML = "";
@@ -1027,6 +1044,49 @@
   function syncSearchVisibility() {
     const wrap = document.getElementById("allSearchWrap");
     if (wrap) wrap.style.display = (state.view === "sku_master") ? "" : "none";
+  }
+
+  // Live listing-scrape strip. Polls a single aggregate row every 20 seconds —
+  // cheap, and it answers the only question the table cannot: is the desktop
+  // app still working right now?
+  let _scrapeTimer = null;
+  async function refreshScrapeBar() {
+    const bar = $("#scrapeBar"), txt = $("#scrapeText");
+    if (!bar || !txt) return;
+    if (state.view !== "sku_master" || !state.session) { bar.style.display = "none"; return; }
+    try {
+      const { data, error } = await sb.rpc("seller_listing_progress");
+      const p = Array.isArray(data) ? data[0] : data;
+      if (error || !p) { bar.style.display = "none"; return; }
+      bar.style.display = "";
+      const total = Number(p.total || 0), checked = Number(p.checked || 0), ok = Number(p.ok_rows || 0);
+      const lastMs = p.last_at ? new Date(p.last_at).getTime() : 0;
+      const ageSec = lastMs ? Math.round((Date.now() - lastMs) / 1000) : null;
+      // Green while something was scraped in the last 3 minutes; amber after.
+      bar.classList.toggle("live",  ageSec !== null && ageSec < 180);
+      bar.classList.toggle("stale", ageSec === null || ageSec >= 180);
+      const pct = total ? ((checked / total) * 100).toFixed(1) : "0";
+      const when = lastMs ? new Date(lastMs).toLocaleTimeString("en-IN") : "\u2014";
+      const ago = ageSec === null ? "" :
+        ageSec < 60 ? `${ageSec}s ago` :
+        ageSec < 3600 ? `${Math.round(ageSec / 60)}m ago` : `${Math.round(ageSec / 3600)}h ago`;
+      const bits = [
+        `<b>${checked.toLocaleString("en-IN")}</b> of <b>${total.toLocaleString("en-IN")}</b> scraped (${pct}%)`,
+        `<b>${ok.toLocaleString("en-IN")}</b> with data`,
+      ];
+      if (p.last_sku) {
+        const price = (p.last_price === null || p.last_price === undefined) ? p.last_status || "" : "\u20b9" + p.last_price;
+        bits.push(`last: <b>${escapeHtml(p.last_sku)}</b> \u00b7 ${escapeHtml(p.last_company || "")} \u00b7 ${escapeHtml(p.last_platform || "")} \u00b7 ${escapeHtml(String(price))} at ${escapeHtml(when)} (${ago})`);
+      } else {
+        bits.push("nothing scraped yet");
+      }
+      txt.innerHTML = bits.join(' <span class="sep">|</span> ');
+    } catch (e) { /* the strip is decoration; never break the page over it */ }
+  }
+  function startScrapeBar() {
+    if (_scrapeTimer) clearInterval(_scrapeTimer);
+    refreshScrapeBar();
+    _scrapeTimer = setInterval(refreshScrapeBar, 20000);
   }
 
   function labelForDate(v) {
