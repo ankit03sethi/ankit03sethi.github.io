@@ -724,21 +724,22 @@
       });
     });
 
-    // Sort: default groups by company then platform; reverse groups by platform then company
-    if (reversed) {
-      const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
-      rows.sort((a, b) =>
-        (platOrder[a.platform] - platOrder[b.platform]) ||
-        a.company.localeCompare(b.company)
-      );
-    } else {
-      const companyOrder = Object.fromEntries(list.map((c, i) => [c.name, i]));
-      const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
-      rows.sort((a, b) =>
-        (companyOrder[a.company] - companyOrder[b.company]) ||
-        (platOrder[a.platform] - platOrder[b.platform])
-      );
-    }
+    // Sort: most recently updated first, oldest next, never-uploaded last.
+    // Rows with the same standing (in practice, all the "Never" ones) keep the
+    // old grouping — by company then platform, or platform then company in the
+    // reversed layout — so the bottom of the list stays predictable.
+    const companyOrder = Object.fromEntries(list.map((c, i) => [c.name, i]));
+    const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
+    const lastMs = (r) => {
+      const iso = pickerLastByCombo[r.company + "::" + r.platform];
+      if (!iso) return -1;                       // never uploaded -> bottom
+      const t = new Date(iso).getTime();
+      return isNaN(t) ? -1 : t;
+    };
+    const groupCmp = reversed
+      ? (a, b) => (platOrder[a.platform] - platOrder[b.platform]) || a.company.localeCompare(b.company)
+      : (a, b) => (companyOrder[a.company] - companyOrder[b.company]) || (platOrder[a.platform] - platOrder[b.platform]);
+    rows.sort((a, b) => (lastMs(b) - lastMs(a)) || groupCmp(a, b));
 
     if (rows.length === 0) {
       wrap.innerHTML = `<div style="padding:24px; text-align:center; color:#64748b; font-size:13px;">No matches for this filter. Clear filters or add companies with the selected platform.</div>`;
