@@ -639,6 +639,15 @@
         const plat = String(r.platform || "").toLowerCase();
         if (plat === "amazon" || plat === "firstcry") return "\u2014";
       }
+      // The marketplace's own inventory export is the source of truth for these
+      // two, ahead of the uploaded master file: the export is what the platform
+      // is listing right now, the master file is whatever was typed last. Only
+      // when the SKU is not in the current export do we fall through to the file.
+      if (col === "ASIN" || col === "Other Listing Id") {
+        const pid = state.platformIds && state.platformIds.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const live = pid ? (col === "ASIN" ? pid.platform_id : pid.other_listing_id) : "";
+        if (!blank(live)) return String(live);
+      }
       // If the raw uploaded file had this exact header, use that value verbatim.
       // An empty cell is not a value — fall through to what we can work out, or
       // an ASIN column present-but-blank in the master file would hide the ASIN.
@@ -652,11 +661,8 @@
       if (col === "Link") {
         return productLink(r.platform, shownVal(r, i, "ASIN")) || "\u2014";
       }
-      // Marketplace IDs come from the platform's own inventory export
+      // Neither the export nor the file had it — last resort is the parsed column
       if (col === "ASIN" || col === "Other Listing Id") {
-        const pid = state.platformIds && state.platformIds.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const v = pid ? (col === "ASIN" ? pid.platform_id : pid.other_listing_id) : "";
-        if (!blank(v)) return String(v);
         if (col === "ASIN" && !blank(r.asin)) return String(r.asin);
         return "\u2014";
       }
@@ -693,6 +699,9 @@
         const plat = String(r.platform || "").toLowerCase();
         if (plat === "amazon" || plat === "firstcry") return "\u2014";
       }
+      // ASIN and Other Listing Id are read from the inventory export, so a value
+      // saved by the old editable version must not shadow it.
+      if (col === "ASIN" || col === "Other Listing Id") return cell(r, i, col);
       const ld = r.listing_data || {};
       if (Object.prototype.hasOwnProperty.call(ld, col) && ld[col] !== "" && ld[col] != null) {
         return String(ld[col]);
