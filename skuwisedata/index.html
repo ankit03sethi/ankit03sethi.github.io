@@ -244,6 +244,7 @@
     rowsById: new Map(),       // id -> row, so an edited cell can find its row
     tools: {},                 // per view: { filters: {colName: text}, sort: {col, dir} }
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
+    listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
     // Paging. The table used to stop at 200 rows; it now pulls another page
     // whenever you scroll near the bottom, until the whole view is loaded.
     pageSize: 500,
@@ -425,7 +426,9 @@
       // one company or platform, and those are different rows here.
       for (const r of (wc || [])) state.windowCounts.set(wcKey(r.company_name, r.platform, r.sku), r);
       state.platformIds = new Map();
+      state.listingStats = new Map();
       await loadPlatformIds(data || []);
+      await loadListingStats(data || []);
     }
 
     $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
@@ -493,6 +496,19 @@
     for (const r of (pid || [])) state.platformIds.set(wcKey(r.company_name, r.platform, r.sku), r);
   }
 
+  // Latest scraped listing values — what the product page says right now, put
+  // there by the desktop app's listing scraper. Same keying and same reason for
+  // sending only the visible keys as loadPlatformIds.
+  async function loadListingStats(rows) {
+    const keys = [...new Set(rows
+      .map(r => wcKey(r.company_name, r.platform, r.seller_sku))
+      .filter(k => k && k !== "||" && !state.listingStats.has(k)))];
+    if (!keys.length) return;
+    const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: keys });
+    if (error) { console.warn("sku_listing_stats failed", error); return; }
+    for (const r of (data || [])) state.listingStats.set(wcKey(r.company_name, r.platform, r.sku), r);
+  }
+
   async function loadMoreRows() {
     if (state.loadingMore || state.view === "uploads") return;
     if (state.loaded >= state.total) return;
@@ -509,6 +525,7 @@
       if (state.view === "sku_master") {
         for (const r of rows) state.rowsById.set(String(r.id), r);
         await loadPlatformIds(rows);
+        await loadListingStats(rows);
       }
       const tbody = $("#tableWrap").querySelector("table.data tbody");
       if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
@@ -655,6 +672,18 @@
       const want = normHdr(col);
       for (const k of Object.keys(rd)) {
         if (normHdr(k) === want && !blank(rd[k])) return safeCell(rd[k]);
+      }
+      // Live listing values from the scraper. Ahead of the uploaded file for the
+      // same reason the IDs are: this is the page as it reads today.
+      if (col === "Site Price" || col === "Ratings" || col === "Count" || col === "Seller") {
+        const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        if (st) {
+          const v = col === "Site Price" ? st.price
+                  : col === "Ratings"    ? st.rating
+                  : col === "Count"      ? st.review_count
+                  :                        st.seller;
+          if (!blank(v)) return String(v);
+        }
       }
       // A Link the master file did not carry is built from the marketplace ID
       // exactly as it is being displayed in the ASIN column for this row.
