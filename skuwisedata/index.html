@@ -12,11 +12,30 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    /* Same palette as the home page, so the app does not look like a different
+       product once you are past the landing screen. */
+    :root {
+      --primary:#1f6feb; --primary-dark:#1858bd; --accent:#f59e0b; --green:#10b981;
+      --purple:#8b5cf6; --pink:#ec4899; --teal:#14b8a6;
+      --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+      --shadow-sm:0 1px 2px rgba(15,23,42,.06);
+      --shadow-md:0 4px 12px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.06);
+      --shadow-lg:0 12px 28px rgba(15,23,42,.10), 0 3px 8px rgba(15,23,42,.06);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; color: var(--text);
+      background:
+        radial-gradient(ellipse 70% 45% at 50% 0%, rgba(31,111,235,.10), transparent 70%),
+        radial-gradient(circle at 12% 40%, rgba(139,92,246,.07), transparent 45%),
+        radial-gradient(circle at 92% 25%, rgba(245,158,11,.07), transparent 45%),
+        #f8fafc;
+      background-attachment: fixed;
+    }
     a { color: inherit; }
     .topbar { display:flex; align-items:center; justify-content:space-between; padding: 14px 28px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:10; }
     .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
-    .brand-box { width:40px; height:40px; background:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+    .brand-box { width:40px; height:40px; background:linear-gradient(135deg,var(--primary),var(--purple)); border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-md); }
     .brand-wordmark { font-family:'Dancing Script', cursive; font-size:22px; color:#0f172a; line-height:1; }
     .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
     .topbar-right { display:flex; align-items:center; gap:14px; font-size:13px; }
@@ -24,33 +43,63 @@
     .btn-link { color:#1f6feb; text-decoration:none; font-weight:600; }
 
     .hero { padding:28px 28px 8px; }
-    .hero h1 { margin:0 0 4px; font-size:24px; font-weight:800; }
+    .hero h1 { margin:0 0 4px; font-size:26px; font-weight:800;
+               background:linear-gradient(135deg,var(--primary) 0%,var(--purple) 55%,var(--pink) 100%);
+               -webkit-background-clip:text; background-clip:text; color:transparent; width:fit-content; }
     .hero .sub { color:#64748b; font-size:14px; margin:0; }
 
     .controls { display:flex; align-items:center; gap:12px; padding:14px 28px 6px; flex-wrap:wrap; }
     .ctrl-lbl { font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
     select, button.btn { font: inherit; padding:8px 12px; border-radius:8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
-    button.btn.primary { background:#1f6feb; color:#fff; border-color:#1f6feb; font-weight:700; }
-    button.btn.primary:hover { background:#1651a8; }
+    select, button.btn { box-shadow:var(--shadow-sm); transition:transform .12s, box-shadow .15s, border-color .15s; }
+    select:hover, button.btn:hover { transform:translateY(-1px); box-shadow:var(--shadow-md); border-color:#cbd5e1; }
+    button.btn.primary { background:linear-gradient(135deg,var(--primary),var(--purple)); color:#fff; border-color:transparent; font-weight:700; }
+    button.btn.primary:hover { filter:brightness(1.06); }
 
     .tabs { display:flex; gap:4px; padding:14px 28px 0; border-bottom:1px solid #e5e7eb; overflow-x:auto; }
-    .tab { padding:10px 16px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
-    .tab:hover { color:#0f172a; }
-    .tab.active { color:#1f6feb; border-bottom-color:#1f6feb; }
+    .tab { padding:10px 16px; font-size:14px; font-weight:600; color:var(--muted); cursor:pointer;
+           border-bottom:3px solid transparent; white-space:nowrap; border-radius:8px 8px 0 0;
+           transition:color .15s, background .15s; }
+    .tab:hover { color:var(--text); background:rgba(31,111,235,.06); }
+    .tab.active { color:var(--primary); border-image:linear-gradient(90deg,var(--primary),var(--purple)) 1;
+                  border-bottom-color:var(--primary); background:rgba(31,111,235,.06); }
 
     .platform-row { display:flex; gap:6px; padding:12px 28px 0; flex-wrap:wrap; }
-    .plat-chip { padding:6px 12px; font-size:12px; font-weight:700; border-radius:999px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; color:#0f172a; }
-    .plat-chip.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+    .plat-chip { padding:6px 13px; font-size:12px; font-weight:700; border-radius:999px;
+                 border:1px solid var(--border); background:#fff; cursor:pointer; color:var(--text);
+                 box-shadow:var(--shadow-sm); transition:transform .12s, box-shadow .15s, background .15s, color .15s; }
+    .plat-chip:hover { transform:translateY(-1px); box-shadow:var(--shadow-md); border-color:#cbd5e1; }
+    .plat-chip.active { background:linear-gradient(135deg,var(--primary),var(--purple)); color:#fff; border-color:transparent; box-shadow:var(--shadow-md); }
+    /* Each marketplace keeps its own colour when selected, so you can tell
+       which one is on without reading the label. */
+    #platformRow .plat-chip[data-p="amazon"].active   { background:linear-gradient(135deg,#f59e0b,#d97706); }
+    #platformRow .plat-chip[data-p="flipkart"].active { background:linear-gradient(135deg,#2874f0,#1651a8); }
+    #platformRow .plat-chip[data-p="meesho"].active   { background:linear-gradient(135deg,#ec4899,#a21caf); }
+    #platformRow .plat-chip[data-p="myntra"].active   { background:linear-gradient(135deg,#f43f5e,#be123c); }
+    #platformRow .plat-chip[data-p="firstcry"].active { background:linear-gradient(135deg,#14b8a6,#0f766e); }
 
     .cell-link { margin-left:6px; font-size:12px; text-decoration:none; }
     .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; padding:16px 28px 8px; }
-    .kpi { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
-    .kpi .label { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
-    .kpi .value { font-size:22px; font-weight:800; margin-top:4px; color:#0f172a; }
+    .kpi { position:relative; background:#fff; border:1px solid var(--border); border-radius:14px;
+           padding:14px 14px 14px 18px; box-shadow:var(--shadow-sm); overflow:hidden;
+           transition:transform .15s, box-shadow .2s; }
+    .kpi:hover { transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+    /* A coloured spine per card — the eye finds the number faster than it reads
+       the label above it. */
+    .kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+                   background:linear-gradient(180deg,var(--primary),var(--purple)); }
+    .kpi:nth-child(2)::before { background:linear-gradient(180deg,var(--green),var(--teal)); }
+    .kpi:nth-child(3)::before { background:linear-gradient(180deg,var(--accent),#d97706); }
+    .kpi:nth-child(4)::before { background:linear-gradient(180deg,var(--pink),var(--purple)); }
+    .kpi .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+    .kpi .value { font-size:23px; font-weight:800; margin-top:4px; color:var(--text); }
     .kpi .foot { font-size:11px; color:#94a3b8; margin-top:4px; }
 
-    .panel { background:#fff; border:1px solid #e5e7eb; border-radius:12px; margin:12px 28px 24px; overflow:hidden; }
-    .panel-head { padding:12px 16px; border-bottom:1px solid #e5e7eb; font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:space-between; }
+    .panel { background:#fff; border:1px solid var(--border); border-radius:14px; margin:12px 28px 24px;
+             overflow:hidden; box-shadow:var(--shadow-md); }
+    .panel-head { padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700;
+                  display:flex; align-items:center; justify-content:space-between;
+                  background:linear-gradient(90deg, rgba(31,111,235,.06), rgba(139,92,246,.05) 55%, rgba(236,72,153,.04)); }
     .panel-body { max-height:calc(100vh - 300px); min-height:420px; overflow:auto; }
     /* A second horizontal scrollbar pinned above the header row. The table is
        wider than the screen and the real one sits at the very bottom of a very
@@ -76,10 +125,18 @@
     .scrape-bar b { color:#0f172a; }
     .scrape-bar .sep { color:#cbd5e1; }
     .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
-    table.data { width:100%; border-collapse:collapse; font-size:13px; }
-    table.data th, table.data td { padding:9px 12px; text-align:left; border-bottom:1px solid #f1f5f9; }
-    table.data thead th { background:#f8fafc; color:#64748b; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.5px; position:sticky; top:0; }
-    table.data tbody tr:hover { background:#eff6ff; }
+    table.data { width:100%; border-collapse:collapse; font-size:14px; }
+    table.data th, table.data td { padding:12px 14px; text-align:left; border-bottom:1px solid #eef2f7; }
+    /* Rows read like data you are meant to act on, not a log dump: a little
+       more room and a little more weight. */
+    table.data tbody td { font-weight:600; color:#1e293b; }
+    table.data tbody td.muted { font-weight:500; }
+    table.data thead th { background:linear-gradient(180deg,#f1f5f9,#e9eef6); color:#475569; font-weight:700;
+                          text-transform:uppercase; font-size:11px; letter-spacing:.5px; position:sticky; top:0;
+                          border-bottom:1px solid var(--border); }
+    table.data tbody tr { transition:background .12s; }
+    table.data tbody tr:nth-child(even) { background:#fbfdff; }
+    table.data tbody tr:hover { background:linear-gradient(90deg, rgba(31,111,235,.10), rgba(139,92,246,.07)); }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
