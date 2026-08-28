@@ -989,6 +989,68 @@ const BULK_KEYS = {
   "status": "status",
   "action": "action", "update / delete": "action", "update/delete": "action",
 };
+
+// ---- Sheet-level checks the server cannot make -----------------------------
+// Both of these upload cleanly and only surface later as a broken product page,
+// which is exactly how nine products shipped with no images and their colour and
+// number axes reversed.
+const IMAGE_KEYS = ["image_1","image_2","image_3","image_4","image_5","image_6","image_7"];
+
+// A link only renders in an <img> if it points at the file itself. Image hosts
+// hand out two: the page the image sits on, and the file. Only the file works.
+function isDirectImageUrl(u) {
+  const v = String(u || "").trim();
+  if (!v) return true;                                    // blank is fine
+  if (/^data:image\//i.test(v)) return true;
+  if (/\/storage\/v1\/object\/public\//.test(v)) return true;
+  return /\.(jpe?g|png|webp|gif|avif|bmp|svg)(\?|#|$)/i.test(v);
+}
+
+function localBulkIssues(rows, headerIdx) {
+  const errors = [], warnings = [];
+  const rowNo = (i) => headerIdx + 2 + i;   // 1-based sheet row
+
+  rows.forEach((r, i) => {
+    for (const k of IMAGE_KEYS) {
+      const v = String(r[k] || "").trim();
+      if (v && !isDirectImageUrl(v)) {
+        errors.push(`Row ${rowNo(i)} (${r.sku || "no SKU"}): ${v}\n    \u2192 that is the page the image sits on, not the image. Use the direct link, which ends in .jpg / .png / .webp.`);
+      }
+    }
+  });
+
+  // "Color and Style" means Color is the FIRST axis. Filling the number into
+  // Color and the colour name into Style is accepted by the importer and then
+  // renders as one row per number instead of a grid of designs.
+  const axis = (t) => String(t || "").toLowerCase().replace("colour", "color");
+  const themeOf = {};
+  rows.forEach(r => {
+    const m = axis(r.variation_theme).match(/^\s*(color|size|style)\s+and\s+(color|size|style)\s*$/);
+    if (m && r.sku) themeOf[String(r.sku).trim()] = [m[1], m[2]];
+  });
+  const kids = {};
+  rows.forEach(r => {
+    const ps = String(r.parent_sku || "").trim();
+    if (ps && themeOf[ps]) (kids[ps] = kids[ps] || []).push(r);
+  });
+  const isNum = (v) => /^\s*\d+\s*$/.test(String(v == null ? "" : v));
+  const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+  Object.keys(kids).forEach(ps => {
+    const [a1, a2] = themeOf[ps];
+    if (a1 !== "color") return;                     // only the colour axis is checkable this way
+    const v1 = kids[ps].map(r => r[a1]).filter(v => String(v || "").trim() !== "");
+    const v2 = kids[ps].map(r => r[a2]).filter(v => String(v || "").trim() !== "");
+    if (v1.length < 2 || v2.length < 2) return;
+    const n1 = v1.filter(isNum).length / v1.length;
+    const n2 = v2.filter(isNum).length / v2.length;
+    if (n1 > 0.8 && n2 < 0.2) {
+      warnings.push(`"${ps}": Color holds numbers (${v1.slice(0,3).join(", ")}) while ${cap(a2)} holds names (${v2.slice(0,3).join(", ")}). These look swapped \u2014 the colour belongs in Color and the number in ${cap(a2)}.`);
+    }
+  });
+
+  return { errors, warnings };
+}
+
 const normHeader = (h) => String(h || "").toLowerCase().replace(/\s+/g, " ").trim();
 const BULK_EXAMPLES = [
   { "SKU": "S483", "Parent/Child": "parent", "Parent SKU": "", "Position": 1,
@@ -1219,15 +1281,17 @@ $("#bulkFileInput").addEventListener("change", async (e) => {
 
     $("#bulkStatus").textContent = `✓ Parsed ${normalized.length} rows from "${sheetName}". Running dry-run preview…`
       + (unknown.length ? `  (ignored columns: ${unknown.slice(0, 5).join(", ")})` : "");
+    const local = localBulkIssues(normalized, hIdx);
     const dry = await callBulk({ rows: normalized, dry_run: true });
     if (!dry.ok) { $("#bulkStatus").textContent = "❌ " + (dry.error || "Preview failed"); return; }
-    renderBulkPreview(dry);
+    renderBulkPreview(dry, local);
   } catch (err) {
     $("#bulkStatus").textContent = "❌ Parse failed: " + (err.message || err);
   }
 });
 
-function renderBulkPreview(res) {
+function renderBulkPreview(res, local) {
+  local = local || { errors: [], warnings: [] };
   $("#bulkPreview").style.display = "block";
   const counts = [
     `📁 <b>Categories:</b> ${res.categories_created} new`,
@@ -1238,9 +1302,25 @@ function renderBulkPreview(res) {
   ].filter(Boolean).join("<br>");
   $("#bulkPreviewCounts").innerHTML = counts;
   const bits = [];
+  // Sheet problems block the import: they are fixable in the file, and letting
+  // them through means finding out on the live product page.
+  if (local.errors.length) {
+    bits.push(`⛔ ${local.errors.length} image link${local.errors.length === 1 ? " is" : "s are"} not usable — fix the sheet and upload again:\n`
+      + local.errors.slice(0, 25).join("\n")
+      + (local.errors.length > 25 ? `\n…and ${local.errors.length - 25} more` : ""));
+  }
+  if (local.warnings.length) bits.push("⚠ Check before importing:\n" + local.warnings.slice(0, 10).join("\n"));
   if (res.errors && res.errors.length) bits.push("⚠ Errors (these rows will be skipped):\n" + res.errors.slice(0, 25).join("\n"));
   if (res.warnings && res.warnings.length) bits.push("Notes:\n" + res.warnings.slice(0, 10).join("\n"));
   $("#bulkPreviewErrors").textContent = bits.join("\n\n");
+
+  const btn = $("#bulkConfirmBtn");
+  if (btn) {
+    btn.disabled = local.errors.length > 0;
+    btn.title = local.errors.length ? "Fix the image links listed above first" : "";
+    btn.style.opacity = local.errors.length ? "0.5" : "";
+    btn.style.cursor = local.errors.length ? "not-allowed" : "";
+  }
 }
 
 $("#bulkConfirmBtn").addEventListener("click", async () => {
