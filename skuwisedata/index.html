@@ -58,6 +58,11 @@
     .hscroll-top { overflow-x:auto; overflow-y:hidden; height:14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; }
     .hscroll-top > div { height:1px; }
     .hscroll-top.hidden { display:none; }
+    .allsearch { flex:1; max-width:420px; margin:0 12px; position:relative; font-weight:normal; }
+    .allsearch input { width:100%; padding:6px 28px 6px 10px; font-size:13px; border:1px solid #e5e7eb; border-radius:8px; }
+    .allsearch input:focus { outline:none; border-color:#1f6feb; }
+    .allsearch .clear { position:absolute; right:8px; top:50%; transform:translateY(-50%); cursor:pointer; color:#94a3b8; font-size:14px; display:none; }
+    .allsearch.on .clear { display:block; }
     .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
     table.data { width:100%; border-collapse:collapse; font-size:13px; }
     table.data th, table.data td { padding:9px 12px; text-align:left; border-bottom:1px solid #f1f5f9; }
@@ -180,6 +185,10 @@
   <div class="panel">
     <div class="panel-head">
       <span id="tableTitle">Latest rows</span>
+      <span class="allsearch" id="allSearchWrap">
+        <input id="allSearch" type="search" placeholder="Search everything &#8212; SKU, ASIN, FSN, listing id, product&#8230;" autocomplete="off">
+        <span class="clear" id="allSearchClear" title="Clear">&#10005;</span>
+      </span>
       <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
     </div>
     <div class="hscroll-top hidden" id="hscrollTop"><div></div></div>
@@ -252,6 +261,7 @@
     tools: {},                 // per view: { filters: {colName: text}, sort: {col, dir} }
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
+    search: "",                // the one search box, run in the database over every row
     // Paging. The table used to stop at 200 rows; it now pulls another page
     // whenever you scroll near the bottom, until the whole view is loaded.
     pageSize: 500,
@@ -331,6 +341,27 @@
   });
   document.getElementById("reloadBtn").addEventListener("click", refresh);
 
+  // One box across every column. It runs in the database, not over the rows
+  // already drawn: filtering the loaded page would only ever look at the newest
+  // few hundred of 26,901 and tell you a SKU you own does not exist.
+  let _searchTimer = null;
+  const allSearchEl = document.getElementById("allSearch");
+  allSearchEl.addEventListener("input", () => {
+    document.getElementById("allSearchWrap").classList.toggle("on", !!allSearchEl.value.trim());
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => {
+      const q = allSearchEl.value.trim();
+      if (q === state.search) return;
+      state.search = q;
+      refresh();
+    }, 350);
+  });
+  document.getElementById("allSearchClear").addEventListener("click", () => {
+    allSearchEl.value = "";
+    document.getElementById("allSearchWrap").classList.remove("on");
+    if (state.search) { state.search = ""; refresh(); }
+  });
+
   // ---- 3. Fetch + render ----
   // ---- Meesho: the manifest is the dispatch list ---------------------------
   // Meesho data lands twice: the orders CSV (rich detail, every order in range)
@@ -384,6 +415,7 @@
   }
 
   async function refresh() {
+    syncSearchVisibility();
     if (state.view === "uploads") return;
     $("#tableWrap").innerHTML = '<div class="empty">Loading&hellip;</div>';
     $("#kpis").innerHTML = "";
@@ -417,7 +449,21 @@
         return;
       }
     }
-    const { data, count, error } = await fetchRowPage(table, dateCol, 0);
+    let data, count, error;
+    if (state.view === "sku_master" && state.search) {
+      // Searching: the database returns the matches, so there is no next page
+      // to scroll into and no total beyond what came back.
+      const res = await sb.rpc("sku_master_search", {
+        p_q: state.search,
+        p_company: state.company || null,
+        p_platform: state.platform || null,
+        p_limit: 1000,
+      });
+      data = res.data; error = res.error; count = (res.data || []).length;
+    } else {
+      const res = await fetchRowPage(table, dateCol, 0);
+      data = res.data; count = res.count; error = res.error;
+    }
     if (error) { $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(error.message)}</div>`; return; }
 
     state.loaded = (data || []).length;
@@ -483,6 +529,11 @@
 
   function rowCountLabel() {
     const t = state.total.toLocaleString("en-IN");
+    if (state.search) {
+      return state.loaded === 0
+        ? `No match for \u201c${state.search}\u201d`
+        : `${t} match${state.loaded === 1 ? "" : "es"} for \u201c${state.search}\u201d`;
+    }
     if (state.loaded >= state.total) return t + " total rows";
     return state.loaded.toLocaleString("en-IN") + " of " + t + " rows \u00b7 scroll for more";
   }
@@ -518,6 +569,7 @@
 
   async function loadMoreRows() {
     if (state.loadingMore || state.view === "uploads") return;
+    if (state.search) return;               // a search already returned all its matches
     if (state.loaded >= state.total) return;
     const table = KIND_TABLE[state.view];
     const dateCol = DATE_COL[state.view];
@@ -962,6 +1014,12 @@
       case "meesho":   return `https://www.meesho.com/search?q=${e}`;
       default:         return "";
     }
+  }
+
+  // The box searches seller_sku_master, so it only makes sense on that view.
+  function syncSearchVisibility() {
+    const wrap = document.getElementById("allSearchWrap");
+    if (wrap) wrap.style.display = (state.view === "sku_master") ? "" : "none";
   }
 
   function labelForDate(v) {
