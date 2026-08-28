@@ -655,6 +655,11 @@
     const cell = (r, i, col) => {
       const rd = r.raw_data || {};
       const blank = v => v == null || String(v).trim() === "";
+      // S.NO is where the row sits in this table, 1 upward. The uploaded master
+      // file has its own S.NO column carrying numbers from wherever that sheet
+      // was cut (12307, 12308, ...), which read as nonsense against a list that
+      // starts at the top.
+      if (col === "S.NO") return String(i + 1);
       // Amazon and FirstCry have exactly one identifier and it is already in the
       // ASIN column. This has to come before the uploaded file is consulted:
       // the master file carries a stray "3" here on 1,789 Amazon rows, which is
@@ -829,6 +834,18 @@
           return String(x).localeCompare(String(y), undefined, { numeric: true }) * dir;
         });
         rows.forEach(tr => body.appendChild(tr));
+      }
+    }
+
+    // Renumber S.NO over the rows actually on screen, so it stays 1..N after a
+    // sort or a filter instead of carrying the pre-sort positions around.
+    const snoIdx = heads.indexOf("S.NO");
+    if (snoIdx >= 0) {
+      let n = 0;
+      for (const tr of body.rows) {
+        if (tr.style.display === "none") continue;
+        const cellEl = tr.cells[snoIdx];
+        if (cellEl) cellEl.textContent = String(++n);
       }
     }
 
