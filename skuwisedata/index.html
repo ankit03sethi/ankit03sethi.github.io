@@ -121,6 +121,8 @@
     .scrape-bar .dot { width:8px; height:8px; border-radius:50%; background:#cbd5e1; flex:none; }
     .scrape-bar.live .dot { background:#16a34a; animation:pulse 1.6s ease-in-out infinite; }
     .scrape-bar.stale .dot { background:#f59e0b; }
+    .scrape-bar.down .dot { background:#dc2626; animation:none; }
+    .scrape-bar.down { color:#991b1b; background:#fef2f2; border-top-color:#fecaca; }
     @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.25 } }
     .scrape-bar b { color:#0f172a; }
     .scrape-bar .sep { color:#cbd5e1; }
@@ -1119,12 +1121,29 @@
       const total = Number(p.total || 0), checked = Number(p.checked || 0), ok = Number(p.ok_rows || 0);
       const lastMs = p.last_at ? new Date(p.last_at).getTime() : 0;
       const ageSec = lastMs ? Math.round((Date.now() - lastMs) / 1000) : null;
-      // Green while something was scraped in the last 3 minutes; amber after.
-      bar.classList.toggle("live",  ageSec !== null && ageSec < 180);
-      bar.classList.toggle("stale", ageSec === null || ageSec >= 180);
+      // Three states, because "slow" and "stopped" are different problems:
+      //   green  something landed in the last 3 minutes
+      //   amber  nothing for 3-15 minutes, or a slow patch
+      //   red    nothing for 15 minutes, or the desktop app stopped pinging
+      //          (it pings every poll, so a ping older than 5 minutes means the
+      //          app is closed, signed out, or offline)
+      const pingMs = p.worker_ping_at ? new Date(p.worker_ping_at).getTime() : 0;
+      const pingAge = pingMs ? (Date.now() - pingMs) / 1000 : Infinity;
+      const down  = pingAge > 300 || ageSec === null || ageSec >= 900;
+      const live  = !down && ageSec < 180;
+      bar.classList.toggle("live",  live);
+      bar.classList.toggle("stale", !live && !down);
+      bar.classList.toggle("down",  down);
       // Row number and when it happened. Everything else was noise — the point
       // of the strip is only "is it moving, and when did it last move".
       if (!lastMs) { txt.innerHTML = "Nothing scraped yet"; return; }
+      if (down) {
+        const why = pingAge > 300 ? "desktop app not running" : "no activity for 15+ minutes";
+        txt.innerHTML = `<b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> `
+          + `${escapeHtml(new Date(lastMs).toLocaleString("en-IN", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit" }))}`
+          + ` <span class="sep">|</span> stopped \u2014 ${why}`;
+        return;
+      }
       const d = new Date(lastMs);
       const when = d.toLocaleString("en-IN", {
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
