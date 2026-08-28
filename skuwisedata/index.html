@@ -66,6 +66,13 @@
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
+    /* Explicit low-to-high / high-to-low buttons on every column. Clicking the
+       header still toggles, but nothing about a bare header says it is
+       clickable, so the two directions are spelled out. */
+    table.data thead th .sort-btns { display:inline-flex; flex-direction:column; line-height:7px; margin-left:5px; vertical-align:middle; }
+    table.data thead th .sort-btn { cursor:pointer; color:#cbd5e1; font-size:9px; padding:0 1px; user-select:none; }
+    table.data thead th .sort-btn:hover { color:#1f6feb; }
+    table.data thead th .sort-btn.on { color:#1f6feb; }
     table.data thead tr.filter-row th { position:sticky; top:33px; background:#fff; padding:5px 8px; border-bottom:1px solid #e5e7eb; }
     .col-filter { font:inherit; font-size:12px; width:100%; min-width:70px; padding:3px 6px; border:1px solid #e5e7eb; border-radius:5px; }
     .col-filter:focus { outline:none; border-color:#1f6feb; }
@@ -845,9 +852,8 @@
     headRow.querySelectorAll("th").forEach((th, i) => {
       th.dataset.col = names[i];
       th.classList.add("sortable");
-      if (t.sort && t.sort.col === names[i]) {
-        th.innerHTML = escapeHtml(names[i]) + `<span class="sort-caret">${t.sort.dir === "asc" ? "\u2191" : "\u2193"}</span>`;
-      }
+      th.innerHTML = headerHtml(names[i], t);
+      bindSortButtons(th, names[i], t, table);
       th.addEventListener("click", () => {
         // First click on a new column sorts high to low, which is what you want
         // on counts and prices; clicking again flips it.
@@ -878,12 +884,34 @@
   }
 
   // Re-draw carets after a sort change, then re-apply.
+  // A header cell: its name, then an up/down pair. Up is low to high, down is
+  // high to low; the active one is highlighted so the current sort is visible
+  // without hunting for a caret.
+  function headerHtml(name, t) {
+    const active = t.sort && t.sort.col === name ? t.sort.dir : "";
+    return escapeHtml(name) +
+      `<span class="sort-btns">` +
+        `<span class="sort-btn${active === "asc"  ? " on" : ""}" data-dir="asc"  title="Low to high">\u25b2</span>` +
+        `<span class="sort-btn${active === "desc" ? " on" : ""}" data-dir="desc" title="High to low">\u25bc</span>` +
+      `</span>`;
+  }
+
+  function bindSortButtons(th, name, t, table) {
+    th.querySelectorAll(".sort-btn").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();          // don't let the header's own toggle fire too
+        t.sort = { col: name, dir: btn.dataset.dir };
+        installedRefresh(table);
+      });
+    });
+  }
+
   function installedRefresh(table) {
     const t = toolsFor(state.view);
     [...table.querySelectorAll("thead tr:first-child th")].forEach(th => {
       const name = th.dataset.col;
-      th.innerHTML = escapeHtml(name) + (t.sort && t.sort.col === name
-        ? `<span class="sort-caret">${t.sort.dir === "asc" ? "\u2191" : "\u2193"}</span>` : "");
+      th.innerHTML = headerHtml(name, t);
+      bindSortButtons(th, name, t, table);
     });
     applyTableTools();
   }
