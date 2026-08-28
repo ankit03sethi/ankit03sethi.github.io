@@ -648,8 +648,9 @@
         if (normHdr(k) === want && !blank(rd[k])) return safeCell(rd[k]);
       }
       // A Link the master file did not carry is built from the marketplace ID
+      // exactly as it is being displayed in the ASIN column for this row.
       if (col === "Link") {
-        return productLink(r) || "\u2014";
+        return productLink(r.platform, shownVal(r, i, "ASIN")) || "\u2014";
       }
       // Marketplace IDs come from the platform's own inventory export
       if (col === "ASIN" || col === "Other Listing Id") {
@@ -852,17 +853,23 @@
   const wcKey = (co, plat, sku) =>
     [co, plat, sku].map(x => String(x || "").trim().toLowerCase()).join("|");
 
-  // Product page URL built from the marketplace's own ID — the same shapes the
-  // PD Tracker stores in analytics_products.product_url, so a link opened from
-  // here lands on the same page the tracker scrapes. Meesho has no ID-only
-  // product URL (its paths carry a slug), so it falls back to a site search on
-  // the product ID, exactly as the tracker does.
-  function productLink(r) {
-    const plat = String(r.platform || "").trim().toLowerCase();
-    const pid  = state.platformIds && state.platformIds.get(wcKey(r.company_name, r.platform, r.seller_sku));
-    let id = pid && pid.platform_id ? String(pid.platform_id).trim() : "";
-    if (!id && plat === "amazon" && r.asin) id = String(r.asin).trim();
-    if (!id) return "";
+  // Product page URL, byte-for-byte the same rule the PD Tracker uses. That rule
+  // lives in the database as the generated column analytics_products.product_url:
+  //
+  //   Amazon    'https://www.amazon.in/dp/'   || product_id || '?th=1'
+  //   Flipkart  'https://www.flipkart.com/product/p/itme?pid=' || product_id
+  //   Meesho    'https://www.meesho.com/search?q='  || product_id
+  //   Myntra    'https://www.myntra.com/p/p/p/'     || product_id || '/buy'
+  //   FirstCry  'https://www.firstcry.com/p/p/'     || product_id || '/product-detail'
+  //
+  // Nothing else is added or validated, so a link opened here lands on exactly
+  // the page the tracker scrapes. `id` is whatever the ASIN column is showing
+  // for that row, so the link can never point somewhere other than the ID
+  // printed beside it.
+  function productLink(platform, id) {
+    const plat = String(platform || "").trim().toLowerCase();
+    id = String(id == null ? "" : id).trim();
+    if (!id || id === "\u2014") return "";
     const e = encodeURIComponent(id);
     switch (plat) {
       case "amazon":   return `https://www.amazon.in/dp/${e}?th=1`;
