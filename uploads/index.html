@@ -906,7 +906,13 @@
       const CHUNK = 400;
       for (let i = 0; i < payload.length; i += CHUNK) {
         const slice = payload.slice(i, i + CHUNK);
-        const { error } = await sb.from(cfg.table).insert(slice);
+        // seller_stock has a unique dedup_hash (company + platform + day + row
+        // content). Re-uploading the same inventory export would fail the whole
+        // batch on a plain insert, so ignore the duplicates instead — the
+        // keep-latest trigger still swaps a genuinely new file in.
+        const { error } = (cfg.table === "seller_stock")
+          ? await sb.from(cfg.table).upsert(slice, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
+          : await sb.from(cfg.table).insert(slice);
         if (error) { setStatus(`Save error on ${s.fileName}: ${error.message}`, true); btn.disabled = false; return; }
       }
       totalInserted += payload.length;
