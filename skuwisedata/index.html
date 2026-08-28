@@ -533,7 +533,17 @@
       }
     }
     let data, count, error;
-    if (state.view === "sku_master" && state.search) {
+    const ss = serverSort();
+    if (state.view === "sku_master" && ss) {
+      // Order in the database over all 26,901 rows. Sorting the loaded page in
+      // the browser ranked 500 rows and called it the top of the list.
+      const res = await sb.rpc("sku_master_page", {
+        p_sort: ss.key, p_dir: ss.dir,
+        p_company: state.company || null, p_platform: state.platform || null,
+        p_search: state.search || null, p_limit: 1000, p_offset: 0,
+      });
+      data = res.data; error = res.error; count = (res.data || []).length;
+    } else if (state.view === "sku_master" && state.search) {
       // Searching: the database returns the matches, so there is no next page
       // to scroll into and no total beyond what came back.
       const res = await sb.rpc("sku_master_search", {
@@ -660,7 +670,20 @@
     state.loadingMore = true;
     $("#rowCount").textContent = "Loading more\u2026";
     try {
-      const { data, error } = await fetchRowPage(table, dateCol, state.loaded);
+      const ss2 = serverSort();
+      let data, error;
+      if (ss2) {
+        const res = await sb.rpc("sku_master_page", {
+          p_sort: ss2.key, p_dir: ss2.dir,
+          p_company: state.company || null, p_platform: state.platform || null,
+          p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
+        });
+        data = res.data; error = res.error;
+        if (!error) state.total = Math.max(state.total, state.loaded + (data || []).length + ((data || []).length === 1000 ? 1 : 0));
+      } else {
+        const res = await fetchRowPage(table, dateCol, state.loaded);
+        data = res.data; error = res.error;
+      }
       if (error) { console.warn("loadMoreRows failed", error); return; }
       const rows = data || [];
       if (rows.length === 0) { state.total = state.loaded; return; }
@@ -963,7 +986,9 @@
     }
 
     // Sort — numeric when both sides are numbers, otherwise plain text.
-    if (t.sort) {
+    // Skipped when the database already ordered these rows: re-sorting the
+    // loaded slice would only shuffle it back into a page-local ranking.
+    if (t.sort && !serverSort()) {
       const i = heads.indexOf(t.sort.col);
       if (i >= 0) {
         const dir = t.sort.dir === "asc" ? 1 : -1;
@@ -1018,7 +1043,8 @@
         // on counts and prices; clicking again flips it.
         if (t.sort && t.sort.col === names[i]) t.sort.dir = t.sort.dir === "asc" ? "desc" : "asc";
         else t.sort = { col: names[i], dir: "desc" };
-        installedRefresh(table);
+        if (SORT_KEYS[names[i]] && state.view === "sku_master") refresh();
+        else installedRefresh(table);
       });
     });
 
@@ -1060,7 +1086,8 @@
       btn.addEventListener("click", e => {
         e.stopPropagation();          // don't let the header's own toggle fire too
         t.sort = { col: name, dir: btn.dataset.dir };
-        installedRefresh(table);
+        if (SORT_KEYS[name] && state.view === "sku_master") refresh();
+        else installedRefresh(table);
       });
     });
   }
@@ -1073,6 +1100,26 @@
       bindSortButtons(th, name, t, table);
     });
     applyTableTools();
+  }
+
+  // Display column -> the sort key sku_master_page() understands. Anything not
+  // listed here (Focus, Link, Vertical, Non Returnable, Listed By, S.NO) has no
+  // database expression behind it, so those still sort the rows on screen.
+  const SORT_KEYS = {
+    "Date":"date", "Company":"company", "Platform":"platform", "Brand":"brand",
+    "Category":"category", "Sub Category":"subcategory", "Product":"product",
+    "Color":"color", "ASIN":"asin", "SKU":"sku", "Master Sku":"mastersku", "HSN":"hsn",
+    "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
+    "Expected Settlement":"expectedsettlement", "Tax %":"tax", "Packaging":"packaging",
+    "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
+    "1day":"d1", "3day":"d3", "7day":"d7", "15day":"d15", "30day":"d30", "60day":"d60",
+  };
+  function serverSort() {
+    if (state.view !== "sku_master") return null;
+    const t = state.tools["sku_master"];
+    if (!t || !t.sort) return null;
+    const key = SORT_KEYS[t.sort.col];
+    return key ? { key, dir: t.sort.dir } : null;
   }
 
   const wcKey = (co, plat, sku) =>
