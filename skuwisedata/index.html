@@ -1122,22 +1122,14 @@
       // Green while something was scraped in the last 3 minutes; amber after.
       bar.classList.toggle("live",  ageSec !== null && ageSec < 180);
       bar.classList.toggle("stale", ageSec === null || ageSec >= 180);
-      const pct = total ? ((checked / total) * 100).toFixed(1) : "0";
-      const when = lastMs ? new Date(lastMs).toLocaleTimeString("en-IN") : "\u2014";
-      const ago = ageSec === null ? "" :
-        ageSec < 60 ? `${ageSec}s ago` :
-        ageSec < 3600 ? `${Math.round(ageSec / 60)}m ago` : `${Math.round(ageSec / 3600)}h ago`;
-      const bits = [
-        `<b>${checked.toLocaleString("en-IN")}</b> of <b>${total.toLocaleString("en-IN")}</b> scraped (${pct}%)`,
-        `<b>${ok.toLocaleString("en-IN")}</b> with data`,
-      ];
-      if (p.last_sku) {
-        const price = (p.last_price === null || p.last_price === undefined) ? p.last_status || "" : "\u20b9" + p.last_price;
-        bits.push(`last: <b>${escapeHtml(p.last_sku)}</b> \u00b7 ${escapeHtml(p.last_company || "")} \u00b7 ${escapeHtml(p.last_platform || "")} \u00b7 ${escapeHtml(String(price))} at ${escapeHtml(when)} (${ago})`);
-      } else {
-        bits.push("nothing scraped yet");
-      }
-      txt.innerHTML = bits.join(' <span class="sep">|</span> ');
+      // Row number and when it happened. Everything else was noise — the point
+      // of the strip is only "is it moving, and when did it last move".
+      if (!lastMs) { txt.innerHTML = "Nothing scraped yet"; return; }
+      const d = new Date(lastMs);
+      const when = d.toLocaleString("en-IN", {
+        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
+      });
+      txt.innerHTML = `Row <b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> ${escapeHtml(when)}`;
     } catch (e) { /* the strip is decoration; never break the page over it */ }
   }
   function startScrapeBar() {
