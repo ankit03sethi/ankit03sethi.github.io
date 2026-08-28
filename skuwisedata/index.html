@@ -51,7 +51,14 @@
 
     .panel { background:#fff; border:1px solid #e5e7eb; border-radius:12px; margin:12px 28px 24px; overflow:hidden; }
     .panel-head { padding:12px 16px; border-bottom:1px solid #e5e7eb; font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:space-between; }
-    .panel-body { max-height:520px; overflow:auto; }
+    .panel-body { max-height:calc(100vh - 300px); min-height:420px; overflow:auto; }
+    /* A second horizontal scrollbar pinned above the header row. The table is
+       wider than the screen and the real one sits at the very bottom of a very
+       long list, which is nowhere near where you are looking. */
+    .hscroll-top { overflow-x:auto; overflow-y:hidden; height:14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; }
+    .hscroll-top > div { height:1px; }
+    .hscroll-top.hidden { display:none; }
+    .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
     table.data { width:100%; border-collapse:collapse; font-size:13px; }
     table.data th, table.data td { padding:9px 12px; text-align:left; border-bottom:1px solid #f1f5f9; }
     table.data thead th { background:#f8fafc; color:#64748b; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.5px; position:sticky; top:0; }
@@ -166,6 +173,7 @@
       <span id="tableTitle">Latest rows</span>
       <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
     </div>
+    <div class="hscroll-top hidden" id="hscrollTop"><div></div></div>
     <div class="panel-body" id="tableWrap">
       <div class="empty">Loading&hellip;</div>
     </div>
@@ -233,6 +241,14 @@
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
     rowsById: new Map(),       // id -> row, so an edited cell can find its row
     tools: {},                 // per view: { filters: {colName: text}, sort: {col, dir} }
+    platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
+    // Paging. The table used to stop at 200 rows; it now pulls another page
+    // whenever you scroll near the bottom, until the whole view is loaded.
+    pageSize: 500,
+    loaded: 0,
+    total: 0,
+    loadingMore: false,
+    genericCols: null,         // raw_data columns chosen on the first page, reused by later pages
   };
   const DATE_COL = { orders: "order_date", returns: "return_date", payments: "payment_date", stock: "snapshot_date", sku_master: "updated_at" };
   const KIND_TABLE = { orders: "seller_orders", returns: "seller_returns", payments: "seller_payments", stock: "seller_stock", sku_master: "seller_sku_master" };
@@ -375,54 +391,39 @@
                <p>Install the Cursive Analyst app and drop your Meesho manifest and orders CSV into the SellerOps folder.</p>
                <a class="empty-cta" href="/analyst/">Install Cursive Analyst</a>
              </div>`;
+        // The manifest join is assembled in the browser and already capped, so
+        // there is no next page to fetch here.
+        state.loaded = rows.length;
+        state.total  = rows.length;
         installTableTools();
+        syncHScroll();
         return;
       } catch (e) {
         $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(e.message || String(e))}</div>`;
         return;
       }
     }
-    let q = sb.from(table).select("*", { count: "exact" })
-      .eq("user_id", state.session.user.id)
-      .order(dateCol, { ascending: false, nullsFirst: false })
-      .limit(200);
-    if (state.view !== "sku_master" && state.platform) q = q.eq("platform", state.platform);
-    if (state.view !== "sku_master" && state.company) q = q.eq("company_name", state.company);
-    const { data, count, error } = await q;
+    const { data, count, error } = await fetchRowPage(table, dateCol, 0);
     if (error) { $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(error.message)}</div>`; return; }
 
+    state.loaded = (data || []).length;
+    state.total  = count ?? state.loaded;
     if (state.view === "sku_master") {
+      state.rowsById = new Map((data || []).map(r => [String(r.id), r]));
+      state.windowCounts = new Map();
       // Rolling order counts per SKU, computed in the database — pulling 60 days
       // of orders into the browser just to count them would be far heavier.
-      state.windowCounts = new Map();
       const { data: wc, error: wcErr } = await sb.rpc("sku_order_window_counts");
       if (wcErr) console.warn("sku_order_window_counts failed", wcErr);
       // Keyed on company + platform + SKU: the same SKU can sell under more than
       // one company or platform, and those are different rows here.
       for (const r of (wc || [])) state.windowCounts.set(wcKey(r.company_name, r.platform, r.sku), r);
-      state.rowsById = new Map((data || []).map(r => [String(r.id), r]));
-
-      // Marketplace IDs for the rows we are about to draw — ASIN on Amazon, FSN
-      // on Flipkart, PRODUCT ID on Meesho, FC ProductID on FirstCry, plus the
-      // Flipkart Listing ID / Meesho Catalog ID for Other Listing Id. Read off
-      // the latest inventory export, joined on company + platform + SKU.
-      // We send only the keys on screen: PostgREST truncates any reply at 1000
-      // rows and the stock table is several thousand.
       state.platformIds = new Map();
-      const idKeys = [...new Set((data || [])
-        .map(r => wcKey(r.company_name, r.platform, r.seller_sku))
-        .filter(k => k && k !== "||"))];
-      if (idKeys.length) {
-        const { data: pid, error: pidErr } = await sb.rpc("sku_platform_ids", { p_keys: idKeys });
-        if (pidErr) console.warn("sku_platform_ids failed", pidErr);
-        for (const r of (pid || [])) {
-          state.platformIds.set(wcKey(r.company_name, r.platform, r.sku), r);
-        }
-      }
+      await loadPlatformIds(data || []);
     }
 
     $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
-    $("#rowCount").textContent = (count ?? 0) + " total rows";
+    $("#rowCount").textContent = rowCountLabel();
     renderKpis(data || [], count ?? 0);
 
     if (!data || data.length === 0) {
@@ -442,9 +443,113 @@
       }
       return;
     }
-    $("#tableWrap").innerHTML = renderTable(data);
+    $("#tableWrap").innerHTML = renderTable(data, 0, false);
     installTableTools();
+    syncHScroll();
+    installInfiniteScroll();
   }
+
+  // ---- Paging ---------------------------------------------------------------
+  // The table stopped at 200 rows. It now pulls the next page as you approach
+  // the bottom, so a 26,000-row master file is scrollable all the way down
+  // without ever asking the browser to hold 26,000 rows it is not looking at.
+  function fetchRowPage(table, dateCol, from) {
+    let q = sb.from(table).select("*", { count: "exact" })
+      .eq("user_id", state.session.user.id)
+      .order(dateCol, { ascending: false, nullsFirst: false })
+      .range(from, from + state.pageSize - 1);
+    // These apply to the SKU Master view too — the chips at the top of the page
+    // used to be ignored there, so picking "Amazon" changed nothing.
+    if (state.platform) q = q.eq("platform", state.platform);
+    if (state.company)  q = q.eq("company_name", state.company);
+    return q;
+  }
+
+  function rowCountLabel() {
+    const t = state.total.toLocaleString("en-IN");
+    if (state.loaded >= state.total) return t + " total rows";
+    return state.loaded.toLocaleString("en-IN") + " of " + t + " rows \u00b7 scroll for more";
+  }
+
+  // Marketplace IDs for the rows we are about to draw — ASIN on Amazon, FSN on
+  // Flipkart, PRODUCT ID on Meesho, FC ProductID on FirstCry, plus the Flipkart
+  // Listing ID / Meesho Catalog ID for Other Listing Id. Read off the latest
+  // inventory export, joined on company + platform + SKU. We send only the keys
+  // on screen: PostgREST truncates any reply at 1000 rows and seller_stock is
+  // several thousand.
+  async function loadPlatformIds(rows) {
+    const keys = [...new Set(rows
+      .map(r => wcKey(r.company_name, r.platform, r.seller_sku))
+      .filter(k => k && k !== "||" && !state.platformIds.has(k)))];
+    if (!keys.length) return;
+    const { data: pid, error } = await sb.rpc("sku_platform_ids", { p_keys: keys });
+    if (error) { console.warn("sku_platform_ids failed", error); return; }
+    for (const r of (pid || [])) state.platformIds.set(wcKey(r.company_name, r.platform, r.sku), r);
+  }
+
+  async function loadMoreRows() {
+    if (state.loadingMore || state.view === "uploads") return;
+    if (state.loaded >= state.total) return;
+    const table = KIND_TABLE[state.view];
+    const dateCol = DATE_COL[state.view];
+    if (!table) return;
+    state.loadingMore = true;
+    $("#rowCount").textContent = "Loading more\u2026";
+    try {
+      const { data, error } = await fetchRowPage(table, dateCol, state.loaded);
+      if (error) { console.warn("loadMoreRows failed", error); return; }
+      const rows = data || [];
+      if (rows.length === 0) { state.total = state.loaded; return; }
+      if (state.view === "sku_master") {
+        for (const r of rows) state.rowsById.set(String(r.id), r);
+        await loadPlatformIds(rows);
+      }
+      const tbody = $("#tableWrap").querySelector("table.data tbody");
+      if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
+      state.loaded += rows.length;
+      // Re-apply whatever filter and sort the user has set, now including the
+      // rows that just arrived.
+      applyTableTools();
+    } finally {
+      state.loadingMore = false;
+      $("#rowCount").textContent = rowCountLabel();
+    }
+  }
+
+  function installInfiniteScroll() {
+    const wrap = $("#tableWrap");
+    if (!wrap || wrap.dataset.infinite === "1") return;
+    wrap.dataset.infinite = "1";
+    wrap.addEventListener("scroll", () => {
+      syncHScrollPosition();
+      if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) loadMoreRows();
+    });
+  }
+
+  // ---- The horizontal scrollbar above the header ----------------------------
+  let _hSyncing = false;
+  function syncHScroll() {
+    const wrap = $("#tableWrap"), bar = $("#hscrollTop");
+    if (!wrap || !bar) return;
+    const inner = bar.firstElementChild;
+    const needed = wrap.scrollWidth > wrap.clientWidth + 2;
+    bar.classList.toggle("hidden", !needed);
+    if (!needed) return;
+    inner.style.width = wrap.scrollWidth + "px";
+    bar.scrollLeft = wrap.scrollLeft;
+    if (bar.dataset.bound === "1") return;
+    bar.dataset.bound = "1";
+    bar.addEventListener("scroll", () => {
+      if (_hSyncing) return;
+      _hSyncing = true; $("#tableWrap").scrollLeft = bar.scrollLeft; _hSyncing = false;
+    });
+  }
+  function syncHScrollPosition() {
+    const wrap = $("#tableWrap"), bar = $("#hscrollTop");
+    if (!wrap || !bar || _hSyncing) return;
+    _hSyncing = true; bar.scrollLeft = wrap.scrollLeft; _hSyncing = false;
+  }
+  window.addEventListener("resize", syncHScroll);
 
   function renderKpis(rows, total) {
     const dc = DATE_COL[state.view];
@@ -468,12 +573,18 @@
     }
   }
 
-  function renderTable(rows) {
-    if (state.view === "sku_master") return renderSkuMasterTable(rows);
+  // rowsOnly = return just the <tr> block, for appending the next page onto the
+  // table already on screen. startIndex keeps S.NO continuous across pages.
+  function renderTable(rows, startIndex, rowsOnly) {
+    startIndex = startIndex || 0;
+    if (state.view === "sku_master") return renderSkuMasterTable(rows, startIndex, rowsOnly);
     const dc = DATE_COL[state.view];
-    const rawKeys = new Set();
-    rows.slice(0, 20).forEach(r => Object.keys(r.raw_data || {}).forEach(k => rawKeys.add(k)));
-    const cols = Array.from(rawKeys).slice(0, 10);
+    if (!rowsOnly || !state.genericCols) {
+      const rawKeys = new Set();
+      rows.slice(0, 20).forEach(r => Object.keys(r.raw_data || {}).forEach(k => rawKeys.add(k)));
+      state.genericCols = Array.from(rawKeys).slice(0, 10);
+    }
+    const cols = state.genericCols;
     const th = `
       <tr>
         <th>${labelForDate(state.view)}</th>
@@ -489,10 +600,12 @@
         ${cols.map(c => `<td>${escapeHtml(safeCell((r.raw_data || {})[c]))}</td>`).join("")}
         <td class="muted">${escapeHtml(r.source_file || "")}</td>
       </tr>`).join("");
+    if (rowsOnly) return tr;
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
   }
 
-  function renderSkuMasterTable(rows) {
+  function renderSkuMasterTable(rows, startIndex, rowsOnly) {
+    startIndex = startIndex || 0;
     // Columns in the EXACT same order and with the EXACT same headers as the Master SKU sample file
     // (skuwisedata/master_sku_sample.xlsx). S.NO is a running counter (not stored — just row index).
     const COLS = [
@@ -562,7 +675,7 @@
       return cell(r, i, col);
     };
 
-    const tr = rows.map((r, i) => "<tr>" + COLS.map(c => {
+    const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const n = wc ? wc[DAY_COLS[c]] : 0;
@@ -576,7 +689,8 @@
         return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">Open</a></td>`;
       }
       return `<td>${escapeHtml(v)}</td>`;
-    }).join("") + "</tr>").join("");
+    }).join("") + "</tr>"; }).join("");
+    if (rowsOnly) return tr;
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
   }
 
