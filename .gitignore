@@ -1,2 +1,7 @@
 node_modules/
 package-lock.json
+
+# scratch copies used for headless UI checks — never part of the site
+_stagecopy.html
+_uptest.html
+_uploads_preview.html

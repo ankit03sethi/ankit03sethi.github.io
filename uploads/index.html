@@ -250,8 +250,8 @@
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
         <div>
-          <div class="up-name">Orders CSV</div>
-          <div class="up-desc">Raw marketplace order CSV export per company &amp; platform.</div>
+          <div class="up-name">CSV</div>
+          <div class="up-desc">The marketplace&#39;s own CSV order export &mdash; e.g. Meesho Orders_*.csv.</div>
         </div>
       </div>
       <div class="up-right">
@@ -269,8 +269,8 @@
       <div class="up-left">
         <div class="up-icon" style="background:#fce7f3; color:#ec4899;">&#128230;</div>
         <div>
-          <div class="up-name">Orders Manifest</div>
-          <div class="up-desc">Meesho manifest / dispatch file &mdash; adds order rows with a manifest tag.</div>
+          <div class="up-name">Manifest</div>
+          <div class="up-desc">Meesho dispatch list &mdash; what is going out today. Stored separately from orders.</div>
         </div>
       </div>
       <div class="up-right">
@@ -289,7 +289,7 @@
         <div class="up-icon" style="background:#e0e7ff; color:#4338ca;">&#128193;</div>
         <div>
           <div class="up-name">Orders File</div>
-          <div class="up-desc">Consolidated / master orders XLSX (any format) per company &amp; platform.</div>
+          <div class="up-desc">Order reports that are not the marketplace CSV &mdash; e.g. Amazon&#39;s 36-column order report.</div>
         </div>
       </div>
       <div class="up-right">
@@ -426,7 +426,7 @@
         <div class="up-icon" style="background:#fef9c3; color:#a16207;">&#9888;&#65039;</div>
         <div>
           <div class="up-name">Add a company first</div>
-          <div class="up-desc">Click <b>Companies</b> above, add at least one company with its platforms, then Orders CSV upload will appear here.</div>
+          <div class="up-desc">Click <b>Companies</b> above, add at least one company with its platforms, then the CSV upload will appear here.</div>
         </div>
       </div>
     </div>
@@ -703,12 +703,12 @@
 
   // ---- MULTI-KIND UPLOADS: Orders / Returns / Payments ----
   const KIND_CFG = {
-    orders:      { title:"Upload Orders CSV",             table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
+    orders:      { title:"Upload CSV",             table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
     orders_file: { title:"Upload Orders File",            table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"], tag:"file" },
     // A manifest is a dispatch list, not an order, and now has its own table.
     // The web upload writes to it directly; the desktop watcher still pushes
     // through seller-push into seller_orders, where a trigger relocates it.
-    manifest:    { title:"Upload Orders Manifest (Meesho)", table:"seller_manifest", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
+    manifest:    { title:"Upload Manifest (Meesho)", table:"seller_manifest", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
     // Return-date columns as the five marketplaces actually name them. Every one
     // of these exports also carries an ORDER date, so the return columns are
     // listed first — otherwise a returns file gets filed under the day the
