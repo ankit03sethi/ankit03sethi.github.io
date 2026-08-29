@@ -375,6 +375,28 @@
     </div>
     <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
+    <div class="up-item" id="warehouseRow">
+      <div class="up-left">
+        <div class="up-icon" style="background:#dcfce7; color:#166534;">&#127981;</div>
+        <div>
+          <div class="up-name">Warehouse Stock File</div>
+          <div class="up-desc">Loose items, the items you build from them, and the kits you sell &#8212; so one kit sold takes the right amount off every part it is made of.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none" id="warehouseStamp">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn" id="warehouseTemplateBtn" title="A ready-made workbook with a worked example inside it">&#11015; Blank Template</button>
+          <button class="up-btn primary" id="warehouseUploadBtn">&#8593; Upload</button>
+          <button class="up-btn" id="warehouseDownloadBtn" title="Download the copy you last uploaded">&#11015; Download</button>
+        </div>
+      </div>
+    </div>
+    <input id="warehouseFileInput" type="file" accept=".xlsx,.xlsm,.xls" style="display:none;" />
+
     <div class="up-item kind-hint" id="ordersHint" style="display:none;">
       <div class="up-left">
         <div class="up-icon" style="background:#fef9c3; color:#a16207;">&#9888;&#65039;</div>
@@ -567,6 +589,7 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await refreshMasterStamp();
+    await refreshWarehouseStamp();
     await loadCompanies();
     await refreshOrdersStamp();
   })();
@@ -1547,6 +1570,89 @@
   }
   // Back-compat alias
   const refreshOrdersStamp = refreshStamps;
+
+  // ---- Warehouse Stock file --------------------------------------------
+  // One workbook per account, kept whole rather than shredded into tables.
+  // Wiring it to the Master SKU file, and the Master SKU file to platform
+  // inventory, are the next two steps; for now this is where the current copy
+  // lives so it is not stranded on whichever desk it was last edited on.
+  const WH_BUCKET = "warehouse-files";
+  const WH_NAME   = "warehouse-stock.xlsx";
+  const whPath = () => `${session.user.id}/${WH_NAME}`;
+
+  $("#warehouseTemplateBtn").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = "/uploads/warehouse-stock-template.xlsx";
+    a.download = "Warehouse Stock.xlsx";
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  async function refreshWarehouseStamp() {
+    const el = $("#warehouseStamp");
+    if (!el || !session) return;
+    try {
+      const { data, error } = await sb.storage.from(WH_BUCKET)
+        .list(session.user.id, { search: WH_NAME });
+      const hit = !error && (data || []).find(f => f.name === WH_NAME);
+      if (!hit) { el.textContent = "Never"; el.classList.add("none"); el.classList.remove("today"); return; }
+      const iso = hit.updated_at || hit.created_at;
+      const when = new Date(iso).toLocaleString("en-IN",
+        { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+      el.classList.remove("none");
+      el.classList.toggle("today", isToday(iso));
+      el.innerHTML = `<span class="when">${isToday(iso) ? TICK : ""}${escapeHtml(when)}</span>`;
+    } catch (e) { console.warn("warehouse stamp:", e); }
+  }
+
+  $("#warehouseDownloadBtn").addEventListener("click", async () => {
+    try {
+      const { data, error } = await sb.storage.from(WH_BUCKET).createSignedUrl(whPath(), 120);
+      if (error || !data) { setStatus("Nothing uploaded yet — start from the blank template.", true); return; }
+      const a = document.createElement("a");
+      a.href = data.signedUrl; a.download = "Warehouse Stock.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { setStatus("Could not fetch the file: " + (e.message || e), true); }
+  });
+
+  $("#warehouseUploadBtn").addEventListener("click", () => $("#warehouseFileInput").click());
+
+  // The tabs this workbook must have. A file missing one of them is not this
+  // workbook, and storing it would quietly replace a good copy with a wrong one.
+  const WH_TABS = ["A Loose", "B Made", "C Kits", "Recipes", "Movements", "Master SKU Feed"];
+
+  $("#warehouseFileInput").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    setStatus("Checking " + f.name + " …", false);
+    try {
+      const wb = repairSheetRanges(XLSX.read(await f.arrayBuffer(), { type: "array", cellDates: true }));
+      const missing = WH_TABS.filter(t => !wb.SheetNames.includes(t));
+      if (missing.length) {
+        setStatus(`That file is missing the ${missing.join(", ")} tab${missing.length > 1 ? "s" : ""} — nothing was uploaded. Start from the blank template.`, true);
+        return;
+      }
+      // Count what is actually in it, so the confirmation says something real
+      // rather than just "uploaded".
+      const count = (tab, col) => {
+        const g = XLSX.utils.sheet_to_json(wb.Sheets[tab], { header: 1, defval: null });
+        return g.slice(4).filter(r => r && r[col] != null && String(r[col]).trim() !== "").length;
+      };
+      const nA = count("A Loose", 0), nB = count("B Made", 0), nC = count("C Kits", 0);
+      const nR = count("Recipes", 0), nM = count("Movements", 2);
+      if (nA + nB + nC === 0) { setStatus("That workbook has no items in it yet — nothing was uploaded.", true); return; }
+
+      const { error } = await sb.storage.from(WH_BUCKET)
+        .upload(whPath(), f, { upsert: true, contentType: f.type ||
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      if (error) { setStatus("Upload failed: " + error.message, true); return; }
+      setStatus(`✅ Saved ${f.name} — ${nA} loose item${nA===1?"":"s"}, ${nB} made item${nB===1?"":"s"}, ${nC} kit${nC===1?"":"s"}, ${nR} recipe line${nR===1?"":"s"}, ${nM} movement${nM===1?"":"s"}.`, false);
+      await refreshWarehouseStamp();
+    } catch (err) {
+      console.error(err);
+      setStatus("Could not read that file: " + (err.message || err), true);
+    }
+  });
 
   // Sample button → downloads pre-built .xlsx with header, dropdowns, auto S.NO
   $("#masterSampleBtn").addEventListener("click", () => {
