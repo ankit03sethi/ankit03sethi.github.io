@@ -291,7 +291,7 @@
         <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#8618;</div>
         <div>
           <div class="up-name">Returns File</div>
-          <div class="up-desc">Marketplace return / RTO / cancellation reports.</div>
+          <div class="up-desc">Marketplace return / RTO / cancellation reports. Myntra: use the MDirect Returns Report here.</div>
         </div>
       </div>
       <div class="up-right">
@@ -301,6 +301,25 @@
         </div>
         <div class="up-actions">
           <button class="up-btn primary kind-upload-btn" data-kind="returns">&#8593; Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="up-item kind-row" data-kind="returns_delivery">
+      <div class="up-left">
+        <div class="up-icon" style="background:#ffe4e6; color:#9f1239;">&#128666;</div>
+        <div>
+          <div class="up-name">Returns File &#8212; Myntra Return Delivery</div>
+          <div class="up-desc">Myntra only. The date the parcel reached you &#8212; return complete, stock sellable again. Kept separate so it never doubles the returns count.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+          <div class="stamp none kind-stamp" data-kind="returns_delivery">Never</div>
+        </div>
+        <div class="up-actions">
+          <button class="up-btn primary kind-upload-btn" data-kind="returns_delivery">&#8593; Upload</button>
         </div>
       </div>
     </div>
@@ -694,6 +713,14 @@
     // listed first — otherwise a returns file gets filed under the day the
     // order was placed, which is what FirstCry was doing.
     returns:     { title:"Upload Returns File",           table:"seller_returns",  dateCol:"return_date",  dateAliases:["return created date","return_created_date","return request date","return requested date","sales return date","return date","return-date","returndate","sr date","rto_cancel_date","order_rto_date","return approval date","return delivery date","customer_delivered_date","deliver_to_seller_date","rto date","cancel date","reverse date","date"] },
+    // Myntra ships two returns exports and they are not interchangeable. MDirect
+    // Returns (the row above) is windowed on the return date and carries
+    // quantity + refund status - that is the count. Return Delivery is windowed
+    // on the date the parcel reached the seller, so it drags in older returns
+    // that merely arrived this month (68 of 128 in the sample were April-July
+    // returns). It rides in seller_returns behind a tag: joinable for
+    // deliver_to_seller_date, which nothing else carries, but never counted.
+    returns_delivery: { title:"Upload Myntra Return Delivery Report", table:"seller_returns", dateCol:"return_date", dateAliases:["deliver_to_seller_date","gatepass_lastmodified","rto_cancel_date","return_created_date","return date"], platforms:["myntra"], tag:"return_delivery" },
     inventory:   { title:"Upload Inventory File",         table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","snapshot-date","inventory date","stock date","as on date","as-on date","report date","date"] },
     payments:    { title:"Upload Payments File",          table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
     // Myntra's Style Dashboard export. It is a listing export, not a quantity,
@@ -707,7 +734,7 @@
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
-  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, inventory: {}, payments: {}, myntra_style: {} };
+  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, returns_delivery: {}, inventory: {}, payments: {}, myntra_style: {} };
   // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
   let pickerLastByCombo = {};
 
