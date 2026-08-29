@@ -33,21 +33,12 @@
     .up-list { padding:8px 8px 16px; }
     .up-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid #f1f5f9; }
     .up-item:last-child { border-bottom:none; }
-    /* "Others" — a collapsed drawer for the odd file a platform only sometimes
-       makes you fetch by hand. Closed by default so it costs no attention. */
     /* A platform that ships two files for one kind gets two rows; the sub-label
        says which is which. Nothing shows on the platforms that ship one. */
     /* Always on its own line, indented past the dot, so the two rows of a split
        platform look identical instead of one wrapping and one not depending on
        how long its label happens to be. */
     .cell-platform .cell-sub { flex:0 0 100%; margin-left:14px; font-size:11px; font-weight:600; color:#64748b; white-space:nowrap; }
-    .others-head { cursor:pointer; user-select:none; }
-    .others-head:hover { background:#f8fafc; }
-    .others-chev { font-size:13px; color:#64748b; transition:transform .18s ease; display:inline-block; }
-    .others-head.open .others-chev { transform:rotate(90deg); }
-    .others-count { font-size:11px; font-weight:700; color:#475569; background:#e2e8f0; border-radius:999px; padding:2px 8px; margin-left:8px; }
-    #othersBody { border-top:1px solid #f1f5f9; background:#fbfdff; }
-    #othersBody .up-item { padding-left:34px; }
     .up-left { display:flex; align-items:center; gap:14px; min-width:0; }
     .up-icon { width:42px; height:42px; background:#dbeafe; color:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
     .up-name { font-size:15px; font-weight:700; color:#0f172a; }
@@ -383,43 +374,6 @@
       </div>
     </div>
     <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
-
-    <div class="up-item others-head" id="othersToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="othersBody">
-      <div class="up-left">
-        <div class="up-icon" style="background:#fef3c7; color:#92400e;">&#9881;</div>
-        <div>
-          <div class="up-name"><span class="others-chev">&#9654;</span> Others <span class="others-count">1</span></div>
-          <div class="up-desc">Extra platform exports that are not orders, returns, inventory or payments.</div>
-        </div>
-      </div>
-      <div class="up-right">
-        <div class="up-stamp-box">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">&nbsp;</div>
-          <div class="stamp none" id="othersHint">Click to open</div>
-        </div>
-      </div>
-    </div>
-
-    <div id="othersBody" hidden>
-      <div class="up-item kind-row" data-kind="myntra_style">
-        <div class="up-left">
-          <div class="up-icon" style="background:#fce7f3; color:#9d174d;">&#127991;</div>
-          <div>
-            <div class="up-name">Myntra Style Id File</div>
-            <div class="up-desc">Style Dashboard export &#8212; carries the style id that builds the product link. The inventory CSV does not have it.</div>
-          </div>
-        </div>
-        <div class="up-right">
-          <div class="up-stamp-box">
-            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
-            <div class="stamp none kind-stamp" data-kind="myntra_style">Never</div>
-          </div>
-          <div class="up-actions">
-            <button class="up-btn primary kind-upload-btn" data-kind="myntra_style">&#8593; Upload</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div class="up-item kind-hint" id="ordersHint" style="display:none;">
       <div class="up-left">
@@ -761,6 +715,11 @@
   // each for Meesho, Flipkart and Myntra, three for FirstCry.
   const KIND_GROUPS = {
     returns: ["returns", "returns_delivery"],
+    // Myntra's Style Dashboard export is a stock file too - same table, same
+    // picker - it just carries the style id instead of a quantity. It used to
+    // sit in an "Others" drawer of its own, which meant the one platform that
+    // needs a second stock file had it filed somewhere nobody opens.
+    inventory: ["inventory", "myntra_style"],
     payments: ["payments", "payments_settled", "payments_upcoming",
                "payments_advice", "payments_sr_pre", "payments_sr_post"],
   };
@@ -774,6 +733,7 @@
   // Shown under the platform name, only where a platform has more than one file.
   const ROW_SUBLABEL = {
     returns: "MDirect Returns", returns_delivery: "Return Delivery",
+    inventory: "Stock Count", myntra_style: "Style Id",
     payments: "Statement", payments_settled: "Settled", payments_upcoming: "Upcoming",
     payments_advice: "Payment Advice", payments_sr_pre: "RTO Pre-Delivery", payments_sr_post: "SR Post-Delivery",
   };
@@ -1207,6 +1167,20 @@
     return { name: best.name, buf: await best.entry.async("arraybuffer") };
   }
 
+  // Myntra is the one platform that ships two stock files, so the Inventory
+  // picker gives it two rows. Same principle as payments: if one lands in the
+  // other's row, the columns decide. The inventory CSV counts units and carries
+  // inventoryCount; the Style Dashboard export carries the style id that builds
+  // a product link and has no quantity at all, so filing either as the other
+  // would either count nothing as stock or hide real stock from the count.
+  function classifyStockRows(headers, platform) {
+    if (String(platform || "").toLowerCase() !== "myntra") return null;
+    const c = headers.map(nkp);
+    if (c.includes("inventorycount")) return "inventory";
+    if (c.includes("styleid")) return "myntra_style";
+    return null;
+  }
+
   // Parse & STAGE the file locally — does not push to Supabase yet
   $("#ordersFileInput").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
@@ -1223,7 +1197,7 @@
         buf = inner.buf; readName = inner.name;
         setStatus("Reading " + inner.name + " from " + f.name + " …", false);
       }
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const wb = repairSheetRanges(XLSX.read(buf, { type: "array", cellDates: true }));
       const sheet = wb.Sheets[wb.SheetNames[0]];
       let rows = sheetRowsWithHeader(sheet);
 
@@ -1247,6 +1221,9 @@
         rows = det.rows;
       }
       if (rows.length === 0) { setStatus("File is empty.", true); return; }
+      if (stageKind === "inventory" || stageKind === "myntra_style") {
+        stageKind = classifyStockRows(Object.keys(rows[0]), platform) || stageKind;
+      }
       // Snapshot the modal's date choice now (so it locks with this file)
       let overrideDate = null, dateFrom = null, dateTo = null;
       if (dateMode === "single") {
@@ -1390,6 +1367,38 @@
   // so the whole file arrived as one column of nothing. Same rule as the desktop
   // watcher: the table is the widest thing in the file, so find the width the
   // body settles on and take the first non-numeric row of that width.
+  // A sheet declares its own used range in !ref and an exporter can get that
+  // wrong. Myntra's Style Dashboard export declares A1:Q2 while the sheet holds
+  // 6,544 cells down to row 410, so every reader that trusts !ref sees a header
+  // and nothing else - which is exactly what this page was doing: the file
+  // staged as "empty" with no error to explain it. Flipkart's orders export has
+  // the same fault (A1:AM1 over 2,632 real rows). Rebuild the range from the
+  // cells that are actually there, for every sheet, before reading anything.
+  // The desktop watcher has done this since the Flipkart file turned up; the
+  // manual path never got it.
+  function repairSheetRanges(wb) {
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      if (!ws) continue;
+      let maxR = 0, maxC = 0, seen = 0;
+      for (const addr of Object.keys(ws)) {
+        if (addr[0] === "!") continue;
+        let cell;
+        try { cell = XLSX.utils.decode_cell(addr); } catch { continue; }
+        seen++;
+        if (cell.r > maxR) maxR = cell.r;
+        if (cell.c > maxC) maxC = cell.c;
+      }
+      if (!seen) continue;
+      let declaredR = -1;
+      try { declaredR = XLSX.utils.decode_range(ws["!ref"]).e.r; } catch { /* missing or unparseable */ }
+      if (declaredR < maxR) {
+        ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+      }
+    }
+    return wb;
+  }
+
   function sheetRowsWithHeader(sheet) {
     const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" })
                      .filter(r => r.some(v => String(v == null ? "" : v).trim() !== ""));
@@ -1538,49 +1547,6 @@
   }
   // Back-compat alias
   const refreshOrdersStamp = refreshStamps;
-
-  // ---- "Others" drawer ----
-  // Collapsed by default. The head mirrors whatever the newest stamp inside it
-  // says, so a packer can tell at a glance whether anything in there is stale
-  // without having to open it first.
-  (function initOthers() {
-    const head = $("#othersToggle"), body = $("#othersBody"), hint = $("#othersHint");
-    if (!head || !body) return;
-    function setOpen(open) {
-      body.hidden = !open;
-      head.classList.toggle("open", open);
-      head.setAttribute("aria-expanded", open ? "true" : "false");
-      // The head only stands in for what is inside while the drawer is shut.
-      // Once it is open the real stamp is right there, so repeating it — or
-      // still saying "click to open" — is noise.
-      if (hint) hint.style.visibility = open ? "hidden" : "";
-      try { localStorage.setItem("uploadsOthersOpen", open ? "1" : "0"); } catch {}
-    }
-    head.addEventListener("click", () => setOpen(body.hidden));
-    head.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(body.hidden); }
-    });
-    let start = false;
-    try { start = localStorage.getItem("uploadsOthersOpen") === "1"; } catch {}
-    setOpen(start);
-
-    // Mirror the inner stamp onto the collapsed head.
-    const inner = document.querySelector('.kind-stamp[data-kind="myntra_style"]');
-    if (inner && hint) {
-      const sync = () => {
-        if (inner.classList.contains("none")) {
-          hint.textContent = "Click to open";
-          hint.classList.add("none"); hint.classList.remove("today");
-        } else {
-          hint.innerHTML = inner.innerHTML;
-          hint.classList.remove("none");
-          hint.classList.toggle("today", inner.classList.contains("today"));
-        }
-      };
-      new MutationObserver(sync).observe(inner, { childList: true, subtree: true, attributes: true });
-      sync();
-    }
-  })();
 
   // Sample button → downloads pre-built .xlsx with header, dropdowns, auto S.NO
   $("#masterSampleBtn").addEventListener("click", () => {
@@ -1859,7 +1825,7 @@
         return;
       }
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const wb = repairSheetRanges(XLSX.read(buf, { type: "array", cellDates: true }));
       if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
         setStatus("Could not read any sheets from " + f.name, true); return;
       }
