@@ -35,12 +35,6 @@
     .up-item:last-child { border-bottom:none; }
     /* "Others" — a collapsed drawer for the odd file a platform only sometimes
        makes you fetch by hand. Closed by default so it costs no attention. */
-    /* A platform that ships two files for one kind gets two rows; the sub-label
-       says which is which. Nothing shows on the platforms that ship one. */
-    /* Always on its own line, indented past the dot, so the two rows of a split
-       platform look identical instead of one wrapping and one not depending on
-       how long its label happens to be. */
-    .cell-platform .cell-sub { flex:0 0 100%; margin-left:14px; font-size:11px; font-weight:600; color:#64748b; white-space:nowrap; }
     .others-head { cursor:pointer; user-select:none; }
     .others-head:hover { background:#f8fafc; }
     .others-chev { font-size:13px; color:#64748b; transition:transform .18s ease; display:inline-block; }
@@ -111,7 +105,7 @@
 
     /* One row per (company, platform) — uniform, no company separators */
     #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
-    .cell-lastup { font-size:11px; line-height:1.15; text-align:right; min-width:120px; flex:0 0 120px; }
+    .cell-lastup { font-size:11px; line-height:1.15; text-align:right; min-width:96px; }
     .cell-lastup .lu-lbl { display:block; color:#94a3b8; text-transform:uppercase; letter-spacing:.4px; font-size:10px; font-weight:700; }
     .cell-lastup .lu-val { display:block; color:#1f6feb; font-weight:700; font-size:12px; white-space:nowrap; }
     .cell-lastup.none .lu-val { color:#cbd5e1; font-style:italic; font-weight:normal; }
@@ -119,22 +113,13 @@
     .today-tick { color:#16a34a; font-weight:800; margin-right:4px; }
     .cell-lastup.today .lu-val { color:#16a34a; }
     .up-stamp-box .stamp.today .when { color:#16a34a; }
-    /* A real grid, not flex. With flex:1 a long company name ("Sethi Trading
-       Company", "Hirday Enterprises") refuses to shrink below its own text and
-       shoves the platform column right, so the platform names stepped in and
-       out down the list. minmax(0,…) lets the columns hold their width and the
-       text wrap inside them instead, which lines every row up in every picker
-       - orders, returns, inventory, the lot. */
-    .combo-row { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr) auto;
-                 align-items:center; gap:14px; padding:10px 14px; background:#fff;
-                 border-bottom:1px solid #f1f5f9; }
+    .combo-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:#fff; border-bottom:1px solid #f1f5f9; }
     .combo-row:last-child { border-bottom:none; }
-    .combo-row .cell-company { min-width:0; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
-    .combo-row .cell-company::before { content:"🏢"; font-size:15px; flex:0 0 auto; }
-    .combo-row .cell-platform { min-width:0; font-size:14px; font-weight:600; color:#0f172a; display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
-    /* The dot must not shrink, or it goes oval when the label wraps. */
-    .combo-row .cell-platform::before { content:""; width:8px; height:8px; border-radius:50%; background:#1f6feb; flex:0 0 auto; align-self:center; }
-    .combo-row .cell-action { display:flex; align-items:center; gap:10px; justify-content:flex-end; }
+    .combo-row .cell-company { flex:1; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
+    .combo-row .cell-company::before { content:"🏢"; font-size:15px; }
+    .combo-row .cell-platform { flex:1; font-size:14px; font-weight:600; color:#0f172a; display:flex; align-items:center; gap:6px; }
+    .combo-row .cell-platform::before { content:""; width:8px; height:8px; border-radius:50%; background:#1f6feb; }
+    .combo-row .cell-action { flex:0 0 auto; }
     .combo-row .up-mini { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid #1f6feb; background:#1f6feb; color:#fff; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .combo-row .up-mini:hover { background:#1651a8; }
     .combo-row.staged { background:#f0fdf4; }
@@ -142,9 +127,7 @@
     .combo-row .staged-name { color:#64748b; font-size:11px; font-weight:600; margin-left:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; display:inline-block; }
     .combo-row .up-remove { background:transparent; border:none; color:#dc2626; font-size:16px; cursor:pointer; margin-left:6px; }
     @media (max-width: 600px) {
-      .combo-row { grid-template-columns:1fr; align-items:stretch; gap:6px; }
-      .combo-row .cell-action { justify-content:space-between; }
-      .combo-row .cell-lastup { text-align:left; flex:0 0 auto; min-width:0; }
+      .combo-row { flex-direction:column; align-items:stretch; gap:6px; }
     }
 
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
@@ -308,7 +291,7 @@
         <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#8618;</div>
         <div>
           <div class="up-name">Returns File</div>
-          <div class="up-desc">Marketplace return / RTO / cancellation reports. Myntra has two &#8212; both are listed inside.</div>
+          <div class="up-desc">Marketplace return / RTO / cancellation reports.</div>
         </div>
       </div>
       <div class="up-right">
@@ -705,23 +688,12 @@
   const KIND_CFG = {
     orders:      { title:"Upload Orders CSV",             table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
     orders_file: { title:"Upload Orders File",            table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"], tag:"file" },
-    // A manifest is a dispatch list, not an order, and now has its own table.
-    // The web upload writes to it directly; the desktop watcher still pushes
-    // through seller-push into seller_orders, where a trigger relocates it.
-    manifest:    { title:"Upload Orders Manifest (Meesho)", table:"seller_manifest", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
+    manifest:    { title:"Upload Orders Manifest (Meesho)", table:"seller_orders", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
     // Return-date columns as the five marketplaces actually name them. Every one
     // of these exports also carries an ORDER date, so the return columns are
     // listed first — otherwise a returns file gets filed under the day the
     // order was placed, which is what FirstCry was doing.
     returns:     { title:"Upload Returns File",           table:"seller_returns",  dateCol:"return_date",  dateAliases:["return created date","return_created_date","return request date","return requested date","sales return date","return date","return-date","returndate","sr date","rto_cancel_date","order_rto_date","return approval date","return delivery date","customer_delivered_date","deliver_to_seller_date","rto date","cancel date","reverse date","date"] },
-    // Myntra ships two returns exports and they are not interchangeable. MDirect
-    // Returns (the row above) is windowed on the return date and carries
-    // quantity + refund status - that is the count. Return Delivery is windowed
-    // on the date the parcel reached the seller, so it drags in older returns
-    // that merely arrived this month (68 of 128 in the sample were April-July
-    // returns). It rides in seller_returns behind a tag: joinable for
-    // deliver_to_seller_date, which nothing else carries, but never counted.
-    returns_delivery: { title:"Upload Myntra Return Delivery Report", table:"seller_returns", dateCol:"return_date", dateAliases:["deliver_to_seller_date","gatepass_lastmodified","rto_cancel_date","return_created_date","return date"], platforms:["myntra"], tag:"return_delivery" },
     inventory:   { title:"Upload Inventory File",         table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","snapshot-date","inventory date","stock date","as on date","as-on date","report date","date"] },
     payments:    { title:"Upload Payments File",          table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
     // Myntra's Style Dashboard export. It is a listing export, not a quantity,
@@ -732,20 +704,10 @@
     myntra_style:{ title:"Upload Myntra Style Id file",   table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","report date","date"], platforms:["myntra"], tag:"catalog", dateFallbackToday:true },
   };
   let currentKind = "orders";
-  // A picker usually covers one kind. Returns covers two, because Myntra is the
-  // only platform that ships a second returns export and it answers a different
-  // question (when the parcel reached you, not when the return was raised).
-  // Rather than a second row on the page — which would ask every other platform
-  // a question that only applies to Myntra — the pair lives as tabs inside this
-  // one picker.
-  const KIND_GROUPS = { returns: ["returns", "returns_delivery"] };
-  // Shown under the platform name, only where a platform has more than one file.
-  const ROW_SUBLABEL = { returns: "MDirect Returns", returns_delivery: "Return Delivery" };
-  let pickerKinds = ["orders"];
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
-  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, returns_delivery: {}, inventory: {}, payments: {}, myntra_style: {} };
+  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, inventory: {}, payments: {}, myntra_style: {} };
   // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
   let pickerLastByCombo = {};
 
@@ -771,18 +733,15 @@
   // "Never" even though their data was right there. seller_last_uploads()
   // aggregates in the database and returns one row per kind+company+platform,
   // for every kind at once.
-  async function loadPickerLastMap(kinds) {
-    // Keyed by kind as well as company+platform: a Myntra row in the returns
-    // picker is now two rows, one per export, and each has its own stamp.
-    const want = new Set(Array.isArray(kinds) ? kinds : [kinds]);
+  async function loadPickerLastMap(kind) {
     pickerLastByCombo = {};
     if (!session) return;
     try {
       const { data, error } = await sb.rpc("seller_last_uploads");
       if (error) { console.warn("loadPickerLastMap rpc err:", error); return; }
       (data || []).forEach(r => {
-        if (!want.has(r.kind)) return;
-        const key = r.kind + "::" + (r.company_name || "") + "::" + (r.platform || "");
+        if (r.kind !== kind) return;
+        const key = (r.company_name || "") + "::" + (r.platform || "");
         const prev = pickerLastByCombo[key];
         if (!prev || new Date(r.last_pushed) > new Date(prev)) pickerLastByCombo[key] = r.last_pushed;
       });
@@ -792,25 +751,18 @@
   document.querySelectorAll(".kind-upload-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       currentKind = btn.dataset.kind;
-      pickerKinds = KIND_GROUPS[currentKind] || [currentKind];
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
       ordersFilterCompany = ""; ordersFilterPlatform = "";
       $("#ordersPickerTitle").textContent = KIND_CFG[currentKind].title;
-      renderKindTabs(withPlats);
       buildFilterChips(withPlats);
       renderOrdersPickerList(withPlats);           // initial render (no stamps yet)
       updateSaveButton();
       $("#ordersPickerModal").classList.add("show");
       // Load stamps in background then re-render — non-blocking so modal opens instantly
-      loadPickerLastMap(pickerKinds).then(() => renderOrdersPickerList(withPlats));
+      loadPickerLastMap(currentKind).then(() => renderOrdersPickerList(withPlats));
     });
   });
-
-  // The tab strip is gone: the two Myntra returns exports are two rows in the
-  // list instead, so the choice sits next to the company and platform it
-  // applies to rather than above a list where it looks global.
-  function renderKindTabs() {}
 
   function buildFilterChips(list) {
     const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
@@ -833,21 +785,15 @@
     const wrap = $("#ordersPickerList");
     const reversed = wrap.classList.contains("reverse");
 
-    // One row per (company, platform, kind). Almost always that is one row per
-    // company+platform, because almost every kind is a single file. Myntra in
-    // the returns picker is the exception: it ships two exports that answer
-    // different questions, so it gets two rows here rather than making the
-    // other four platforms look at a choice that does not apply to them.
+    // Flatten to one row per (company, platform), apply active filters + kind-restricted platforms
+    const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
     const rows = [];
     list.forEach(c => {
       if (ordersFilterCompany && c.name !== ordersFilterCompany) return;
-      (c.platforms || []).forEach(p => {
+      const plats = kindPlats.filter(p => (c.platforms || []).includes(p));
+      plats.forEach(p => {
         if (ordersFilterPlatform && p !== ordersFilterPlatform) return;
-        pickerKinds.forEach(k => {
-          const kindPlats = KIND_CFG[k].platforms || PLATFORMS;
-          if (!kindPlats.includes(p)) return;
-          rows.push({ company: c.name, platform: p, kind: k });
-        });
+        rows.push({ company: c.name, platform: p });
       });
     });
 
@@ -858,22 +804,15 @@
     const companyOrder = Object.fromEntries(list.map((c, i) => [c.name, i]));
     const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
     const lastMs = (r) => {
-      const iso = pickerLastByCombo[r.kind + "::" + r.company + "::" + r.platform];
+      const iso = pickerLastByCombo[r.company + "::" + r.platform];
       if (!iso) return -1;                       // never uploaded -> bottom
       const t = new Date(iso).getTime();
       return isNaN(t) ? -1 : t;
     };
-    const kindOrder = Object.fromEntries(pickerKinds.map((k, i) => [k, i]));
     const groupCmp = reversed
       ? (a, b) => (platOrder[a.platform] - platOrder[b.platform]) || a.company.localeCompare(b.company)
       : (a, b) => (companyOrder[a.company] - companyOrder[b.company]) || (platOrder[a.platform] - platOrder[b.platform]);
-    // The two rows of a split platform stay together, in a fixed order, rather
-    // than being separated by recency — they are one decision, not two.
-    rows.sort((a, b) =>
-      (lastMs(b) - lastMs(a)) || groupCmp(a, b) || (kindOrder[a.kind] - kindOrder[b.kind]));
-    if (pickerKinds.length > 1) {
-      rows.sort((a, b) => groupCmp(a, b) || (kindOrder[a.kind] - kindOrder[b.kind]));
-    }
+    rows.sort((a, b) => (lastMs(b) - lastMs(a)) || groupCmp(a, b));
 
     if (rows.length === 0) {
       wrap.innerHTML = `<div style="padding:24px; text-align:center; color:#64748b; font-size:13px;">No matches for this filter. Clear filters or add companies with the selected platform.</div>`;
@@ -881,16 +820,7 @@
     }
 
     // In reverse mode, platform cell shows first (left)
-    // Which platforms actually got more than one row. Labelling by "this picker
-    // has two kinds" would put "MDirect Returns" under Amazon, Flipkart, Meesho
-    // and FirstCry too — naming a distinction that does not exist for them.
-    // Counted per company AND platform: counting by platform alone labels
-    // Amazon simply because two companies sell on it.
-    const rowsPerCombo = {};
-    rows.forEach(r => {
-      const ck = r.company + "::" + r.platform;
-      rowsPerCombo[ck] = (rowsPerCombo[ck] || 0) + 1;
-    });
+    const bucket = stagedUploads[currentKind];
     // Format a "last uploaded" timestamp for a company+platform combo — dd Mon, HH:MM
     const fmtLast = (iso) => {
       if (!iso) return "";
@@ -900,25 +830,21 @@
     };
     const html = rows.map(r => {
       const key = r.company + "::" + r.platform;
-      const staged = (stagedUploads[r.kind] || {})[key];
-      const lastIso = pickerLastByCombo[r.kind + "::" + key];
+      const staged = bucket[key];
+      const lastIso = pickerLastByCombo[key];
       const fresh = isToday(lastIso);
       const stampHtml = lastIso
         ? `<div class="cell-lastup${fresh ? ' today' : ''}" title="Last uploaded ${escapeHtml(new Date(lastIso).toLocaleString('en-IN'))}"><span class="lu-lbl">Last</span> <span class="lu-val">${fresh ? TICK : ''}${escapeHtml(fmtLast(lastIso))}</span></div>`
         : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span></div>`;
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
-      // Only a split platform is labelled. Naming the file type on every row
-      // would be noise on the four platforms that only have one.
-      const sub = (rowsPerCombo[r.company + "::" + r.platform] > 1) && ROW_SUBLABEL[r.kind]
-        ? `<span class="cell-sub">${escapeHtml(ROW_SUBLABEL[r.kind])}</span>` : "";
-      const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}${sub}</div>`;
+      const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>`;
       let actionInner;
       if (staged) {
         actionInner = `<span class="staged-badge">&#10004; ${staged.rows.length} rows staged</span>
           <span class="staged-name" title="${escapeHtml(staged.fileName)}">${escapeHtml(staged.fileName)}</span>
-          <button class="up-remove" data-key="${escapeHtml(key)}" data-kind="${r.kind}" title="Remove staged file">&times;</button>`;
+          <button class="up-remove" data-key="${escapeHtml(key)}" title="Remove staged file">&times;</button>`;
       } else {
-        actionInner = `<button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}" data-kind="${r.kind}">&#8593; Upload</button>`;
+        actionInner = `<button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>`;
       }
       const actionCell = `<div class="cell-action" style="display:flex; align-items:center; gap:10px;">${stampHtml}${actionInner}</div>`;
       return `<div class="combo-row${staged ? ' staged' : ''}">${reversed ? platformCell + companyCell : companyCell + platformCell}${actionCell}</div>`;
@@ -928,9 +854,6 @@
       btn.addEventListener("click", () => {
         const company = btn.dataset.company;
         const platform = btn.dataset.platform;
-        // The row decides which file type this upload is, not a tab somewhere
-        // else on screen. The change handler reads currentKind.
-        currentKind = btn.dataset.kind || currentKind;
         $("#ordersFileInput").dataset.company = company;
         $("#ordersFileInput").dataset.platform = platform;
         $("#ordersFileInput").click();
@@ -938,9 +861,8 @@
     });
     wrap.querySelectorAll(".up-remove").forEach(btn => {
       btn.addEventListener("click", () => {
-        delete stagedUploads[btn.dataset.kind || currentKind][btn.dataset.key];
+        delete stagedUploads[currentKind][btn.dataset.key];
         const withPlats = companies.filter(c => (c.platforms || []).length > 0);
-        renderKindTabs(withPlats);
         renderOrdersPickerList(withPlats);
         updateSaveButton();
       });
@@ -950,10 +872,7 @@
   function updateSaveButton() {
     const btn = $("#ordersSaveAllBtn");
     const cnt = $("#ordersSaveCount");
-    // Counts across every tab in this picker. Counting only the visible tab
-    // would let a file staged on the other one be dropped without a word when
-    // the modal closes.
-    const n = pickerKinds.reduce((t, k) => t + Object.keys(stagedUploads[k] || {}).length, 0);
+    const n = Object.keys(stagedUploads[currentKind] || {}).length;
     btn.disabled = n === 0;
     cnt.textContent = n > 0 ? "(" + n + " file" + (n === 1 ? "" : "s") + ")" : "";
     btn.title = n === 0 ? "Upload staged files first" : "Push all staged files to Supabase";
@@ -995,7 +914,7 @@
     setStatus("Reading " + f.name + " …", false);
     try {
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const wb = XLSX.read(buf, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = sheetRowsWithHeader(sheet);
       if (rows.length === 0) { setStatus("File is empty.", true); return; }
@@ -1014,7 +933,6 @@
       const dateCol = detectDateColumn(Object.keys(rows[0]), cfg.dateAliases);
       const key = company + "::" + platform;
       stagedUploads[currentKind][key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol, kind: currentKind };
-      renderKindTabs(companies.filter(c => (c.platforms || []).length > 0));
       setStatus(`✅ Staged ${rows.length} rows from ${f.name} for ${PLAT_LABEL[platform]} · ${company}. Click Save when ready.`, false);
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       renderOrdersPickerList(withPlats);
@@ -1031,22 +949,15 @@
 
   // Save button — pushes all staged uploads (of current kind) to Supabase in sequence
   $("#ordersSaveAllBtn").addEventListener("click", async () => {
-    // Save every tab in this picker, not just the visible one — the count on
-    // the button already spans them, so saving less than it says would be a lie.
-    const jobs = [];
-    for (const kind of pickerKinds) {
-      for (const key of Object.keys(stagedUploads[kind] || {})) jobs.push({ kind, key });
-    }
-    if (jobs.length === 0) return;
+    const bucket = stagedUploads[currentKind];
+    const keys = Object.keys(bucket);
+    if (keys.length === 0) return;
+    const cfg = KIND_CFG[currentKind];
     const btn = $("#ordersSaveAllBtn");
     btn.disabled = true;
     const uid = session.user.id;
     let totalInserted = 0, filesDone = 0;
-    const keys = jobs;   // kept for the progress line below
-    for (const job of jobs) {
-      const cfg = KIND_CFG[job.kind];
-      const bucket = stagedUploads[job.kind];
-      const k = job.key;
+    for (const k of keys) {
       const s = bucket[k];
       const payload = s.rows.map(r => {
         // One column is detected for the whole file, but a single column is not
@@ -1093,8 +1004,7 @@
         // content). Re-uploading the same inventory export would fail the whole
         // batch on a plain insert, so ignore the duplicates instead — the
         // keep-latest trigger still swaps a genuinely new file in.
-        const DEDUPED = ["seller_stock", "seller_returns", "seller_manifest"];
-        const { error } = DEDUPED.includes(cfg.table)
+        const { error } = (cfg.table === "seller_stock")
           ? await sb.from(cfg.table).upsert(slice, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
           : await sb.from(cfg.table).insert(slice);
         if (error) { setStatus(`Save error on ${s.fileName}: ${error.message}`, true); btn.disabled = false; return; }
@@ -1105,7 +1015,6 @@
     }
     setStatus(`✅ Saved ${totalInserted} rows from ${filesDone} file${filesDone === 1 ? "" : "s"} to Supabase.`, false);
     const withPlats = companies.filter(c => (c.platforms || []).length > 0);
-    renderKindTabs(withPlats);
     renderOrdersPickerList(withPlats);
     updateSaveButton();
     await refreshStamps();
@@ -1121,20 +1030,17 @@
     const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" })
                      .filter(r => r.some(v => String(v == null ? "" : v).trim() !== ""));
     if (grid.length === 0) return [];
-    // Count FILLED cells, not array length: sheet_to_json pads every row out to
-    // the sheet's full width, so the two-cell banner rows measure 22 wide just
-    // like the real header and "widest row" picks the banner.
     const LOOK = Math.min(grid.length, 30);
-    const filled = (r) => r.filter(v => String(v == null ? "" : v).trim() !== "").length;
     let width = 0;
-    for (let i = 0; i < LOOK; i++) width = Math.max(width, filled(grid[i]));
+    for (let i = 0; i < LOOK; i++) if (grid[i].length > width) width = grid[i].length;
     let start = 0;
     if (width >= 2) {
       for (let i = 0; i < LOOK; i++) {
-        if (filled(grid[i]) !== width) continue;
+        if (grid[i].length !== width) continue;
         const cells = grid[i].map(v => String(v == null ? "" : v).trim()).filter(Boolean);
+        if (cells.length < 2) continue;
         const numeric = cells.filter(v => /^-?[\d,.]+$/.test(v)).length;
-        if (numeric > cells.length / 2) continue;   // that is a data row, not a header
+        if (numeric > cells.length / 2) continue;
         start = i; break;
       }
     }
@@ -1149,17 +1055,10 @@
     });
   }
 
-  // Candidate-first, not header-first. The alias lists are written in priority
-  // order — for returns, the date the return was raised before any secondary
-  // date — and looping over the headers instead threw that away: Flipkart's
-  // export lists "Return Approval Date" before "Return Requested Date", so the
-  // header-first loop picked the approval date no matter how the list was
-  // ordered. This is also how the desktop watcher resolves it.
   function detectDateColumn(headers, candidates) {
-    for (const c of candidates) {
-      const n = norm(c);
-      const hit = headers.find(h => norm(h) === n);
-      if (hit) return hit;
+    for (const h of headers) {
+      const n = norm(h);
+      if (candidates.some(c => n === norm(c))) return h;
     }
     return null;
   }
@@ -1168,17 +1067,6 @@
     if (v instanceof Date) return v.toISOString();
     const s = String(v).trim();
     if (!s) return null;
-    // A bare number in this range is an Excel date serial, not a year. Without
-    // cellDates the sheet reader hands back 46229 for 2026-08-25, and
-    // new Date("46229") is the year 46229 — a date that passes every check and
-    // is completely wrong. Range covers 1970 to 2100.
-    if (/^\d{4,5}(\.\d+)?$/.test(s)) {
-      const serial = parseFloat(s);
-      if (serial >= 25569 && serial <= 73415) {
-        const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
-        if (!isNaN(d)) return d.toISOString();
-      }
-    }
     // Try ISO / IST formats
     const iso = new Date(s);
     // A date before 2000 is not a date, it is a null written as one: Myntra
@@ -1226,11 +1114,8 @@
         .order("pushed_at", { ascending: false })
         .limit(1);
       // If this kind has a tag, filter to only rows with that tag; otherwise exclude any tagged rows
-      // seller_manifest holds nothing but manifests, so filtering it by the tag
-      // would depend on a marker the table no longer needs.
-      if (cfg.table === "seller_manifest") { /* whole table is this kind */ }
-      else if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
-      else              q = q.is("raw_data->>__file_tag", null);
+      if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
+      else         q = q.is("raw_data->>__file_tag", null);
       const { data } = await q;
       const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
       if (!el) continue;
@@ -1572,7 +1457,7 @@
         return;
       }
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const wb = XLSX.read(buf, { type: "array" });
       if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
         setStatus("Could not read any sheets from " + f.name, true); return;
       }

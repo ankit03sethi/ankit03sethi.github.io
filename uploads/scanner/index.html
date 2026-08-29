@@ -680,6 +680,27 @@
         if (chunk.length < PAGE) break;
         from_i += PAGE;
       }
+      // Manifests live in seller_manifest now, not behind a tag in seller_orders,
+      // so they have to be fetched separately and folded in. The tag is put back
+      // on the way in: every reader below still identifies a manifest row by it,
+      // and the join logic is unchanged.
+      {
+        let mFrom = 0;
+        while (mFrom < HARD_CAP) {
+          let mq = sb.from("seller_manifest").select("id, order_date, dispatch_date, company_name, platform, raw_data")
+            .eq("user_id", state.session.user.id)
+            .range(mFrom, mFrom + PAGE - 1);
+          if (from) mq = mq.gte("dispatch_date", from);
+          if (to)   mq = mq.lte("dispatch_date", to);
+          const { data: mData, error: mErr } = await mq;
+          if (mErr) throw mErr;
+          const mChunk = (mData || []).map(r => ({ ...r, raw_data: { ...(r.raw_data || {}), __file_tag: "manifest" } }));
+          orders.push(...mChunk);
+          if ((mData || []).length < PAGE) break;
+          mFrom += PAGE;
+        }
+      }
+
       // On Meesho, swap the orders CSV for the manifest and carry the CSV's
       // columns across. Must run before the courier filter, which now prefers the
       // manifest's own Courier field.

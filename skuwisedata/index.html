@@ -470,6 +470,22 @@
       if (chunk.length < PAGE) break;
     }
 
+    // Manifests moved to their own table. Fetch them alongside and re-tag on the
+    // way in so everything below still recognises them the same way.
+    for (let from = 0; from < CAP; from += PAGE) {
+      let mq = sb.from("seller_manifest").select("*")
+        .eq("user_id", state.session.user.id)
+        .eq("platform", "meesho")
+        .order("order_date", { ascending: false, nullsFirst: false })
+        .range(from, from + PAGE - 1);
+      if (state.company) mq = mq.eq("company_name", state.company);
+      const { data: mData, error: mErr } = await mq;
+      if (mErr) throw mErr;
+      const mChunk = (mData || []).map(r => ({ ...r, raw_data: { ...(r.raw_data || {}), __file_tag: "manifest" } }));
+      all.push(...mChunk);
+      if ((mData || []).length < PAGE) break;
+    }
+
     const isManifest = r => (r.raw_data || {}).__file_tag === "manifest";
     const subOf      = r => String((r.raw_data || {})["Sub Order No"] || "").trim();
 
