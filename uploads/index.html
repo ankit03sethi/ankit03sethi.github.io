@@ -359,7 +359,7 @@
         </div>
       </div>
     </div>
-    <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt" style="display:none;" />
+    <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt,.zip" style="display:none;" />
 
     <div class="up-item">
       <div class="up-left">
@@ -723,7 +723,25 @@
     // deliver_to_seller_date, which nothing else carries, but never counted.
     returns_delivery: { title:"Upload Myntra Return Delivery Report", table:"seller_returns", dateCol:"return_date", dateAliases:["deliver_to_seller_date","gatepass_lastmodified","rto_cancel_date","return_created_date","return date"], platforms:["myntra"], tag:"return_delivery" },
     inventory:   { title:"Upload Inventory File",         table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","snapshot-date","inventory date","stock date","as on date","as-on date","report date","date"] },
-    payments:    { title:"Upload Payments File",          table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
+    // ---- PAYMENTS: ten slots, and none of them can reject a file ----------
+    // Amazon ships ONE export holding both released and deferred rows, so it
+    // gets one slot and the split happens per row. Meesho, Flipkart and Myntra
+    // each ship a settled file and an upcoming file. FirstCry ships three: the
+    // payment advice, and the pre- and post-delivery debit notes it raises
+    // against it when a customer returns.
+    //
+    // Every one of these is classified by its COLUMNS on the way in (see
+    // classifyPaymentWorkbook below), so the slot only decides where the row
+    // appears on this page, never what gets stored. On the payment-date list:
+    // all of these exports also carry an order date, and DATE_ALIASES is
+    // matched candidate-first, so the settlement dates have to come first or a
+    // payment file gets filed weeks before the payment it describes.
+    payments:          { title:"Upload Payments File",              table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["amazon"] },
+    payments_settled:  { title:"Upload Settled Payments File",      table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["meesho","flipkart","myntra"], tag:"settled" },
+    payments_upcoming: { title:"Upload Upcoming Payments File",     table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["meesho","flipkart","myntra"], tag:"upcoming" },
+    payments_advice:   { title:"Upload FirstCry Payment Advice",    table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"advice" },
+    payments_sr_pre:   { title:"Upload FirstCry SR Pre-Delivery",   table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"sr_pre" },
+    payments_sr_post:  { title:"Upload FirstCry SR Post-Delivery",  table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"sr_post" },
     // Myntra's Style Dashboard export. It is a listing export, not a quantity,
     // so it rides in seller_stock behind the 'catalog' tag: the id lookups read
     // it, and nothing counts it as inventory. The desktop watcher picks this
@@ -738,7 +756,14 @@
   // Rather than a second row on the page — which would ask every other platform
   // a question that only applies to Myntra — the pair lives as tabs inside this
   // one picker.
-  const KIND_GROUPS = { returns: ["returns", "returns_delivery"] };
+  // Payments is the same idea at a larger scale: one button, and inside it a
+  // row for every payment file a platform actually ships — one for Amazon, two
+  // each for Meesho, Flipkart and Myntra, three for FirstCry.
+  const KIND_GROUPS = {
+    returns: ["returns", "returns_delivery"],
+    payments: ["payments", "payments_settled", "payments_upcoming",
+               "payments_advice", "payments_sr_pre", "payments_sr_post"],
+  };
   // Platforms that really do ship a SECOND, different orders export. Amazon
   // does: a 36-column report keyed on amazon-order-id alongside its 21-column
   // dispatch CSV. Everyone else ships one file, so for them CSV File and Orders
@@ -747,12 +772,21 @@
   // here the moment a genuine second export for it turns up.
   const PLATFORMS_WITH_SEPARATE_ORDERS_FILE = ["amazon", "myntra"];
   // Shown under the platform name, only where a platform has more than one file.
-  const ROW_SUBLABEL = { returns: "MDirect Returns", returns_delivery: "Return Delivery" };
+  const ROW_SUBLABEL = {
+    returns: "MDirect Returns", returns_delivery: "Return Delivery",
+    payments: "Statement", payments_settled: "Settled", payments_upcoming: "Upcoming",
+    payments_advice: "Payment Advice", payments_sr_pre: "SR Pre-Delivery", payments_sr_post: "SR Post-Delivery",
+  };
   let pickerKinds = ["orders"];
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
-  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, returns_delivery: {}, inventory: {}, payments: {}, myntra_style: {} };
+  const stagedUploads = {
+    orders: {}, orders_file: {}, manifest: {}, returns: {}, returns_delivery: {},
+    inventory: {}, myntra_style: {},
+    payments: {}, payments_settled: {}, payments_upcoming: {},
+    payments_advice: {}, payments_sr_pre: {}, payments_sr_post: {},
+  };
   // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
   let pickerLastByCombo = {};
 
@@ -820,7 +854,10 @@
   function renderKindTabs() {}
 
   function buildFilterChips(list) {
-    const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
+    // A picker can cover several kinds with different platform lists — Payments
+    // is Amazon on one kind, FirstCry on three others — so the dropdown offers
+    // the union, not whichever list the button happened to carry.
+    const kindPlats = [...new Set(pickerKinds.flatMap(k => KIND_CFG[k].platforms || PLATFORMS))];
     const uniqPlats = new Set();
     list.forEach(c => (c.platforms || []).forEach(p => { if (kindPlats.includes(p)) uniqPlats.add(p); }));
     // Company dropdown
@@ -994,6 +1031,182 @@
       $("#dateRangeBox").style.display  = (dateMode === "range")  ? "" : "none";
     });
   });
+  // ---- PAYMENTS: the slot is a label, the columns decide ----------------
+  // Same rules as the desktop watcher, ported here so a file dropped into the
+  // wrong payment slot is still filed correctly instead of being rejected or,
+  // worse, stored under the wrong tag. Drop the settled export into Upcoming
+  // and it saves as settled; drop the same file into both slots and the second
+  // one inserts nothing, because the rows come out identical and
+  // seller_payments drops a repeated (user, dedup_hash) on the way in.
+  //
+  // The three awkward layouts:
+  //   Flipkart  16 sheets; rows live on "Orders" under a two-line banner. The
+  //             workbook headed "Outstanding Report Summary" is the SETTLED one
+  //             and vice versa - their titles are swapped, so only the columns
+  //             are trusted: NEFT ID = settled, Due Date = upcoming.
+  //   Meesho    a ZIP holding one workbook; sheet "Order Payments" puts a
+  //             formula legend ("A", "(B + C + G + H)") under the header.
+  //   FirstCry  four tables stacked on one sheet; the line items are the last,
+  //             at row 40 in PRE26077333 and row 21 in POST26108713.
+  const PAY_KINDS = ["payments", "payments_settled", "payments_upcoming",
+                     "payments_advice", "payments_sr_pre", "payments_sr_post"];
+  const isPayKind = (k) => PAY_KINDS.includes(k);
+  const nkp = (v) => String(v == null ? "" : v).toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+  // Flipkart writes the formula into the header cell - "Bank Settlement Value
+  // (Rs.)\n= SUM(H:P)" settled, "= SUM(I:Q)" upcoming - so the same column
+  // arrives under two different names unless the annotation is stripped.
+  function payCleanHeader(h) {
+    return String(h == null ? "" : h)
+      .replace(/\s+/g, " ")
+      .replace(/\s*=\s*SUM\([^)]*\)\s*$/i, "")
+      .replace(/\s*\[[^\]]*\]\s*$/, "")
+      .trim();
+  }
+  function payFindHeaderRow(arr, needles, limit) {
+    const want = needles.map(nkp);
+    for (let i = 0; i < Math.min(arr.length, limit || 120); i++) {
+      const cells = (arr[i] || []).map(nkp);
+      if (want.every(w => cells.includes(w))) return i;
+    }
+    return -1;
+  }
+  // Rows as objects, starting at hdrIdx. Anything with no value in the key
+  // column is not a record: that one rule drops Meesho's formula legend,
+  // Flipkart's blank spacer row and FirstCry's in-table sub-totals alike.
+  function payTableFrom(arr, hdrIdx, keyCol) {
+    const headers = (arr[hdrIdx] || []).map(payCleanHeader);
+    const keyIdx = headers.findIndex(h => nkp(h) === nkp(keyCol));
+    const keep = [];
+    const body = [];
+    for (let i = hdrIdx + 1; i < arr.length; i++) {
+      const r = arr[i] || [];
+      if (!r.some(v => v != null && String(v).trim() !== "")) continue;
+      if (keyIdx >= 0 && String(r[keyIdx] == null ? "" : r[keyIdx]).trim() === "") continue;
+      body.push(r);
+    }
+    // Both layouts space their column groups apart with merged cells, which
+    // arrive as columns with no header and no values.
+    headers.forEach((h, i) => {
+      if (h !== "" || body.some(r => r[i] != null && String(r[i]).trim() !== "")) keep.push(i);
+    });
+    return body.map(r => {
+      const o = {};
+      keep.forEach(i => { o[headers[i] || ("col_" + (i + 1))] = r[i] == null ? "" : r[i]; });
+      return o;
+    });
+  }
+  const paySheets = (wb) => wb.SheetNames.map(n => ({
+    name: n, arr: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: null }),
+  }));
+
+  function classifyPaymentWorkbook(wb, platform) {
+    const sheets = paySheets(wb);
+    const p = String(platform || "").toLowerCase();
+
+    if (p === "flipkart") {
+      if (!sheets.some(s => nkp(s.name) === "summaryofreport")) return null;
+      const sh = sheets.find(s => nkp(s.name) === "orders");
+      if (!sh) return null;
+      const h = payFindHeaderRow(sh.arr, ["order item id"], 10);
+      if (h < 0) return null;
+      const cols = (sh.arr[h] || []).map(x => nkp(payCleanHeader(x)));
+      return {
+        kind: cols.includes("neftid") ? "payments_settled"
+            : cols.includes("duedate") ? "payments_upcoming" : "payments_settled",
+        rows: payTableFrom(sh.arr, h, "Order item ID"),
+      };
+    }
+    if (p === "meesho") {
+      const sh = sheets.find(s => nkp(s.name) === "orderpayments");
+      if (!sh) return null;
+      const h = payFindHeaderRow(sh.arr, ["sub order no"], 10);
+      if (h < 0) return null;
+      const rows = payTableFrom(sh.arr, h, "Sub Order No");
+      // OUTSTANDING leaves Transaction ID empty on every row; PREVIOUS fills it.
+      const paid = rows.some(r => Object.keys(r).some(k => nkp(k) === "transactionid" && String(r[k]).trim() !== ""));
+      return { kind: paid ? "payments_settled" : "payments_upcoming", rows };
+    }
+    if (p === "firstcry") {
+      const pre  = sheets.find(s => nkp(s.name).startsWith("predelivery"));
+      const post = sheets.find(s => nkp(s.name).startsWith("postdelivery"));
+      const sh = pre || post;
+      if (sh) {
+        const h = payFindHeaderRow(sh.arr, ["order ids"], 200);
+        if (h < 0) return null;
+        return { kind: pre ? "payments_sr_pre" : "payments_sr_post", rows: payTableFrom(sh.arr, h, "Order Ids") };
+      }
+      return null;   // the advice export is flat — the generic reader has it
+    }
+    return null;     // Amazon and Myntra are single-sheet CSVs, handled by header
+  }
+
+  function classifyPaymentHeaders(headers, platform) {
+    const c = headers.map(nkp);
+    const p = String(platform || "").toLowerCase();
+    if (p === "myntra") {
+      if (c.includes("unsettledamount") || c.includes("duedate")) return "payments_upcoming";
+      if (c.includes("neftref") || c.includes("settledamount")) return "payments_settled";
+    }
+    // "settlement id" appears in no other Amazon export. One file, both states,
+    // split per row by Transaction Status.
+    if (p === "amazon" && c.includes("settlementid")) return "payments";
+    return null;
+  }
+
+  function payPick(obj, ...names) {
+    const want = names.map(nkp);
+    for (const k of Object.keys(obj)) {
+      if (want.includes(nkp(k))) {
+        const v = obj[k];
+        if (v != null && String(v).trim() !== "") return String(v).trim();
+      }
+    }
+    return "";
+  }
+  // Settled or upcoming, per row rather than per file — Amazon's single export
+  // carries 2,628 Released rows and 1,637 Deferred ones side by side.
+  function payRowStatus(platform, o) {
+    switch (String(platform || "").toLowerCase()) {
+      case "amazon":   return /defer/i.test(payPick(o, "Transaction Status")) ? "upcoming" : "settled";
+      case "meesho":   return payPick(o, "Transaction ID") ? "settled" : "upcoming";
+      case "flipkart": return payPick(o, "NEFT ID") ? "settled" : "upcoming";
+      case "myntra":   return payPick(o, "NEFT_Ref") ? "settled" : "upcoming";
+      // A debit note is money FirstCry takes back off the next advice when a
+      // customer returns, not a receipt that has or has not arrived.
+      case "firstcry": return payPick(o, "Order Ids", "SR Date") ? "deduction" : "settled";
+      default:         return null;
+    }
+  }
+
+  // Meesho hands you the payment file as a ZIP with one workbook inside. JSZip
+  // is pulled in only when a .zip is actually picked, so the page costs nothing
+  // for the other four platforms.
+  let _jszip = null;
+  async function loadJSZip() {
+    if (_jszip) return _jszip;
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = res; s.onerror = () => rej(new Error("could not load the zip reader"));
+      document.head.appendChild(s);
+    });
+    _jszip = window.JSZip;
+    return _jszip;
+  }
+  async function unzipLargestWorkbook(buf) {
+    const JSZipLib = await loadJSZip();
+    const zip = await JSZipLib.loadAsync(buf);
+    let best = null;
+    zip.forEach((p, e) => {
+      if (e.dir || !/\.(xlsx|xlsm|xls|csv)$/i.test(p)) return;
+      const size = (e._data && e._data.uncompressedSize) || 0;
+      if (!best || size > best.size) best = { entry: e, size, name: p };
+    });
+    if (!best) throw new Error("that .zip has no spreadsheet inside it");
+    return { name: best.name, buf: await best.entry.async("arraybuffer") };
+  }
+
   // Parse & STAGE the file locally — does not push to Supabase yet
   $("#ordersFileInput").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
@@ -1001,10 +1214,38 @@
     const platform = e.target.dataset.platform;
     setStatus("Reading " + f.name + " …", false);
     try {
-      const buf = await f.arrayBuffer();
+      let buf = await f.arrayBuffer();
+      let readName = f.name;
+      // Meesho's payment export is a ZIP with one workbook inside it. Reach in
+      // rather than making anyone unzip it by hand first.
+      if (/\.zip$/i.test(f.name)) {
+        const inner = await unzipLargestWorkbook(buf);
+        buf = inner.buf; readName = inner.name;
+        setStatus("Reading " + inner.name + " from " + f.name + " …", false);
+      }
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = sheetRowsWithHeader(sheet);
+      let rows = sheetRowsWithHeader(sheet);
+
+      // The upload slot is a label. What the file IS comes from its columns, so
+      // a settled export dropped into the Upcoming slot still files as settled
+      // instead of being rejected or, worse, stored under the wrong tag. Put
+      // the same file in both slots and the second save inserts nothing —
+      // seller_payments drops a repeated (user, dedup_hash) on the way in.
+      let stageKind = currentKind;
+      if (isPayKind(currentKind)) {
+        const det = classifyPaymentWorkbook(wb, platform)
+                 || (rows.length ? (() => {
+                      const k = classifyPaymentHeaders(Object.keys(rows[0]), platform);
+                      return k ? { kind: k, rows } : null;
+                    })() : null);
+        if (!det) {
+          setStatus(`${f.name} does not look like a payment file for ${PLAT_LABEL[platform]} — nothing was staged.`, true);
+          return;
+        }
+        stageKind = det.kind;
+        rows = det.rows;
+      }
       if (rows.length === 0) { setStatus("File is empty.", true); return; }
       // Snapshot the modal's date choice now (so it locks with this file)
       let overrideDate = null, dateFrom = null, dateTo = null;
@@ -1017,12 +1258,15 @@
         if (a) dateFrom = new Date(a + "T00:00:00Z").toISOString();
         if (b) dateTo   = new Date(b + "T00:00:00Z").toISOString();
       }
-      const cfg = KIND_CFG[currentKind];
+      const cfg = KIND_CFG[stageKind];
       const dateCol = detectDateColumn(Object.keys(rows[0]), cfg.dateAliases);
       const key = company + "::" + platform;
-      stagedUploads[currentKind][key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol, kind: currentKind };
+      stagedUploads[stageKind][key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol, kind: stageKind };
       renderKindTabs(companies.filter(c => (c.platforms || []).length > 0));
-      setStatus(`✅ Staged ${rows.length} rows from ${f.name} for ${PLAT_LABEL[platform]} · ${company}. Click Save when ready.`, false);
+      const moved = stageKind !== currentKind
+        ? ` — filed as ${ROW_SUBLABEL[stageKind] || stageKind} on its columns, not ${ROW_SUBLABEL[currentKind] || currentKind}`
+        : "";
+      setStatus(`✅ Staged ${rows.length} rows from ${f.name} for ${PLAT_LABEL[platform]} · ${company}${moved}. Click Save when ready.`, false);
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       renderOrdersPickerList(withPlats);
       updateSaveButton();
@@ -1083,6 +1327,18 @@
         const tagApplies = (job.kind !== "orders_file")
           || PLATFORMS_WITH_SEPARATE_ORDERS_FILE.includes(String(s.platform || "").toLowerCase());
         if (cfg.tag && tagApplies) rawWithMeta.__file_tag = cfg.tag;
+        // Settled / upcoming / deduction, decided by this row's own cells. The
+        // file-level tag says which export it came from; this says whether the
+        // money has actually moved, which is the column reconciliation groups on.
+        if (isPayKind(job.kind)) {
+          const st = payRowStatus(s.platform, r);
+          if (st) rawWithMeta.__pay_status = st;
+          // Amazon's 8 "Transfer" rows are the bank payout of everything above
+          // them. Summed with the earnings they count the same money twice.
+          if (String(s.platform).toLowerCase() === "amazon" && /^transfer$/i.test(payPick(r, "type"))) {
+            rawWithMeta.__pay_row = "payout";
+          }
+        }
         if (s.overrideDate) rawWithMeta.__file_date = s.overrideDate;
         if (s.dateFrom)     rawWithMeta.__file_date_from = s.dateFrom;
         if (s.dateTo)       rawWithMeta.__file_date_to   = s.dateTo;
@@ -1232,6 +1488,10 @@
     if (!session) return;
     for (const kind of Object.keys(KIND_CFG)) {
       const cfg = KIND_CFG[kind];
+      // Only kinds that have a row on this page have a stamp to fill. The five
+      // payment sub-kinds live inside the Payments picker, not on the page, so
+      // querying for them here would be five round trips for nothing.
+      if (!document.querySelector(`.kind-stamp[data-kind="${kind}"]`)) continue;
       let q = sb.from(cfg.table)
         .select("pushed_at, source_file, company_name, platform, raw_data")
         .eq("user_id", session.user.id)
@@ -1246,6 +1506,11 @@
         const notSeparate = PLATFORMS_WITH_SEPARATE_ORDERS_FILE.map(p => `platform.neq.${p}`).join(",");
         q = q.or(`raw_data->>__file_tag.eq.file,and(raw_data->>__file_tag.is.null,${notSeparate})`);
       }
+      // The Payments row on the page stands for all six payment files, so it
+      // shows the newest of them whatever tag it carries. Only the untagged
+      // Amazon statement would match the default rule, which would leave the row
+      // reading "Never" the whole time Meesho and Flipkart files were landing.
+      else if (kind === "payments") { /* any tag */ }
       else if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
       else              q = q.is("raw_data->>__file_tag", null);
       const { data } = await q;
