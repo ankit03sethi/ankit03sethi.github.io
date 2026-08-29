@@ -740,7 +740,7 @@
     payments_settled:  { title:"Upload Settled Payments File",      table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["meesho","flipkart","myntra"], tag:"settled" },
     payments_upcoming: { title:"Upload Upcoming Payments File",     table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["meesho","flipkart","myntra"], tag:"upcoming" },
     payments_advice:   { title:"Upload FirstCry Payment Advice",    table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"advice" },
-    payments_sr_pre:   { title:"Upload FirstCry SR Pre-Delivery",   table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"sr_pre" },
+    payments_sr_pre:   { title:"Upload FirstCry RTO Pre-Delivery",   table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"sr_pre" },
     payments_sr_post:  { title:"Upload FirstCry SR Post-Delivery",  table:"seller_payments", dateCol:"payment_date", dateAliases:["transaction release date","payment date","payment-date","paymentdate","due date","due_date","settlement date","date/time","sr date","sr_date","debit note generation date","deduction date","credited on","transaction date","date"], platforms:["firstcry"], tag:"sr_post" },
     // Myntra's Style Dashboard export. It is a listing export, not a quantity,
     // so it rides in seller_stock behind the 'catalog' tag: the id lookups read
@@ -775,7 +775,7 @@
   const ROW_SUBLABEL = {
     returns: "MDirect Returns", returns_delivery: "Return Delivery",
     payments: "Statement", payments_settled: "Settled", payments_upcoming: "Upcoming",
-    payments_advice: "Payment Advice", payments_sr_pre: "SR Pre-Delivery", payments_sr_post: "SR Post-Delivery",
+    payments_advice: "Payment Advice", payments_sr_pre: "RTO Pre-Delivery", payments_sr_post: "SR Post-Delivery",
   };
   let pickerKinds = ["orders"];
   let ordersFilterCompany = "";
