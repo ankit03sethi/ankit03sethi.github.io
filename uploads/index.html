@@ -289,7 +289,7 @@
         <div class="up-icon" style="background:#e0e7ff; color:#4338ca;">&#128193;</div>
         <div>
           <div class="up-name">Orders File</div>
-          <div class="up-desc">Order reports that are not the marketplace CSV &mdash; e.g. Amazon&#39;s 36-column order report.</div>
+          <div class="up-desc">A second, different order export &mdash; e.g. Amazon&#39;s 36-column report. Platforms with only one file show it here too.</div>
         </div>
       </div>
       <div class="up-right">
@@ -739,6 +739,13 @@
   // a question that only applies to Myntra — the pair lives as tabs inside this
   // one picker.
   const KIND_GROUPS = { returns: ["returns", "returns_delivery"] };
+  // Platforms that really do ship a SECOND, different orders export. Amazon
+  // does: a 36-column report keyed on amazon-order-id alongside its 21-column
+  // dispatch CSV. Everyone else ships one file, so for them CSV File and Orders
+  // File describe the same thing - the rows are stored once, untagged, and the
+  // Orders File slot mirrors them instead of showing "Never". Add a platform
+  // here the moment a genuine second export for it turns up.
+  const PLATFORMS_WITH_SEPARATE_ORDERS_FILE = ["amazon"];
   // Shown under the platform name, only where a platform has more than one file.
   const ROW_SUBLABEL = { returns: "MDirect Returns", returns_delivery: "Return Delivery" };
   let pickerKinds = ["orders"];
@@ -1070,7 +1077,12 @@
         const finalDate = s.overrideDate || csvDate || s.dateFrom
                        || (cfg.dateFallbackToday ? new Date().toISOString() : null);
         const rawWithMeta = { ...r };
-        if (cfg.tag)        rawWithMeta.__file_tag = cfg.tag;
+        // Tagging a single-export platform here would store the same file a
+        // second time - once as CSV, once as 'file' - and double its order
+        // count. Only a platform with a genuinely separate report gets the tag.
+        const tagApplies = (job.kind !== "orders_file")
+          || PLATFORMS_WITH_SEPARATE_ORDERS_FILE.includes(String(s.platform || "").toLowerCase());
+        if (cfg.tag && tagApplies) rawWithMeta.__file_tag = cfg.tag;
         if (s.overrideDate) rawWithMeta.__file_date = s.overrideDate;
         if (s.dateFrom)     rawWithMeta.__file_date_from = s.dateFrom;
         if (s.dateTo)       rawWithMeta.__file_date_to   = s.dateTo;
@@ -1229,6 +1241,11 @@
       // seller_manifest holds nothing but manifests, so filtering it by the tag
       // would depend on a marker the table no longer needs.
       if (cfg.table === "seller_manifest") { /* whole table is this kind */ }
+      else if (kind === "orders_file") {
+        // Tagged reports, plus the single-export platforms' untagged rows.
+        const notSeparate = PLATFORMS_WITH_SEPARATE_ORDERS_FILE.map(p => `platform.neq.${p}`).join(",");
+        q = q.or(`raw_data->>__file_tag.eq.file,and(raw_data->>__file_tag.is.null,${notSeparate})`);
+      }
       else if (cfg.tag) q = q.eq("raw_data->>__file_tag", cfg.tag);
       else              q = q.is("raw_data->>__file_tag", null);
       const { data } = await q;
