@@ -1582,7 +1582,11 @@
 
   $("#warehouseTemplateBtn").addEventListener("click", () => {
     const a = document.createElement("a");
-    a.href = "/uploads/warehouse-stock-template.xlsx";
+    // Cache-busted on purpose. The template is a file at a fixed path, so a
+    // browser that fetched last week's copy will happily hand it back and the
+    // download looks like it worked. This is a once-in-a-while click; there is
+    // nothing to gain from caching it and a wrong workbook to lose.
+    a.href = "/uploads/warehouse-stock-template.xlsx?v=" + Date.now();
     a.download = "Warehouse Stock.xlsx";
     document.body.appendChild(a); a.click(); a.remove();
   });
