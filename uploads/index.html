@@ -35,17 +35,9 @@
     .up-item:last-child { border-bottom:none; }
     /* "Others" — a collapsed drawer for the odd file a platform only sometimes
        makes you fetch by hand. Closed by default so it costs no attention. */
-    /* Sub-tabs inside a picker. Only Myntra ships two returns exports; every
-       other platform has one, so the strip appears only where it is needed. */
-    .kind-tabs { display:flex; gap:6px; margin:0 0 12px; border-bottom:1px solid #e2e8f0; }
-    .kind-tab { appearance:none; border:none; background:none; font:inherit; cursor:pointer;
-                padding:8px 12px; font-size:13px; font-weight:600; color:#64748b;
-                border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:6px 6px 0 0; }
-    .kind-tab:hover { background:#f8fafc; color:#0f172a; }
-    .kind-tab.active { color:#1f6feb; border-bottom-color:#1f6feb; }
-    .kind-tab .tab-n { font-size:11px; font-weight:700; background:#1f6feb; color:#fff;
-                       border-radius:999px; padding:1px 6px; margin-left:6px; }
-    .kind-tab-note { font-size:12px; color:#64748b; margin:-4px 0 12px; }
+    /* A platform that ships two files for one kind gets two rows; the sub-label
+       says which is which. Nothing shows on the platforms that ship one. */
+    .cell-platform .cell-sub { display:block; font-size:11px; font-weight:600; color:#64748b; margin-top:2px; }
     .others-head { cursor:pointer; user-select:none; }
     .others-head:hover { background:#f8fafc; }
     .others-chev { font-size:13px; color:#64748b; transition:transform .18s ease; display:inline-block; }
@@ -302,7 +294,7 @@
         <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#8618;</div>
         <div>
           <div class="up-name">Returns File</div>
-          <div class="up-desc">Marketplace return / RTO / cancellation reports. Myntra: use the MDirect Returns Report here.</div>
+          <div class="up-desc">Marketplace return / RTO / cancellation reports. Myntra has two &#8212; both are listed inside.</div>
         </div>
       </div>
       <div class="up-right">
@@ -484,8 +476,6 @@
       <button class="x" id="ordersPickerClose">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="kind-tabs" id="kindTabs" hidden></div>
-      <div class="kind-tab-note" id="kindTabNote" hidden></div>
       <p style="margin:0 0 10px; color:#64748b; font-size:13px;">Pick a date (or date range), then click <b>Upload</b> next to a company &amp; platform. Your file will be tagged automatically.</p>
 
       <div style="display:flex; gap:6px; margin-bottom:10px;">
@@ -732,11 +722,8 @@
   // a question that only applies to Myntra — the pair lives as tabs inside this
   // one picker.
   const KIND_GROUPS = { returns: ["returns", "returns_delivery"] };
-  const TAB_LABEL = { returns: "Returns", returns_delivery: "Myntra \u00b7 Return Delivery" };
-  const TAB_NOTE = {
-    returns: "The returns count. For Myntra use the MDirect Returns Report.",
-    returns_delivery: "Myntra only \u2014 the Return Delivery Report. Dated by when the parcel reached you, so the unit is back and sellable. Kept apart from the count above, which would otherwise pick up older returns that merely arrived this month.",
-  };
+  // Shown under the platform name, only where a platform has more than one file.
+  const ROW_SUBLABEL = { returns: "MDirect Returns", returns_delivery: "Return Delivery" };
   let pickerKinds = ["orders"];
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
@@ -767,15 +754,18 @@
   // "Never" even though their data was right there. seller_last_uploads()
   // aggregates in the database and returns one row per kind+company+platform,
   // for every kind at once.
-  async function loadPickerLastMap(kind) {
+  async function loadPickerLastMap(kinds) {
+    // Keyed by kind as well as company+platform: a Myntra row in the returns
+    // picker is now two rows, one per export, and each has its own stamp.
+    const want = new Set(Array.isArray(kinds) ? kinds : [kinds]);
     pickerLastByCombo = {};
     if (!session) return;
     try {
       const { data, error } = await sb.rpc("seller_last_uploads");
       if (error) { console.warn("loadPickerLastMap rpc err:", error); return; }
       (data || []).forEach(r => {
-        if (r.kind !== kind) return;
-        const key = (r.company_name || "") + "::" + (r.platform || "");
+        if (!want.has(r.kind)) return;
+        const key = r.kind + "::" + (r.company_name || "") + "::" + (r.platform || "");
         const prev = pickerLastByCombo[key];
         if (!prev || new Date(r.last_pushed) > new Date(prev)) pickerLastByCombo[key] = r.last_pushed;
       });
@@ -796,39 +786,14 @@
       updateSaveButton();
       $("#ordersPickerModal").classList.add("show");
       // Load stamps in background then re-render — non-blocking so modal opens instantly
-      loadPickerLastMap(currentKind).then(() => renderOrdersPickerList(withPlats));
+      loadPickerLastMap(pickerKinds).then(() => renderOrdersPickerList(withPlats));
     });
   });
 
-  // Renders the sub-tab strip, and nothing at all for a picker with one kind.
-  function renderKindTabs(list) {
-    const wrap = $("#kindTabs"), note = $("#kindTabNote");
-    if (pickerKinds.length < 2) { wrap.hidden = true; note.hidden = true; wrap.innerHTML = ""; return; }
-    wrap.hidden = false;
-    wrap.innerHTML = pickerKinds.map(k => {
-      const n = Object.keys(stagedUploads[k] || {}).length;
-      return `<button class="kind-tab${k === currentKind ? " active" : ""}" data-k="${k}">`
-           + `${escapeHtml(TAB_LABEL[k] || k)}`
-           + (n ? `<span class="tab-n">${n}</span>` : "")
-           + `</button>`;
-    }).join("");
-    note.hidden = !TAB_NOTE[currentKind];
-    note.textContent = TAB_NOTE[currentKind] || "";
-    wrap.querySelectorAll(".kind-tab").forEach(b => {
-      b.addEventListener("click", () => {
-        if (b.dataset.k === currentKind) return;
-        currentKind = b.dataset.k;
-        // A tab restricted to one platform cannot keep the other tab's filter.
-        ordersFilterCompany = ""; ordersFilterPlatform = "";
-        $("#ordersPickerTitle").textContent = KIND_CFG[currentKind].title;
-        renderKindTabs(list);
-        buildFilterChips(list);
-        renderOrdersPickerList(list);
-        updateSaveButton();
-        loadPickerLastMap(currentKind).then(() => renderOrdersPickerList(list));
-      });
-    });
-  }
+  // The tab strip is gone: the two Myntra returns exports are two rows in the
+  // list instead, so the choice sits next to the company and platform it
+  // applies to rather than above a list where it looks global.
+  function renderKindTabs() {}
 
   function buildFilterChips(list) {
     const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
@@ -851,15 +816,21 @@
     const wrap = $("#ordersPickerList");
     const reversed = wrap.classList.contains("reverse");
 
-    // Flatten to one row per (company, platform), apply active filters + kind-restricted platforms
-    const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
+    // One row per (company, platform, kind). Almost always that is one row per
+    // company+platform, because almost every kind is a single file. Myntra in
+    // the returns picker is the exception: it ships two exports that answer
+    // different questions, so it gets two rows here rather than making the
+    // other four platforms look at a choice that does not apply to them.
     const rows = [];
     list.forEach(c => {
       if (ordersFilterCompany && c.name !== ordersFilterCompany) return;
-      const plats = kindPlats.filter(p => (c.platforms || []).includes(p));
-      plats.forEach(p => {
+      (c.platforms || []).forEach(p => {
         if (ordersFilterPlatform && p !== ordersFilterPlatform) return;
-        rows.push({ company: c.name, platform: p });
+        pickerKinds.forEach(k => {
+          const kindPlats = KIND_CFG[k].platforms || PLATFORMS;
+          if (!kindPlats.includes(p)) return;
+          rows.push({ company: c.name, platform: p, kind: k });
+        });
       });
     });
 
@@ -870,15 +841,22 @@
     const companyOrder = Object.fromEntries(list.map((c, i) => [c.name, i]));
     const platOrder = Object.fromEntries(PLATFORMS.map((p, i) => [p, i]));
     const lastMs = (r) => {
-      const iso = pickerLastByCombo[r.company + "::" + r.platform];
+      const iso = pickerLastByCombo[r.kind + "::" + r.company + "::" + r.platform];
       if (!iso) return -1;                       // never uploaded -> bottom
       const t = new Date(iso).getTime();
       return isNaN(t) ? -1 : t;
     };
+    const kindOrder = Object.fromEntries(pickerKinds.map((k, i) => [k, i]));
     const groupCmp = reversed
       ? (a, b) => (platOrder[a.platform] - platOrder[b.platform]) || a.company.localeCompare(b.company)
       : (a, b) => (companyOrder[a.company] - companyOrder[b.company]) || (platOrder[a.platform] - platOrder[b.platform]);
-    rows.sort((a, b) => (lastMs(b) - lastMs(a)) || groupCmp(a, b));
+    // The two rows of a split platform stay together, in a fixed order, rather
+    // than being separated by recency — they are one decision, not two.
+    rows.sort((a, b) =>
+      (lastMs(b) - lastMs(a)) || groupCmp(a, b) || (kindOrder[a.kind] - kindOrder[b.kind]));
+    if (pickerKinds.length > 1) {
+      rows.sort((a, b) => groupCmp(a, b) || (kindOrder[a.kind] - kindOrder[b.kind]));
+    }
 
     if (rows.length === 0) {
       wrap.innerHTML = `<div style="padding:24px; text-align:center; color:#64748b; font-size:13px;">No matches for this filter. Clear filters or add companies with the selected platform.</div>`;
@@ -886,7 +864,16 @@
     }
 
     // In reverse mode, platform cell shows first (left)
-    const bucket = stagedUploads[currentKind];
+    // Which platforms actually got more than one row. Labelling by "this picker
+    // has two kinds" would put "MDirect Returns" under Amazon, Flipkart, Meesho
+    // and FirstCry too — naming a distinction that does not exist for them.
+    // Counted per company AND platform: counting by platform alone labels
+    // Amazon simply because two companies sell on it.
+    const rowsPerCombo = {};
+    rows.forEach(r => {
+      const ck = r.company + "::" + r.platform;
+      rowsPerCombo[ck] = (rowsPerCombo[ck] || 0) + 1;
+    });
     // Format a "last uploaded" timestamp for a company+platform combo — dd Mon, HH:MM
     const fmtLast = (iso) => {
       if (!iso) return "";
@@ -896,21 +883,25 @@
     };
     const html = rows.map(r => {
       const key = r.company + "::" + r.platform;
-      const staged = bucket[key];
-      const lastIso = pickerLastByCombo[key];
+      const staged = (stagedUploads[r.kind] || {})[key];
+      const lastIso = pickerLastByCombo[r.kind + "::" + key];
       const fresh = isToday(lastIso);
       const stampHtml = lastIso
         ? `<div class="cell-lastup${fresh ? ' today' : ''}" title="Last uploaded ${escapeHtml(new Date(lastIso).toLocaleString('en-IN'))}"><span class="lu-lbl">Last</span> <span class="lu-val">${fresh ? TICK : ''}${escapeHtml(fmtLast(lastIso))}</span></div>`
         : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span></div>`;
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
-      const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}</div>`;
+      // Only a split platform is labelled. Naming the file type on every row
+      // would be noise on the four platforms that only have one.
+      const sub = (rowsPerCombo[r.company + "::" + r.platform] > 1) && ROW_SUBLABEL[r.kind]
+        ? `<span class="cell-sub">${escapeHtml(ROW_SUBLABEL[r.kind])}</span>` : "";
+      const platformCell = `<div class="cell-platform">${escapeHtml(PLAT_LABEL[r.platform])}${sub}</div>`;
       let actionInner;
       if (staged) {
         actionInner = `<span class="staged-badge">&#10004; ${staged.rows.length} rows staged</span>
           <span class="staged-name" title="${escapeHtml(staged.fileName)}">${escapeHtml(staged.fileName)}</span>
-          <button class="up-remove" data-key="${escapeHtml(key)}" title="Remove staged file">&times;</button>`;
+          <button class="up-remove" data-key="${escapeHtml(key)}" data-kind="${r.kind}" title="Remove staged file">&times;</button>`;
       } else {
-        actionInner = `<button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}">&#8593; Upload</button>`;
+        actionInner = `<button class="up-mini" data-company="${escapeHtml(r.company)}" data-platform="${r.platform}" data-kind="${r.kind}">&#8593; Upload</button>`;
       }
       const actionCell = `<div class="cell-action" style="display:flex; align-items:center; gap:10px;">${stampHtml}${actionInner}</div>`;
       return `<div class="combo-row${staged ? ' staged' : ''}">${reversed ? platformCell + companyCell : companyCell + platformCell}${actionCell}</div>`;
@@ -920,6 +911,9 @@
       btn.addEventListener("click", () => {
         const company = btn.dataset.company;
         const platform = btn.dataset.platform;
+        // The row decides which file type this upload is, not a tab somewhere
+        // else on screen. The change handler reads currentKind.
+        currentKind = btn.dataset.kind || currentKind;
         $("#ordersFileInput").dataset.company = company;
         $("#ordersFileInput").dataset.platform = platform;
         $("#ordersFileInput").click();
@@ -927,7 +921,7 @@
     });
     wrap.querySelectorAll(".up-remove").forEach(btn => {
       btn.addEventListener("click", () => {
-        delete stagedUploads[currentKind][btn.dataset.key];
+        delete stagedUploads[btn.dataset.kind || currentKind][btn.dataset.key];
         const withPlats = companies.filter(c => (c.platforms || []).length > 0);
         renderKindTabs(withPlats);
         renderOrdersPickerList(withPlats);
