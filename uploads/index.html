@@ -1361,7 +1361,12 @@
         // content). Re-uploading the same inventory export would fail the whole
         // batch on a plain insert, so ignore the duplicates instead — the
         // keep-latest trigger still swaps a genuinely new file in.
-        const DEDUPED = ["seller_stock", "seller_returns", "seller_manifest"];
+        // seller_payments joins them: a payment file dropped into both slots
+        // arrives twice with identical rows. A BEFORE INSERT trigger drops the
+        // repeat across separate saves, but two identical rows inside ONE
+        // 400-row chunk are invisible to it — the trigger cannot see rows from
+        // its own statement — so the upsert path is what makes that case safe.
+        const DEDUPED = ["seller_stock", "seller_returns", "seller_manifest", "seller_payments"];
         const { error } = DEDUPED.includes(cfg.table)
           ? await sb.from(cfg.table).upsert(slice, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
           : await sb.from(cfg.table).insert(slice);
