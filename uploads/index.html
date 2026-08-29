@@ -250,7 +250,7 @@
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
         <div>
-          <div class="up-name">CSV</div>
+          <div class="up-name">CSV File</div>
           <div class="up-desc">The marketplace&#39;s own CSV order export &mdash; e.g. Meesho Orders_*.csv.</div>
         </div>
       </div>
@@ -269,7 +269,7 @@
       <div class="up-left">
         <div class="up-icon" style="background:#fce7f3; color:#ec4899;">&#128230;</div>
         <div>
-          <div class="up-name">Manifest</div>
+          <div class="up-name">Manifest File</div>
           <div class="up-desc">Meesho dispatch list &mdash; what is going out today. Stored separately from orders.</div>
         </div>
       </div>
@@ -365,7 +365,7 @@
       <div class="up-left">
         <div class="up-icon">&#128193;</div>
         <div>
-          <div class="up-name">Master SKU file</div>
+          <div class="up-name">Master SKU File</div>
           <div class="up-desc">Maps each platform SKU to your Master SKU + brand, category, HSN.</div>
         </div>
       </div>
@@ -405,7 +405,7 @@
         <div class="up-left">
           <div class="up-icon" style="background:#fce7f3; color:#9d174d;">&#127991;</div>
           <div>
-            <div class="up-name">Myntra Style Id</div>
+            <div class="up-name">Myntra Style Id File</div>
             <div class="up-desc">Style Dashboard export &#8212; carries the style id that builds the product link. The inventory CSV does not have it.</div>
           </div>
         </div>
@@ -426,7 +426,7 @@
         <div class="up-icon" style="background:#fef9c3; color:#a16207;">&#9888;&#65039;</div>
         <div>
           <div class="up-name">Add a company first</div>
-          <div class="up-desc">Click <b>Companies</b> above, add at least one company with its platforms, then the CSV upload will appear here.</div>
+          <div class="up-desc">Click <b>Companies</b> above, add at least one company with its platforms, then the CSV File upload will appear here.</div>
         </div>
       </div>
     </div>
@@ -703,12 +703,12 @@
 
   // ---- MULTI-KIND UPLOADS: Orders / Returns / Payments ----
   const KIND_CFG = {
-    orders:      { title:"Upload CSV",             table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
+    orders:      { title:"Upload CSV File",             table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
     orders_file: { title:"Upload Orders File",            table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"], tag:"file" },
     // A manifest is a dispatch list, not an order, and now has its own table.
     // The web upload writes to it directly; the desktop watcher still pushes
     // through seller-push into seller_orders, where a trigger relocates it.
-    manifest:    { title:"Upload Manifest (Meesho)", table:"seller_manifest", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
+    manifest:    { title:"Upload Manifest File (Meesho)", table:"seller_manifest", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
     // Return-date columns as the five marketplaces actually name them. Every one
     // of these exports also carries an ORDER date, so the return columns are
     // listed first — otherwise a returns file gets filed under the day the
@@ -729,7 +729,7 @@
     // it, and nothing counts it as inventory. The desktop watcher picks this
     // file up on its own; this row is the manual path for when it is not
     // running or Myntra hands you the file somewhere else.
-    myntra_style:{ title:"Upload Myntra Style Id file",   table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","report date","date"], platforms:["myntra"], tag:"catalog", dateFallbackToday:true },
+    myntra_style:{ title:"Upload Myntra Style Id File",   table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","report date","date"], platforms:["myntra"], tag:"catalog", dateFallbackToday:true },
   };
   let currentKind = "orders";
   // A picker usually covers one kind. Returns covers two, because Myntra is the
