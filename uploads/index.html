@@ -37,7 +37,10 @@
        makes you fetch by hand. Closed by default so it costs no attention. */
     /* A platform that ships two files for one kind gets two rows; the sub-label
        says which is which. Nothing shows on the platforms that ship one. */
-    .cell-platform .cell-sub { display:block; font-size:11px; font-weight:600; color:#64748b; margin-top:2px; }
+    /* Always on its own line, indented past the dot, so the two rows of a split
+       platform look identical instead of one wrapping and one not depending on
+       how long its label happens to be. */
+    .cell-platform .cell-sub { flex:0 0 100%; margin-left:14px; font-size:11px; font-weight:600; color:#64748b; white-space:nowrap; }
     .others-head { cursor:pointer; user-select:none; }
     .others-head:hover { background:#f8fafc; }
     .others-chev { font-size:13px; color:#64748b; transition:transform .18s ease; display:inline-block; }
@@ -108,7 +111,7 @@
 
     /* One row per (company, platform) — uniform, no company separators */
     #ordersPickerList { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
-    .cell-lastup { font-size:11px; line-height:1.15; text-align:right; min-width:96px; }
+    .cell-lastup { font-size:11px; line-height:1.15; text-align:right; min-width:120px; flex:0 0 120px; }
     .cell-lastup .lu-lbl { display:block; color:#94a3b8; text-transform:uppercase; letter-spacing:.4px; font-size:10px; font-weight:700; }
     .cell-lastup .lu-val { display:block; color:#1f6feb; font-weight:700; font-size:12px; white-space:nowrap; }
     .cell-lastup.none .lu-val { color:#cbd5e1; font-style:italic; font-weight:normal; }
@@ -116,13 +119,22 @@
     .today-tick { color:#16a34a; font-weight:800; margin-right:4px; }
     .cell-lastup.today .lu-val { color:#16a34a; }
     .up-stamp-box .stamp.today .when { color:#16a34a; }
-    .combo-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:#fff; border-bottom:1px solid #f1f5f9; }
+    /* A real grid, not flex. With flex:1 a long company name ("Sethi Trading
+       Company", "Hirday Enterprises") refuses to shrink below its own text and
+       shoves the platform column right, so the platform names stepped in and
+       out down the list. minmax(0,…) lets the columns hold their width and the
+       text wrap inside them instead, which lines every row up in every picker
+       - orders, returns, inventory, the lot. */
+    .combo-row { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr) auto;
+                 align-items:center; gap:14px; padding:10px 14px; background:#fff;
+                 border-bottom:1px solid #f1f5f9; }
     .combo-row:last-child { border-bottom:none; }
-    .combo-row .cell-company { flex:1; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
-    .combo-row .cell-company::before { content:"🏢"; font-size:15px; }
-    .combo-row .cell-platform { flex:1; font-size:14px; font-weight:600; color:#0f172a; display:flex; align-items:center; gap:6px; }
-    .combo-row .cell-platform::before { content:""; width:8px; height:8px; border-radius:50%; background:#1f6feb; }
-    .combo-row .cell-action { flex:0 0 auto; }
+    .combo-row .cell-company { min-width:0; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px; }
+    .combo-row .cell-company::before { content:"🏢"; font-size:15px; flex:0 0 auto; }
+    .combo-row .cell-platform { min-width:0; font-size:14px; font-weight:600; color:#0f172a; display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+    /* The dot must not shrink, or it goes oval when the label wraps. */
+    .combo-row .cell-platform::before { content:""; width:8px; height:8px; border-radius:50%; background:#1f6feb; flex:0 0 auto; align-self:center; }
+    .combo-row .cell-action { display:flex; align-items:center; gap:10px; justify-content:flex-end; }
     .combo-row .up-mini { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid #1f6feb; background:#1f6feb; color:#fff; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .combo-row .up-mini:hover { background:#1651a8; }
     .combo-row.staged { background:#f0fdf4; }
@@ -130,7 +142,9 @@
     .combo-row .staged-name { color:#64748b; font-size:11px; font-weight:600; margin-left:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; display:inline-block; }
     .combo-row .up-remove { background:transparent; border:none; color:#dc2626; font-size:16px; cursor:pointer; margin-left:6px; }
     @media (max-width: 600px) {
-      .combo-row { flex-direction:column; align-items:stretch; gap:6px; }
+      .combo-row { grid-template-columns:1fr; align-items:stretch; gap:6px; }
+      .combo-row .cell-action { justify-content:space-between; }
+      .combo-row .cell-lastup { text-align:left; flex:0 0 auto; min-width:0; }
     }
 
     #locker { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
