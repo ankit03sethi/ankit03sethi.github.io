@@ -689,7 +689,11 @@
     orders:      { title:"Upload Orders CSV",             table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"] },
     orders_file: { title:"Upload Orders File",            table:"seller_orders",   dateCol:"order_date",   dateAliases:["order date","order-date","orderdate","date","invoice date","invoice-date","purchase date","dispatch date"], tag:"file" },
     manifest:    { title:"Upload Orders Manifest (Meesho)", table:"seller_orders", dateCol:"order_date",   dateAliases:["order date","dispatch date","invoice date","date"], platforms:["meesho"], tag:"manifest" },
-    returns:     { title:"Upload Returns File",           table:"seller_returns",  dateCol:"return_date",  dateAliases:["return date","return-date","returndate","date","rto date","cancel date","reverse date"] },
+    // Return-date columns as the five marketplaces actually name them. Every one
+    // of these exports also carries an ORDER date, so the return columns are
+    // listed first — otherwise a returns file gets filed under the day the
+    // order was placed, which is what FirstCry was doing.
+    returns:     { title:"Upload Returns File",           table:"seller_returns",  dateCol:"return_date",  dateAliases:["return created date","return_created_date","return request date","return requested date","sales return date","return date","return-date","returndate","sr date","rto_cancel_date","order_rto_date","return approval date","return delivery date","customer_delivered_date","deliver_to_seller_date","rto date","cancel date","reverse date","date"] },
     inventory:   { title:"Upload Inventory File",         table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","snapshot-date","inventory date","stock date","as on date","as-on date","report date","date"] },
     payments:    { title:"Upload Payments File",          table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
     // Myntra's Style Dashboard export. It is a listing export, not a quantity,
@@ -910,9 +914,9 @@
     setStatus("Reading " + f.name + " …", false);
     try {
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const rows = sheetRowsWithHeader(sheet);
       if (rows.length === 0) { setStatus("File is empty.", true); return; }
       // Snapshot the modal's date choice now (so it locks with this file)
       let overrideDate = null, dateFrom = null, dateTo = null;
@@ -956,7 +960,20 @@
     for (const k of keys) {
       const s = bucket[k];
       const payload = s.rows.map(r => {
-        const csvDate = s.dateCol ? parseDate(r[s.dateCol]) : null;
+        // One column is detected for the whole file, but a single column is not
+        // always populated on every row: Myntra leaves return_created_date as
+        // the 1970 sentinel on RTO rows and puts the real date in
+        // rto_cancel_date. So if the detected column comes back empty for this
+        // row, walk the rest of the kind's aliases before giving up on it.
+        let csvDate = s.dateCol ? parseDate(r[s.dateCol]) : null;
+        if (!csvDate && cfg.dateAliases) {
+          for (const alias of cfg.dateAliases) {
+            const hit = Object.keys(r).find(k => norm(k) === norm(alias));
+            if (!hit || hit === s.dateCol) continue;
+            csvDate = parseDate(r[hit]);
+            if (csvDate) break;
+          }
+        }
         // A catalogue export is a snapshot of "what is live now" and carries no
         // date column of its own. Without a fallback it lands with a null
         // snapshot_date and sorts to the bottom of every view — same reason the
@@ -1003,10 +1020,55 @@
     await refreshStamps();
   });
 
+  // Some exports put a banner above the table. Meesho's returns CSV opens with
+  // "Meesho Supplier Panel" and four supplier key-value rows, and only reaches
+  // its real 22-column header on row 8. sheet_to_json takes row 0 as the header,
+  // so the whole file arrived as one column of nothing. Same rule as the desktop
+  // watcher: the table is the widest thing in the file, so find the width the
+  // body settles on and take the first non-numeric row of that width.
+  function sheetRowsWithHeader(sheet) {
+    const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" })
+                     .filter(r => r.some(v => String(v == null ? "" : v).trim() !== ""));
+    if (grid.length === 0) return [];
+    // Count FILLED cells, not array length: sheet_to_json pads every row out to
+    // the sheet's full width, so the two-cell banner rows measure 22 wide just
+    // like the real header and "widest row" picks the banner.
+    const LOOK = Math.min(grid.length, 30);
+    const filled = (r) => r.filter(v => String(v == null ? "" : v).trim() !== "").length;
+    let width = 0;
+    for (let i = 0; i < LOOK; i++) width = Math.max(width, filled(grid[i]));
+    let start = 0;
+    if (width >= 2) {
+      for (let i = 0; i < LOOK; i++) {
+        if (filled(grid[i]) !== width) continue;
+        const cells = grid[i].map(v => String(v == null ? "" : v).trim()).filter(Boolean);
+        const numeric = cells.filter(v => /^-?[\d,.]+$/.test(v)).length;
+        if (numeric > cells.length / 2) continue;   // that is a data row, not a header
+        start = i; break;
+      }
+    }
+    const headers = (grid[start] || []).map((h, i) => {
+      const t = String(h == null ? "" : h).trim();
+      return t || `col_${i + 1}`;
+    });
+    return grid.slice(start + 1).map(r => {
+      const o = {};
+      headers.forEach((h, i) => { o[h] = r[i] == null ? "" : r[i]; });
+      return o;
+    });
+  }
+
+  // Candidate-first, not header-first. The alias lists are written in priority
+  // order — for returns, the date the return was raised before any secondary
+  // date — and looping over the headers instead threw that away: Flipkart's
+  // export lists "Return Approval Date" before "Return Requested Date", so the
+  // header-first loop picked the approval date no matter how the list was
+  // ordered. This is also how the desktop watcher resolves it.
   function detectDateColumn(headers, candidates) {
-    for (const h of headers) {
-      const n = norm(h);
-      if (candidates.some(c => n === norm(c))) return h;
+    for (const c of candidates) {
+      const n = norm(c);
+      const hit = headers.find(h => norm(h) === n);
+      if (hit) return hit;
     }
     return null;
   }
@@ -1015,9 +1077,23 @@
     if (v instanceof Date) return v.toISOString();
     const s = String(v).trim();
     if (!s) return null;
+    // A bare number in this range is an Excel date serial, not a year. Without
+    // cellDates the sheet reader hands back 46229 for 2026-08-25, and
+    // new Date("46229") is the year 46229 — a date that passes every check and
+    // is completely wrong. Range covers 1970 to 2100.
+    if (/^\d{4,5}(\.\d+)?$/.test(s)) {
+      const serial = parseFloat(s);
+      if (serial >= 25569 && serial <= 73415) {
+        const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+        if (!isNaN(d)) return d.toISOString();
+      }
+    }
     // Try ISO / IST formats
     const iso = new Date(s);
-    if (!isNaN(iso)) return iso.toISOString();
+    // A date before 2000 is not a date, it is a null written as one: Myntra
+    // fills return_created_date with "1970-01-01" on every RTO row. Treating it
+    // as real files those returns at the Unix epoch, where no report shows them.
+    if (!isNaN(iso)) return iso.getUTCFullYear() >= 2000 ? iso.toISOString() : null;
     return null;
   }
   function parseYear(v) {
@@ -1402,7 +1478,7 @@
         return;
       }
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
       if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
         setStatus("Could not read any sheets from " + f.name, true); return;
       }
