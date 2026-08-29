@@ -33,6 +33,15 @@
     .up-list { padding:8px 8px 16px; }
     .up-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid #f1f5f9; }
     .up-item:last-child { border-bottom:none; }
+    /* "Others" — a collapsed drawer for the odd file a platform only sometimes
+       makes you fetch by hand. Closed by default so it costs no attention. */
+    .others-head { cursor:pointer; user-select:none; }
+    .others-head:hover { background:#f8fafc; }
+    .others-chev { font-size:13px; color:#64748b; transition:transform .18s ease; display:inline-block; }
+    .others-head.open .others-chev { transform:rotate(90deg); }
+    .others-count { font-size:11px; font-weight:700; color:#475569; background:#e2e8f0; border-radius:999px; padding:2px 8px; margin-left:8px; }
+    #othersBody { border-top:1px solid #f1f5f9; background:#fbfdff; }
+    #othersBody .up-item { padding-left:34px; }
     .up-left { display:flex; align-items:center; gap:14px; min-width:0; }
     .up-icon { width:42px; height:42px; background:#dbeafe; color:#1f6feb; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
     .up-name { font-size:15px; font-weight:700; color:#0f172a; }
@@ -358,6 +367,43 @@
     </div>
     <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
+    <div class="up-item others-head" id="othersToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="othersBody">
+      <div class="up-left">
+        <div class="up-icon" style="background:#fef3c7; color:#92400e;">&#9881;</div>
+        <div>
+          <div class="up-name"><span class="others-chev">&#9654;</span> Others <span class="others-count">1</span></div>
+          <div class="up-desc">Extra platform exports that are not orders, returns, inventory or payments.</div>
+        </div>
+      </div>
+      <div class="up-right">
+        <div class="up-stamp-box">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">&nbsp;</div>
+          <div class="stamp none" id="othersHint">Click to open</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="othersBody" hidden>
+      <div class="up-item kind-row" data-kind="myntra_style">
+        <div class="up-left">
+          <div class="up-icon" style="background:#fce7f3; color:#9d174d;">&#127991;</div>
+          <div>
+            <div class="up-name">Myntra Style Id</div>
+            <div class="up-desc">Style Dashboard export &#8212; carries the style id that builds the product link. The inventory CSV does not have it.</div>
+          </div>
+        </div>
+        <div class="up-right">
+          <div class="up-stamp-box">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
+            <div class="stamp none kind-stamp" data-kind="myntra_style">Never</div>
+          </div>
+          <div class="up-actions">
+            <button class="up-btn primary kind-upload-btn" data-kind="myntra_style">&#8593; Upload</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="up-item kind-hint" id="ordersHint" style="display:none;">
       <div class="up-left">
         <div class="up-icon" style="background:#fef9c3; color:#a16207;">&#9888;&#65039;</div>
@@ -646,12 +692,18 @@
     returns:     { title:"Upload Returns File",           table:"seller_returns",  dateCol:"return_date",  dateAliases:["return date","return-date","returndate","date","rto date","cancel date","reverse date"] },
     inventory:   { title:"Upload Inventory File",         table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","snapshot-date","inventory date","stock date","as on date","as-on date","report date","date"] },
     payments:    { title:"Upload Payments File",          table:"seller_payments", dateCol:"payment_date", dateAliases:["payment date","payment-date","paymentdate","date","settlement date","credited on","transaction date"] },
+    // Myntra's Style Dashboard export. It is a listing export, not a quantity,
+    // so it rides in seller_stock behind the 'catalog' tag: the id lookups read
+    // it, and nothing counts it as inventory. The desktop watcher picks this
+    // file up on its own; this row is the manual path for when it is not
+    // running or Myntra hands you the file somewhere else.
+    myntra_style:{ title:"Upload Myntra Style Id file",   table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","report date","date"], platforms:["myntra"], tag:"catalog", dateFallbackToday:true },
   };
   let currentKind = "orders";
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
-  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, inventory: {}, payments: {} };
+  const stagedUploads = { orders: {}, orders_file: {}, manifest: {}, returns: {}, inventory: {}, payments: {}, myntra_style: {} };
   // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
   let pickerLastByCombo = {};
 
@@ -905,7 +957,12 @@
       const s = bucket[k];
       const payload = s.rows.map(r => {
         const csvDate = s.dateCol ? parseDate(r[s.dateCol]) : null;
-        const finalDate = s.overrideDate || csvDate || s.dateFrom || null;
+        // A catalogue export is a snapshot of "what is live now" and carries no
+        // date column of its own. Without a fallback it lands with a null
+        // snapshot_date and sorts to the bottom of every view — same reason the
+        // desktop watcher stamps stock files with the current time.
+        const finalDate = s.overrideDate || csvDate || s.dateFrom
+                       || (cfg.dateFallbackToday ? new Date().toISOString() : null);
         const rawWithMeta = { ...r };
         if (cfg.tag)        rawWithMeta.__file_tag = cfg.tag;
         if (s.overrideDate) rawWithMeta.__file_date = s.overrideDate;
@@ -1024,6 +1081,49 @@
   }
   // Back-compat alias
   const refreshOrdersStamp = refreshStamps;
+
+  // ---- "Others" drawer ----
+  // Collapsed by default. The head mirrors whatever the newest stamp inside it
+  // says, so a packer can tell at a glance whether anything in there is stale
+  // without having to open it first.
+  (function initOthers() {
+    const head = $("#othersToggle"), body = $("#othersBody"), hint = $("#othersHint");
+    if (!head || !body) return;
+    function setOpen(open) {
+      body.hidden = !open;
+      head.classList.toggle("open", open);
+      head.setAttribute("aria-expanded", open ? "true" : "false");
+      // The head only stands in for what is inside while the drawer is shut.
+      // Once it is open the real stamp is right there, so repeating it — or
+      // still saying "click to open" — is noise.
+      if (hint) hint.style.visibility = open ? "hidden" : "";
+      try { localStorage.setItem("uploadsOthersOpen", open ? "1" : "0"); } catch {}
+    }
+    head.addEventListener("click", () => setOpen(body.hidden));
+    head.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(body.hidden); }
+    });
+    let start = false;
+    try { start = localStorage.getItem("uploadsOthersOpen") === "1"; } catch {}
+    setOpen(start);
+
+    // Mirror the inner stamp onto the collapsed head.
+    const inner = document.querySelector('.kind-stamp[data-kind="myntra_style"]');
+    if (inner && hint) {
+      const sync = () => {
+        if (inner.classList.contains("none")) {
+          hint.textContent = "Click to open";
+          hint.classList.add("none"); hint.classList.remove("today");
+        } else {
+          hint.innerHTML = inner.innerHTML;
+          hint.classList.remove("none");
+          hint.classList.toggle("today", inner.classList.contains("today"));
+        }
+      };
+      new MutationObserver(sync).observe(inner, { childList: true, subtree: true, attributes: true });
+      sync();
+    }
+  })();
 
   // Sample button → downloads pre-built .xlsx with header, dropdowns, auto S.NO
   $("#masterSampleBtn").addEventListener("click", () => {
