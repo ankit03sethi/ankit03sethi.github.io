@@ -35,6 +35,17 @@
     .up-item:last-child { border-bottom:none; }
     /* "Others" — a collapsed drawer for the odd file a platform only sometimes
        makes you fetch by hand. Closed by default so it costs no attention. */
+    /* Sub-tabs inside a picker. Only Myntra ships two returns exports; every
+       other platform has one, so the strip appears only where it is needed. */
+    .kind-tabs { display:flex; gap:6px; margin:0 0 12px; border-bottom:1px solid #e2e8f0; }
+    .kind-tab { appearance:none; border:none; background:none; font:inherit; cursor:pointer;
+                padding:8px 12px; font-size:13px; font-weight:600; color:#64748b;
+                border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:6px 6px 0 0; }
+    .kind-tab:hover { background:#f8fafc; color:#0f172a; }
+    .kind-tab.active { color:#1f6feb; border-bottom-color:#1f6feb; }
+    .kind-tab .tab-n { font-size:11px; font-weight:700; background:#1f6feb; color:#fff;
+                       border-radius:999px; padding:1px 6px; margin-left:6px; }
+    .kind-tab-note { font-size:12px; color:#64748b; margin:-4px 0 12px; }
     .others-head { cursor:pointer; user-select:none; }
     .others-head:hover { background:#f8fafc; }
     .others-chev { font-size:13px; color:#64748b; transition:transform .18s ease; display:inline-block; }
@@ -305,25 +316,6 @@
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="returns_delivery">
-      <div class="up-left">
-        <div class="up-icon" style="background:#ffe4e6; color:#9f1239;">&#128666;</div>
-        <div>
-          <div class="up-name">Returns File &#8212; Myntra Return Delivery</div>
-          <div class="up-desc">Myntra only. The date the parcel reached you &#8212; return complete, stock sellable again. Kept separate so it never doubles the returns count.</div>
-        </div>
-      </div>
-      <div class="up-right">
-        <div class="up-stamp-box">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Last uploaded</div>
-          <div class="stamp none kind-stamp" data-kind="returns_delivery">Never</div>
-        </div>
-        <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="returns_delivery">&#8593; Upload</button>
-        </div>
-      </div>
-    </div>
-
     <div class="up-item kind-row" data-kind="inventory">
       <div class="up-left">
         <div class="up-icon" style="background:#ede9fe; color:#6d28d9;">&#128200;</div>
@@ -492,6 +484,8 @@
       <button class="x" id="ordersPickerClose">&times;</button>
     </div>
     <div class="modal-body">
+      <div class="kind-tabs" id="kindTabs" hidden></div>
+      <div class="kind-tab-note" id="kindTabNote" hidden></div>
       <p style="margin:0 0 10px; color:#64748b; font-size:13px;">Pick a date (or date range), then click <b>Upload</b> next to a company &amp; platform. Your file will be tagged automatically.</p>
 
       <div style="display:flex; gap:6px; margin-bottom:10px;">
@@ -731,6 +725,19 @@
     myntra_style:{ title:"Upload Myntra Style Id file",   table:"seller_stock",    dateCol:"snapshot_date", dateAliases:["snapshot date","report date","date"], platforms:["myntra"], tag:"catalog", dateFallbackToday:true },
   };
   let currentKind = "orders";
+  // A picker usually covers one kind. Returns covers two, because Myntra is the
+  // only platform that ships a second returns export and it answers a different
+  // question (when the parcel reached you, not when the return was raised).
+  // Rather than a second row on the page — which would ask every other platform
+  // a question that only applies to Myntra — the pair lives as tabs inside this
+  // one picker.
+  const KIND_GROUPS = { returns: ["returns", "returns_delivery"] };
+  const TAB_LABEL = { returns: "Returns", returns_delivery: "Myntra \u00b7 Return Delivery" };
+  const TAB_NOTE = {
+    returns: "The returns count. For Myntra use the MDirect Returns Report.",
+    returns_delivery: "Myntra only \u2014 the Return Delivery Report. Dated by when the parcel reached you, so the unit is back and sellable. Kept apart from the count above, which would otherwise pick up older returns that merely arrived this month.",
+  };
+  let pickerKinds = ["orders"];
   let ordersFilterCompany = "";
   let ordersFilterPlatform = "";
   // stagedUploads keyed by kind → { "company::platform": {...} }
@@ -778,10 +785,12 @@
   document.querySelectorAll(".kind-upload-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       currentKind = btn.dataset.kind;
+      pickerKinds = KIND_GROUPS[currentKind] || [currentKind];
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       if (withPlats.length === 0) { alert("Add at least one company with platforms first."); return; }
       ordersFilterCompany = ""; ordersFilterPlatform = "";
       $("#ordersPickerTitle").textContent = KIND_CFG[currentKind].title;
+      renderKindTabs(withPlats);
       buildFilterChips(withPlats);
       renderOrdersPickerList(withPlats);           // initial render (no stamps yet)
       updateSaveButton();
@@ -790,6 +799,36 @@
       loadPickerLastMap(currentKind).then(() => renderOrdersPickerList(withPlats));
     });
   });
+
+  // Renders the sub-tab strip, and nothing at all for a picker with one kind.
+  function renderKindTabs(list) {
+    const wrap = $("#kindTabs"), note = $("#kindTabNote");
+    if (pickerKinds.length < 2) { wrap.hidden = true; note.hidden = true; wrap.innerHTML = ""; return; }
+    wrap.hidden = false;
+    wrap.innerHTML = pickerKinds.map(k => {
+      const n = Object.keys(stagedUploads[k] || {}).length;
+      return `<button class="kind-tab${k === currentKind ? " active" : ""}" data-k="${k}">`
+           + `${escapeHtml(TAB_LABEL[k] || k)}`
+           + (n ? `<span class="tab-n">${n}</span>` : "")
+           + `</button>`;
+    }).join("");
+    note.hidden = !TAB_NOTE[currentKind];
+    note.textContent = TAB_NOTE[currentKind] || "";
+    wrap.querySelectorAll(".kind-tab").forEach(b => {
+      b.addEventListener("click", () => {
+        if (b.dataset.k === currentKind) return;
+        currentKind = b.dataset.k;
+        // A tab restricted to one platform cannot keep the other tab's filter.
+        ordersFilterCompany = ""; ordersFilterPlatform = "";
+        $("#ordersPickerTitle").textContent = KIND_CFG[currentKind].title;
+        renderKindTabs(list);
+        buildFilterChips(list);
+        renderOrdersPickerList(list);
+        updateSaveButton();
+        loadPickerLastMap(currentKind).then(() => renderOrdersPickerList(list));
+      });
+    });
+  }
 
   function buildFilterChips(list) {
     const kindPlats = KIND_CFG[currentKind].platforms || PLATFORMS;
@@ -890,6 +929,7 @@
       btn.addEventListener("click", () => {
         delete stagedUploads[currentKind][btn.dataset.key];
         const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+        renderKindTabs(withPlats);
         renderOrdersPickerList(withPlats);
         updateSaveButton();
       });
@@ -899,7 +939,10 @@
   function updateSaveButton() {
     const btn = $("#ordersSaveAllBtn");
     const cnt = $("#ordersSaveCount");
-    const n = Object.keys(stagedUploads[currentKind] || {}).length;
+    // Counts across every tab in this picker. Counting only the visible tab
+    // would let a file staged on the other one be dropped without a word when
+    // the modal closes.
+    const n = pickerKinds.reduce((t, k) => t + Object.keys(stagedUploads[k] || {}).length, 0);
     btn.disabled = n === 0;
     cnt.textContent = n > 0 ? "(" + n + " file" + (n === 1 ? "" : "s") + ")" : "";
     btn.title = n === 0 ? "Upload staged files first" : "Push all staged files to Supabase";
@@ -960,6 +1003,7 @@
       const dateCol = detectDateColumn(Object.keys(rows[0]), cfg.dateAliases);
       const key = company + "::" + platform;
       stagedUploads[currentKind][key] = { fileName: f.name, rows, company, platform, overrideDate, dateFrom, dateTo, dateCol, kind: currentKind };
+      renderKindTabs(companies.filter(c => (c.platforms || []).length > 0));
       setStatus(`✅ Staged ${rows.length} rows from ${f.name} for ${PLAT_LABEL[platform]} · ${company}. Click Save when ready.`, false);
       const withPlats = companies.filter(c => (c.platforms || []).length > 0);
       renderOrdersPickerList(withPlats);
@@ -976,15 +1020,22 @@
 
   // Save button — pushes all staged uploads (of current kind) to Supabase in sequence
   $("#ordersSaveAllBtn").addEventListener("click", async () => {
-    const bucket = stagedUploads[currentKind];
-    const keys = Object.keys(bucket);
-    if (keys.length === 0) return;
-    const cfg = KIND_CFG[currentKind];
+    // Save every tab in this picker, not just the visible one — the count on
+    // the button already spans them, so saving less than it says would be a lie.
+    const jobs = [];
+    for (const kind of pickerKinds) {
+      for (const key of Object.keys(stagedUploads[kind] || {})) jobs.push({ kind, key });
+    }
+    if (jobs.length === 0) return;
     const btn = $("#ordersSaveAllBtn");
     btn.disabled = true;
     const uid = session.user.id;
     let totalInserted = 0, filesDone = 0;
-    for (const k of keys) {
+    const keys = jobs;   // kept for the progress line below
+    for (const job of jobs) {
+      const cfg = KIND_CFG[job.kind];
+      const bucket = stagedUploads[job.kind];
+      const k = job.key;
       const s = bucket[k];
       const payload = s.rows.map(r => {
         // One column is detected for the whole file, but a single column is not
@@ -1042,6 +1093,7 @@
     }
     setStatus(`✅ Saved ${totalInserted} rows from ${filesDone} file${filesDone === 1 ? "" : "s"} to Supabase.`, false);
     const withPlats = companies.filter(c => (c.platforms || []).length > 0);
+    renderKindTabs(withPlats);
     renderOrdersPickerList(withPlats);
     updateSaveButton();
     await refreshStamps();
