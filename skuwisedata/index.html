@@ -348,6 +348,8 @@
     loaded: 0,
     total: 0,
     loadingMore: false,
+    hasMore: false,            // a sorted page cannot report a total, so track this instead
+    grandTotal: 0,             // the real row count, for the label and the KPI
     genericCols: null,         // raw_data columns chosen on the first page, reused by later pages
   };
   const DATE_COL = { orders: "order_date", returns: "return_date", payments: "payment_date", stock: "snapshot_date", sku_master: "updated_at" };
@@ -561,6 +563,25 @@
 
     state.loaded = (data || []).length;
     state.total  = count ?? state.loaded;
+    // A server-sorted page returns rows, not a count. Ask for the count once,
+    // separately and cheaply (head-only), so the label and the KPI still show
+    // the real number instead of the size of the page.
+    if (state.view === "sku_master" && (ss || state.search)) {
+      let cq = sb.from("seller_sku_master").select("id", { count: "exact", head: true })
+        .eq("user_id", state.session.user.id);
+      if (state.platform) cq = cq.eq("platform", state.platform);
+      if (state.company)  cq = cq.eq("company_name", state.company);
+      const { count: real } = await cq;
+      state.total = state.search ? state.loaded : (real ?? state.loaded);
+      state.grandTotal = real ?? state.loaded;
+    } else {
+      state.grandTotal = state.total;
+    }
+    // "Is there another page" cannot come from the total when the total is
+    // unknown: a full page back means keep going, a short one means the end.
+    state.hasMore = (state.view === "sku_master" && ss)
+      ? (data || []).length >= 1000
+      : state.loaded < state.total;
     if (state.view === "sku_master") {
       state.rowsById = new Map((data || []).map(r => [String(r.id), r]));
       state.windowCounts = new Map();
@@ -579,7 +600,8 @@
 
     $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
     $("#rowCount").textContent = rowCountLabel();
-    renderKpis(data || [], count ?? 0);
+    // The KPI shows the real row count, not the size of the page that came back.
+    renderKpis(data || [], state.grandTotal || state.total || 0);
 
     if (!data || data.length === 0) {
       if (state.view === "sku_master") {
@@ -598,8 +620,13 @@
       }
       return;
     }
-    $("#tableWrap").innerHTML = renderTable(data, 0, false);
+    // Re-rendering the table resets its scroll to the far left, which throws you
+    // back to the S.NO column every time you sort a column you had scrolled to.
+    const wrapEl = $("#tableWrap");
+    const keepLeft = wrapEl ? wrapEl.scrollLeft : 0;
+    wrapEl.innerHTML = renderTable(data, 0, false);
     installTableTools();
+    if (keepLeft) { wrapEl.scrollLeft = keepLeft; }
     syncHScroll();
     installInfiniteScroll();
   }
@@ -621,13 +648,13 @@
   }
 
   function rowCountLabel() {
-    const t = state.total.toLocaleString("en-IN");
+    const t = (state.grandTotal || state.total).toLocaleString("en-IN");
     if (state.search) {
       return state.loaded === 0
         ? `No match for \u201c${state.search}\u201d`
         : `${t} match${state.loaded === 1 ? "" : "es"} for \u201c${state.search}\u201d`;
     }
-    if (state.loaded >= state.total) return t + " total rows";
+    if (!state.hasMore) return t + " total rows";
     return state.loaded.toLocaleString("en-IN") + " of " + t + " rows \u00b7 scroll for more";
   }
 
@@ -663,7 +690,7 @@
   async function loadMoreRows() {
     if (state.loadingMore || state.view === "uploads") return;
     if (state.search) return;               // a search already returned all its matches
-    if (state.loaded >= state.total) return;
+    if (!state.hasMore) return;
     const table = KIND_TABLE[state.view];
     const dateCol = DATE_COL[state.view];
     if (!table) return;
@@ -679,14 +706,14 @@
           p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
         });
         data = res.data; error = res.error;
-        if (!error) state.total = Math.max(state.total, state.loaded + (data || []).length + ((data || []).length === 1000 ? 1 : 0));
+        if (!error) state.hasMore = (data || []).length >= 1000;
       } else {
         const res = await fetchRowPage(table, dateCol, state.loaded);
         data = res.data; error = res.error;
       }
       if (error) { console.warn("loadMoreRows failed", error); return; }
       const rows = data || [];
-      if (rows.length === 0) { state.total = state.loaded; return; }
+      if (rows.length === 0) { state.hasMore = false; return; }
       if (state.view === "sku_master") {
         for (const r of rows) state.rowsById.set(String(r.id), r);
         await loadPlatformIds(rows);
@@ -695,6 +722,7 @@
       const tbody = $("#tableWrap").querySelector("table.data tbody");
       if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
       state.loaded += rows.length;
+      if (!ss2) state.hasMore = state.loaded < state.total;
       // Re-apply whatever filter and sort the user has set, now including the
       // rows that just arrived.
       applyTableTools();
