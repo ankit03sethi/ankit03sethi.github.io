@@ -13,14 +13,14 @@
   .brand-name{font-size:17px;font-weight:800;letter-spacing:-.2px}
   .nav-sub{font-size:11px;color:#64748b;margin-top:2px}
   .back-link{display:inline-flex;align-items:center;gap:6px;color:#1f6feb;text-decoration:none;font-size:14px;font-weight:700}
-  main{max-width:1100px;margin:0 auto;padding:28px 20px 80px}
+  main{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
   h1{font-size:24px;font-weight:800;margin:0 0 4px}
   .sub{color:#64748b;font-size:14px;margin:0 0 24px}
   .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 4px 18px rgba(15,23,42,.05)}
   .card.locked{opacity:.62}
   .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .card h2{font-size:18px;font-weight:800;margin:0 0 4px}
-  .card p.desc{margin:0;color:#64748b;font-size:13.5px;max-width:620px}
+  .card p.desc{margin:0;color:#64748b;font-size:13.5px;max-width:660px}
   .pill{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
   .pill.ok{background:#ecfdf5;color:#047857}
   .pill.need{background:#fef3c7;color:#92400e}
@@ -29,16 +29,24 @@
   .kpi .l{font-size:11.5px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .kpi .n.warn{color:#b45309}
   .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 0}
-  select,button{font:inherit;padding:8px 12px;border-radius:9px;border:1px solid #cbd5e1;background:#fff}
+  .controls label{font-size:12.5px;color:#475569;font-weight:700}
+  select,button,input{font:inherit;padding:7px 11px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;font-size:13.5px}
   button.primary{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:700;cursor:pointer}
   button.ghost{cursor:pointer;font-weight:700;color:#334155}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .chip{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;user-select:none}
+  .chip.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
   table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
-  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:800;background:#f8fafc;position:sticky;top:0}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:800;background:#f8fafc;position:sticky;top:0;z-index:1}
+  th.sortable{cursor:pointer;user-select:none}
+  th.sortable:hover{color:#1f6feb}
+  th .arrow{opacity:.45;font-size:10px}
+  th.sorted .arrow{opacity:1;color:#1f6feb}
   td.num,th.num{text-align:right}
-  .scroll{max-height:460px;overflow:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:12px}
+  .scroll{max-height:520px;overflow:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:12px}
   .muted{color:#94a3b8}
-  .note{font-size:12.5px;color:#64748b;background:#f8fafc;border-left:3px solid #cbd5e1;padding:10px 12px;border-radius:0 8px 8px 0;margin-top:14px;line-height:1.55}
+  .note{font-size:12.5px;color:#64748b;background:#f8fafc;border-left:3px solid #cbd5e1;padding:10px 12px;border-radius:0 8px 8px 0;margin-top:14px;line-height:1.6}
   .empty{padding:26px;text-align:center;color:#64748b;font-size:14px}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid #cbd5e1;border-top-color:#1f6feb;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -50,7 +58,7 @@
   <a href="/home/" class="brand">
     <div>
       <div class="brand-name">Cursive Analyst</div>
-      <div class="nav-sub">Reports &middot; build 2026-08-30a</div>
+      <div class="nav-sub">Reports &middot; build 2026-08-30b</div>
     </div>
   </a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
@@ -60,41 +68,42 @@
   <h1>Reports</h1>
   <p class="sub">Each report turns on by itself once the data it needs has been uploaded. Nothing to configure.</p>
 
-  <!-- ============ 1. Unpaid delivered orders ============ -->
   <div class="card locked" id="cardUnpaid">
     <div class="card-head">
       <div>
         <h2>Unpaid delivered orders</h2>
-        <p class="desc">Orders the marketplace confirms it delivered, with no settlement line anywhere against them.
-          Anything delivered recently is excluded &mdash; marketplaces pay days later, so a recent order
-          <em>should</em> be unpaid. What is left is money past its window.</p>
+        <p class="desc">Every line the marketplace says it delivered, with no settlement row against it, still unpaid
+          after the number of days you choose.</p>
       </div>
       <span class="pill need" id="pillUnpaid">checking&hellip;</span>
     </div>
 
     <div id="unpaidBody" style="display:none">
       <div class="controls">
-        <label style="font-size:13px;color:#475569;font-weight:700">Older than</label>
+        <label>Unpaid after</label>
         <select id="grace">
-          <option value="15">15 days</option>
-          <option value="20" selected>20 days</option>
+          <option value="7">7 days</option>
+          <option value="10">10 days</option>
+          <option value="15" selected>15 days</option>
+          <option value="21">21 days</option>
           <option value="30">30 days</option>
           <option value="45">45 days</option>
         </select>
-        <button class="primary" id="runUnpaid">Run</button>
+        <input id="search" type="search" placeholder="Search SKU or order ref" style="min-width:220px">
+        <button class="primary" id="runUnpaid">Refresh</button>
         <button class="ghost" id="csvUnpaid">Download CSV</button>
         <span id="unpaidStatus" class="muted" style="font-size:12.5px"></span>
       </div>
+      <div class="chips" id="platChips"></div>
+      <div class="chips" id="coChips"></div>
 
       <div class="kpis" id="unpaidKpis"></div>
       <div id="unpaidByPlat"></div>
       <div class="scroll" id="unpaidTableWrap" style="display:none"><table id="unpaidTable"></table></div>
-
       <div class="note" id="unpaidNote"></div>
     </div>
   </div>
 
-  <!-- ============ placeholders, in the order they will be built ============ -->
   <div class="card locked">
     <div class="card-head">
       <div><h2>Payout reconciliation</h2>
@@ -127,20 +136,33 @@ const $ = (s) => document.querySelector(s);
 const inr = (n) => n == null ? "" : "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-let LAST_ROWS = [];
+let ALL = [];                       // everything the last run returned
+const F = { plat: "", co: "", q: "" };
+const SORT = { col: "age_days", dir: -1 };   // oldest first: the ones worth chasing
+
+const COLS = [
+  { k: "ordered_on",   t: "Ordered",   sortable: true },
+  { k: "delivered_on", t: "Delivered", sortable: true },
+  { k: "age_days",     t: "Age",       sortable: true, num: true },
+  { k: "platform",     t: "Platform",  sortable: true },
+  { k: "company_name", t: "Company",   sortable: true },
+  { k: "order_ref",    t: "Order ref", sortable: false },
+  { k: "sku",          t: "SKU",       sortable: true },
+  { k: "value",        t: "Value",     sortable: true, num: true },
+  { k: "dated_by",     t: "Aged from", sortable: false },
+];
 
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { location.href = "/home/?return=%2Freports%2F"; return; }
 
-  // A report is only offered when the data behind it exists. Showing a report
-  // that can only answer "nothing found" because a file was never uploaded is
-  // worse than not showing it - it reads as a clean bill of health.
+  // A report is only offered when the data behind it exists. One that answers
+  // "nothing found" because a file was never uploaded reads as a clean bill of
+  // health, which is worse than not showing it at all.
   const [{ count: nOrders }, { count: nPayments }] = await Promise.all([
     sb.from("seller_orders").select("id", { count: "exact", head: true }),
     sb.from("seller_payments").select("id", { count: "exact", head: true }),
   ]);
-
   const pill = $("#pillUnpaid");
   if (!nOrders || !nPayments) {
     pill.className = "pill need";
@@ -149,34 +171,63 @@ let LAST_ROWS = [];
     return;
   }
   $("#cardUnpaid").classList.remove("locked");
-  pill.className = "pill ok";
-  pill.textContent = "ready";
+  pill.className = "pill ok"; pill.textContent = "ready";
   $("#unpaidBody").style.display = "";
-  runUnpaid();
+  run();
 })();
 
-$("#runUnpaid").addEventListener("click", runUnpaid);
-$("#grace").addEventListener("change", runUnpaid);
+$("#runUnpaid").addEventListener("click", run);
+$("#grace").addEventListener("change", run);
 $("#csvUnpaid").addEventListener("click", downloadCsv);
+$("#search").addEventListener("input", (e) => { F.q = e.target.value.trim().toLowerCase(); paint(); });
 
-async function runUnpaid() {
-  const grace = Number($("#grace").value);
+async function run() {
   $("#unpaidStatus").innerHTML = '<span class="spin"></span> running';
-  $("#unpaidKpis").innerHTML = "";
-  $("#unpaidByPlat").innerHTML = "";
-  $("#unpaidTableWrap").style.display = "none";
-
-  const { data, error } = await sb.rpc("seller_unpaid_delivered", { _grace_days: grace });
-  if (error) {
-    $("#unpaidStatus").textContent = "could not run: " + error.message;
-    return;
-  }
-  LAST_ROWS = data || [];
+  const { data, error } = await sb.rpc("seller_unpaid_delivered", { _grace_days: Number($("#grace").value) });
+  if (error) { $("#unpaidStatus").textContent = "could not run: " + error.message; return; }
+  ALL = data || [];
   $("#unpaidStatus").textContent = "";
-  render(LAST_ROWS, grace);
+  buildChips();
+  paint();
 }
 
-function render(rows, grace) {
+function buildChips() {
+  const plats = [...new Set(ALL.map(r => r.platform))].sort();
+  const cos = [...new Set(ALL.map(r => r.company_name))].sort();
+  const row = (items, sel, key) =>
+    `<div class="chip ${sel === "" ? "active" : ""}" data-${key}="">All ${key === "p" ? "platforms" : "companies"}</div>` +
+    items.map(v => `<div class="chip ${sel === v ? "active" : ""}" data-${key}="${esc(v)}">${esc(v)}</div>`).join("");
+  $("#platChips").innerHTML = plats.length > 1 ? row(plats, F.plat, "p") : "";
+  $("#coChips").innerHTML = cos.length > 1 ? row(cos, F.co, "c") : "";
+}
+$("#platChips").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  F.plat = c.dataset.p; buildChips(); paint();
+});
+$("#coChips").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  F.co = c.dataset.c; buildChips(); paint();
+});
+
+function filtered() {
+  return ALL.filter(r =>
+    (!F.plat || r.platform === F.plat) &&
+    (!F.co || r.company_name === F.co) &&
+    (!F.q || String(r.sku || "").toLowerCase().includes(F.q) || String(r.order_ref || "").toLowerCase().includes(F.q)));
+}
+
+function sorted(rows) {
+  const c = SORT.col, d = SORT.dir;
+  return [...rows].sort((a, b) => {
+    let x = a[c], y = b[c];
+    if (c === "age_days" || c === "value") { x = Number(x) || 0; y = Number(y) || 0; return (x - y) * d; }
+    x = String(x == null ? "" : x); y = String(y == null ? "" : y);
+    return x < y ? -d : x > y ? d : 0;
+  });
+}
+
+function paint() {
+  const rows = sorted(filtered());
   const total = rows.length;
   const value = rows.reduce((a, r) => a + (Number(r.value) || 0), 0);
   const priced = rows.filter(r => r.value != null).length;
@@ -184,12 +235,13 @@ function render(rows, grace) {
 
   $("#unpaidKpis").innerHTML = `
     <div class="kpi"><div class="n ${total ? "warn" : ""}">${total.toLocaleString("en-IN")}</div><div class="l">orders unpaid</div></div>
-    <div class="kpi"><div class="n">${value ? inr(value) : "—"}</div><div class="l">listed value${priced < total ? " (" + priced + " of " + total + " priced)" : ""}</div></div>
+    <div class="kpi"><div class="n">${value ? inr(value) : "—"}</div><div class="l">listed value${priced < total ? " (" + priced + " of " + total + ")" : ""}</div></div>
     <div class="kpi"><div class="n">${oldest || "—"}</div><div class="l">oldest, days</div></div>`;
 
   if (!total) {
-    $("#unpaidByPlat").innerHTML = `<div class="empty">Nothing delivered more than ${grace} days ago is missing a payment. Every settled line reconciles.</div>`;
-    $("#unpaidNote").textContent = "Re-run this after each new payment file — an order can sit here legitimately until the next payout lands.";
+    $("#unpaidByPlat").innerHTML = `<div class="empty">Nothing here. Every delivered line older than ${$("#grace").value} days has a payment against it.</div>`;
+    $("#unpaidTableWrap").style.display = "none";
+    $("#unpaidNote").textContent = "Re-run after each new payment file — an order sits here legitimately until the next payout lands.";
     return;
   }
 
@@ -207,31 +259,44 @@ function render(rows, grace) {
       <td class="num">${g.n}</td><td class="num">${g.v ? inr(g.v) : '<span class="muted">n/a</span>'}</td>
       <td class="num">${g.oldest}d</td></tr>`).join("")}</table>`;
 
-  const show = rows.slice(0, 500);
+  const show = rows.slice(0, 800);
   $("#unpaidTableWrap").style.display = "";
-  $("#unpaidTable").innerHTML = `
-    <tr><th>Delivered</th><th class="num">Age</th><th>Platform</th><th>Company</th><th>Order ref</th><th>SKU</th><th class="num">Value</th><th>Dated by</th></tr>
-    ${show.map(r => `<tr>
-      <td>${esc(r.delivered_on)}</td><td class="num">${r.age_days}d</td>
+  $("#unpaidTable").innerHTML =
+    `<tr>${COLS.map(c => {
+      const on = SORT.col === c.k;
+      return `<th class="${c.num ? "num " : ""}${c.sortable ? "sortable " : ""}${on ? "sorted" : ""}" ${c.sortable ? `data-sort="${c.k}"` : ""}>${c.t}${c.sortable ? ` <span class="arrow">${on ? (SORT.dir < 0 ? "▼" : "▲") : "↕"}</span>` : ""}</th>`;
+    }).join("")}</tr>` +
+    show.map(r => `<tr>
+      <td>${esc(r.ordered_on || "")}</td>
+      <td>${r.delivered_on ? esc(r.delivered_on) : '<span class="muted">not given</span>'}</td>
+      <td class="num">${r.age_days}d</td>
       <td>${esc(r.platform)}</td><td>${esc(r.company_name)}</td>
       <td>${esc(r.order_ref)}</td><td>${esc(r.sku || "")}</td>
       <td class="num">${r.value != null ? inr(r.value) : '<span class="muted">n/a</span>'}</td>
-      <td>${r.dated_by === "delivered" ? "delivery date" : '<span class="muted">order date</span>'}</td>
-    </tr>`).join("")}`;
+      <td>${r.dated_by === "delivery date" ? "delivery" : '<span class="muted">order</span>'}</td>
+    </tr>`).join("");
 
-  const estimated = rows.filter(r => r.dated_by !== "delivered").length;
+  const byOrder = rows.filter(r => r.dated_by !== "delivery date").length;
   $("#unpaidNote").innerHTML =
-    `Value is the price listed on the order, not what you would receive &mdash; commission, shipping and fees come out of it, so expect to net roughly half.`
-    + (estimated ? ` ${estimated} of these have no delivery date in the export, so age is counted from the order date and runs slightly long.` : "")
+    `Value is the price on the order, not what would reach you &mdash; commission, shipping and fees come out of it.`
+    + (byOrder ? ` <b>${byOrder} of these have no delivery date in the export</b>, so they are aged from the order date. Order to delivery is about a week, so their real age is roughly seven days less than shown &mdash; treat them as leads, not overdue.` : "")
     + ` Re-run after each new payment file before raising anything with support: a payout landing tomorrow clears these without a ticket.`
-    + (show.length < total ? ` Showing the ${show.length} oldest of ${total}; the CSV has all of them.` : "");
+    + (show.length < total ? ` Showing ${show.length} of ${total}; the CSV has all of them.` : "");
 }
 
+$("#unpaidTable").addEventListener("click", (e) => {
+  const th = e.target.closest("th[data-sort]"); if (!th) return;
+  const k = th.dataset.sort;
+  if (SORT.col === k) SORT.dir = -SORT.dir; else { SORT.col = k; SORT.dir = (k === "age_days" || k === "value") ? -1 : 1; }
+  paint();
+});
+
 function downloadCsv() {
-  if (!LAST_ROWS.length) return;
-  const cols = ["platform", "company_name", "order_ref", "sku", "delivered_on", "age_days", "value", "dated_by"];
+  const rows = sorted(filtered());
+  if (!rows.length) return;
+  const cols = ["platform", "company_name", "order_ref", "sku", "ordered_on", "delivered_on", "age_days", "value", "dated_by"];
   const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
-  const csv = [cols.join(","), ...LAST_ROWS.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
+  const csv = [cols.join(","), ...rows.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = `unpaid-delivered-${new Date().toISOString().slice(0, 10)}.csv`;
