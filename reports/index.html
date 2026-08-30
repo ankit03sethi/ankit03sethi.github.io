@@ -58,7 +58,7 @@
   <a href="/home/" class="brand">
     <div>
       <div class="brand-name">Cursive Analyst</div>
-      <div class="nav-sub">Reports &middot; build 2026-08-30c</div>
+      <div class="nav-sub">Reports &middot; build 2026-08-30d</div>
     </div>
   </a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
@@ -138,12 +138,12 @@ const COLS = [
   { k: "delivered_on", t: "Delivered", sortable: true },
   { k: "over_by",      t: "Overdue by", sortable: true, num: true },
   { k: "age_days",     t: "Age",        sortable: true, num: true },
+  { k: "dated_by",     t: "Aged from",  sortable: false },
   { k: "platform",     t: "Platform",  sortable: true },
   { k: "company_name", t: "Company",   sortable: true },
   { k: "order_ref",    t: "Order ref", sortable: false },
   { k: "sku",          t: "SKU",       sortable: true },
-  { k: "value",        t: "Value",     sortable: true, num: true },
-  { k: "dated_by",     t: "Aged from", sortable: false },
+  { k: "value",        t: "Value",      sortable: true, num: true },
 ];
 
 (async () => {
@@ -266,10 +266,10 @@ function paint() {
       <td>${r.delivered_on ? esc(r.delivered_on) : '<span class="muted">not given</span>'}</td>
       <td class="num"><b>${r.over_by}d</b></td>
       <td class="num">${r.age_days}d</td>
+      <td>${r.dated_by === "delivery date" ? "delivery" : '<span class="muted">order</span>'}</td>
       <td>${esc(r.platform)}</td><td>${esc(r.company_name)}</td>
       <td>${esc(r.order_ref)}</td><td>${esc(r.sku || "")}</td>
       <td class="num">${r.value != null ? inr(r.value) : '<span class="muted">n/a</span>'}</td>
-      <td>${r.dated_by === "delivery date" ? "delivery" : '<span class="muted">order</span>'}</td>
     </tr>`).join("");
 
   const byOrder = rows.filter(r => r.dated_by !== "delivery date").length;
