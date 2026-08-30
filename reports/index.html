@@ -6,138 +6,98 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Reports &middot; Cursive Analyst</title>
 <style>
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;color:#0f172a}
-  header{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
-  .brand-name{font-size:17px;font-weight:800;letter-spacing:-.2px}
-  .nav-sub{font-size:11px;color:#64748b;margin-top:2px}
-  .back-link{display:inline-flex;align-items:center;gap:6px;color:#1f6feb;text-decoration:none;font-size:14px;font-weight:700}
-  main{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
-  h1{font-size:24px;font-weight:800;margin:0 0 4px}
-  .sub{color:#64748b;font-size:14px;margin:0 0 24px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 4px 18px rgba(15,23,42,.05)}
-  .card.locked{opacity:.62}
-  .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-  .card h2{font-size:18px;font-weight:800;margin:0 0 4px}
-  .card p.desc{margin:0;color:#64748b;font-size:13.5px;max-width:660px}
-  .pill{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
-  .pill.ok{background:#ecfdf5;color:#047857}
-  .pill.need{background:#fef3c7;color:#92400e}
-  .kpis{display:flex;gap:26px;flex-wrap:wrap;margin:18px 0 4px}
-  .kpi .n{font-size:26px;font-weight:800;letter-spacing:-.5px}
-  .kpi .l{font-size:11.5px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
-  .kpi .n.warn{color:#b45309}
-  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 0}
-  .controls label{font-size:12.5px;color:#475569;font-weight:700}
-  select,button,input{font:inherit;padding:7px 11px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;font-size:13.5px}
-  button.primary{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:700;cursor:pointer}
-  button.ghost{cursor:pointer;font-weight:700;color:#334155}
-  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-  .chip{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;user-select:none}
-  .chip.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
-  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:800;background:#f8fafc;position:sticky;top:0;z-index:1}
-  th.sortable{cursor:pointer;user-select:none}
-  th.sortable:hover{color:#1f6feb}
-  th .arrow{opacity:.45;font-size:10px}
-  th.sorted .arrow{opacity:1;color:#1f6feb}
-  td.num,th.num{text-align:right}
-  .scroll{max-height:520px;overflow:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:12px}
-  .muted{color:#94a3b8}
-  .note{font-size:12.5px;color:#64748b;background:#f8fafc;border-left:3px solid #cbd5e1;padding:10px 12px;border-radius:0 8px 8px 0;margin-top:14px;line-height:1.6}
-  .empty{padding:26px;text-align:center;color:#64748b;font-size:14px}
-  .spin{display:inline-block;width:14px;height:14px;border:2px solid #cbd5e1;border-top-color:#1f6feb;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
-  @keyframes sp{to{transform:rotate(360deg)}}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;color:#0f172a}
+header{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.brand{text-decoration:none;color:inherit}
+.brand-name{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.nav-sub{font-size:11px;color:#64748b;margin-top:2px}
+.back-link{color:#1f6feb;text-decoration:none;font-size:14px;font-weight:700}
+main{max-width:1200px;margin:0 auto;padding:26px 20px 80px}
+h1{font-size:24px;font-weight:800;margin:0 0 4px}
+.sub{color:#64748b;font-size:14px;margin:0 0 18px}
+.section{margin-bottom:34px}
+.section-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.section-head h2{font-size:14px;font-weight:800;margin:0;text-transform:uppercase;letter-spacing:.9px;color:#1f6feb}
+.section-head .rule{flex:1;height:1px;background:#e2e8f0}
+.section-head .cnt{font-size:11.5px;font-weight:800;color:#64748b}
+.section.missings .section-head h2{color:#b45309}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:14px;box-shadow:0 3px 14px rgba(15,23,42,.05)}
+.card.locked{opacity:.6}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;cursor:pointer}
+.card h3{font-size:16px;font-weight:800;margin:0 0 3px}
+.card p.desc{margin:0;color:#64748b;font-size:13px;max-width:700px}
+.pill{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:#ecfdf5;color:#047857}
+.pill.hit{background:#fef3c7;color:#92400e}
+.pill.bad{background:#fee2e2;color:#991b1b}
+.pill.need{background:#f1f5f9;color:#64748b}
+.kpis{display:flex;gap:24px;flex-wrap:wrap;margin:16px 0 2px}
+.kpi .n{font-size:23px;font-weight:800;letter-spacing:-.4px}
+.kpi .n.warn{color:#b45309}
+.kpi .n.bad{color:#991b1b}
+.kpi .l{font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0 0}
+.controls label{font-size:12.5px;color:#475569;font-weight:700}
+select,button,input{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;font-size:13px}
+button.ghost{cursor:pointer;font-weight:700;color:#334155}
+button.primary{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:700;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;user-select:none}
+.chip.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:800;background:#f8fafc;position:sticky;top:0;z-index:1;cursor:pointer;user-select:none}
+th:hover{color:#1f6feb}
+th .a{opacity:.4;font-size:9px}
+th.on .a{opacity:1;color:#1f6feb}
+td.num,th.num{text-align:right}
+.st{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:#f1f5f9;color:#475569}
+.st.bad{background:#fee2e2;color:#991b1b}
+.st.warn{background:#fef3c7;color:#92400e}
+.neg{color:#991b1b;font-weight:700}
+.scroll{max-height:460px;overflow:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px}
+.muted{color:#94a3b8}
+.note{font-size:12px;color:#64748b;background:#f8fafc;border-left:3px solid #cbd5e1;padding:9px 11px;border-radius:0 8px 8px 0;margin-top:12px;line-height:1.6}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #cbd5e1;border-top-color:#1f6feb;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.body{display:none}
+.body.open{display:block}
 </style>
 </head>
 <body>
-
 <header>
-  <a href="/home/" class="brand">
-    <div>
-      <div class="brand-name">Cursive Analyst</div>
-      <div class="nav-sub">Reports &middot; build 2026-08-30h</div>
-    </div>
-  </a>
+  <a href="/home/" class="brand"><div>
+    <div class="brand-name">Cursive Analyst</div>
+    <div class="nav-sub">Reports &middot; build 2026-08-30m</div>
+  </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
-
 <main>
   <h1>Reports</h1>
-  <p class="sub">Each report turns on by itself once the data it needs has been uploaded. Nothing to configure.</p>
-
-  <div class="card locked" id="cardUnpaid">
-    <div class="card-head">
-      <div>
-        <h2>Unpaid delivered orders</h2>
-        <p class="desc">Every line the marketplace says it delivered, not returned, and still unsettled
-          <b>25 days after delivery</b> &mdash; or <b>35 days after the order</b> where the marketplace gives no
-          delivery date (Meesho, Amazon). Both sit clear of the slowest payment on record in this account,
-          so a line here is slower than anything that has ever actually been paid.</p>
-      </div>
-      <span class="pill need" id="pillUnpaid">checking&hellip;</span>
-    </div>
-
-    <div id="unpaidBody" style="display:none">
-      <div class="controls">
-        <input id="search" type="search" placeholder="Search SKU or order ref" style="min-width:220px">
-        <button class="primary" id="runUnpaid">Refresh</button>
-        <button class="ghost" id="csvUnpaid">Download CSV</button>
-        <span id="unpaidStatus" class="muted" style="font-size:12.5px"></span>
-      </div>
-      <div class="chips" id="platChips"></div>
-      <div class="chips" id="coChips"></div>
-
-      <div class="kpis" id="unpaidKpis"></div>
-      <div id="unpaidByPlat"></div>
-      <div class="scroll" id="unpaidTableWrap" style="display:none"><table id="unpaidTable"></table></div>
-      <div class="note" id="unpaidNote"></div>
-    </div>
+  <p class="sub">Click any report to open it. Each one turns on by itself once the data it needs is loaded.</p>
+  <div class="controls" id="gc" style="display:none">
+    <input id="q" type="search" placeholder="Search SKU or order ref" style="min-width:230px">
+    <button class="primary" id="refresh">Refresh</button>
+    <span id="status" class="muted" style="font-size:12px"></span>
   </div>
+  <div class="chips" id="platChips"></div>
+  <div class="chips" id="coChips" style="margin-bottom:16px"></div>
 
-  <div class="card locked" id="cardLost">
-    <div class="card-head">
-      <div>
-        <h2>Returns you paid for but never got back</h2>
-        <p class="desc">The marketplace took the money back and the parcel never reached your warehouse.
-          Shown once it is <b>15 days past the clawback</b> &mdash; when a return does arrive it is a median of
-          two days after, and 95% are back within six, so anything still missing at fifteen is gone rather
-          than slow. A lost return is the marketplace's to compensate.</p>
-      </div>
-      <span class="pill need" id="pillLost">checking&hellip;</span>
-    </div>
-    <div id="lostBody" style="display:none">
-      <div class="kpis" id="lostKpis"></div>
-      <div class="controls"><button class="ghost" id="csvLost">Download CSV</button>
-        <span id="lostStatus" class="muted" style="font-size:12.5px"></span></div>
-      <div class="scroll" id="lostWrap" style="display:none"><table id="lostTable"></table></div>
-      <div class="note" id="lostNote"></div>
-    </div>
-  </div>
+  <section class="section" id="secPayments">
+    <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
+    <div id="wrapPayments"></div>
+  </section>
 
-  <div class="card locked">
-    <div class="card-head">
-      <div><h2>Payout reconciliation</h2>
-        <p class="desc">Income less advertising and fees, per company, platform and month &mdash; against the money that actually reached the bank.</p></div>
-      <span class="pill need">next</span>
-    </div>
-  </div>
-  <div class="card locked">
-    <div class="card-head">
-      <div><h2>Returns &amp; RTO</h2>
-        <p class="desc">Return rate, RTO rate, return freight and reasons &mdash; keeping customer returns and RTO apart, because only one of them takes money back.</p></div>
-      <span class="pill need">planned</span>
-    </div>
-  </div>
-  <div class="card locked">
-    <div class="card-head">
-      <div><h2>Data coverage</h2>
-        <p class="desc">Which company, platform and file type is loaded, what is missing, and when each was last read.</p></div>
-      <span class="pill need">planned</span>
-    </div>
-  </div>
+  <section class="section" id="secReturns">
+    <div class="section-head"><h2>Returns</h2><div class="rule"></div><span class="cnt" id="cntReturns"></span></div>
+    <div id="wrapReturns"></div>
+  </section>
+
+  <section class="section missings" id="secMissings">
+    <div class="section-head"><h2>Missings</h2><div class="rule"></div><span class="cnt" id="cntMissings"></span></div>
+    <div id="wrapMissings"></div>
+  </section>
 </main>
 
 <script type="module">
@@ -145,245 +105,363 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
 const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
 const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
 const $ = (s) => document.querySelector(s);
-const inr = (n) => n == null ? "" : "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const money = (v) => "₹" + num(v).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+const money2 = (v) => "₹" + num(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const titleCase = (s) => String(s || "").replace(/\b\w/g, (c) => c.toUpperCase());
 
-let ALL = [];                       // everything the last run returned
-const F = { plat: "", co: "", q: "" };
-const SORT = { col: "over_by", dir: -1 };   // oldest first: the ones worth chasing
+/* ---------- the reports ------------------------------------------------ */
+/* Every report is a slice of one of two RPCs. They light up on their own as
+   soon as the data behind them exists; nothing here needs configuring. */
 
-const COLS = [
-  { k: "ordered_on",   t: "Ordered",   sortable: true },
-  { k: "delivered_on", t: "Delivered", sortable: true },
-  { k: "over_by",      t: "Overdue by", sortable: true, num: true },
-  { k: "age_days",     t: "Age",        sortable: true, num: true },
-  { k: "dated_by",     t: "Aged from",  sortable: false },
-  { k: "platform",     t: "Platform",  sortable: true },
-  { k: "company_name", t: "Company",   sortable: true },
-  { k: "order_ref",    t: "Order ref", sortable: false },
-  { k: "sku",          t: "SKU",       sortable: true },
-  { k: "value",        t: "Value",      sortable: true, num: true },
+const COL = {
+  plat:   { k: "platform",     l: "Platform",  t: "plat" },
+  co:     { k: "company_name", l: "Company",   t: "txt"  },
+  ref:    { k: "order_ref",    l: "Order ref", t: "txt"  },
+  sku:    { k: "sku",          l: "SKU",       t: "txt"  },
+  msku:   { k: "master_sku",   l: "Master SKU",t: "txt"  },
+  ord:    { k: "ordered_on",   l: "Ordered",   t: "date" },
+  age:    { k: "age_days",     l: "Days old",  t: "int"  },
+  stat:   { k: "order_status", l: "Status",    t: "st"   },
+  val:    { k: "value",        l: "Order value", t: "money" },
+  ded:    { k: "deducted",     l: "Deducted",  t: "moneyneg" },
+  qty:    { k: "qty",          l: "Qty",       t: "int"  },
+  recd:   { k: "received",     l: "Received",  t: "money" },
+  cop:    { k: "cop",          l: "COP",       t: "money" },
+  profit: { k: "profit",       l: "Profit",    t: "moneysign" },
+  mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  }
+};
+
+const REPORTS = [
+  {
+    id: "unpaid", sec: "Payments",
+    title: "Payment not received",
+    desc: "Orders placed 45 or more days ago that are not cancelled, are not sitting in a returns file, and have no money against them in any payment file.",
+    src: "check", pick: (r) => r.bucket === "payment not received",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.age, COL.stat, COL.val],
+    sort: { k: "age_days", dir: -1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length, cls: rows.length ? "bad" : "" },
+      { l: "Value at stake", n: money(sum(rows, "value")), cls: rows.length ? "bad" : "" },
+      { l: "Oldest", n: (rows.length ? Math.max(...rows.map((r) => num(r.age_days))) : 0) + " days" }
+    ],
+    empty: "Nothing outstanding. Every order older than 45 days has either been paid, cancelled, or is accounted for as a return."
+  },
+  {
+    id: "paid", sec: "Payments",
+    title: "Orders paid successfully",
+    desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
+    src: "profit", pick: (r) => num(r.received) > 0,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "received", dir: -1 },
+    kpis: (rows) => {
+      const p = rows.filter((r) => r.cop_known);
+      return [
+        { l: "Orders paid", n: rows.length.toLocaleString("en-IN") },
+        { l: "Received", n: money(sum(rows, "received")) },
+        { l: "Cost of goods", n: money(sum(p, "cop")) },
+        { l: "Profit", n: money(sum(p, "profit")), cls: sum(p, "profit") < 0 ? "bad" : "" },
+        { l: "Costed", n: p.length ? Math.round((p.length / rows.length) * 100) + "%" : "0%" }
+      ];
+    },
+    empty: "No settled payments loaded yet."
+  },
+  {
+    id: "belowcop", sec: "Payments",
+    title: "Received less than COP",
+    desc: "Money came in, but less than the item cost you to buy. Every one of these is a loss on the sale itself.",
+    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0 && num(r.received) < num(r.cop),
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "profit", dir: 1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" },
+      { l: "Total loss", n: money(sum(rows, "profit")), cls: "bad" },
+      { l: "Worst single", n: money(rows.length ? Math.min(...rows.map((r) => num(r.profit))) : 0), cls: "bad" }
+    ],
+    empty: "Nothing sold below cost."
+  },
+  {
+    id: "belowpct", sec: "Payments",
+    title: "Received less than a % margin",
+    desc: "Orders whose margin fell under the percentage you set. Type the number you want to hold the line at.",
+    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0,
+    thr: { id: "pct", label: "Margin below", suffix: "%", def: 10, step: "0.5" },
+    filt: (r, v) => num(r.margin_pct) < v,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "margin_pct", dir: 1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+      { l: "Profit on them", n: money(sum(rows, "profit")), cls: sum(rows, "profit") < 0 ? "bad" : "warn" },
+      { l: "Received", n: money(sum(rows, "received")) }
+    ],
+    empty: "No paid order falls under that margin."
+  },
+  {
+    id: "belowamt", sec: "Payments",
+    title: "Received less than a profit amount",
+    desc: "Orders that left you with less rupees of profit than the figure you set, whatever the percentage says.",
+    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0,
+    thr: { id: "amt", label: "Profit below", suffix: "₹", def: 50, step: "10" },
+    filt: (r, v) => num(r.profit) < v,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "profit", dir: 1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+      { l: "Profit on them", n: money(sum(rows, "profit")), cls: sum(rows, "profit") < 0 ? "bad" : "warn" },
+      { l: "Received", n: money(sum(rows, "received")) }
+    ],
+    empty: "No paid order falls under that amount."
+  },
+  {
+    id: "retlost", sec: "Returns",
+    title: "Returned, goods never arrived",
+    desc: "The payment file says the order came back and took the money with it, but the parcel is not in any returns file. If the platform lost it, this is what to claim.",
+    src: "check", pick: (r) => r.bucket !== "payment not received",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.age, COL.stat, COL.val],
+    sort: { k: "age_days", dir: -1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length, cls: rows.length ? "warn" : "" },
+      { l: "Value to claim", n: money(sum(rows, "value")), cls: rows.length ? "warn" : "" },
+      { l: "Oldest", n: (rows.length ? Math.max(...rows.map((r) => num(r.age_days))) : 0) + " days" }
+    ],
+    empty: "Every return the payment files charged you for has physically come back."
+  },
+  {
+    id: "nocop", sec: "Missings",
+    title: "Cost price not available",
+    desc: "Paid orders that could not be matched to a cost in the SKU master, so their cost is counted as zero and their profit is overstated. Everything known about each one is here so the SKU can be added.",
+    src: "profit", pick: (r) => !r.cop_known,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd],
+    sort: { k: "received", dir: -1 },
+    kpis: (rows) => {
+      const skus = new Set(rows.map((r) => (r.platform || "") + "|" + (r.company_name || "") + "|" + (r.sku || "")));
+      return [
+        { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+        { l: "Distinct SKUs", n: skus.size.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+        { l: "Received on them", n: money(sum(rows, "received")) }
+      ];
+    },
+    empty: "Every paid order maps to a cost price."
+  }
 ];
 
-(async () => {
+function sum(rows, k) { let t = 0; for (const r of rows) t += num(r[k]); return t; }
+
+/* ---------- state ------------------------------------------------------ */
+const state = { check: null, profit: null, plat: "", co: "", q: "", ui: {} };
+for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300 };
+
+/* ---------- boot ------------------------------------------------------- */
+(async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { location.href = "/home/?return=%2Freports%2F"; return; }
-
-  // A report is only offered when the data behind it exists. One that answers
-  // "nothing found" because a file was never uploaded reads as a clean bill of
-  // health, which is worse than not showing it at all.
-  const [{ count: nOrders }, { count: nPayments }] = await Promise.all([
-    sb.from("seller_orders").select("id", { count: "exact", head: true }),
-    sb.from("seller_payments").select("id", { count: "exact", head: true }),
-  ]);
-  const pill = $("#pillUnpaid");
-  if (!nOrders || !nPayments) {
-    pill.className = "pill need";
-    pill.textContent = !nOrders && !nPayments ? "needs orders + payments"
-                     : !nOrders ? "needs an orders file" : "needs a payments file";
-    return;
-  }
-  $("#cardUnpaid").classList.remove("locked");
-  pill.className = "pill ok"; pill.textContent = "ready";
-  $("#unpaidBody").style.display = "";
-  run();
+  buildCards();
+  $("#gc").style.display = "flex";
+  $("#refresh").addEventListener("click", () => load(true));
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
+  await load(false);
 })();
 
-$("#runUnpaid").addEventListener("click", run);
-$("#csvUnpaid").addEventListener("click", downloadCsv);
-$("#search").addEventListener("input", (e) => { F.q = e.target.value.trim().toLowerCase(); paint(); });
-
-async function run() {
-  $("#unpaidStatus").innerHTML = '<span class="spin"></span> running';
-  const { data, error } = await sb.rpc("seller_unpaid_delivered");
-  if (error) { $("#unpaidStatus").textContent = "could not run: " + error.message; return; }
-  // How far past its own platform's rule each line is - the only ranking that
-  // compares a Flipkart line to a Meesho one fairly, since their clocks differ.
-  ALL = (data || []).map(r => ({ ...r, over_by: (r.age_days || 0) - (r.threshold || 0) }));
-  $("#unpaidStatus").textContent = "";
+async function load(force) {
+  $("#status").innerHTML = '<span class="spin"></span> reading your data…';
+  const t0 = Date.now();
+  const [a, b] = await Promise.all([
+    sb.rpc("seller_order_money_check", { _days: 45 }),
+    sb.rpc("seller_paid_profit")
+  ]);
+  if (a.error) console.error("money check", a.error);
+  if (b.error) console.error("paid profit", b.error);
+  state.check = a.error ? [] : (a.data || []);
+  state.profit = b.error ? [] : (b.data || []);
+  const bad = [a.error, b.error].filter(Boolean);
+  $("#status").textContent = bad.length
+    ? "Some data could not be read — " + bad.map((e) => e.message).join("; ")
+    : state.profit.length.toLocaleString("en-IN") + " paid orders · checked in " + ((Date.now() - t0) / 1000).toFixed(1) + "s";
   buildChips();
-  paint();
+  renderAll();
 }
 
+/* ---------- chips ------------------------------------------------------ */
 function buildChips() {
-  const plats = [...new Set(ALL.map(r => r.platform))].sort();
-  const cos = [...new Set(ALL.map(r => r.company_name))].sort();
-  const row = (items, sel, key) =>
-    `<div class="chip ${sel === "" ? "active" : ""}" data-${key}="">All ${key === "p" ? "platforms" : "companies"}</div>` +
-    items.map(v => `<div class="chip ${sel === v ? "active" : ""}" data-${key}="${esc(v)}">${esc(v)}</div>`).join("");
-  $("#platChips").innerHTML = plats.length > 1 ? row(plats, F.plat, "p") : "";
-  $("#coChips").innerHTML = cos.length > 1 ? row(cos, F.co, "c") : "";
-}
-$("#platChips").addEventListener("click", e => {
-  const c = e.target.closest(".chip"); if (!c) return;
-  F.plat = c.dataset.p; buildChips(); paint();
-});
-$("#coChips").addEventListener("click", e => {
-  const c = e.target.closest(".chip"); if (!c) return;
-  F.co = c.dataset.c; buildChips(); paint();
-});
-
-function filtered() {
-  return ALL.filter(r =>
-    (!F.plat || r.platform === F.plat) &&
-    (!F.co || r.company_name === F.co) &&
-    (!F.q || String(r.sku || "").toLowerCase().includes(F.q) || String(r.order_ref || "").toLowerCase().includes(F.q)));
+  const all = [...(state.check || []), ...(state.profit || [])];
+  const plats = [...new Set(all.map((r) => r.platform).filter(Boolean))].sort();
+  const cos = [...new Set(all.map((r) => r.company_name).filter(Boolean))].sort();
+  const draw = (host, list, key, allLabel) => {
+    host.innerHTML = "";
+    const mk = (val, label) => {
+      const c = document.createElement("span");
+      c.className = "chip" + (state[key] === val ? " active" : "");
+      c.textContent = label;
+      c.addEventListener("click", () => { state[key] = val; buildChips(); renderAll(); });
+      host.appendChild(c);
+    };
+    mk("", allLabel);
+    for (const v of list) mk(v, titleCase(v));
+  };
+  draw($("#platChips"), plats, "plat", "All platforms");
+  draw($("#coChips"), cos, "co", "All companies");
 }
 
-function sorted(rows) {
-  const c = SORT.col, d = SORT.dir;
-  return [...rows].sort((a, b) => {
-    let x = a[c], y = b[c];
-    if (c === "age_days" || c === "value" || c === "over_by") { x = Number(x) || 0; y = Number(y) || 0; return (x - y) * d; }
-    x = String(x == null ? "" : x); y = String(y == null ? "" : y);
-    return x < y ? -d : x > y ? d : 0;
+/* ---------- card scaffolding ------------------------------------------ */
+function buildCards() {
+  for (const r of REPORTS) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.id = "card_" + r.id;
+    card.innerHTML =
+      '<div class="card-head" data-id="' + r.id + '">' +
+        "<div><h3>" + esc(r.title) + '</h3><p class="desc">' + esc(r.desc) + "</p></div>" +
+        '<span class="pill need" id="pill_' + r.id + '">…</span>' +
+      "</div>" +
+      '<div class="body" id="body_' + r.id + '"></div>';
+    card.querySelector(".card-head").addEventListener("click", () => {
+      state.ui[r.id].open = !state.ui[r.id].open;
+      render(r);
+    });
+    $("#wrap" + r.sec).appendChild(card);
+  }
+}
+
+/* ---------- rows for one report --------------------------------------- */
+function rowsFor(r) {
+  const src = r.src === "check" ? state.check : state.profit;
+  if (!src) return null;
+  const u = state.ui[r.id];
+  let out = src.filter(r.pick);
+  if (r.filt) out = out.filter((row) => r.filt(row, num(u.thr)));
+  if (state.plat) out = out.filter((row) => row.platform === state.plat);
+  if (state.co) out = out.filter((row) => row.company_name === state.co);
+  if (state.q) {
+    const q = state.q;
+    out = out.filter((row) =>
+      String(row.sku || "").toLowerCase().includes(q) ||
+      String(row.order_ref || "").toLowerCase().includes(q) ||
+      String(row.master_sku || "").toLowerCase().includes(q));
+  }
+  const s = u.sort;
+  out = out.slice().sort((x, y) => {
+    const a = x[s.k], b = y[s.k];
+    const na = Number(a), nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb) && a !== null && b !== null) return (na - nb) * s.dir;
+    return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
   });
+  return out;
 }
 
-function paint() {
-  const rows = sorted(filtered());
-  const total = rows.length;
-  const value = rows.reduce((a, r) => a + (Number(r.value) || 0), 0);
-  const priced = rows.filter(r => r.value != null).length;
-  const oldest = rows.reduce((a, r) => Math.max(a, r.age_days || 0), 0);
+/* ---------- cell rendering -------------------------------------------- */
+function cell(row, c) {
+  const v = row[c.k];
+  switch (c.t) {
+    case "plat": return "<td>" + esc(titleCase(v)) + "</td>";
+    case "date": return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
+    case "int": return '<td class="num">' + (v == null ? "" : num(v).toLocaleString("en-IN")) + "</td>";
+    case "money": return '<td class="num">' + money2(v) + "</td>";
+    case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
+    case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
+    case "pct": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + num(v).toFixed(1) + "%</td>";
+    case "st": {
+      const t = String(v || "").trim();
+      if (!t) return '<td><span class="muted">—</span></td>';
+      const u = t.toUpperCase();
+      const cls = /LOST|DAMAG|F$/.test(u) ? " bad" : /RTO|RETURN|PEND/.test(u) ? " warn" : "";
+      return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
+    }
+    default: return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
+  }
+}
 
-  $("#unpaidKpis").innerHTML = `
-    <div class="kpi"><div class="n ${total ? "warn" : ""}">${total.toLocaleString("en-IN")}</div><div class="l">orders unpaid</div></div>
-    <div class="kpi"><div class="n">${value ? inr(value) : "—"}</div><div class="l">listed value${priced < total ? " (" + priced + " of " + total + ")" : ""}</div></div>
-    <div class="kpi"><div class="n">${oldest || "—"}</div><div class="l">oldest, days</div></div>`;
+/* ---------- render one report ----------------------------------------- */
+function render(r) {
+  const u = state.ui[r.id];
+  const card = $("#card_" + r.id);
+  const pill = $("#pill_" + r.id);
+  const body = $("#body_" + r.id);
+  const rows = rowsFor(r);
 
-  if (!total) {
-    $("#unpaidByPlat").innerHTML = `<div class="empty">Nothing overdue. Every delivered line past its platform's payment window has a settlement against it.</div>`;
-    $("#unpaidTableWrap").style.display = "none";
-    $("#unpaidNote").textContent = "Re-run after each new payment file — an order sits here legitimately until the next payout lands.";
+  if (rows === null) {
+    card.classList.add("locked");
+    pill.className = "pill need";
+    pill.textContent = "waiting for data";
+    body.className = "body";
     return;
   }
+  card.classList.remove("locked");
+  const n = rows.length;
+  const clean = r.id === "paid";
+  pill.className = "pill " + (clean ? "ok" : n === 0 ? "ok" : r.sec === "Payments" && r.id === "unpaid" ? "bad" : "hit");
+  pill.textContent = n === 0 && !clean ? "all clear" : n.toLocaleString("en-IN") + (n === 1 ? " order" : " orders");
 
-  const by = new Map();
-  for (const r of rows) {
-    const k = r.platform + "|" + r.company_name;
-    const g = by.get(k) || { platform: r.platform, company: r.company_name, n: 0, v: 0, oldest: 0 };
-    g.n++; g.v += Number(r.value) || 0; g.oldest = Math.max(g.oldest, r.age_days || 0);
-    by.set(k, g);
+  body.className = "body" + (u.open ? " open" : "");
+  if (!u.open) { body.innerHTML = ""; return; }
+
+  let h = '<div class="kpis">';
+  for (const k of r.kpis(rows)) h += '<div class="kpi"><div class="n ' + (k.cls || "") + '">' + esc(String(k.n)) + '</div><div class="l">' + esc(k.l) + "</div></div>";
+  h += "</div>";
+
+  h += '<div class="controls">';
+  if (r.thr) h += "<label>" + esc(r.thr.label) + '</label><input type="number" step="' + r.thr.step + '" value="' + u.thr + '" id="thr_' + r.id + '" style="width:96px">' +
+                 '<span class="muted" style="font-size:12px">' + r.thr.suffix + "</span>";
+  h += '<button class="ghost" id="csv_' + r.id + '">Download CSV</button>';
+  if (n > u.limit) h += '<button class="ghost" id="more_' + r.id + '">Show all ' + n.toLocaleString("en-IN") + "</button>";
+  h += '<span class="muted" style="font-size:12px">' + (n > u.limit ? "showing first " + u.limit.toLocaleString("en-IN") : "showing all " + n.toLocaleString("en-IN")) + "</span>";
+  h += "</div>";
+
+  if (n === 0) {
+    h += '<div class="note">' + esc(r.empty) + "</div>";
+  } else {
+    h += '<div class="scroll"><table><thead><tr>';
+    for (const c of r.cols) {
+      const on = u.sort.k === c.k;
+      const numy = ["int", "money", "moneyneg", "moneysign", "pct"].includes(c.t);
+      h += '<th class="' + (numy ? "num " : "") + (on ? "on" : "") + '" data-k="' + c.k + '">' + esc(c.l) +
+           ' <span class="a">' + (on ? (u.sort.dir === 1 ? "▲" : "▼") : "◆") + "</span></th>";
+    }
+    h += "</tr></thead><tbody>";
+    for (const row of rows.slice(0, u.limit)) {
+      h += "<tr>";
+      for (const c of r.cols) h += cell(row, c);
+      h += "</tr>";
+    }
+    h += "</tbody></table></div>";
   }
-  const groups = [...by.values()].sort((a, b) => b.n - a.n);
-  $("#unpaidByPlat").innerHTML = `<table>
-    <tr><th>Platform</th><th>Company</th><th class="num">Orders</th><th class="num">Value</th><th class="num">Oldest</th></tr>
-    ${groups.map(g => `<tr><td>${esc(g.platform)}</td><td>${esc(g.company)}</td>
-      <td class="num">${g.n}</td><td class="num">${g.v ? inr(g.v) : '<span class="muted">n/a</span>'}</td>
-      <td class="num">${g.oldest}d</td></tr>`).join("")}</table>`;
+  body.innerHTML = h;
 
-  const show = rows.slice(0, 800);
-  $("#unpaidTableWrap").style.display = "";
-  $("#unpaidTable").innerHTML =
-    `<tr>${COLS.map(c => {
-      const on = SORT.col === c.k;
-      return `<th class="${c.num ? "num " : ""}${c.sortable ? "sortable " : ""}${on ? "sorted" : ""}" ${c.sortable ? `data-sort="${c.k}"` : ""}>${c.t}${c.sortable ? ` <span class="arrow">${on ? (SORT.dir < 0 ? "▼" : "▲") : "↕"}</span>` : ""}</th>`;
-    }).join("")}</tr>` +
-    show.map(r => `<tr>
-      <td>${esc(r.ordered_on || "")}</td>
-      <td>${r.delivered_on ? esc(r.delivered_on) : '<span class="muted">not given</span>'}</td>
-      <td class="num"><b>${r.over_by}d</b></td>
-      <td class="num">${r.age_days}d</td>
-      <td>${r.dated_by === "delivery date" ? "delivery" : '<span class="muted">order</span>'}</td>
-      <td>${esc(r.platform)}</td><td>${esc(r.company_name)}</td>
-      <td>${esc(r.order_ref)}</td><td>${esc(r.sku || "")}</td>
-      <td class="num">${r.value != null ? inr(r.value) : '<span class="muted">n/a</span>'}</td>
-    </tr>`).join("");
-
-  const byOrder = rows.filter(r => r.dated_by !== "delivery date").length;
-  $("#unpaidNote").innerHTML =
-    `Value is the price on the order, not what would reach you &mdash; commission, shipping and fees come out of it.`
-    + ` A return raised but not yet back in your warehouse is not in the returns file, so it can still appear here &mdash; check the seller panel before raising anything.`
-    + ` <b>Overdue by</b> is days past that platform's own window, which is the fair way to rank a Flipkart line against a Meesho one.`
-    + (byOrder ? ` <b>${byOrder} of these have no delivery date in the export</b>, so they are aged from the order date and their window is 22 days rather than 15 to absorb transit.` : "")
-    + ` Re-run after each new payment file before raising anything with support: a payout landing tomorrow clears these without a ticket.`
-    + (show.length < total ? ` Showing ${show.length} of ${total}; the CSV has all of them.` : "");
+  body.querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
+    const k = th.dataset.k;
+    if (u.sort.k === k) u.sort.dir = -u.sort.dir; else { u.sort.k = k; u.sort.dir = -1; }
+    render(r);
+  }));
+  const thr = body.querySelector("#thr_" + r.id);
+  if (thr) thr.addEventListener("change", () => { u.thr = Number(thr.value); render(r); });
+  const more = body.querySelector("#more_" + r.id);
+  if (more) more.addEventListener("click", () => { u.limit = 1e9; render(r); });
+  body.querySelector("#csv_" + r.id).addEventListener("click", () => csv(r, rows));
 }
 
-$("#unpaidTable").addEventListener("click", (e) => {
-  const th = e.target.closest("th[data-sort]"); if (!th) return;
-  const k = th.dataset.sort;
-  if (SORT.col === k) SORT.dir = -SORT.dir; else { SORT.col = k; SORT.dir = (k === "age_days" || k === "value" || k === "over_by") ? -1 : 1; }
-  paint();
-});
+function renderAll() {
+  for (const r of REPORTS) render(r);
+  for (const sec of ["Payments", "Returns", "Missings"]) {
+    const list = REPORTS.filter((r) => r.sec === sec);
+    const live = list.filter((r) => { const x = rowsFor(r); return x && x.length; }).length;
+    $("#cnt" + sec) && ($("#cnt" + sec).textContent = list.length + (list.length === 1 ? " report" : " reports") + (live ? " · " + live + " with hits" : ""));
+  }
+}
 
-function downloadCsv() {
-  const rows = sorted(filtered());
-  if (!rows.length) return;
-  const cols = ["platform", "company_name", "order_ref", "sku", "ordered_on", "delivered_on", "age_days", "threshold", "over_by", "value", "dated_by"];
-  const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
-  const csv = [cols.join(","), ...rows.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
+/* ---------- csv -------------------------------------------------------- */
+function csv(r, rows) {
+  const q = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [r.cols.map((c) => q(c.l)).join(",")];
+  for (const row of rows) lines.push(r.cols.map((c) => q(row[c.k])).join(","));
+  const url = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = `unpaid-delivered-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.href = url;
+  a.download = "cursive-" + r.id + "-" + new Date().toISOString().slice(0, 10) + ".csv";
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
-
-// ============ 2. Returns paid for but never received ============
-let LOST = [];
-(async () => {
-  const [{ count: nPay }, { count: nRet }] = await Promise.all([
-    sb.from("seller_payments").select("id", { count: "exact", head: true }),
-    sb.from("seller_returns").select("id", { count: "exact", head: true }),
-  ]);
-  const pill = $("#pillLost");
-  if (!nPay || !nRet) {
-    pill.textContent = !nPay && !nRet ? "needs payments + returns"
-                     : !nPay ? "needs a payments file" : "needs a returns file";
-    return;
-  }
-  $("#cardLost").classList.remove("locked");
-  pill.className = "pill ok"; pill.textContent = "ready";
-  $("#lostBody").style.display = "";
-  const { data, error } = await sb.rpc("seller_returns_not_received", { _grace_days: 15 });
-  if (error) { $("#lostStatus").textContent = "could not run: " + error.message; return; }
-  LOST = data || [];
-  paintLost();
-})();
-
-function paintLost() {
-  const rows = LOST;
-  const goods = rows.reduce((a, r) => a + (Number(r.goods_value) || 0), 0);
-  const net = rows.reduce((a, r) => a + (Number(r.net_deducted) || 0), 0);
-  const oldest = rows.reduce((a, r) => Math.max(a, r.days_since || 0), 0);
-  $("#lostKpis").innerHTML = `
-    <div class="kpi"><div class="n ${rows.length ? "warn" : ""}">${rows.length}</div><div class="l">returns missing</div></div>
-    <div class="kpi"><div class="n">${goods ? inr(goods) : "—"}</div><div class="l">goods not returned</div></div>
-    <div class="kpi"><div class="n">${net ? inr(Math.abs(net)) : "—"}</div><div class="l">deducted from you</div></div>
-    <div class="kpi"><div class="n">${oldest || "—"}</div><div class="l">oldest, days</div></div>`;
-  if (!rows.length) {
-    $("#lostWrap").style.display = "none";
-    $("#lostNote").textContent = "Every return the marketplace charged you for has physically come back.";
-    return;
-  }
-  $("#lostWrap").style.display = "";
-  $("#lostTable").innerHTML =
-    `<tr><th>Charged</th><th class="num">Days</th><th>Platform</th><th>Company</th><th>Order ref</th><th>SKU</th>
-      <th class="num">Goods</th><th class="num">Deducted</th><th>Note</th></tr>` +
-    rows.map(r => `<tr>
-      <td>${esc(r.charged_on)}</td><td class="num"><b>${r.days_since}</b></td>
-      <td>${esc(r.platform)}</td><td>${esc(r.company_name)}</td>
-      <td>${esc(r.order_ref)}</td><td>${esc(r.sku || "")}</td>
-      <td class="num">${r.goods_value != null ? inr(r.goods_value) : '<span class="muted">n/a</span>'}</td>
-      <td class="num">${r.net_deducted != null ? inr(Math.abs(r.net_deducted)) : ""}</td>
-      <td>${esc(r.note)}</td></tr>`).join("");
-  $("#lostNote").innerHTML =
-    `Each row is a claim: you have the order reference, the date the money was taken, and the absence of the parcel from your own returns file. `
-    + `Raise them in the seller panel &mdash; and check the oldest first, since claim windows close.`;
-}
-$("#csvLost").addEventListener("click", () => {
-  if (!LOST.length) return;
-  const cols = ["platform","company_name","order_ref","sku","charged_on","days_since","goods_value","net_deducted","note"];
-  const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
-  const csv = [cols.join(","), ...LOST.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = `returns-not-received-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click(); URL.revokeObjectURL(a.href);
-});
 </script>
 </body>
 </html>
