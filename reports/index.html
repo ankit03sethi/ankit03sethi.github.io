@@ -58,7 +58,7 @@
   <a href="/home/" class="brand">
     <div>
       <div class="brand-name">Cursive Analyst</div>
-      <div class="nav-sub">Reports &middot; build 2026-08-30g</div>
+      <div class="nav-sub">Reports &middot; build 2026-08-30h</div>
     </div>
   </a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
@@ -94,6 +94,26 @@
       <div id="unpaidByPlat"></div>
       <div class="scroll" id="unpaidTableWrap" style="display:none"><table id="unpaidTable"></table></div>
       <div class="note" id="unpaidNote"></div>
+    </div>
+  </div>
+
+  <div class="card locked" id="cardLost">
+    <div class="card-head">
+      <div>
+        <h2>Returns you paid for but never got back</h2>
+        <p class="desc">The marketplace took the money back and the parcel never reached your warehouse.
+          Shown once it is <b>15 days past the clawback</b> &mdash; when a return does arrive it is a median of
+          two days after, and 95% are back within six, so anything still missing at fifteen is gone rather
+          than slow. A lost return is the marketplace's to compensate.</p>
+      </div>
+      <span class="pill need" id="pillLost">checking&hellip;</span>
+    </div>
+    <div id="lostBody" style="display:none">
+      <div class="kpis" id="lostKpis"></div>
+      <div class="controls"><button class="ghost" id="csvLost">Download CSV</button>
+        <span id="lostStatus" class="muted" style="font-size:12.5px"></span></div>
+      <div class="scroll" id="lostWrap" style="display:none"><table id="lostTable"></table></div>
+      <div class="note" id="lostNote"></div>
     </div>
   </div>
 
@@ -301,6 +321,69 @@ function downloadCsv() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ============ 2. Returns paid for but never received ============
+let LOST = [];
+(async () => {
+  const [{ count: nPay }, { count: nRet }] = await Promise.all([
+    sb.from("seller_payments").select("id", { count: "exact", head: true }),
+    sb.from("seller_returns").select("id", { count: "exact", head: true }),
+  ]);
+  const pill = $("#pillLost");
+  if (!nPay || !nRet) {
+    pill.textContent = !nPay && !nRet ? "needs payments + returns"
+                     : !nPay ? "needs a payments file" : "needs a returns file";
+    return;
+  }
+  $("#cardLost").classList.remove("locked");
+  pill.className = "pill ok"; pill.textContent = "ready";
+  $("#lostBody").style.display = "";
+  const { data, error } = await sb.rpc("seller_returns_not_received", { _grace_days: 15 });
+  if (error) { $("#lostStatus").textContent = "could not run: " + error.message; return; }
+  LOST = data || [];
+  paintLost();
+})();
+
+function paintLost() {
+  const rows = LOST;
+  const goods = rows.reduce((a, r) => a + (Number(r.goods_value) || 0), 0);
+  const net = rows.reduce((a, r) => a + (Number(r.net_deducted) || 0), 0);
+  const oldest = rows.reduce((a, r) => Math.max(a, r.days_since || 0), 0);
+  $("#lostKpis").innerHTML = `
+    <div class="kpi"><div class="n ${rows.length ? "warn" : ""}">${rows.length}</div><div class="l">returns missing</div></div>
+    <div class="kpi"><div class="n">${goods ? inr(goods) : "—"}</div><div class="l">goods not returned</div></div>
+    <div class="kpi"><div class="n">${net ? inr(Math.abs(net)) : "—"}</div><div class="l">deducted from you</div></div>
+    <div class="kpi"><div class="n">${oldest || "—"}</div><div class="l">oldest, days</div></div>`;
+  if (!rows.length) {
+    $("#lostWrap").style.display = "none";
+    $("#lostNote").textContent = "Every return the marketplace charged you for has physically come back.";
+    return;
+  }
+  $("#lostWrap").style.display = "";
+  $("#lostTable").innerHTML =
+    `<tr><th>Charged</th><th class="num">Days</th><th>Platform</th><th>Company</th><th>Order ref</th><th>SKU</th>
+      <th class="num">Goods</th><th class="num">Deducted</th><th>Note</th></tr>` +
+    rows.map(r => `<tr>
+      <td>${esc(r.charged_on)}</td><td class="num"><b>${r.days_since}</b></td>
+      <td>${esc(r.platform)}</td><td>${esc(r.company_name)}</td>
+      <td>${esc(r.order_ref)}</td><td>${esc(r.sku || "")}</td>
+      <td class="num">${r.goods_value != null ? inr(r.goods_value) : '<span class="muted">n/a</span>'}</td>
+      <td class="num">${r.net_deducted != null ? inr(Math.abs(r.net_deducted)) : ""}</td>
+      <td>${esc(r.note)}</td></tr>`).join("");
+  $("#lostNote").innerHTML =
+    `Each row is a claim: you have the order reference, the date the money was taken, and the absence of the parcel from your own returns file. `
+    + `Raise them in the seller panel &mdash; and check the oldest first, since claim windows close.`;
+}
+$("#csvLost").addEventListener("click", () => {
+  if (!LOST.length) return;
+  const cols = ["platform","company_name","order_ref","sku","charged_on","days_since","goods_value","net_deducted","note"];
+  const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+  const csv = [cols.join(","), ...LOST.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `returns-not-received-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
 </script>
 </body>
 </html>
