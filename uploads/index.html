@@ -115,9 +115,6 @@
     /* Green tick = this one was refreshed today, so it is current. */
     .today-tick { color:#16a34a; font-weight:800; margin-right:4px; }
     .cell-lastup.today .lu-val { color:#16a34a; }
-    /* "checked" sits under the change stamp and is deliberately quieter: it is
-       reassurance that the file was seen, not news that anything happened. */
-    .cell-lastup .lu-chk { display:block; color:#94a3b8; font-size:10px; font-weight:600; font-style:italic; white-space:nowrap; margin-top:1px; }
     .up-stamp-box .stamp.today .when { color:#16a34a; }
     /* A real grid, not flex. With flex:1 a long company name ("Sethi Trading
        Company", "Hirday Enterprises") refuses to shrink below its own text and
@@ -175,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-08-30c</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-08-30d</span></div>
     </div>
   </a>
   </div>
@@ -965,19 +962,16 @@
       const key = r.company + "::" + r.platform;
       const staged = (stagedUploads[r.kind] || {})[key];
       const lastIso = pickerLastByCombo[r.kind + "::" + key];
-      const fresh = isToday(lastIso);
+
       // A file read that wrote nothing is still a file read. Show it under the
       // stamp when it is more recent than the last change, so re-downloading
       // something unchanged looks like "checked, nothing new" instead of like
       // nothing happening at all.
       const read = pickerReadByCombo[r.kind + "::" + key];
-      const readNewer = read && (!lastIso || new Date(read.at) > new Date(lastIso));
-      const checkedHtml = readNewer
-        ? `<span class="lu-chk" title="${escapeHtml(read.file || "")}\nread ${escapeHtml(new Date(read.at).toLocaleString("en-IN"))} — ${read.saw} rows in the file, ${read.wrote} new">checked ${escapeHtml(fmtLast(read.at))}${read.wrote === 0 ? " · nothing new" : ""}</span>`
-        : "";
-      const stampHtml = lastIso
-        ? `<div class="cell-lastup${fresh ? ' today' : ''}" title="Last uploaded ${escapeHtml(new Date(lastIso).toLocaleString('en-IN'))}"><span class="lu-lbl">Last</span> <span class="lu-val">${fresh ? TICK : ''}${escapeHtml(fmtLast(lastIso))}</span>${checkedHtml}</div>`
-        : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span>${checkedHtml}</div>`;
+      const shownIso = (read && (!lastIso || new Date(read.at) > new Date(lastIso))) ? read.at : lastIso;
+      const stampHtml = shownIso
+        ? `<div class="cell-lastup${isToday(shownIso) ? ' today' : ''}" title="${escapeHtml(new Date(shownIso).toLocaleString('en-IN'))}${read ? `\n${read.file || ""}\n${read.saw} rows in the file, ${read.wrote} new` : ""}"><span class="lu-lbl">Last</span> <span class="lu-val">${isToday(shownIso) ? TICK : ''}${escapeHtml(fmtLast(shownIso))}</span></div>`
+        : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span></div>`;
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
       // Only a split platform is labelled. Naming the file type on every row
       // would be noise on the four platforms that only have one.
@@ -1635,53 +1629,60 @@
       const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
       if (!el) continue;
       if (!data || data.length === 0) {
-        el.textContent = "Never"; el.classList.add("none"); el.classList.remove("today"); el.title = "";
-        appendChecked(el, kind, readsByKind, null);
+        const seen0 = newestRead(kind, readsByKind);
+        if (seen0) {
+          const when0 = new Date(seen0.at).toLocaleString("en-IN",
+            { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+          const who0 = [seen0.company || "", PLAT_LABEL[seen0.platform] || seen0.platform || ""].filter(Boolean).join(" · ");
+          el.classList.remove("none");
+          el.classList.toggle("today", isToday(seen0.at));
+          el.innerHTML = (who0 ? `<span class="who">${escapeHtml(who0)}</span>` : "")
+                       + `<span class="when">${isToday(seen0.at) ? TICK : ""}${escapeHtml(when0)}</span>`;
+          el.title = `${who0}\n${seen0.file || ""}\n${seen0.saw} rows in the file, ${seen0.wrote} new\nnothing stored yet`;
+        } else {
+          el.textContent = "Never"; el.classList.add("none"); el.classList.remove("today"); el.title = "";
+        }
         continue;
       }
       const row = data[0];
-      const dt = new Date(row.pushed_at);
+      // The stamp answers "when did we last take a file for this row" - so a
+      // read that wrote nothing still counts. It is the question you actually
+      // ask after a download, and a stamp that ignores unchanged files looks
+      // broken every time you re-pull something.
+      const seen = newestRead(kind, readsByKind);
+      const useRead = seen && new Date(seen.at) > new Date(row.pushed_at);
+      const stampIso = useRead ? seen.at : row.pushed_at;
+      const dt = new Date(stampIso);
       const when = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-      const company = row.company_name || "";
-      const platform = PLAT_LABEL[row.platform] || row.platform || "";
+      const company = (useRead ? seen.company : row.company_name) || "";
+      const platform = PLAT_LABEL[useRead ? seen.platform : row.platform]
+                    || (useRead ? seen.platform : row.platform) || "";
       const who = [company, platform].filter(Boolean).join(" · ");
       el.classList.remove("none");
-      el.classList.toggle("today", isToday(row.pushed_at));
+      el.classList.toggle("today", isToday(stampIso));
       // Render company · platform on top, then the timestamp beneath it
       el.innerHTML = (who ? `<span class="who">${escapeHtml(who)}</span>` : "")
-                   + `<span class="when">${isToday(row.pushed_at) ? TICK : ""}${escapeHtml(when)}</span>`;
-      el.title = who + (row.source_file ? "\n" + row.source_file : "");
-      appendChecked(el, kind, readsByKind, row.pushed_at);
-    }
-
-    // Rows whose data never arrived still deserve to say they were looked at.
-    for (const kind of Object.keys(KIND_CFG)) {
-      const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
-      if (el && el.classList.contains("none")) appendChecked(el, kind, readsByKind, null);
+                   + `<span class="when">${isToday(stampIso) ? TICK : ""}${escapeHtml(when)}</span>`;
+      // The detail lives in the tooltip: which file, and whether it brought
+      // anything new. The stamp itself stays a single clean line.
+      el.title = who
+        + (useRead ? `\n${seen.file || ""}\n${seen.saw} rows in the file, ${seen.wrote} new`
+                   : (row.source_file ? "\n" + row.source_file : ""))
+        + `\ndata last changed ${new Date(row.pushed_at).toLocaleString("en-IN")}`;
     }
   }
 
-  // A page row stands for every kind in its picker - the Payments row covers all
-  // six payment files - so the newest read across the group is the one to show.
-  function appendChecked(el, kind, readsByKind, lastIso) {
-    if (!el || el.querySelector(".lu-chk")) return;
-    const group = KIND_GROUPS[kind] || [kind];
+  // A page row stands for every kind in its picker - Payments covers all six
+  // payment files - so the newest read across the group is the one that counts.
+  function newestRead(kind, readsByKind) {
     let best = null;
-    for (const k of group) {
+    for (const k of (KIND_GROUPS[kind] || [kind])) {
       const r = readsByKind[k];
       if (r && (!best || new Date(r.at) > new Date(best.at))) best = r;
     }
-    if (!best) return;
-    if (lastIso && new Date(best.at) <= new Date(lastIso)) return;   // the stamp already says it
-    const when = new Date(best.at).toLocaleString("en-IN",
-      { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-    const span = document.createElement("span");
-    span.className = "lu-chk";
-    span.textContent = `checked ${when}${best.wrote === 0 ? " · nothing new" : ""}`;
-    span.title = `${best.company || ""} \u00b7 ${best.platform || ""}\n${best.file || ""}\n`
-               + `${best.saw} rows in the file, ${best.wrote} new`;
-    el.appendChild(span);
+    return best;
   }
+
   // Back-compat alias
   const refreshOrdersStamp = refreshStamps;
 
