@@ -58,7 +58,7 @@
   <a href="/home/" class="brand">
     <div>
       <div class="brand-name">Cursive Analyst</div>
-      <div class="nav-sub">Reports &middot; build 2026-08-30d</div>
+      <div class="nav-sub">Reports &middot; build 2026-08-30e</div>
     </div>
   </a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
@@ -72,10 +72,11 @@
     <div class="card-head">
       <div>
         <h2>Unpaid delivered orders</h2>
-        <p class="desc">Every line the marketplace says it delivered, not returned, and still unsettled
-          <b>15 days after delivery</b>. Flipkart and Myntra give a delivery date so it is counted from that;
-          Meesho and Amazon do not, so their clock starts at the order and carries a week of transit inside
-          it &mdash; 22 days there is the same 15 days here.</p>
+        <p class="desc">Every line the marketplace says it delivered, not returned, and slower to settle than
+          anything that has ever actually been paid on that platform &mdash; measured from this account's own
+          history: <b>Flipkart 21 days from delivery, Myntra 24, Meesho and Amazon 35 from the order</b>
+          (neither gives a delivery date). A line only appears once it is past the worst legitimate case on
+          record, so anything here is genuinely unusual.</p>
       </div>
       <span class="pill need" id="pillUnpaid">checking&hellip;</span>
     </div>
@@ -275,6 +276,7 @@ function paint() {
   const byOrder = rows.filter(r => r.dated_by !== "delivery date").length;
   $("#unpaidNote").innerHTML =
     `Value is the price on the order, not what would reach you &mdash; commission, shipping and fees come out of it.`
+    + ` A return raised but not yet back in your warehouse is not in the returns file, so it can still appear here &mdash; check the seller panel before raising anything.`
     + ` <b>Overdue by</b> is days past that platform's own window, which is the fair way to rank a Flipkart line against a Meesho one.`
     + (byOrder ? ` <b>${byOrder} of these have no delivery date in the export</b>, so they are aged from the order date and their window is 22 days rather than 15 to absorb transit.` : "")
     + ` Re-run after each new payment file before raising anything with support: a payout landing tomorrow clears these without a ticket.`
