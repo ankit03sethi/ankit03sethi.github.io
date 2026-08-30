@@ -175,7 +175,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-08-30b</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-08-30c</span></div>
     </div>
   </a>
   </div>
@@ -1588,6 +1588,22 @@
 
   async function refreshStamps() {
     if (!session) return;
+    // When each row was last CHECKED. The stamp itself only moves when data
+    // changes, so without this a re-download of an unchanged file looks exactly
+    // like the watcher never seeing it.
+    let readsByKind = {};
+    try {
+      const { data: reads } = await sb.rpc("seller_last_reads");
+      (reads || []).forEach(r => {
+        const prev = readsByKind[r.kind];
+        if (!prev || new Date(r.last_read) > new Date(prev.at)) {
+          readsByKind[r.kind] = { at: r.last_read, file: r.source_file,
+                                  saw: r.rows_in_file, wrote: r.rows_written,
+                                  company: r.company_name, platform: r.platform };
+        }
+      });
+    } catch (e) { console.warn("seller_last_reads:", e); }
+
     for (const kind of Object.keys(KIND_CFG)) {
       const cfg = KIND_CFG[kind];
       // Only kinds that have a row on this page have a stamp to fill. The five
@@ -1618,7 +1634,11 @@
       const { data } = await q;
       const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
       if (!el) continue;
-      if (!data || data.length === 0) { el.textContent = "Never"; el.classList.add("none"); el.classList.remove("today"); el.title = ""; continue; }
+      if (!data || data.length === 0) {
+        el.textContent = "Never"; el.classList.add("none"); el.classList.remove("today"); el.title = "";
+        appendChecked(el, kind, readsByKind, null);
+        continue;
+      }
       const row = data[0];
       const dt = new Date(row.pushed_at);
       const when = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
@@ -1631,7 +1651,36 @@
       el.innerHTML = (who ? `<span class="who">${escapeHtml(who)}</span>` : "")
                    + `<span class="when">${isToday(row.pushed_at) ? TICK : ""}${escapeHtml(when)}</span>`;
       el.title = who + (row.source_file ? "\n" + row.source_file : "");
+      appendChecked(el, kind, readsByKind, row.pushed_at);
     }
+
+    // Rows whose data never arrived still deserve to say they were looked at.
+    for (const kind of Object.keys(KIND_CFG)) {
+      const el = document.querySelector(`.kind-stamp[data-kind="${kind}"]`);
+      if (el && el.classList.contains("none")) appendChecked(el, kind, readsByKind, null);
+    }
+  }
+
+  // A page row stands for every kind in its picker - the Payments row covers all
+  // six payment files - so the newest read across the group is the one to show.
+  function appendChecked(el, kind, readsByKind, lastIso) {
+    if (!el || el.querySelector(".lu-chk")) return;
+    const group = KIND_GROUPS[kind] || [kind];
+    let best = null;
+    for (const k of group) {
+      const r = readsByKind[k];
+      if (r && (!best || new Date(r.at) > new Date(best.at))) best = r;
+    }
+    if (!best) return;
+    if (lastIso && new Date(best.at) <= new Date(lastIso)) return;   // the stamp already says it
+    const when = new Date(best.at).toLocaleString("en-IN",
+      { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    const span = document.createElement("span");
+    span.className = "lu-chk";
+    span.textContent = `checked ${when}${best.wrote === 0 ? " · nothing new" : ""}`;
+    span.title = `${best.company || ""} \u00b7 ${best.platform || ""}\n${best.file || ""}\n`
+               + `${best.saw} rows in the file, ${best.wrote} new`;
+    el.appendChild(span);
   }
   // Back-compat alias
   const refreshOrdersStamp = refreshStamps;
