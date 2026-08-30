@@ -115,6 +115,9 @@
     /* Green tick = this one was refreshed today, so it is current. */
     .today-tick { color:#16a34a; font-weight:800; margin-right:4px; }
     .cell-lastup.today .lu-val { color:#16a34a; }
+    /* "checked" sits under the change stamp and is deliberately quieter: it is
+       reassurance that the file was seen, not news that anything happened. */
+    .cell-lastup .lu-chk { display:block; color:#94a3b8; font-size:10px; font-weight:600; font-style:italic; white-space:nowrap; margin-top:1px; }
     .up-stamp-box .stamp.today .when { color:#16a34a; }
     /* A real grid, not flex. With flex:1 a long company name ("Sethi Trading
        Company", "Hirday Enterprises") refuses to shrink below its own text and
@@ -172,7 +175,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-08-30a</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-08-30b</span></div>
     </div>
   </a>
   </div>
@@ -788,6 +791,11 @@
   };
   // Last-pushed timestamp map for the currently open picker, keyed by "company::platform"
   let pickerLastByCombo = {};
+  // When a company+platform was last CHECKED, as opposed to last changed. A
+  // re-download of an identical file writes nothing, so "last uploaded" rightly
+  // does not move - and without this you cannot tell that from the watcher never
+  // having seen the file at all.
+  let pickerReadByCombo = {};
 
   // True when the timestamp falls on today's calendar date in the viewer's own
   // timezone — the signal for the green tick that says "this is current".
@@ -818,13 +826,25 @@
     pickerLastByCombo = {};
     if (!session) return;
     try {
-      const { data, error } = await sb.rpc("seller_last_uploads");
+      const [{ data, error }, reads] = await Promise.all([
+        sb.rpc("seller_last_uploads"),
+        sb.rpc("seller_last_reads"),
+      ]);
       if (error) { console.warn("loadPickerLastMap rpc err:", error); return; }
       (data || []).forEach(r => {
         if (!want.has(r.kind)) return;
         const key = r.kind + "::" + (r.company_name || "") + "::" + (r.platform || "");
         const prev = pickerLastByCombo[key];
         if (!prev || new Date(r.last_pushed) > new Date(prev)) pickerLastByCombo[key] = r.last_pushed;
+      });
+      pickerReadByCombo = {};
+      ((reads && reads.data) || []).forEach(r => {
+        if (!want.has(r.kind)) return;
+        const key = r.kind + "::" + (r.company_name || "") + "::" + (r.platform || "");
+        const prev = pickerReadByCombo[key];
+        if (!prev || new Date(r.last_read) > new Date(prev.at)) {
+          pickerReadByCombo[key] = { at: r.last_read, file: r.source_file, wrote: r.rows_written, saw: r.rows_in_file };
+        }
       });
     } catch (e) { console.warn("loadPickerLastMap err:", e); }
   }
@@ -946,9 +966,18 @@
       const staged = (stagedUploads[r.kind] || {})[key];
       const lastIso = pickerLastByCombo[r.kind + "::" + key];
       const fresh = isToday(lastIso);
+      // A file read that wrote nothing is still a file read. Show it under the
+      // stamp when it is more recent than the last change, so re-downloading
+      // something unchanged looks like "checked, nothing new" instead of like
+      // nothing happening at all.
+      const read = pickerReadByCombo[r.kind + "::" + key];
+      const readNewer = read && (!lastIso || new Date(read.at) > new Date(lastIso));
+      const checkedHtml = readNewer
+        ? `<span class="lu-chk" title="${escapeHtml(read.file || "")}\nread ${escapeHtml(new Date(read.at).toLocaleString("en-IN"))} — ${read.saw} rows in the file, ${read.wrote} new">checked ${escapeHtml(fmtLast(read.at))}${read.wrote === 0 ? " · nothing new" : ""}</span>`
+        : "";
       const stampHtml = lastIso
-        ? `<div class="cell-lastup${fresh ? ' today' : ''}" title="Last uploaded ${escapeHtml(new Date(lastIso).toLocaleString('en-IN'))}"><span class="lu-lbl">Last</span> <span class="lu-val">${fresh ? TICK : ''}${escapeHtml(fmtLast(lastIso))}</span></div>`
-        : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span></div>`;
+        ? `<div class="cell-lastup${fresh ? ' today' : ''}" title="Last uploaded ${escapeHtml(new Date(lastIso).toLocaleString('en-IN'))}"><span class="lu-lbl">Last</span> <span class="lu-val">${fresh ? TICK : ''}${escapeHtml(fmtLast(lastIso))}</span>${checkedHtml}</div>`
+        : `<div class="cell-lastup none"><span class="lu-lbl">Last</span> <span class="lu-val">Never</span>${checkedHtml}</div>`;
       const companyCell = `<div class="cell-company">${escapeHtml(r.company)}</div>`;
       // Only a split platform is labelled. Naming the file type on every row
       // would be noise on the four platforms that only have one.
