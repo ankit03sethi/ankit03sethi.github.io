@@ -58,7 +58,7 @@
   <a href="/home/" class="brand">
     <div>
       <div class="brand-name">Cursive Analyst</div>
-      <div class="nav-sub">Reports &middot; build 2026-08-30b</div>
+      <div class="nav-sub">Reports &middot; build 2026-08-30c</div>
     </div>
   </a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
@@ -72,23 +72,16 @@
     <div class="card-head">
       <div>
         <h2>Unpaid delivered orders</h2>
-        <p class="desc">Every line the marketplace says it delivered, with no settlement row against it, still unpaid
-          after the number of days you choose.</p>
+        <p class="desc">Every line the marketplace says it delivered, not returned, and still unsettled
+          <b>15 days after delivery</b>. Flipkart and Myntra give a delivery date so it is counted from that;
+          Meesho and Amazon do not, so their clock starts at the order and carries a week of transit inside
+          it &mdash; 22 days there is the same 15 days here.</p>
       </div>
       <span class="pill need" id="pillUnpaid">checking&hellip;</span>
     </div>
 
     <div id="unpaidBody" style="display:none">
       <div class="controls">
-        <label>Unpaid after</label>
-        <select id="grace">
-          <option value="7">7 days</option>
-          <option value="10">10 days</option>
-          <option value="15" selected>15 days</option>
-          <option value="21">21 days</option>
-          <option value="30">30 days</option>
-          <option value="45">45 days</option>
-        </select>
         <input id="search" type="search" placeholder="Search SKU or order ref" style="min-width:220px">
         <button class="primary" id="runUnpaid">Refresh</button>
         <button class="ghost" id="csvUnpaid">Download CSV</button>
@@ -138,12 +131,13 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "
 
 let ALL = [];                       // everything the last run returned
 const F = { plat: "", co: "", q: "" };
-const SORT = { col: "age_days", dir: -1 };   // oldest first: the ones worth chasing
+const SORT = { col: "over_by", dir: -1 };   // oldest first: the ones worth chasing
 
 const COLS = [
   { k: "ordered_on",   t: "Ordered",   sortable: true },
   { k: "delivered_on", t: "Delivered", sortable: true },
-  { k: "age_days",     t: "Age",       sortable: true, num: true },
+  { k: "over_by",      t: "Overdue by", sortable: true, num: true },
+  { k: "age_days",     t: "Age",        sortable: true, num: true },
   { k: "platform",     t: "Platform",  sortable: true },
   { k: "company_name", t: "Company",   sortable: true },
   { k: "order_ref",    t: "Order ref", sortable: false },
@@ -177,15 +171,16 @@ const COLS = [
 })();
 
 $("#runUnpaid").addEventListener("click", run);
-$("#grace").addEventListener("change", run);
 $("#csvUnpaid").addEventListener("click", downloadCsv);
 $("#search").addEventListener("input", (e) => { F.q = e.target.value.trim().toLowerCase(); paint(); });
 
 async function run() {
   $("#unpaidStatus").innerHTML = '<span class="spin"></span> running';
-  const { data, error } = await sb.rpc("seller_unpaid_delivered", { _grace_days: Number($("#grace").value) });
+  const { data, error } = await sb.rpc("seller_unpaid_delivered");
   if (error) { $("#unpaidStatus").textContent = "could not run: " + error.message; return; }
-  ALL = data || [];
+  // How far past its own platform's rule each line is - the only ranking that
+  // compares a Flipkart line to a Meesho one fairly, since their clocks differ.
+  ALL = (data || []).map(r => ({ ...r, over_by: (r.age_days || 0) - (r.threshold || 0) }));
   $("#unpaidStatus").textContent = "";
   buildChips();
   paint();
@@ -220,7 +215,7 @@ function sorted(rows) {
   const c = SORT.col, d = SORT.dir;
   return [...rows].sort((a, b) => {
     let x = a[c], y = b[c];
-    if (c === "age_days" || c === "value") { x = Number(x) || 0; y = Number(y) || 0; return (x - y) * d; }
+    if (c === "age_days" || c === "value" || c === "over_by") { x = Number(x) || 0; y = Number(y) || 0; return (x - y) * d; }
     x = String(x == null ? "" : x); y = String(y == null ? "" : y);
     return x < y ? -d : x > y ? d : 0;
   });
@@ -239,7 +234,7 @@ function paint() {
     <div class="kpi"><div class="n">${oldest || "—"}</div><div class="l">oldest, days</div></div>`;
 
   if (!total) {
-    $("#unpaidByPlat").innerHTML = `<div class="empty">Nothing here. Every delivered line older than ${$("#grace").value} days has a payment against it.</div>`;
+    $("#unpaidByPlat").innerHTML = `<div class="empty">Nothing overdue. Every delivered line past its platform's payment window has a settlement against it.</div>`;
     $("#unpaidTableWrap").style.display = "none";
     $("#unpaidNote").textContent = "Re-run after each new payment file — an order sits here legitimately until the next payout lands.";
     return;
@@ -269,6 +264,7 @@ function paint() {
     show.map(r => `<tr>
       <td>${esc(r.ordered_on || "")}</td>
       <td>${r.delivered_on ? esc(r.delivered_on) : '<span class="muted">not given</span>'}</td>
+      <td class="num"><b>${r.over_by}d</b></td>
       <td class="num">${r.age_days}d</td>
       <td>${esc(r.platform)}</td><td>${esc(r.company_name)}</td>
       <td>${esc(r.order_ref)}</td><td>${esc(r.sku || "")}</td>
@@ -279,7 +275,8 @@ function paint() {
   const byOrder = rows.filter(r => r.dated_by !== "delivery date").length;
   $("#unpaidNote").innerHTML =
     `Value is the price on the order, not what would reach you &mdash; commission, shipping and fees come out of it.`
-    + (byOrder ? ` <b>${byOrder} of these have no delivery date in the export</b>, so they are aged from the order date. Order to delivery is about a week, so their real age is roughly seven days less than shown &mdash; treat them as leads, not overdue.` : "")
+    + ` <b>Overdue by</b> is days past that platform's own window, which is the fair way to rank a Flipkart line against a Meesho one.`
+    + (byOrder ? ` <b>${byOrder} of these have no delivery date in the export</b>, so they are aged from the order date and their window is 22 days rather than 15 to absorb transit.` : "")
     + ` Re-run after each new payment file before raising anything with support: a payout landing tomorrow clears these without a ticket.`
     + (show.length < total ? ` Showing ${show.length} of ${total}; the CSV has all of them.` : "");
 }
@@ -287,14 +284,14 @@ function paint() {
 $("#unpaidTable").addEventListener("click", (e) => {
   const th = e.target.closest("th[data-sort]"); if (!th) return;
   const k = th.dataset.sort;
-  if (SORT.col === k) SORT.dir = -SORT.dir; else { SORT.col = k; SORT.dir = (k === "age_days" || k === "value") ? -1 : 1; }
+  if (SORT.col === k) SORT.dir = -SORT.dir; else { SORT.col = k; SORT.dir = (k === "age_days" || k === "value" || k === "over_by") ? -1 : 1; }
   paint();
 });
 
 function downloadCsv() {
   const rows = sorted(filtered());
   if (!rows.length) return;
-  const cols = ["platform", "company_name", "order_ref", "sku", "ordered_on", "delivered_on", "age_days", "value", "dated_by"];
+  const cols = ["platform", "company_name", "order_ref", "sku", "ordered_on", "delivered_on", "age_days", "threshold", "over_by", "value", "dated_by"];
   const q = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
   const csv = [cols.join(","), ...rows.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
   const a = document.createElement("a");
