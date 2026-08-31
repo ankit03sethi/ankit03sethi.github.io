@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -927,7 +927,15 @@
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
       "Site Price","Ratings","Count","Seller","Link",
-      "1day","3day","7day","15day","30day","60day","Focus"
+      "1day","3day","7day","15day","30day","60day","90day",
+      // Returns per window: total units back, then what share of what sold in
+      // the same window, then the same split by who sent it back. RTO never
+      // reached the buyer; SR is a customer return, which costs you the
+      // shipping both ways.
+      "30d Ret","30d Ret %","30d RTO","30d RTO %","30d SR","30d SR %",
+      "60d Ret","60d Ret %","60d RTO","60d RTO %","60d SR","60d SR %",
+      "90d Ret","90d Ret %","90d RTO","90d RTO %","90d SR","90d SR %",
+      "Focus"
     ];
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
@@ -1010,7 +1018,18 @@
     // Counted from orders instead — 1day is today, 3day is today plus the two
     // days before it, and so on. Not typed.
     const DAY_COLS = { "1day":"d1", "3day":"d3", "7day":"d7",
-                       "15day":"d15", "30day":"d30", "60day":"d60" };
+                       "15day":"d15", "30day":"d30", "60day":"d60", "90day":"d90",
+                       "30d Ret":"r30",   "60d Ret":"r60",   "90d Ret":"r90",
+                       "30d RTO":"rto30", "60d RTO":"rto60", "90d RTO":"rto90",
+                       "30d SR":"sr30",   "60d SR":"sr60",   "90d SR":"sr90" };
+    // Percentage columns: [numerator, denominator]. The denominator is always
+    // what sold in the SAME window, so 30d Ret % is 30-day returns over 30-day
+    // sales. A SKU that sold nothing shows a dash, not a division by zero.
+    const PCT_COLS = {
+      "30d Ret %":["r30","d30"],   "60d Ret %":["r60","d60"],   "90d Ret %":["r90","d90"],
+      "30d RTO %":["rto30","d30"], "60d RTO %":["rto60","d60"], "90d RTO %":["rto90","d90"],
+      "30d SR %":["sr30","d30"],   "60d SR %":["sr60","d60"],   "90d SR %":["sr90","d90"],
+    };
     const DAY_COLS_NAMES = new Set(Object.keys(DAY_COLS));
     // Nothing is typed here — every column comes from the uploaded files. Values
     // saved in listing_data by the earlier editable version still take priority
@@ -1039,6 +1058,18 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
+      if (PCT_COLS[c]) {
+        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const [numKey, denKey] = PCT_COLS[c];
+        const den = wc ? Number(wc[denKey]) || 0 : 0;
+        const num = wc ? Number(wc[numKey]) || 0 : 0;
+        if (!den) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        const pct = (num / den) * 100;
+        // Above a fifth of everything sold coming back is worth spotting from
+        // across the table; above a third is a problem.
+        const col = pct >= 33 ? "#b91c1c" : pct >= 20 ? "#b45309" : "#475569";
+        return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${pct.toFixed(1)}%</td>`;
+      }
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const n = wc ? wc[DAY_COLS[c]] : 0;
@@ -1236,7 +1267,14 @@
     "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
     "Expected Settlement":"expectedsettlement", "Tax %":"tax", "Packaging":"packaging",
     "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
-    "1day":"d1", "3day":"d3", "7day":"d7", "15day":"d15", "30day":"d30", "60day":"d60",
+    "1day":"d1", "3day":"d3", "7day":"d7", "15day":"d15", "30day":"d30",
+    "60day":"d60", "90day":"d90",
+    "30d Ret":"r30",   "60d Ret":"r60",   "90d Ret":"r90",
+    "30d RTO":"rto30", "60d RTO":"rto60", "90d RTO":"rto90",
+    "30d SR":"sr30",   "60d SR":"sr60",   "90d SR":"sr90",
+    "30d Ret %":"r30pct",   "60d Ret %":"r60pct",   "90d Ret %":"r90pct",
+    "30d RTO %":"rto30pct", "60d RTO %":"rto60pct", "90d RTO %":"rto90pct",
+    "30d SR %":"sr30pct",   "60d SR %":"sr60pct",   "90d SR %":"sr90pct",
   };
   function serverSort() {
     if (state.view !== "sku_master") return null;
