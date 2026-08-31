@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31i</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31j</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1024,10 +1024,10 @@
       // recent window is still unsettled, so counting only cash received would
       // halve the figure. Margin and margin % do not move by window; only the
       // totals do.
-      "Settle/unit","Margin/unit",
-      "30d Margin","30d Ret Fees","30d Tax","30d Net","30d Net/unit","30d Net %COP",
-      "60d Margin","60d Ret Fees","60d Tax","60d Net","60d Net/unit","60d Net %COP",
-      "90d Margin","90d Ret Fees","90d Tax","90d Net","90d Net/unit","90d Net %COP",
+      "Settle/unit","Margin/unit","Margin %COP",
+      "30d Net Units","30d Margin","30d Ret Fees","30d Tax","30d Net","30d Net/unit","30d Net %COP",
+      "60d Net Units","60d Margin","60d Ret Fees","60d Tax","60d Net","60d Net/unit","60d Net %COP",
+      "90d Net Units","90d Margin","90d Ret Fees","90d Tax","90d Net","90d Net/unit","90d Net %COP",
       "Focus"
   ];
 
@@ -1163,9 +1163,9 @@
     //                 sheet has no Tax % column, which it currently has not)
     //   final       = profit - return loss - tax
     const MONEY_WIN = {
-      "30d Margin":30, "30d Ret Fees":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
-      "60d Margin":60, "60d Ret Fees":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
-      "90d Margin":90, "90d Ret Fees":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
+      "30d Net Units":30, "30d Margin":30, "30d Ret Fees":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
+      "60d Net Units":60, "60d Margin":60, "60d Ret Fees":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
+      "90d Net Units":90, "90d Margin":90, "90d Ret Fees":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
     const money = (v) => "\u20b9" + Math.round(v).toLocaleString("en-IN");
     function moneyCell(wc, col) {
       if (!wc) return null;
@@ -1173,6 +1173,10 @@
       const su = Number(wc.settle_unit), cop = Number(wc.cop_unit);
       const sold = Number(wc["d" + w]) || 0, ret = Number(wc["r" + w]) || 0;
       const loss = Number(wc["rl" + w]) || 0;
+      if (col.endsWith("Net Units")) {
+        const nu = sold - ret;
+        return { v: nu, txt: nu.toLocaleString("en-IN") };
+      }
       if (col.endsWith("Ret Fees")) return { v: -loss, txt: loss ? money(-loss) : "0" };
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
@@ -1226,7 +1230,7 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
-      if (MONEY_WIN[c] || c === "Settle/unit" || c === "Margin/unit") {
+      if (MONEY_WIN[c] || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const su = wc ? Number(wc.settle_unit) : NaN;
         const cop = wc ? Number(wc.cop_unit) : NaN;
@@ -1234,6 +1238,8 @@
         if (c === "Settle/unit")      out = Number.isFinite(su) ? { v: su, txt: money(su) } : null;
         else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
                                             ? { v: su - cop, txt: money(su - cop) } : null;
+        else if (c === "Margin %COP") out = (Number.isFinite(su) && Number.isFinite(cop) && cop > 0)
+                                            ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0)+"%" } : null;
         else out = moneyCell(wc, c);
         if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
         const neg = out.v < 0;
@@ -1447,6 +1453,7 @@
   const COL_HELP = {
     "Settle/unit": "All money this SKU has been paid, divided by units paid. Each order is netted (settlement minus its own fees) before adding up. From the payment files.",
     "Margin/unit": "Settle/unit minus COP. What one unit earns BEFORE the return fees this SKU causes.",
+    "Margin %COP": "Margin/unit as a percentage of COP, BEFORE returns and fees. Compare it with Net %COP to see what returns cost you.",
     "1day":"Units ordered today. Cancelled orders excluded.",
     "3day":"Units ordered in the last 3 days.", "7day":"Units ordered in the last 7 days.",
     "15day":"Units ordered in the last 15 days.", "30day":"Units ordered in the last 30 days.",
@@ -1459,6 +1466,7 @@
     COL_HELP[w+"d RTO %"]    = "RTO as a share of units sold in the same "+w+" days.";
     COL_HELP[w+"d SR"]       = "Customer returns - the buyer had it and sent it back. You pay shipping both ways.";
     COL_HELP[w+"d SR %"]     = "Customer returns as a share of units sold in the same "+w+" days.";
+    COL_HELP[w+"d Net Units"]= "Units ordered minus units returned over "+w+" days - the units that actually stayed sold. Every money figure for this window is built on it.";
     COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
     COL_HELP[w+"d Ret Fees"] = "What the marketplace actually deducted on the orders that were returned, over "+w+" days. From the payment files.";
     COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
@@ -1482,7 +1490,8 @@
     "30d Ret %":"r30pct",   "60d Ret %":"r60pct",   "90d Ret %":"r90pct",
     "30d RTO %":"rto30pct", "60d RTO %":"rto60pct", "90d RTO %":"rto90pct",
     "30d SR %":"sr30pct",   "60d SR %":"sr60pct",   "90d SR %":"sr90pct",
-    "Settle/unit":"settleunit", "Margin/unit":"marginunit",
+    "Settle/unit":"settleunit", "Margin/unit":"marginunit", "Margin %COP":"marginpct",
+    "30d Net Units":"n30", "60d Net Units":"n60", "90d Net Units":"n90",
     "30d Margin":"p30", "60d Margin":"p60", "90d Margin":"p90",
     "30d Ret Fees":"rl30", "60d Ret Fees":"rl60", "90d Ret Fees":"rl90",
     "30d Net":"f30", "60d Net":"f60", "90d Net":"f90",
