@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -338,7 +338,12 @@
     companies: [],
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
     rowsById: new Map(),       // id -> row, so an edited cell can find its row
-    tools: {},                 // per view: { filters: {colName: text}, sort: {col, dir} }
+    // The SKU master view opens on 30-day units, highest first. Ordered by
+    // "last updated" it opened on 500 rows that had not sold a single unit -
+    // every master row carries the same bulk-load timestamp, so the tie-break
+    // landed on FirstCry, the one platform with no orders file at all. Opening
+    // on what is actually moving is the answer to "why is everything zero".
+    tools: { sku_master: { filters: {}, sort: { col: "30day", dir: "desc" } } },
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
     loadToken: 0,              // guards a slow enrichment reply from an abandoned view
