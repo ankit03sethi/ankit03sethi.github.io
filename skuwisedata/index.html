@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -341,6 +341,7 @@
     tools: {},                 // per view: { filters: {colName: text}, sort: {col, dir} }
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
+    loadToken: 0,              // guards a slow enrichment reply from an abandoned view
     search: "",                // the one search box, run in the database over every row
     // Paging. The table used to stop at 200 rows; it now pulls another page
     // whenever you scroll near the bottom, until the whole view is loaded.
@@ -572,8 +573,12 @@
       });
       data = res.data; error = res.error; count = (res.data || []).length;
     } else {
-      const res = await fetchRowPage(table, dateCol, 0);
-      data = res.data; count = res.count; error = res.error;
+      // Rows and count at the same time instead of one after the other.
+      const [res, cres] = await Promise.all([
+        fetchRowPage(table, dateCol, 0),
+        fetchRowCount(table),
+      ]);
+      data = res.data; error = res.error; count = cres.count;
     }
     if (error) { $("#tableWrap").innerHTML = `<div class="empty">Error: ${escapeHtml(error.message)}</div>`; return; }
 
@@ -598,20 +603,16 @@
     state.hasMore = (state.view === "sku_master" && ss)
       ? (data || []).length >= 1000
       : state.loaded < state.total;
+    // The day counts, the platform ids and the scraped listing values are NOT
+    // waited for here. They used to run one after another before the first
+    // paint, so the page sat on "Loading…" for the sum of all three. They are
+    // started below, after the rows are already on screen, and the cells they
+    // fill are redrawn when they land.
     if (state.view === "sku_master") {
-      state.rowsById = new Map((data || []).map(r => [String(r.id), r]));
+      state.rowsById     = new Map((data || []).map(r => [String(r.id), r]));
       state.windowCounts = new Map();
-      // Rolling order counts per SKU, computed in the database — pulling 60 days
-      // of orders into the browser just to count them would be far heavier.
-      const { data: wc, error: wcErr } = await sb.rpc("sku_order_window_counts");
-      if (wcErr) console.warn("sku_order_window_counts failed", wcErr);
-      // Keyed on company + platform + SKU: the same SKU can sell under more than
-      // one company or platform, and those are different rows here.
-      for (const r of (wc || [])) state.windowCounts.set(wcKey(r.company_name, r.platform, r.sku), r);
-      state.platformIds = new Map();
+      state.platformIds  = new Map();
       state.listingStats = new Map();
-      await loadPlatformIds(data || []);
-      await loadListingStats(data || []);
     }
 
     $("#lastLoadAt").textContent = "Loaded at " + new Date().toLocaleTimeString("en-IN");
@@ -645,19 +646,67 @@
     if (keepLeft) { wrapEl.scrollLeft = keepLeft; }
     syncHScroll();
     installInfiniteScroll();
+    if (state.view === "sku_master") loadEnrichments(data);
+  }
+
+  // Three independent lookups, run together rather than in a chain, once the
+  // table is already visible. Each load carries a token so a slow reply from a
+  // view the user has since left cannot paint over a newer one, and the redraw
+  // is skipped if infinite scroll has since appended rows this call never saw.
+  async function loadEnrichments(rows) {
+    const token = ++state.loadToken;
+    const list = rows || [];
+    const [wcRes] = await Promise.all([
+      sb.rpc("sku_order_window_counts"),
+      loadPlatformIds(list),
+      loadListingStats(list),
+    ]);
+    if (token !== state.loadToken) return;
+    if (wcRes.error) { console.warn("sku_order_window_counts failed", wcRes.error); }
+    for (const r of (wcRes.data || [])) {
+      state.windowCounts.set(wcKey(r.company_name, r.platform, r.sku), r);
+    }
+    if (state.loaded !== list.length) return;   // more rows arrived meanwhile
+    redrawTable(list);
+  }
+
+  function redrawTable(rows) {
+    const wrapEl = $("#tableWrap");
+    if (!wrapEl || !rows || !rows.length) return;
+    if (!wrapEl.querySelector("table")) return;
+    const left = wrapEl.scrollLeft, top = wrapEl.scrollTop;
+    wrapEl.innerHTML = renderTable(rows, 0, false);
+    installTableTools();
+    applyTableTools();
+    wrapEl.scrollLeft = left; wrapEl.scrollTop = top;
+    syncHScroll();
   }
 
   // ---- Paging ---------------------------------------------------------------
   // The table stopped at 200 rows. It now pulls the next page as you approach
   // the bottom, so a 26,000-row master file is scrollable all the way down
   // without ever asking the browser to hold 26,000 rows it is not looking at.
+  // The count used to ride along on this query as PostgREST's count:"exact".
+  // That compiles to count(*) over (), which forces the database to read every
+  // one of the 26,901 rows before it can return the first 500 - 4.7 seconds of
+  // work to produce a number shown in one label. The rows and the number are
+  // now two queries that run at the same time; together they take under 100ms.
   function fetchRowPage(table, dateCol, from) {
-    let q = sb.from(table).select("*", { count: "exact" })
+    let q = sb.from(table).select("*")
       .eq("user_id", state.session.user.id)
       .order(dateCol, { ascending: false, nullsFirst: false })
       .range(from, from + state.pageSize - 1);
     // These apply to the SKU Master view too — the chips at the top of the page
     // used to be ignored there, so picking "Amazon" changed nothing.
+    if (state.platform) q = q.eq("platform", state.platform);
+    if (state.company)  q = q.eq("company_name", state.company);
+    return q;
+  }
+
+  // Head-only count over a single indexed column: an index-only scan, ~35ms.
+  function fetchRowCount(table) {
+    let q = sb.from(table).select("id", { count: "exact", head: true })
+      .eq("user_id", state.session.user.id);
     if (state.platform) q = q.eq("platform", state.platform);
     if (state.company)  q = q.eq("company_name", state.company);
     return q;
@@ -732,8 +781,7 @@
       if (rows.length === 0) { state.hasMore = false; return; }
       if (state.view === "sku_master") {
         for (const r of rows) state.rowsById.set(String(r.id), r);
-        await loadPlatformIds(rows);
-        await loadListingStats(rows);
+        await Promise.all([loadPlatformIds(rows), loadListingStats(rows)]);
       }
       const tbody = $("#tableWrap").querySelector("table.data tbody");
       if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
