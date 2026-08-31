@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31h</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -940,10 +940,10 @@
       // recent window is still unsettled, so counting only cash received would
       // halve the figure. Margin and margin % do not move by window; only the
       // totals do.
-      "Settle/unit","Margin/unit","Margin % COP",
-      "30d Profit","30d Ret Loss","30d Tax","30d Final",
-      "60d Profit","60d Ret Loss","60d Tax","60d Final",
-      "90d Profit","90d Ret Loss","90d Tax","90d Final",
+      "Settle/unit","Margin/unit",
+      "30d Margin","30d Ret Fees","30d Tax","30d Net","30d Net/unit","30d Net %COP",
+      "60d Margin","60d Ret Fees","60d Tax","60d Net","60d Net/unit","60d Net %COP",
+      "90d Margin","90d Ret Fees","90d Tax","90d Net","90d Net/unit","90d Net %COP",
       "Focus"
     ];
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
@@ -1040,9 +1040,10 @@
     //   tax         = Tax % from the master sheet on the net revenue (0 if the
     //                 sheet has no Tax % column, which it currently has not)
     //   final       = profit - return loss - tax
-    const MONEY_WIN = { "30d Profit":30, "30d Ret Loss":30, "30d Tax":30, "30d Final":30,
-                        "60d Profit":60, "60d Ret Loss":60, "60d Tax":60, "60d Final":60,
-                        "90d Profit":90, "90d Ret Loss":90, "90d Tax":90, "90d Final":90 };
+    const MONEY_WIN = {
+      "30d Margin":30, "30d Ret Fees":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
+      "60d Margin":60, "60d Ret Fees":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
+      "90d Margin":90, "90d Ret Fees":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
     const money = (v) => "\u20b9" + Math.round(v).toLocaleString("en-IN");
     function moneyCell(wc, col) {
       if (!wc) return null;
@@ -1050,14 +1051,23 @@
       const su = Number(wc.settle_unit), cop = Number(wc.cop_unit);
       const sold = Number(wc["d" + w]) || 0, ret = Number(wc["r" + w]) || 0;
       const loss = Number(wc["rl" + w]) || 0;
-      if (col.endsWith("Ret Loss")) return { v: -loss, txt: loss ? money(-loss) : "0" };
+      if (col.endsWith("Ret Fees")) return { v: -loss, txt: loss ? money(-loss) : "0" };
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
       const profit = net * (su - cop);
       const tax = (Number(wc.tax_pct) || 0) / 100 * (net * su);
       if (col.endsWith("Tax"))    return { v: -tax, txt: tax ? money(-tax) : "0" };
-      if (col.endsWith("Profit")) return { v: profit, txt: money(profit) };
+      if (col.endsWith("Margin")) return { v: profit, txt: money(profit) };
       const fin = profit - loss - tax;
+      if (col.endsWith("d Net"))  return { v: fin, txt: money(fin) };
+      // Everything that came in less everything that went out, over the units
+      // that actually stayed sold. Margin/unit is the same number BEFORE the
+      // returns this SKU caused; this is what you are really left with.
+      if (net <= 0) return null;
+      if (col.endsWith("Net/unit")) return { v: fin / net, txt: money(fin / net) };
+      if (col.endsWith("%COP"))   return cop > 0
+        ? { v: fin / net / cop * 100, txt: (fin / net / cop * 100).toFixed(0) + "%" }
+        : null;
       return { v: fin, txt: money(fin) };
     }
 
@@ -1094,7 +1104,7 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
-      if (MONEY_WIN[c] || c === "Settle/unit" || c === "Margin/unit" || c === "Margin % COP") {
+      if (MONEY_WIN[c] || c === "Settle/unit" || c === "Margin/unit") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const su = wc ? Number(wc.settle_unit) : NaN;
         const cop = wc ? Number(wc.cop_unit) : NaN;
@@ -1102,8 +1112,6 @@
         if (c === "Settle/unit")      out = Number.isFinite(su) ? { v: su, txt: money(su) } : null;
         else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
                                             ? { v: su - cop, txt: money(su - cop) } : null;
-        else if (c === "Margin % COP") out = (Number.isFinite(su) && Number.isFinite(cop) && cop > 0)
-                                            ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0) + "%" } : null;
         else out = moneyCell(wc, c);
         if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
         const neg = out.v < 0;
@@ -1243,6 +1251,7 @@
       th.dataset.col = names[i];
       th.classList.add("sortable");
       th.innerHTML = headerHtml(names[i], t);
+      if (COL_HELP[names[i]]) th.title = COL_HELP[names[i]];
       bindSortButtons(th, names[i], t, table);
       th.addEventListener("click", () => {
         // First click on a new column sorts high to low, which is what you want
@@ -1311,6 +1320,31 @@
   // Display column -> the sort key sku_master_page() understands. Anything not
   // listed here (Focus, Link, Vertical, Non Returnable, Listed By, S.NO) has no
   // database expression behind it, so those still sort the rows on screen.
+  // Hover help. These columns are arithmetic on six inputs, and a header alone
+  // cannot say which file each one came from.
+  const COL_HELP = {
+    "Settle/unit": "All money this SKU has been paid, divided by units paid. Each order is netted (settlement minus its own fees) before adding up. From the payment files.",
+    "Margin/unit": "Settle/unit minus COP. What one unit earns BEFORE the return fees this SKU causes.",
+    "1day":"Units ordered today. Cancelled orders excluded.",
+    "3day":"Units ordered in the last 3 days.", "7day":"Units ordered in the last 7 days.",
+    "15day":"Units ordered in the last 15 days.", "30day":"Units ordered in the last 30 days.",
+    "60day":"Units ordered in the last 60 days.", "90day":"Units ordered in the last 90 days.",
+  };
+  for (const w of [30, 60, 90]) {
+    COL_HELP[w+"d Ret"]      = "Units returned in the last "+w+" days. From the returns file.";
+    COL_HELP[w+"d Ret %"]    = "Returns as a share of units sold in the same "+w+" days.";
+    COL_HELP[w+"d RTO"]      = "Courier returns - never reached the buyer, so no customer-side shipping.";
+    COL_HELP[w+"d RTO %"]    = "RTO as a share of units sold in the same "+w+" days.";
+    COL_HELP[w+"d SR"]       = "Customer returns - the buyer had it and sent it back. You pay shipping both ways.";
+    COL_HELP[w+"d SR %"]     = "Customer returns as a share of units sold in the same "+w+" days.";
+    COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
+    COL_HELP[w+"d Ret Fees"] = "What the marketplace actually deducted on the orders that were returned, over "+w+" days. From the payment files.";
+    COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
+    COL_HELP[w+"d Net"]      = "Margin minus return fees minus tax. Everything in, less everything out, over "+w+" days.";
+    COL_HELP[w+"d Net/unit"] = "Net divided by the units that stayed sold (ordered - returned). What you actually keep per unit.";
+    COL_HELP[w+"d Net %COP"] = "Net/unit as a percentage of COP. Your real return on each rupee of stock.";
+  }
+
   const SORT_KEYS = {
     "Date":"date", "Company":"company", "Platform":"platform", "Brand":"brand",
     "Category":"category", "Sub Category":"subcategory", "Product":"product",
@@ -1326,10 +1360,12 @@
     "30d Ret %":"r30pct",   "60d Ret %":"r60pct",   "90d Ret %":"r90pct",
     "30d RTO %":"rto30pct", "60d RTO %":"rto60pct", "90d RTO %":"rto90pct",
     "30d SR %":"sr30pct",   "60d SR %":"sr60pct",   "90d SR %":"sr90pct",
-    "Settle/unit":"settleunit", "Margin/unit":"marginunit", "Margin % COP":"marginpct",
-    "30d Profit":"p30", "60d Profit":"p60", "90d Profit":"p90",
-    "30d Ret Loss":"rl30", "60d Ret Loss":"rl60", "90d Ret Loss":"rl90",
-    "30d Final":"f30", "60d Final":"f60", "90d Final":"f90",
+    "Settle/unit":"settleunit", "Margin/unit":"marginunit",
+    "30d Margin":"p30", "60d Margin":"p60", "90d Margin":"p90",
+    "30d Ret Fees":"rl30", "60d Ret Fees":"rl60", "90d Ret Fees":"rl90",
+    "30d Net":"f30", "60d Net":"f60", "90d Net":"f90",
+    "30d Net/unit":"u30", "60d Net/unit":"u60", "90d Net/unit":"u90",
+    "30d Net %COP":"c30", "60d Net %COP":"c60", "90d Net %COP":"c90",
   };
   function serverSort() {
     if (state.view !== "sku_master") return null;
