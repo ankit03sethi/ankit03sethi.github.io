@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31m</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31n</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -950,7 +950,7 @@
   }
 
   function colGroup(c) {
-    if (/^\d+day$/.test(c)) return "Sales";
+    if (/^\d+day$/.test(c) || c === "Last 3 Settle") return "Sales";
     if (/^\d+d (Ret|RTO|SR)/.test(c)) return "Returns";
     if (/^\d+d (Net Units|Margin|Ret Fees|Tax|Net)/.test(c)
         || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") return "Money";
@@ -1052,6 +1052,11 @@
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
       "Site Price","Ratings","Count","Seller","Link",
+      // What the marketplace is settling this SKU at right now - the average of
+      // its three most recent paid orders. One order can be an outlier, three
+      // is steadier, and it moves when the platform changes your payout while
+      // the all-time Settle/unit is still catching up.
+      "Last 3 Settle",
       "1day","3day","7day","15day","30day","60day","90day",
       // Returns per window: total units back, then what share of what sold in
       // the same window, then the same split by who sent it back. RTO never
@@ -1271,11 +1276,24 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
-      if (MONEY_WIN[c] || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") {
+      if (MONEY_WIN[c] || c === "Last 3 Settle" || c === "Settle/unit"
+          || c === "Margin/unit" || c === "Margin %COP") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const su = wc ? Number(wc.settle_unit) : NaN;
         const cop = wc ? Number(wc.cop_unit) : NaN;
         let out = null;
+        if (c === "Last 3 Settle") {
+          const v3 = wc ? Number(wc.settle_last3) : NaN;
+          if (!Number.isFinite(v3)) return '<td style="color:#cbd5e1">' + DASH + "</td>";
+          // Green when the recent rate beats the all-time average, red when it
+          // has slipped - a platform quietly cutting your payout shows up here
+          // before it shows up anywhere else.
+          const drift = Number.isFinite(su) ? v3 - su : 0;
+          const col = drift > 1 ? "#047857" : drift < -1 ? "#b91c1c" : "#0f172a";
+          const when = wc.settle_last_on ? " (last paid " + escapeHtml(String(wc.settle_last_on)) + ")" : "";
+          return '<td title="Average of the 3 most recent settled orders' + when
+               + '" style="color:' + col + ';font-weight:600">' + money(v3) + "</td>";
+        }
         if (c === "Settle/unit")      out = Number.isFinite(su) ? { v: su, txt: money(su) } : null;
         else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
                                             ? { v: su - cop, txt: money(su - cop) } : null;
@@ -1492,6 +1510,7 @@
   // Hover help. These columns are arithmetic on six inputs, and a header alone
   // cannot say which file each one came from.
   const COL_HELP = {
+    "Last 3 Settle": "Average settlement per unit across this SKU's three most recent paid orders - what the platform is paying you NOW. Green means it is running above the all-time Settle/unit, red means it has slipped.",
     "Settle/unit": "All money this SKU has been paid, divided by units paid. Each order is netted (settlement minus its own fees) before adding up. From the payment files.",
     "Margin/unit": "Settle/unit minus COP. What one unit earns BEFORE the return fees this SKU causes.",
     "Margin %COP": "Margin/unit as a percentage of COP, BEFORE returns and fees. Compare it with Net %COP to see what returns cost you.",
@@ -1531,7 +1550,8 @@
     "30d Ret %":"r30pct",   "60d Ret %":"r60pct",   "90d Ret %":"r90pct",
     "30d RTO %":"rto30pct", "60d RTO %":"rto60pct", "90d RTO %":"rto90pct",
     "30d SR %":"sr30pct",   "60d SR %":"sr60pct",   "90d SR %":"sr90pct",
-    "Settle/unit":"settleunit", "Margin/unit":"marginunit", "Margin %COP":"marginpct",
+    "Last 3 Settle":"last3", "Settle/unit":"settleunit",
+    "Margin/unit":"marginunit", "Margin %COP":"marginpct",
     "30d Net Units":"n30", "60d Net Units":"n60", "90d Net Units":"n90",
     "30d Margin":"p30", "60d Margin":"p60", "90d Margin":"p90",
     "30d Ret Fees":"rl30", "60d Ret Fees":"rl60", "90d Ret Fees":"rl90",
