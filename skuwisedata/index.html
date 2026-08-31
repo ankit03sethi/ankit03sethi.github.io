@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -935,6 +935,15 @@
       "30d Ret","30d Ret %","30d RTO","30d RTO %","30d SR","30d SR %",
       "60d Ret","60d Ret %","60d RTO","60d RTO %","60d SR","60d SR %",
       "90d Ret","90d Ret %","90d RTO","90d RTO %","90d SR","90d SR %",
+      // Money. Settle/unit is what this SKU actually settles at per unit across
+      // every order of it that has been paid - used because roughly half of any
+      // recent window is still unsettled, so counting only cash received would
+      // halve the figure. Margin and margin % do not move by window; only the
+      // totals do.
+      "Settle/unit","Margin/unit","Margin % COP",
+      "30d Profit","30d Ret Loss","30d Tax","30d Final",
+      "60d Profit","60d Ret Loss","60d Tax","60d Final",
+      "90d Profit","90d Ret Loss","90d Tax","90d Final",
       "Focus"
     ];
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
@@ -1025,6 +1034,33 @@
     // Percentage columns: [numerator, denominator]. The denominator is always
     // what sold in the SAME window, so 30d Ret % is 30-day returns over 30-day
     // sales. A SKU that sold nothing shows a dash, not a division by zero.
+    // Money columns, all derived from the same cached per-SKU figures.
+    //   net units   = sold - returned in the window
+    //   profit      = net units x (settle/unit - COP)
+    //   tax         = Tax % from the master sheet on the net revenue (0 if the
+    //                 sheet has no Tax % column, which it currently has not)
+    //   final       = profit - return loss - tax
+    const MONEY_WIN = { "30d Profit":30, "30d Ret Loss":30, "30d Tax":30, "30d Final":30,
+                        "60d Profit":60, "60d Ret Loss":60, "60d Tax":60, "60d Final":60,
+                        "90d Profit":90, "90d Ret Loss":90, "90d Tax":90, "90d Final":90 };
+    const money = (v) => "\u20b9" + Math.round(v).toLocaleString("en-IN");
+    function moneyCell(wc, col) {
+      if (!wc) return null;
+      const w = MONEY_WIN[col];
+      const su = Number(wc.settle_unit), cop = Number(wc.cop_unit);
+      const sold = Number(wc["d" + w]) || 0, ret = Number(wc["r" + w]) || 0;
+      const loss = Number(wc["rl" + w]) || 0;
+      if (col.endsWith("Ret Loss")) return { v: -loss, txt: loss ? money(-loss) : "0" };
+      if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
+      const net = sold - ret;
+      const profit = net * (su - cop);
+      const tax = (Number(wc.tax_pct) || 0) / 100 * (net * su);
+      if (col.endsWith("Tax"))    return { v: -tax, txt: tax ? money(-tax) : "0" };
+      if (col.endsWith("Profit")) return { v: profit, txt: money(profit) };
+      const fin = profit - loss - tax;
+      return { v: fin, txt: money(fin) };
+    }
+
     const PCT_COLS = {
       "30d Ret %":["r30","d30"],   "60d Ret %":["r60","d60"],   "90d Ret %":["r90","d90"],
       "30d RTO %":["rto30","d30"], "60d RTO %":["rto60","d60"], "90d RTO %":["rto90","d90"],
@@ -1058,6 +1094,21 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
+      if (MONEY_WIN[c] || c === "Settle/unit" || c === "Margin/unit" || c === "Margin % COP") {
+        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const su = wc ? Number(wc.settle_unit) : NaN;
+        const cop = wc ? Number(wc.cop_unit) : NaN;
+        let out = null;
+        if (c === "Settle/unit")      out = Number.isFinite(su) ? { v: su, txt: money(su) } : null;
+        else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
+                                            ? { v: su - cop, txt: money(su - cop) } : null;
+        else if (c === "Margin % COP") out = (Number.isFinite(su) && Number.isFinite(cop) && cop > 0)
+                                            ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0) + "%" } : null;
+        else out = moneyCell(wc, c);
+        if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        const neg = out.v < 0;
+        return `<td style="color:${neg ? "#b91c1c" : "#0f172a"};font-weight:${neg ? 700 : 400}">${out.txt}</td>`;
+      }
       if (PCT_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const [numKey, denKey] = PCT_COLS[c];
@@ -1275,6 +1326,10 @@
     "30d Ret %":"r30pct",   "60d Ret %":"r60pct",   "90d Ret %":"r90pct",
     "30d RTO %":"rto30pct", "60d RTO %":"rto60pct", "90d RTO %":"rto90pct",
     "30d SR %":"sr30pct",   "60d SR %":"sr60pct",   "90d SR %":"sr90pct",
+    "Settle/unit":"settleunit", "Margin/unit":"marginunit", "Margin % COP":"marginpct",
+    "30d Profit":"p30", "60d Profit":"p60", "90d Profit":"p90",
+    "30d Ret Loss":"rl30", "60d Ret Loss":"rl60", "90d Ret Loss":"rl90",
+    "30d Final":"f30", "60d Final":"f60", "90d Final":"f90",
   };
   function serverSort() {
     if (state.view !== "sku_master") return null;
