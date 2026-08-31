@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -390,10 +390,21 @@
   // company + platform + SKU because the same SKU sells under more than one of
   // each. Refreshed only when you press Reload.
   async function loadWindowCounts() {
-    const { data, error } = await sb.rpc("sku_order_window_counts");
-    if (error) { console.warn("sku_order_window_counts failed", error); return; }
+    // Read it in slices. PostgREST truncates every reply at 1,000 rows, and
+    // there are more selling SKUs than that - the missing ones were the reason
+    // a 30day sort showed rows ordered correctly by the database with 0 in
+    // their day cells: the row was ranked on a count the browser never held.
     const m = new Map();
-    for (const r of (data || [])) m.set(wcKey(r.company_name, r.platform, r.sku), r);
+    const PAGE = 1000;
+    for (let from = 0; from < 200000; from += PAGE) {
+      const { data, error } = await sb
+        .rpc("sku_order_window_counts")
+        .range(from, from + PAGE - 1);
+      if (error) { console.warn("sku_order_window_counts failed", error); break; }
+      const batch = data || [];
+      for (const r of batch) m.set(wcKey(r.company_name, r.platform, r.sku), r);
+      if (batch.length < PAGE) break;
+    }
     state.windowCounts = m;
   }
 
