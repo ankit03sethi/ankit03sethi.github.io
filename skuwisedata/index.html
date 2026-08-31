@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -267,6 +267,14 @@
         <span class="clear" id="allSearchClear" title="Clear">&#10005;</span>
       </span>
       <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
+      <span id="colPickWrap" style="position:relative; margin-left:12px;">
+        <button class="btn" id="colPickBtn" type="button"
+                style="font-size:12px; padding:5px 11px;">Columns</button>
+        <div id="colPickPanel" class="hidden" style="position:absolute; right:0; top:calc(100% + 6px);
+             width:300px; max-height:420px; overflow:auto; background:#fff; border:1px solid #e2e8f0;
+             border-radius:10px; box-shadow:0 12px 28px rgba(15,23,42,.14); padding:10px; z-index:60;">
+        </div>
+      </span>
     </div>
     <div class="hscroll-top hidden" id="hscrollTop"><div></div></div>
     <div class="panel-body" id="tableWrap">
@@ -346,6 +354,7 @@
     tools: { sku_master: { filters: {}, sort: { col: "30day", dir: "desc" } } },
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
+    hiddenCols: new Set(),     // columns switched off in the Columns picker
     loadToken: 0,              // guards a slow enrichment reply from an abandoned view
     search: "",                // the one search box, run in the database over every row
     // Paging. The table used to stop at 200 rows; it now pulls another page
@@ -382,6 +391,8 @@
     // day cell - the order came from the database, the numbers came from a
     // lookup that had not arrived yet. One small table (about 2,000 rows,
     // ~10ms) covers every sort and every page, so there is nothing to race.
+    loadHiddenCols();
+    installColPicker();
     await loadWindowCounts();
     await refresh();
   })();
@@ -887,6 +898,139 @@
 
   // rowsOnly = return just the <tr> block, for appending the next page onto the
   // table already on screen. startIndex keeps S.NO continuous across pages.
+  // ---- Columns picker ------------------------------------------------------
+  // Reads SKU_COLS, so a column added to that list appears here on its own.
+  // The choice is remembered in this browser only.
+  const COLPICK_KEY = "cursive_sku_hidden_cols_v1";
+
+  function loadHiddenCols() {
+    try {
+      const raw = localStorage.getItem(COLPICK_KEY);
+      if (raw) state.hiddenCols = new Set(JSON.parse(raw));
+    } catch (e) { /* blocked storage - just show everything */ }
+  }
+  function saveHiddenCols() {
+    try { localStorage.setItem(COLPICK_KEY, JSON.stringify([...state.hiddenCols])); }
+    catch (e) { /* not fatal - the choice just will not survive a reload */ }
+  }
+
+  function colGroup(c) {
+    if (/^\d+day$/.test(c)) return "Sales";
+    if (/^\d+d (Ret|RTO|SR)/.test(c)) return "Returns";
+    if (/^\d+d (Margin|Ret Fees|Tax|Net)/.test(c) || c === "Settle/unit" || c === "Margin/unit")
+      return "Money";
+    if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
+    return "Product";
+  }
+
+  function renderColPicker() {
+    const panel = document.getElementById("colPickPanel");
+    if (!panel) return;
+    const groups = new Map();
+    for (const c of SKU_COLS) {
+      const g = colGroup(c);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
+    }
+    let h = '<div style="display:flex;gap:8px;margin-bottom:8px">'
+          + '<button class="btn" type="button" data-all="show" style="font-size:11px;padding:4px 9px">Show all</button>'
+          + '<button class="btn" type="button" data-all="hide" style="font-size:11px;padding:4px 9px">Hide all</button>'
+          + "</div>";
+    for (const [g, cols] of groups) {
+      const on = cols.filter(c => !state.hiddenCols.has(c)).length;
+      h += '<div style="margin:10px 0 4px;display:flex;align-items:center;gap:8px">'
+         + '<b style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#64748b">'
+         + escapeHtml(g) + "</b>"
+         + '<span style="font-size:11px;color:#94a3b8">' + on + "/" + cols.length + "</span>"
+         + '<button class="btn" type="button" data-group="' + escapeHtml(g) + '"'
+         + ' style="font-size:10px;padding:2px 7px;margin-left:auto">'
+         + (on ? "none" : "all") + "</button></div>";
+      for (const c of cols) {
+        h += '<label style="display:flex;align-items:center;gap:7px;padding:3px 2px;font-size:12.5px;cursor:pointer">'
+           + '<input type="checkbox" data-col="' + escapeHtml(c) + '"'
+           + (state.hiddenCols.has(c) ? "" : " checked") + ">"
+           + "<span>" + escapeHtml(c) + "</span></label>";
+      }
+    }
+    panel.innerHTML = h;
+
+    panel.querySelectorAll("input[data-col]").forEach(cb => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) state.hiddenCols.delete(cb.dataset.col);
+        else state.hiddenCols.add(cb.dataset.col);
+        saveHiddenCols(); renderColPicker(); redrawCurrentTable();
+      });
+    });
+    panel.querySelectorAll("button[data-group]").forEach(b => {
+      b.addEventListener("click", () => {
+        const cols = groups.get(b.dataset.group) || [];
+        const anyOn = cols.some(c => !state.hiddenCols.has(c));
+        for (const c of cols) { if (anyOn) state.hiddenCols.add(c); else state.hiddenCols.delete(c); }
+        saveHiddenCols(); renderColPicker(); redrawCurrentTable();
+      });
+    });
+    panel.querySelectorAll("button[data-all]").forEach(b => {
+      b.addEventListener("click", () => {
+        if (b.dataset.all === "hide") SKU_COLS.forEach(c => state.hiddenCols.add(c));
+        else state.hiddenCols.clear();
+        saveHiddenCols(); renderColPicker(); redrawCurrentTable();
+      });
+    });
+  }
+
+  // Repaint from the rows already in hand - hiding a column is not a reason to
+  // ask the database for anything.
+  function redrawCurrentTable() {
+    if (state.view !== "sku_master") return;
+    const rows = [...state.rowsById.values()];
+    if (rows.length) redrawTable(rows);
+  }
+
+  function installColPicker() {
+    const btn = document.getElementById("colPickBtn");
+    const panel = document.getElementById("colPickPanel");
+    if (!btn || !panel) return;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      panel.classList.toggle("hidden");
+      if (!panel.classList.contains("hidden")) renderColPicker();
+    });
+    document.addEventListener("click", (e) => {
+      if (!panel.classList.contains("hidden") && !panel.contains(e.target) && e.target !== btn) {
+        panel.classList.add("hidden");
+      }
+    });
+  }
+
+  // Every column the SKU Master table can show, in order. This is the single
+  // list the table and the Columns picker both read.
+  const SKU_COLS = [
+      "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
+      "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku",
+      "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price",
+      // Listing-health columns. They fill in from the uploaded master file when it
+      // carries these headers, and show a dash until then.
+      "Site Price","Ratings","Count","Seller","Link",
+      "1day","3day","7day","15day","30day","60day","90day",
+      // Returns per window: total units back, then what share of what sold in
+      // the same window, then the same split by who sent it back. RTO never
+      // reached the buyer; SR is a customer return, which costs you the
+      // shipping both ways.
+      "30d Ret","30d Ret %","30d RTO","30d RTO %","30d SR","30d SR %",
+      "60d Ret","60d Ret %","60d RTO","60d RTO %","60d SR","60d SR %",
+      "90d Ret","90d Ret %","90d RTO","90d RTO %","90d SR","90d SR %",
+      // Money. Settle/unit is what this SKU actually settles at per unit across
+      // every order of it that has been paid - used because roughly half of any
+      // recent window is still unsettled, so counting only cash received would
+      // halve the figure. Margin and margin % do not move by window; only the
+      // totals do.
+      "Settle/unit","Margin/unit",
+      "30d Margin","30d Ret Fees","30d Tax","30d Net","30d Net/unit","30d Net %COP",
+      "60d Margin","60d Ret Fees","60d Tax","60d Net","60d Net/unit","60d Net %COP",
+      "90d Margin","90d Ret Fees","90d Tax","90d Net","90d Net/unit","90d Net %COP",
+      "Focus"
+  ];
+
   function renderTable(rows, startIndex, rowsOnly) {
     startIndex = startIndex || 0;
     if (state.view === "sku_master") return renderSkuMasterTable(rows, startIndex, rowsOnly);
@@ -920,32 +1064,10 @@
     startIndex = startIndex || 0;
     // Columns in the EXACT same order and with the EXACT same headers as the Master SKU sample file
     // (skuwisedata/master_sku_sample.xlsx). S.NO is a running counter (not stored — just row index).
-    const COLS = [
-      "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
-      "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku",
-      "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price",
-      // Listing-health columns. They fill in from the uploaded master file when it
-      // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Seller","Link",
-      "1day","3day","7day","15day","30day","60day","90day",
-      // Returns per window: total units back, then what share of what sold in
-      // the same window, then the same split by who sent it back. RTO never
-      // reached the buyer; SR is a customer return, which costs you the
-      // shipping both ways.
-      "30d Ret","30d Ret %","30d RTO","30d RTO %","30d SR","30d SR %",
-      "60d Ret","60d Ret %","60d RTO","60d RTO %","60d SR","60d SR %",
-      "90d Ret","90d Ret %","90d RTO","90d RTO %","90d SR","90d SR %",
-      // Money. Settle/unit is what this SKU actually settles at per unit across
-      // every order of it that has been paid - used because roughly half of any
-      // recent window is still unsettled, so counting only cash received would
-      // halve the figure. Margin and margin % do not move by window; only the
-      // totals do.
-      "Settle/unit","Margin/unit",
-      "30d Margin","30d Ret Fees","30d Tax","30d Net","30d Net/unit","30d Net %COP",
-      "60d Margin","60d Ret Fees","60d Tax","60d Net","60d Net/unit","60d Net %COP",
-      "90d Margin","90d Ret Fees","90d Tax","90d Net","90d Net/unit","90d Net %COP",
-      "Focus"
-    ];
+    // Only the columns still switched on in the Columns picker. The picker is
+    // built from SKU_COLS, so any column added there in future shows up in it
+    // by itself, with nothing else to change.
+    const COLS = SKU_COLS.filter(c => !state.hiddenCols.has(c));
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
     // Uploaded headers are matched case- and spacing-insensitively, so "1 Day",
