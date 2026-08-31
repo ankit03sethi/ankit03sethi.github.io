@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31l</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31m</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -358,6 +358,7 @@
     tools: { sku_master: { filters: {}, sort: { col: "30day", dir: "desc" } } },
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
+    hScroll: 0,                // how far right the table is scrolled, kept across reloads
     hiddenCols: new Set(),     // columns switched off in the Columns picker
     loadToken: 0,              // guards a slow enrichment reply from an abandoned view
     search: "",                // the one search box, run in the database over every row
@@ -397,6 +398,7 @@
     // ~10ms) covers every sort and every page, so there is nothing to race.
     loadHiddenCols();
     installColPicker();
+    installArrowScroll();
     await loadWindowCounts();
     await refresh();
   })();
@@ -573,6 +575,14 @@
     syncSearchVisibility();
     refreshScrapeBar();
     if (state.view === "uploads") return;
+    // Capture how far right the table is scrolled BEFORE wiping it. The old
+    // code read scrollLeft after this line, by which point the content was the
+    // "Loading" placeholder and the answer was always 0 - which is why every
+    // filter and every Reload threw you back to the far left.
+    {
+      const wr = $("#tableWrap");
+      if (wr && wr.querySelector("table")) state.hScroll = wr.scrollLeft;
+    }
     $("#tableWrap").innerHTML = '<div class="empty">Loading&hellip;</div>';
     $("#kpis").innerHTML = "";
     const table = KIND_TABLE[state.view];
@@ -695,11 +705,11 @@
     // Re-rendering the table resets its scroll to the far left, which throws you
     // back to the S.NO column every time you sort a column you had scrolled to.
     const wrapEl = $("#tableWrap");
-    const keepLeft = wrapEl ? wrapEl.scrollLeft : 0;
     wrapEl.innerHTML = renderTable(data, 0, false);
     installTableTools();
-    if (keepLeft) { wrapEl.scrollLeft = keepLeft; }
+    if (state.hScroll) { wrapEl.scrollLeft = state.hScroll; }
     syncHScroll();
+    syncHScrollPosition();
     installInfiniteScroll();
     if (state.view === "sku_master") loadEnrichments(data);
   }
@@ -726,7 +736,9 @@
     installTableTools();
     applyTableTools();
     wrapEl.scrollLeft = left; wrapEl.scrollTop = top;
+    state.hScroll = left;
     syncHScroll();
+    syncHScrollPosition();
   }
 
   // ---- Paging ---------------------------------------------------------------
@@ -990,6 +1002,25 @@
     });
     panel.querySelectorAll("button[data-close]").forEach(b =>
       b.addEventListener("click", closeColPicker));
+  }
+
+  // Left/right arrows scroll the table sideways from anywhere on the page, so
+  // there is no need to click into it first. Typing in a search box still wins,
+  // and so does a genuinely focused scroller.
+  function installArrowScroll() {
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const t = e.target;
+      const tag = t && t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+      const wrap = $("#tableWrap");
+      if (!wrap || !wrap.querySelector("table")) return;
+      const step = e.shiftKey ? wrap.clientWidth * 0.9 : 140;
+      wrap.scrollLeft += (e.key === "ArrowRight" ? step : -step);
+      state.hScroll = wrap.scrollLeft;
+      syncHScrollPosition();
+      e.preventDefault();
+    });
   }
 
   function installColPicker() {
