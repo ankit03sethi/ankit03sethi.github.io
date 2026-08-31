@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31o</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31p</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1219,19 +1219,28 @@
       const w = MONEY_WIN[col];
       const su = Number(wc.settle_unit), cop = Number(wc.cop_unit);
       const sold = Number(wc["d" + w]) || 0, ret = Number(wc["r" + w]) || 0;
-      const loss = Number(wc["rl" + w]) || 0;
+      // Return fees for the returns that happened in THIS window: the real
+      // deduction where the platform has already taken it, and this platform's
+      // learned cost for that kind of return where it has not. Without that,
+      // Margin counted every unit sold while fees counted only what had already
+      // settled - only 17% of Flipkart's recent returns had been charged yet.
+      const loss = Number(wc["rle" + w]);
+      const booked = Number(wc["rl" + w]) || 0;
       if (col.endsWith("Net Units")) {
         const nu = sold - ret;
         return { v: nu, txt: nu.toLocaleString("en-IN") };
       }
-      if (col.endsWith("Ret Fees")) return { v: -loss, txt: loss ? money(-loss) : "0" };
+      if (col.endsWith("Ret Fees")) {
+        const L = Number.isFinite(loss) ? loss : booked;
+        return { v: -L, txt: L ? money(-L) : "0" };
+      }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
       const profit = net * (su - cop);
       const tax = (Number(wc.tax_pct) || 0) / 100 * (net * su);
       if (col.endsWith("Tax"))    return { v: -tax, txt: tax ? money(-tax) : "0" };
       if (col.endsWith("Margin")) return { v: profit, txt: money(profit) };
-      const fin = profit - loss - tax;
+      const fin = profit - (Number.isFinite(loss) ? loss : booked) - tax;
       if (col.endsWith("d Net"))  return { v: fin, txt: money(fin) };
       // Everything that came in less everything that went out, over the units
       // that actually stayed sold. Margin/unit is the same number BEFORE the
@@ -1537,7 +1546,7 @@
     COL_HELP[w+"d SR %"]     = "Customer returns as a share of units sold in the same "+w+" days.";
     COL_HELP[w+"d Net Units"]= "Units ordered minus units returned over "+w+" days - the units that actually stayed sold. Every money figure for this window is built on it.";
     COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
-    COL_HELP[w+"d Ret Fees"] = "What the marketplace actually deducted on the orders that were returned, over "+w+" days. From the payment files.";
+    COL_HELP[w+"d Ret Fees"] = "Cost of the returns that happened in these "+w+" days. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
     COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
     COL_HELP[w+"d Net"]      = "Margin minus return fees minus tax. Everything in, less everything out, over "+w+" days.";
     COL_HELP[w+"d Net/unit"] = "Net divided by the units that stayed sold (ordered - returned). What you actually keep per unit.";
