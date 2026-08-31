@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31j</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -899,8 +899,8 @@
   // rowsOnly = return just the <tr> block, for appending the next page onto the
   // table already on screen. startIndex keeps S.NO continuous across pages.
   // ---- Columns picker ------------------------------------------------------
-  // Reads SKU_COLS, so a column added to that list appears here on its own.
-  // The choice is remembered in this browser only.
+  // Built from SKU_COLS, so a column added there appears here on its own.
+  // Ticking a box applies immediately; the choice is remembered per browser.
   const COLPICK_KEY = "cursive_sku_hidden_cols_v1";
 
   function loadHiddenCols() {
@@ -914,13 +914,37 @@
     catch (e) { /* not fatal - the choice just will not survive a reload */ }
   }
 
+  // One stylesheet, rewritten on every change. Hiding column 12 means hiding
+  // the 12th cell of every row, which the browser does in one pass.
+  function applyColVisibility() {
+    let el = document.getElementById("colHideStyle");
+    if (!el) {
+      el = document.createElement("style");
+      el.id = "colHideStyle";
+      document.head.appendChild(el);
+    }
+    const sel = [];
+    SKU_COLS.forEach((c, i) => {
+      if (state.hiddenCols.has(c)) {
+        sel.push("table.data th:nth-child(" + (i + 1) + ")",
+                 "table.data td:nth-child(" + (i + 1) + ")");
+      }
+    });
+    el.textContent = sel.length ? sel.join(",") + "{display:none}" : "";
+  }
+
   function colGroup(c) {
     if (/^\d+day$/.test(c)) return "Sales";
     if (/^\d+d (Ret|RTO|SR)/.test(c)) return "Returns";
-    if (/^\d+d (Margin|Ret Fees|Tax|Net)/.test(c) || c === "Settle/unit" || c === "Margin/unit")
-      return "Money";
+    if (/^\d+d (Net Units|Margin|Ret Fees|Tax|Net)/.test(c)
+        || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") return "Money";
     if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
     return "Product";
+  }
+
+  function closeColPicker() {
+    const panel = document.getElementById("colPickPanel");
+    if (panel) panel.classList.add("hidden");
   }
 
   function renderColPicker() {
@@ -932,58 +956,36 @@
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(c);
     }
-    let h = '<div style="display:flex;gap:8px;margin-bottom:8px">'
-          + '<button class="btn" type="button" data-all="show" style="font-size:11px;padding:4px 9px">Show all</button>'
-          + '<button class="btn" type="button" data-all="hide" style="font-size:11px;padding:4px 9px">Hide all</button>'
-          + "</div>";
+    const closeBtn = '<button class="btn" type="button" data-close="1"'
+      + ' style="width:100%;font-size:12px;padding:6px 10px">Close</button>';
+    let h = '<div style="position:sticky;top:-10px;background:#fff;padding:2px 0 8px;z-index:2">'
+          + closeBtn + "</div>";
     for (const [g, cols] of groups) {
-      const on = cols.filter(c => !state.hiddenCols.has(c)).length;
-      h += '<div style="margin:10px 0 4px;display:flex;align-items:center;gap:8px">'
-         + '<b style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#64748b">'
-         + escapeHtml(g) + "</b>"
-         + '<span style="font-size:11px;color:#94a3b8">' + on + "/" + cols.length + "</span>"
-         + '<button class="btn" type="button" data-group="' + escapeHtml(g) + '"'
-         + ' style="font-size:10px;padding:2px 7px;margin-left:auto">'
-         + (on ? "none" : "all") + "</button></div>";
+      h += '<div style="margin:10px 0 4px"><b style="font-size:11px;letter-spacing:.5px;'
+         + 'text-transform:uppercase;color:#64748b">' + escapeHtml(g) + "</b></div>";
       for (const c of cols) {
-        h += '<label style="display:flex;align-items:center;gap:7px;padding:3px 2px;font-size:12.5px;cursor:pointer">'
+        h += '<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;'
+           + 'font-size:12.5px;cursor:pointer;border-radius:6px">'
            + '<input type="checkbox" data-col="' + escapeHtml(c) + '"'
            + (state.hiddenCols.has(c) ? "" : " checked") + ">"
            + "<span>" + escapeHtml(c) + "</span></label>";
       }
     }
+    h += '<div style="padding-top:10px">' + closeBtn + "</div>";
     panel.innerHTML = h;
 
+    // Applies straight away. The panel is NOT rebuilt, so the scroll position
+    // and the box you just clicked stay exactly where they were.
     panel.querySelectorAll("input[data-col]").forEach(cb => {
       cb.addEventListener("change", () => {
         if (cb.checked) state.hiddenCols.delete(cb.dataset.col);
         else state.hiddenCols.add(cb.dataset.col);
-        saveHiddenCols(); renderColPicker(); redrawCurrentTable();
+        saveHiddenCols();
+        applyColVisibility();
       });
     });
-    panel.querySelectorAll("button[data-group]").forEach(b => {
-      b.addEventListener("click", () => {
-        const cols = groups.get(b.dataset.group) || [];
-        const anyOn = cols.some(c => !state.hiddenCols.has(c));
-        for (const c of cols) { if (anyOn) state.hiddenCols.add(c); else state.hiddenCols.delete(c); }
-        saveHiddenCols(); renderColPicker(); redrawCurrentTable();
-      });
-    });
-    panel.querySelectorAll("button[data-all]").forEach(b => {
-      b.addEventListener("click", () => {
-        if (b.dataset.all === "hide") SKU_COLS.forEach(c => state.hiddenCols.add(c));
-        else state.hiddenCols.clear();
-        saveHiddenCols(); renderColPicker(); redrawCurrentTable();
-      });
-    });
-  }
-
-  // Repaint from the rows already in hand - hiding a column is not a reason to
-  // ask the database for anything.
-  function redrawCurrentTable() {
-    if (state.view !== "sku_master") return;
-    const rows = [...state.rowsById.values()];
-    if (rows.length) redrawTable(rows);
+    panel.querySelectorAll("button[data-close]").forEach(b =>
+      b.addEventListener("click", closeColPicker));
   }
 
   function installColPicker() {
@@ -992,14 +994,18 @@
     if (!btn || !panel) return;
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      panel.classList.toggle("hidden");
-      if (!panel.classList.contains("hidden")) renderColPicker();
+      const isOpen = !panel.classList.contains("hidden");
+      if (isOpen) { closeColPicker(); return; }   // second click closes it
+      renderColPicker();
+      panel.classList.remove("hidden");
     });
     document.addEventListener("click", (e) => {
       if (!panel.classList.contains("hidden") && !panel.contains(e.target) && e.target !== btn) {
-        panel.classList.add("hidden");
+        closeColPicker();
       }
     });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeColPicker(); });
+    applyColVisibility();
   }
 
   // Every column the SKU Master table can show, in order. This is the single
@@ -1064,10 +1070,10 @@
     startIndex = startIndex || 0;
     // Columns in the EXACT same order and with the EXACT same headers as the Master SKU sample file
     // (skuwisedata/master_sku_sample.xlsx). S.NO is a running counter (not stored — just row index).
-    // Only the columns still switched on in the Columns picker. The picker is
-    // built from SKU_COLS, so any column added there in future shows up in it
-    // by itself, with nothing else to change.
-    const COLS = SKU_COLS.filter(c => !state.hiddenCols.has(c));
+    // Every column is rendered every time. Hiding is a stylesheet rule keyed on
+    // column position (see applyColVisibility), so ticking a box costs one style
+    // update instead of rebuilding 1,000 rows - that rebuild was the lag.
+    const COLS = SKU_COLS;
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
     // Uploaded headers are matched case- and spacing-insensitively, so "1 Day",
