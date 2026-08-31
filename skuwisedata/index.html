@@ -213,7 +213,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-08-31c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -376,8 +376,26 @@
     await loadCompanies();
     startScrapeBar();
     await refreshMasterStamp();
+    // The rolling day counts are loaded ONCE here, before the first table is
+    // drawn. They used to be fetched after each render and pasted in a moment
+    // later, which meant a sort by 30day drew the right rows with 0 in every
+    // day cell - the order came from the database, the numbers came from a
+    // lookup that had not arrived yet. One small table (about 2,000 rows,
+    // ~10ms) covers every sort and every page, so there is nothing to race.
+    await loadWindowCounts();
     await refresh();
   })();
+
+  // Rolling per-SKU order counts for the last 1/3/7/15/30/60 days, keyed on
+  // company + platform + SKU because the same SKU sells under more than one of
+  // each. Refreshed only when you press Reload.
+  async function loadWindowCounts() {
+    const { data, error } = await sb.rpc("sku_order_window_counts");
+    if (error) { console.warn("sku_order_window_counts failed", error); return; }
+    const m = new Map();
+    for (const r of (data || [])) m.set(wcKey(r.company_name, r.platform, r.sku), r);
+    state.windowCounts = m;
+  }
 
   // ---- 1. Companies dropdown ----
   async function loadCompanies() {
@@ -429,7 +447,12 @@
     state.company = c.dataset.c || "";
     refresh();
   });
-  document.getElementById("reloadBtn").addEventListener("click", refresh);
+  // Reload re-reads the day counts too, so a fresh orders file shows up here
+  // without a full page reload.
+  document.getElementById("reloadBtn").addEventListener("click", async () => {
+    await loadWindowCounts();
+    await refresh();
+  });
 
   // One box across every column. It runs in the database, not over the rows
   // already drawn: filtering the loaded page would only ever look at the newest
@@ -613,9 +636,10 @@
     // paint, so the page sat on "Loading…" for the sum of all three. They are
     // started below, after the rows are already on screen, and the cells they
     // fill are redrawn when they land.
+    // windowCounts is NOT cleared here - it is loaded once at startup and
+    // covers every row, so the day cells are correct on the very first paint.
     if (state.view === "sku_master") {
       state.rowsById     = new Map((data || []).map(r => [String(r.id), r]));
-      state.windowCounts = new Map();
       state.platformIds  = new Map();
       state.listingStats = new Map();
     }
@@ -661,16 +685,8 @@
   async function loadEnrichments(rows) {
     const token = ++state.loadToken;
     const list = rows || [];
-    const [wcRes] = await Promise.all([
-      sb.rpc("sku_order_window_counts"),
-      loadPlatformIds(list),
-      loadListingStats(list),
-    ]);
+    await Promise.all([loadPlatformIds(list), loadListingStats(list)]);
     if (token !== state.loadToken) return;
-    if (wcRes.error) { console.warn("sku_order_window_counts failed", wcRes.error); }
-    for (const r of (wcRes.data || [])) {
-      state.windowCounts.set(wcKey(r.company_name, r.platform, r.sku), r);
-    }
     if (state.loaded !== list.length) return;   // more rows arrived meanwhile
     redrawTable(list);
   }
