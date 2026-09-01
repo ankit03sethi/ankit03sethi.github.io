@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01g</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1286,11 +1286,22 @@
       // settled - only 17% of Flipkart's recent returns had been charged yet.
       const loss = Number(wc["rle" + w]);
       const booked = Number(wc["rl" + w]) || 0;
+      // Split the same way as the two columns beside it, because dividing the
+      // whole fee by every return blends the free RTOs into the paid customer
+      // returns: 9,891 over 95 returns reads 104, when an RTO actually cost 0
+      // and each customer return cost 157. Sorting uses the customer figure -
+      // that is the one that varies and the one worth ranking on.
       if (col.endsWith("Ret Cost/unit")) {
-        const L = Number.isFinite(loss) ? loss : booked;
-        if (!ret) return { v: 0, txt: "0" };
-        const per = L / ret;
-        return { v: -per, txt: money(-per) };
+        const rtoN = Number(wc["rto" + w]) || 0, srN = Number(wc["sr" + w]) || 0;
+        const lr = Number(wc["rlr" + w]) || 0,   ls = Number(wc["rls" + w]) || 0;
+        if (!rtoN && !srN) return { v: 0, txt: "0" };
+        const perR = rtoN ? lr / rtoN : 0;
+        const perS = srN  ? ls / srN  : 0;
+        return { v: -perS,
+                 html: '<b style="color:' + (perR > 0 ? "#b91c1c" : "#94a3b8") + '">'
+                     + Math.round(perR) + "</b>"
+                     + '<span style="color:#334155;font-weight:800;padding:0 3px">|</span>'
+                     + '<span style="color:#0f172a">' + Math.round(perS) + "</span>" };
       }
       if (col.endsWith("Ret Charged")) {
         const cr = Number(wc["rcr" + w]) || 0;   // RTO returns the platform billed
@@ -1630,7 +1641,7 @@
     COL_HELP[w+"d SR %"]     = "Customer returns as a share of units sold in the same "+w+" days.";
     COL_HELP[w+"d Net Units"]= "Units ordered minus units returned over "+w+" days - the units that actually stayed sold. Every money figure for this window is built on it.";
     COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
-    COL_HELP[w+"d Ret Cost/unit"] = "Return fees over "+w+" days divided by the number of units returned - what one return costs you on average. Low usually means most of them are RTO, which Flipkart, Meesho and Myntra do not charge for.";
+    COL_HELP[w+"d Ret Cost/unit"] = "What ONE return costs, shown as RTO | customer. Each side is its own fees divided by its own count, so the free courier returns do not drag the customer-return figure down. Sorting uses the customer side.";
     COL_HELP[w+"d Ret Charged"] = "Returns the platform billed you for over "+w+" days, shown as RTO / customer. The RTO figure turns red if it is above zero, because Flipkart, Meesho and Myntra should never charge for a courier return - Amazon does. The rest are priced at this platform's learned cost per return, because the deduction has not settled yet - or, for RTO on Flipkart, Meesho and Myntra, never will.";
     COL_HELP[w+"d Ret Fees"] = "Cost of these "+w+" days' returns, shown as RTO / customer. Anything on the RTO side of Flipkart, Meesho or Myntra is money to claim back. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
     COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
