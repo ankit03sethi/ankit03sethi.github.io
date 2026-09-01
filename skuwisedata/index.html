@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1072,9 +1072,9 @@
       // halve the figure. Margin and margin % do not move by window; only the
       // totals do.
       "Settle/unit","Margin/unit","Margin %COP",
-      "30d Net Units","30d Margin","30d Ret Fees","30d Ret Charged","30d Tax","30d Net","30d Net/unit","30d Net %COP",
-      "60d Net Units","60d Margin","60d Ret Fees","60d Ret Charged","60d Tax","60d Net","60d Net/unit","60d Net %COP",
-      "90d Net Units","90d Margin","90d Ret Fees","90d Ret Charged","90d Tax","90d Net","90d Net/unit","90d Net %COP",
+      "30d Net Units","30d Margin","30d Ret Charged","30d Ret Fees","30d Ret Cost/unit","30d Tax","30d Net","30d Net/unit","30d Net %COP",
+      "60d Net Units","60d Margin","60d Ret Charged","60d Ret Fees","60d Ret Cost/unit","60d Tax","60d Net","60d Net/unit","60d Net %COP",
+      "90d Net Units","90d Margin","90d Ret Charged","90d Ret Fees","90d Ret Cost/unit","90d Tax","90d Net","90d Net/unit","90d Net %COP",
       "Focus"
   ];
 
@@ -1210,9 +1210,9 @@
     //                 sheet has no Tax % column, which it currently has not)
     //   final       = profit - return loss - tax
     const MONEY_WIN = {
-      "30d Net Units":30, "30d Margin":30, "30d Ret Fees":30, "30d Ret Charged":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
-      "60d Net Units":60, "60d Margin":60, "60d Ret Fees":60, "60d Ret Charged":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
-      "90d Net Units":90, "90d Margin":90, "90d Ret Fees":90, "90d Ret Charged":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
+      "30d Net Units":30, "30d Margin":30, "30d Ret Charged":30, "30d Ret Fees":30, "30d Ret Cost/unit":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
+      "60d Net Units":60, "60d Margin":60, "60d Ret Charged":60, "60d Ret Fees":60, "60d Ret Cost/unit":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
+      "90d Net Units":90, "90d Margin":90, "90d Ret Charged":90, "90d Ret Fees":90, "90d Ret Cost/unit":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
     const money = (v) => "\u20b9" + Math.round(v).toLocaleString("en-IN");
     function moneyCell(wc, col) {
       if (!wc) return null;
@@ -1226,6 +1226,12 @@
       // settled - only 17% of Flipkart's recent returns had been charged yet.
       const loss = Number(wc["rle" + w]);
       const booked = Number(wc["rl" + w]) || 0;
+      if (col.endsWith("Ret Cost/unit")) {
+        const L = Number.isFinite(loss) ? loss : booked;
+        if (!ret) return { v: 0, txt: "0" };
+        const per = L / ret;
+        return { v: -per, txt: money(-per) };
+      }
       if (col.endsWith("Ret Charged")) {
         const c = Number(wc["rc" + w]) || 0;
         const totalRet = Number(wc["r" + w]) || 0;
@@ -1551,6 +1557,7 @@
     COL_HELP[w+"d SR %"]     = "Customer returns as a share of units sold in the same "+w+" days.";
     COL_HELP[w+"d Net Units"]= "Units ordered minus units returned over "+w+" days - the units that actually stayed sold. Every money figure for this window is built on it.";
     COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
+    COL_HELP[w+"d Ret Cost/unit"] = "Return fees over "+w+" days divided by the number of units returned - what one return costs you on average. Low usually means most of them are RTO, which Flipkart, Meesho and Myntra do not charge for.";
     COL_HELP[w+"d Ret Charged"] = "How many of these "+w+" days' returns the platform has actually billed you for, out of the total returns. The rest are priced at this platform's learned cost per return, because the deduction has not settled yet - or, for RTO on Flipkart, Meesho and Myntra, never will.";
     COL_HELP[w+"d Ret Fees"] = "Cost of the returns that happened in these "+w+" days. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
     COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
@@ -1580,6 +1587,7 @@
     "30d Margin":"p30", "60d Margin":"p60", "90d Margin":"p90",
     "30d Ret Fees":"rl30", "60d Ret Fees":"rl60", "90d Ret Fees":"rl90",
     "30d Ret Charged":"rc30", "60d Ret Charged":"rc60", "90d Ret Charged":"rc90",
+    "30d Ret Cost/unit":"rcu30", "60d Ret Cost/unit":"rcu60", "90d Ret Cost/unit":"rcu90",
     "30d Net":"f30", "60d Net":"f60", "90d Net":"f90",
     "30d Net/unit":"u30", "60d Net/unit":"u60", "90d Net/unit":"u90",
     "30d Net %COP":"c30", "60d Net %COP":"c60", "90d Net %COP":"c90",
