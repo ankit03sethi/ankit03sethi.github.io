@@ -132,7 +132,13 @@ const COL = {
   recd:   { k: "received",     l: "Received",  t: "money" },
   cop:    { k: "cop",          l: "COP",       t: "money" },
   profit: { k: "profit",       l: "Profit",    t: "moneysign" },
-  mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  }
+  mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  },
+  u30:    { k: "units_30d",    l: "Units 30d", t: "int"  },
+  u90:    { k: "units_90d",    l: "Units 90d", t: "int"  },
+  r90:    { k: "returns_90d",  l: "Returns 90d", t: "int" },
+  spu:    { k: "settle_per_unit", l: "Settle/unit", t: "money" },
+  s90:    { k: "settled_90d",  l: "Settled 90d", t: "money" },
+  rsn:    { k: "reason",       l: "Why",       t: "txt"  }
 };
 
 const REPORTS = [
@@ -230,6 +236,21 @@ const REPORTS = [
     empty: "Every return the payment files charged you for has physically come back."
   },
   {
+    id: "skunocop", sec: "Missings",
+    title: "Selling with no cost price",
+    desc: "SKUs that sold in the last 90 days but have no cost price behind them, so every profit and margin figure for them is blank. Sorted by what is moving now \u2014 this is the order to fix the master sheet in.",
+    src: "nocost", pick: () => true,
+    cols: [COL.plat, COL.co, COL.sku, COL.u30, COL.u90, COL.r90, COL.spu, COL.s90, COL.rsn],
+    sort: { k: "units_30d", dir: -1 },
+    kpis: (rows) => [
+      { l: "SKUs", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+      { l: "Units sold 90d", n: sum(rows, "units_90d").toLocaleString("en-IN") },
+      { l: "Settled on them", n: money(sum(rows, "settled_90d")), cls: rows.length ? "warn" : "" },
+      { l: "Not in master", n: rows.filter((r) => r.reason !== "in master sheet, COP blank").length.toLocaleString("en-IN") }
+    ],
+    empty: "Every SKU that sold in the last 90 days has a cost price."
+  },
+  {
     id: "nocop", sec: "Missings",
     title: "Cost price not available",
     desc: "Paid orders that could not be matched to a cost in the SKU master, so their cost is counted as zero and their profit is overstated. Everything known about each one is here so the SKU can be added.",
@@ -251,7 +272,7 @@ const REPORTS = [
 function sum(rows, k) { let t = 0; for (const r of rows) t += num(r[k]); return t; }
 
 /* ---------- state ------------------------------------------------------ */
-const state = { check: null, profit: null, plat: "", co: "", q: "", ui: {} };
+const state = { check: null, profit: null, nocost: null, plat: "", co: "", q: "", ui: {} };
 for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300 };
 
 /* ---------- boot ------------------------------------------------------- */
@@ -268,15 +289,18 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
 async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
-  const [a, b] = await Promise.all([
+  const [a, b, c] = await Promise.all([
     sb.rpc("seller_order_money_check", { _days: 45 }),
-    sb.rpc("seller_paid_profit")
+    sb.rpc("seller_paid_profit"),
+    sb.rpc("seller_skus_missing_cost")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
+  if (c.error) console.error("missing cost", c.error);
   state.check = a.error ? [] : (a.data || []);
   state.profit = b.error ? [] : (b.data || []);
-  const bad = [a.error, b.error].filter(Boolean);
+  state.nocost = c.error ? [] : (c.data || []);
+  const bad = [a.error, b.error, c.error].filter(Boolean);
   $("#status").textContent = bad.length
     ? "Some data could not be read — " + bad.map((e) => e.message).join("; ")
     : state.profit.length.toLocaleString("en-IN") + " paid orders · checked in " + ((Date.now() - t0) / 1000).toFixed(1) + "s";
@@ -286,7 +310,7 @@ async function load(force) {
 
 /* ---------- chips ------------------------------------------------------ */
 function buildChips() {
-  const all = [...(state.check || []), ...(state.profit || [])];
+  const all = [...(state.check || []), ...(state.profit || []), ...(state.nocost || [])];
   const plats = [...new Set(all.map((r) => r.platform).filter(Boolean))].sort();
   const cos = [...new Set(all.map((r) => r.company_name).filter(Boolean))].sort();
   const draw = (host, list, key, allLabel) => {
@@ -327,7 +351,7 @@ function buildCards() {
 
 /* ---------- rows for one report --------------------------------------- */
 function rowsFor(r) {
-  const src = r.src === "check" ? state.check : state.profit;
+  const src = state[r.src];
   if (!src) return null;
   const u = state.ui[r.id];
   let out = src.filter(r.pick);
