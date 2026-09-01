@@ -163,6 +163,34 @@
     .col-filter { font:inherit; font-size:12px; width:100%; min-width:70px; padding:3px 6px; border:1px solid #e5e7eb; border-radius:5px; }
     .col-filter:focus { outline:none; border-color:#1f6feb; }
     .col-filter.on { border-color:#1f6feb; background:#eff6ff; }
+    /* Per-column value picker. The button sits in the filter row; the panel is
+       attached to the body so the sticky header cannot clip it. */
+    .fbtn { font:inherit; font-size:11px; width:100%; min-width:70px; padding:3px 6px; cursor:pointer;
+            border:1px solid #e5e7eb; border-radius:5px; background:#fff; color:#475569;
+            display:flex; align-items:center; justify-content:space-between; gap:4px; font-weight:600; }
+    .fbtn:hover { border-color:#cbd5e1; background:#f8fafc; }
+    .fbtn.on { border-color:#1f6feb; background:#eff6ff; color:#1f6feb; }
+    .fbtn .cap { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fbtn .car { flex:none; opacity:.55; font-size:9px; }
+    .fpanel { position:fixed; z-index:120; width:262px; background:#fff; border:1px solid #cbd5e1;
+              border-radius:10px; box-shadow:0 12px 32px rgba(15,23,42,.18); font-size:13px; overflow:hidden; }
+    .fpanel .fhead { padding:8px; border-bottom:1px solid #eef2f7; }
+    .fpanel .fhead input { width:100%; font:inherit; font-size:13px; padding:6px 9px;
+                           border:1px solid #e5e7eb; border-radius:7px; }
+    .fpanel .fhead input:focus { outline:none; border-color:#1f6feb; }
+    .fpanel .fbulk { display:flex; gap:14px; padding:6px 10px; border-bottom:1px solid #eef2f7;
+                     font-size:12px; font-weight:700; }
+    .fpanel .fbulk span { color:#1f6feb; cursor:pointer; }
+    .fpanel .fbulk span:hover { text-decoration:underline; }
+    .fpanel .fbulk .cnt { margin-left:auto; color:#94a3b8; font-weight:600; cursor:default; }
+    .fpanel .flist { max-height:280px; overflow:auto; padding:4px 0; }
+    .fpanel .flist label { display:flex; align-items:center; gap:8px; padding:5px 10px; cursor:pointer; }
+    .fpanel .flist label:hover { background:#f1f5f9; }
+    .fpanel .flist label span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fpanel .flist .none { padding:10px; color:#94a3b8; }
+    .fpanel .ffoot { padding:7px 10px; border-top:1px solid #eef2f7; text-align:right; }
+    .fpanel .ffoot button { font:inherit; font-size:12px; font-weight:700; padding:4px 12px;
+                            border:1px solid #cbd5e1; border-radius:7px; background:#fff; cursor:pointer; }
     .muted { color:#94a3b8; font-style:italic; }
     .empty { padding:36px 20px; text-align:center; color:#64748b; }
     .empty h3 { margin:0 0 8px; color:#0f172a; }
@@ -217,7 +245,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01g</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01h</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1491,10 +1519,13 @@
     const body = table.querySelector("tbody");
     const rows = [...body.rows];
 
-    // Filter
+    // Filter. A column with nothing ticked lets every row through; otherwise a
+    // row has to carry one of the values chosen in that column's dropdown.
+    const picks = picksFor(t);
+    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size);
     let shown = 0;
     for (const tr of rows) {
-      const ok = heads.every((name, i) => matchFilter(cellText(tr.cells[i]), t.filters[name] || ""));
+      const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i])));
       tr.style.display = ok ? "" : "none";
       if (ok) shown++;
     }
@@ -1532,7 +1563,8 @@
 
     const info = document.getElementById("filterInfo");
     if (info) {
-      const active = Object.values(t.filters).filter(v => v && v.trim()).length;
+      const p = picksFor(t);
+      const active = Object.keys(p).filter(k => p[k] && p[k].size).length;
       info.textContent = active ? `${shown} of ${rows.length} rows` : "";
     }
   }
@@ -1566,21 +1598,145 @@
     const fr = document.createElement("tr");
     fr.className = "filter-row";
     fr.innerHTML = names.map(n =>
-      `<th><input class="col-filter" data-col="${escapeHtml(n)}" placeholder="Search" value="${escapeHtml(t.filters[n] || "")}"></th>`
+      `<th><button type="button" class="fbtn" data-col="${escapeHtml(n)}">` +
+        `<span class="cap"></span><span class="car">\u25bc</span></button></th>`
     ).join("");
     thead.appendChild(fr);
-    fr.querySelectorAll(".col-filter").forEach(inp => {
-      if (inp.value.trim()) inp.classList.add("on");
-      inp.addEventListener("input", () => {
-        t.filters[inp.dataset.col] = inp.value;
-        inp.classList.toggle("on", !!inp.value.trim());
-        applyTableTools();
+    fr.querySelectorAll(".fbtn").forEach((btn, i) => {
+      paintFilterButton(btn, t);
+      // Clicking the filter button must not sort the column it sits under.
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        openFilterPanel(btn, btn.dataset.col, i, t, table);
       });
-      // Clicking a filter box must not sort the column it sits under.
-      inp.addEventListener("click", e => e.stopPropagation());
     });
 
     applyTableTools();
+  }
+
+  /* ---------- per-column value dropdowns -------------------------------- */
+  // Chosen values live per view, as a Set per column. Nothing ticked in a
+  // column means that column is not filtering at all.
+  function picksFor(t) {
+    if (!t.picks) t.picks = {};
+    return t.picks;
+  }
+
+  function paintFilterButton(btn, t) {
+    const set = picksFor(t)[btn.dataset.col];
+    const cap = btn.querySelector(".cap");
+    const n = set ? set.size : 0;
+    btn.classList.toggle("on", n > 0);
+    cap.textContent = n === 0 ? "All" : n === 1 ? [...set][0] || "(blank)" : n + " picked";
+    btn.title = n === 0 ? "Filter this column" : n + " value" + (n === 1 ? "" : "s") + " selected";
+  }
+
+  // Every value in this column across the rows currently loaded, with how many
+  // rows carry each, most common first.
+  function columnValues(table, colIndex) {
+    const counts = new Map();
+    for (const tr of table.tBodies[0].rows) {
+      const c = tr.cells[colIndex];
+      if (!c) continue;
+      const v = cellText(c);
+      counts.set(v, (counts.get(v) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), undefined, { numeric: true }))
+      .map(([v, n]) => ({ v, n }));
+  }
+
+  let openPanel = null;
+  function closeFilterPanel() {
+    if (openPanel) { openPanel.remove(); openPanel = null; }
+    document.removeEventListener("mousedown", onDocDown, true);
+    document.removeEventListener("keydown", onPanelKey, true);
+  }
+  function onDocDown(e) { if (openPanel && !openPanel.contains(e.target)) closeFilterPanel(); }
+  function onPanelKey(e) { if (e.key === "Escape") closeFilterPanel(); }
+
+  function openFilterPanel(btn, name, colIndex, t, table) {
+    const wasFor = openPanel && openPanel.dataset.col === name;
+    closeFilterPanel();
+    if (wasFor) return;   // clicking the same button again just closes it
+
+    const picks = picksFor(t);
+    const chosen = new Set(picks[name] || []);
+    const values = columnValues(table, colIndex);
+
+    const panel = document.createElement("div");
+    panel.className = "fpanel";
+    panel.dataset.col = name;
+    panel.innerHTML =
+      `<div class="fhead"><input type="search" placeholder="Search ${escapeHtml(name)}"></div>` +
+      `<div class="fbulk"><span data-all="1">Select all</span><span data-none="1">Clear</span>` +
+        `<span class="cnt"></span></div>` +
+      `<div class="flist"></div>` +
+      `<div class="ffoot"><button type="button">Done</button></div>`;
+    document.body.appendChild(panel);
+    openPanel = panel;
+
+    const search = panel.querySelector(".fhead input");
+    const list   = panel.querySelector(".flist");
+    const cnt    = panel.querySelector(".cnt");
+
+    // Only the rows matching the search box are drawn, so a column with
+    // thousands of values stays usable.
+    function draw() {
+      const q = search.value.trim().toLowerCase();
+      const rows = q ? values.filter(o => String(o.v).toLowerCase().includes(q)) : values;
+      cnt.textContent = chosen.size ? chosen.size + " picked" : rows.length + " values";
+      if (!rows.length) { list.innerHTML = '<div class="none">Nothing matches.</div>'; return; }
+      list.innerHTML = rows.slice(0, 600).map(o =>
+        `<label><input type="checkbox" ${chosen.has(o.v) ? "checked" : ""} ` +
+        `value="${escapeHtml(o.v)}"><span>${o.v === "" ? "<i>(blank)</i>" : escapeHtml(o.v)}</span>` +
+        `<span style="margin-left:auto;color:#94a3b8;font-size:11px">${o.n}</span></label>`
+      ).join("") + (rows.length > 600
+        ? '<div class="none">Showing the first 600 \u2014 type to narrow.</div>' : "");
+    }
+
+    function commit() {
+      if (chosen.size) picks[name] = new Set(chosen); else delete picks[name];
+      paintFilterButton(btn, t);
+      applyTableTools();
+    }
+
+    list.addEventListener("change", e => {
+      const cb = e.target;
+      if (!cb || cb.type !== "checkbox") return;
+      if (cb.checked) chosen.add(cb.value); else chosen.delete(cb.value);
+      cnt.textContent = chosen.size ? chosen.size + " picked" : "";
+      commit();
+    });
+    search.addEventListener("input", draw);
+    panel.querySelector("[data-all]").addEventListener("click", () => {
+      const q = search.value.trim().toLowerCase();
+      (q ? values.filter(o => String(o.v).toLowerCase().includes(q)) : values)
+        .forEach(o => chosen.add(o.v));
+      draw(); commit();
+    });
+    panel.querySelector("[data-none]").addEventListener("click", () => {
+      chosen.clear(); draw(); commit();
+    });
+    panel.querySelector(".ffoot button").addEventListener("click", closeFilterPanel);
+
+    draw();
+
+    // Sit under the button, pulled back on screen when the column is near an edge.
+    const r = btn.getBoundingClientRect();
+    const w = 262;
+    panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+    panel.style.top = r.bottom + 4 + "px";
+    const h = panel.getBoundingClientRect().height;
+    if (r.bottom + 4 + h > window.innerHeight - 8) {
+      panel.style.top = Math.max(8, r.top - 4 - h) + "px";
+    }
+
+    search.focus();
+    document.addEventListener("mousedown", onDocDown, true);
+    document.addEventListener("keydown", onPanelKey, true);
+    window.addEventListener("scroll", closeFilterPanel, { capture: true, once: true });
+    window.addEventListener("resize", closeFilterPanel, { once: true });
   }
 
   // Re-draw carets after a sort change, then re-apply.
