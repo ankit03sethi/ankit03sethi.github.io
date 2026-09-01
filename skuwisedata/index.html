@@ -90,6 +90,14 @@
     #platformRow .plat-chip[data-p="firstcry"].active { background:#14b8a6; border-color:#14b8a6; box-shadow:0 4px 10px rgba(20,184,166,.30); }
 
     .cell-link { margin-left:6px; font-size:12px; text-decoration:none; }
+    /* Header note. A real element rather than the browser's title bubble:
+       it appears straight away, wraps properly and can be read. */
+    .colnote { position:fixed; z-index:9999; max-width:320px; padding:9px 11px;
+               background:#0f172a; color:#f8fafc; font-size:12px; line-height:1.45;
+               border-radius:8px; box-shadow:0 8px 24px rgba(15,23,42,.28);
+               pointer-events:none; opacity:0; transition:opacity .12s; }
+    .colnote.on { opacity:1; }
+    .colnote b { display:block; font-size:12px; margin-bottom:3px; color:#93c5fd; }
     .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; padding:16px 28px 8px; }
     .kpi { display:flex; gap:11px; align-items:center; padding:13px 14px;
            background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
@@ -245,7 +253,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01k</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01m</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1067,7 +1075,7 @@
            + ' style="width:48px;padding:2px 4px;font-size:11.5px;text-align:center">'
            + '<input type="checkbox" data-col="' + escapeHtml(c) + '"'
            + (state.hiddenCols.has(c) ? "" : " checked") + ">"
-           + "<span>" + escapeHtml(c) + "</span></label>";
+           + "<span>" + escapeHtml(colLabel(c)) + "</span></label>";
       }
     }
     h += '<div style="padding-top:10px">' + closeBtn + "</div>";
@@ -1720,7 +1728,7 @@
       th.dataset.col = names[i];
       th.classList.add("sortable");
       th.innerHTML = headerHtml(names[i], t);
-      if (COL_HELP[names[i]]) th.title = COL_HELP[names[i]];
+      attachColNote(th, names[i]);
       bindSortButtons(th, names[i], t, table);
       th.addEventListener("click", () => {
         // First click on a new column sorts high to low, which is what you want
@@ -1805,7 +1813,7 @@
     panel.className = "fpanel";
     panel.dataset.col = name;
     panel.innerHTML =
-      `<div class="fhead"><input type="search" placeholder="Search ${escapeHtml(name)}"></div>` +
+      `<div class="fhead"><input type="search" placeholder="Search ${escapeHtml(colLabel(name))}"></div>` +
       `<div class="fbulk"><span data-all="1">Select all</span><span data-none="1">Clear</span>` +
         `<span class="cnt"></span></div>` +
       `<div class="flist"></div>` +
@@ -1880,9 +1888,73 @@
   // A header cell: its name, then an up/down pair. Up is low to high, down is
   // high to low; the active one is highlighted so the current sort is visible
   // without hunting for a caret.
+  // What the header SHOWS. The internal name never changes - sorting,
+  // filtering and the column picker all still key on it - so this is purely
+  // about making the row readable. Anything not listed shows its own name.
+  const COL_LABEL = {
+    "Settle/unit": "Settled /unit", "Last 3 Settle": "Settled avg (3)",
+    "Last Settle": "Settled last",
+    "Margin/unit": "Margin /unit", "Margin %COP": "Margin % of COP",
+    "Last Ret Charge": "Return billed last", "Last Ret Cost": "Return cost last",
+    "Ship/unit": "Courier /unit", "Last 3 Ship": "Courier avg (3)",
+    "Last Ship": "Courier last",
+    "Ret Ship/return": "Return courier /return", "Last Ret Ship": "Return courier last",
+  };
+  for (const w of [1, 3, 7, 15, 30, 60, 90]) COL_LABEL[w + "day"] = w + "d Sold";
+  for (const w of [30, 60, 90]) {
+    COL_LABEL[w+"d Ret"]           = w+"d Returns";
+    COL_LABEL[w+"d Ret %"]         = w+"d Return %";
+    COL_LABEL[w+"d RTO"]           = w+"d RTO";
+    COL_LABEL[w+"d SR"]            = w+"d Buyer returns";
+    COL_LABEL[w+"d SR %"]          = w+"d Buyer return %";
+    COL_LABEL[w+"d Ret Charged"]   = w+"d Returns billed";
+    COL_LABEL[w+"d Ret Fees"]      = w+"d Return cost";
+    COL_LABEL[w+"d Ret Cost/unit"] = w+"d Cost per return";
+    COL_LABEL[w+"d Ship/unit"]     = w+"d Courier /unit";
+    COL_LABEL[w+"d Ship"]          = w+"d Courier total";
+    COL_LABEL[w+"d Net Units"]     = w+"d Units kept";
+    COL_LABEL[w+"d Net"]           = w+"d Profit";
+    COL_LABEL[w+"d Net/unit"]      = w+"d Profit /unit";
+    COL_LABEL[w+"d Net %COP"]      = w+"d Profit % of COP";
+  }
+  const colLabel = (c) => COL_LABEL[c] || c;
+
+  // Rest the cursor on a header and a short note says what the number is.
+  let _noteEl = null, _noteTimer = null;
+  function colNoteEl() {
+    if (!_noteEl) {
+      _noteEl = document.createElement("div");
+      _noteEl.className = "colnote";
+      document.body.appendChild(_noteEl);
+    }
+    return _noteEl;
+  }
+  function hideColNote() {
+    clearTimeout(_noteTimer);
+    if (_noteEl) _noteEl.classList.remove("on");
+  }
+  function attachColNote(th, name) {
+    const text = COL_HELP[name];
+    if (!text) return;
+    th.addEventListener("mouseenter", () => {
+      clearTimeout(_noteTimer);
+      _noteTimer = setTimeout(() => {
+        const el = colNoteEl();
+        el.innerHTML = "<b>" + escapeHtml(colLabel(name)) + "</b>" + escapeHtml(text);
+        el.classList.add("on");
+        const r = th.getBoundingClientRect();
+        // Sit under the header, and pull back inside the window at the right edge.
+        el.style.top = Math.min(r.bottom + 8, window.innerHeight - 130) + "px";
+        el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 340)) + "px";
+      }, 90);
+    });
+    th.addEventListener("mouseleave", hideColNote);
+  }
+  window.addEventListener("scroll", hideColNote, true);
+
   function headerHtml(name, t) {
     const active = t.sort && t.sort.col === name ? t.sort.dir : "";
-    return escapeHtml(name) +
+    return escapeHtml(colLabel(name)) +
       `<span class="sort-btns">` +
         `<span class="sort-btn${active === "asc"  ? " on" : ""}" data-dir="asc"  title="Low to high">\u25b2</span>` +
         `<span class="sort-btn${active === "desc" ? " on" : ""}" data-dir="desc" title="High to low">\u25bc</span>` +
@@ -1915,42 +1987,78 @@
   // database expression behind it, so those still sort the rows on screen.
   // Hover help. These columns are arithmetic on six inputs, and a header alone
   // cannot say which file each one came from.
+  // One short line per column, shown as a note when the cursor rests on the
+  // header. Long enough to say what the number is and where it came from,
+  // short enough to read without stopping.
   const COL_HELP = {
-    "Last 3 Settle": "Money per unit off this SKU's three most recent payouts. A raw figure - no returns, fees, tax or COP go into it. Green means it is meeting Expected Settlement from your master sheet, red means it is falling short.",
-    "Settle/unit": "All money this SKU has been paid, divided by units paid. Each order is netted (settlement minus its own fees) before adding up. From the payment files.",
-    "Margin/unit": "Settle/unit minus COP. What one unit earns BEFORE the return fees this SKU causes.",
-    "Margin %COP": "Margin/unit as a percentage of COP, BEFORE returns and fees. Compare it with Net %COP to see what returns cost you.",
-    "Last 3 Ship": "Forward courier per unit off this SKU's three most recent charged orders. Straight off the payment file - nothing estimated.",
-    "Last Settle": "The single most recent settled order for this SKU, per unit. Every other money column here is an average over a window - this is the one that moves first when a fee changes or a price drops. Hover for the date. Green at or above Expected Settlement, red below.",
-    "Last Ret Charge": "What the platform actually deducted on the most recent return of this SKU it charged you for. The whole deduction, not per unit. Hover for the date and whether the buyer had it (customer) or it never got there (RTO). A warning triangle means an RTO was charged on Flipkart, Meesho or Myntra, which should not happen - that is money to claim back.",
-    "Last Ret Cost": "Last Ret Charge divided by the units on that return - what that one return cost you per unit. Differs from Last Ret Charge only on multi-quantity orders.",
-    "Last Ship": "Forward courier per unit on the last order this SKU was actually charged for. Where one order carried several charge lines they are added up first. A zero or blank line is skipped - it is not a cheap delivery, it is a line with nothing on it - so Flipkart shows a dash here, because it has never billed forward freight.",
-    "Last Ret Ship": "Return freight per unit on the last return this SKU was actually charged for. Amazon prints no reverse freight line, so it shows a dash.",
-    "Ship/unit": "Every rupee of forward courier this SKU has been billed, divided by the units it shipped. Meesho charges it as Shipping Charge, Amazon as Easy Ship weight handling fees, Myntra as Logistics Commission. Flipkart reads 0 because you ship those yourself, so Flipkart bills no forward freight. FirstCry reports nothing, so it shows a dash. This money is ALREADY taken out inside Settle/unit - the column shows you how much of the deduction was courier, it is not a further cost to subtract.",
-    "Ret Ship/return": "Return freight per RETURN that was actually charged - not per unit sold, which would read as near zero. Meesho Return Shipping Charge, Flipkart Reverse Shipping Fee, Myntra reverse logistics. Amazon prints no reverse freight line, so it shows a dash. This is only the freight; the wider cost of a return is in Ret Fees.",
-    "1day":"Units ordered today. Cancelled orders excluded.",
-    "3day":"Units ordered in the last 3 days.", "7day":"Units ordered in the last 7 days.",
-    "15day":"Units ordered in the last 15 days.", "30day":"Units ordered in the last 30 days.",
-    "60day":"Units ordered in the last 60 days.", "90day":"Units ordered in the last 90 days.",
+    "S.NO": "Row number on screen. Not from any file.",
+    "Date": "When this row was added to the master sheet.",
+    "Listed By": "Who listed this SKU. From the master sheet.",
+    "Company": "Which of your companies sells it.",
+    "Platform": "Which marketplace this row is for.",
+    "Brand": "Brand name from the master sheet.",
+    "Vertical": "Your own grouping from the master sheet.",
+    "Non Returnable": "Marked non-returnable in the master sheet.",
+    "Type": "Product type from the master sheet.",
+    "Category": "Category from the master sheet.",
+    "Sub Category": "Sub category from the master sheet.",
+    "Product": "Product name from the master sheet.",
+    "Color": "Colour from the master sheet.",
+    "ASIN": "Amazon's product code.",
+    "Other Listing Id": "The listing id on platforms other than Amazon.",
+    "SKU": "The seller SKU this platform uses.",
+    "Master Sku": "Your own code that ties the same product across platforms.",
+    "COP": "What one unit costs you to buy. You fill this in.",
+    "HSN": "Tax code from the master sheet.",
+    "Tax %": "Tax rate you pay on this SKU. You fill this in.",
+    "Packaging": "Packing cost per unit from the master sheet.",
+    "Final COP": "COP plus packaging - the full cost of one unit.",
+    "Expected Settlement": "What you expect the platform to pay per unit. You fill this in.",
+    "Selling Price": "Your listed price from the master sheet.",
+    "Site Price": "Price found on the live listing by the scraper.",
+    "Ratings": "Star rating on the live listing.",
+    "Count": "Number of ratings on the live listing.",
+    "Seller": "Seller name shown on the live listing.",
+    "Link": "Opens the live listing.",
+    "Focus": "Your own flag. Nothing is calculated from it.",
+
+    "Settle/unit": "Average money the platform has paid you per unit, across every paid order. Fees already taken out.",
+    "Last 3 Settle": "Same thing but only the 3 most recent paid orders. Green means it meets Expected Settlement, red means short.",
+    "Last Settle": "The single most recent paid order, per unit. Moves first when something changes.",
+    "Margin/unit": "Settled per unit minus COP. Before returns and tax.",
+    "Margin %COP": "Margin as a percentage of what the unit cost you.",
+
+    "Last Ret Charge": "The full amount the platform deducted on the last return it charged you for.",
+    "Last Ret Cost": "That same deduction divided by the units on that return.",
+
+    "Ship/unit": "Average forward courier billed per unit shipped. Flipkart reads 0 - you ship those yourself. FirstCry reports nothing.",
+    "Last 3 Ship": "Forward courier per unit on the 3 most recent charged orders.",
+    "Last Ship": "Forward courier per unit on the last charged order. Zero and blank lines are skipped.",
+    "Ret Ship/return": "Average return freight per return the platform charged for. Amazon prints no reverse freight line.",
+    "Last Ret Ship": "Return freight per unit on the last charged return.",
   };
+  for (const w of [1, 3, 7, 15, 30, 60, 90]) {
+    COL_HELP[w + "day"] = "Units ordered in the last " + w + (w === 1 ? " day." : " days.")
+                        + " Cancelled orders left out.";
+  }
   for (const w of [30, 60, 90]) {
-    COL_HELP[w+"d Ret"]      = "Units returned in the last "+w+" days. From the returns file.";
-    COL_HELP[w+"d Ret %"]    = "Returns as a share of units sold in the same "+w+" days.";
-    COL_HELP[w+"d RTO"]      = "Courier returns - never reached the buyer, so no customer-side shipping.";
-    COL_HELP[w+"d RTO %"]    = "RTO as a share of units sold in the same "+w+" days.";
-    COL_HELP[w+"d SR"]       = "Customer returns - the buyer had it and sent it back. You pay shipping both ways.";
-    COL_HELP[w+"d SR %"]     = "Customer returns as a share of units sold in the same "+w+" days.";
-    COL_HELP[w+"d Net Units"]= "Units ordered minus units returned over "+w+" days - the units that actually stayed sold. Every money figure for this window is built on it.";
-    COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
-    COL_HELP[w+"d Ret Cost/unit"] = "What ONE return costs, shown as RTO | customer. Each side is its own fees divided by its own count, so the free courier returns do not drag the customer-return figure down. Sorting uses the customer side.";
-    COL_HELP[w+"d Ret Charged"] = "Returns the platform billed you for over "+w+" days, shown as RTO / customer. The RTO figure turns red if it is above zero, because Flipkart, Meesho and Myntra should never charge for a courier return - Amazon does. The rest are priced at this platform's learned cost per return, because the deduction has not settled yet - or, for RTO on Flipkart, Meesho and Myntra, never will.";
-    COL_HELP[w+"d Ret Fees"] = "Cost of these "+w+" days' returns, shown as RTO / customer. Anything on the RTO side of Flipkart, Meesho or Myntra is money to claim back. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
-    COL_HELP[w+"d Ship/unit"] = "Forward courier per unit over the last "+w+" days, on payment date. What the platform billed, nothing estimated.";
-    COL_HELP[w+"d Ship"]      = "Total forward courier billed on this SKU over the last "+w+" days.";
-    COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
-    COL_HELP[w+"d Net"]      = "Margin minus return fees minus tax. Everything in, less everything out, over "+w+" days.";
-    COL_HELP[w+"d Net/unit"] = "Net divided by the units that stayed sold (ordered - returned). What you actually keep per unit.";
-    COL_HELP[w+"d Net %COP"] = "Net/unit as a percentage of COP. Your real return on each rupee of stock.";
+    COL_HELP[w+"d Ret"]           = "Units that came back in the last "+w+" days.";
+    COL_HELP[w+"d Ret %"]         = "Those returns as a share of what sold in the same "+w+" days.";
+    COL_HELP[w+"d RTO"]           = "Returns that never reached the buyer.";
+    COL_HELP[w+"d RTO %"]         = "RTOs as a share of what sold in the same "+w+" days.";
+    COL_HELP[w+"d SR"]            = "Returns the buyer had and sent back. You pay freight both ways.";
+    COL_HELP[w+"d SR %"]          = "Buyer returns as a share of what sold in the same "+w+" days.";
+    COL_HELP[w+"d Ret Charged"]   = "How many returns the platform billed you for, shown RTO / buyer. Red on the RTO side means money to claim back.";
+    COL_HELP[w+"d Ret Fees"]      = "What those returns cost, shown RTO / buyer. Real deductions where settled, this platform's learned cost where not.";
+    COL_HELP[w+"d Ret Cost/unit"] = "What ONE return costs, shown RTO / buyer. Each side uses its own count.";
+    COL_HELP[w+"d Ship/unit"]     = "Forward courier per unit over the last "+w+" days, on payment date.";
+    COL_HELP[w+"d Ship"]          = "Total forward courier billed on this SKU over "+w+" days.";
+    COL_HELP[w+"d Net Units"]     = "Sold minus returned - the units that stayed sold.";
+    COL_HELP[w+"d Margin"]        = "Units kept x margin per unit. Returned units carry no COP - the stock came back.";
+    COL_HELP[w+"d Tax"]           = "Your Tax % applied to the net revenue. Blank counts as 0.";
+    COL_HELP[w+"d Net"]           = "Margin minus return cost minus tax. Everything in, less everything out.";
+    COL_HELP[w+"d Net/unit"]      = "Profit divided by the units that stayed sold.";
+    COL_HELP[w+"d Net %COP"]      = "Profit per unit as a percentage of COP. What each rupee of stock returns.";
   }
 
   const SORT_KEYS = {
