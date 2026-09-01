@@ -245,7 +245,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -919,6 +919,27 @@
   }
   window.addEventListener("resize", syncHScroll);
 
+  // Forward courier across every SKU currently in the window cache, over the
+  // last 30 days on payment date. Only platforms that print the charge are in
+  // it - the card says which, so a low figure is not read as a low bill.
+  function courierKpi() {
+    let cost = 0, seen = new Set(), blind = new Set();
+    const only = (state.company || "").trim().toLowerCase();
+    for (const wc of state.windowCounts.values()) {
+      if (only && String(wc.company_name || "").toLowerCase() !== only) continue;
+      if (wc.sh_avail === false) { blind.add(wc.platform); continue; }
+      const c = Number(wc.shc30);
+      if (Number.isFinite(c)) { cost += c; seen.add(wc.platform); }
+    }
+    if (!seen.size) return "";
+    const foot = "30 days &middot; " + [...seen].sort().join(", ")
+               + (blind.size ? " &middot; not reported by " + [...blind].sort().join(", ") : "");
+    return '<div class="kpi"><div class="tile" style="background:#7c2d12;">&#128666;</div><div>'
+         + '<div class="label">Forward courier</div>'
+         + '<div class="value">\u20b9' + Math.round(cost).toLocaleString("en-IN") + '</div>'
+         + '<div class="foot">' + foot + '</div></div></div>';
+  }
+
   function renderKpis(rows, total) {
     const dc = DATE_COL[state.view];
     const companies = new Set(rows.map(r => r.company_name).filter(Boolean));
@@ -930,6 +951,7 @@
         <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total mappings</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div></div>
         <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div></div>
         <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
+        ${courierKpi()}
       `;
     } else {
       $("#kpis").innerHTML = `
@@ -1007,6 +1029,7 @@
   function colGroup(c) {
     if (/^\d+day$/.test(c)) return "Sales";
     if (/^\d+d (Ret|RTO|SR)/.test(c)) return "Returns";
+    if (/Ship/.test(c)) return "Courier";
     if (/^\d+d (Net Units|Margin|Ret Fees|Tax|Net)/.test(c)
         || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") return "Money";
     if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
@@ -1160,9 +1183,14 @@
       // halve the figure. Margin and margin % do not move by window; only the
       // totals do.
       "Settle/unit","Margin/unit","Margin %COP",
-      "30d Net Units","30d Margin","30d Ret Charged","30d Ret Fees","30d Ret Cost/unit","30d Tax","30d Net","30d Net/unit","30d Net %COP",
-      "60d Net Units","60d Margin","60d Ret Charged","60d Ret Fees","60d Ret Cost/unit","60d Tax","60d Net","60d Net/unit","60d Net %COP",
-      "90d Net Units","90d Margin","90d Ret Charged","90d Ret Fees","90d Ret Cost/unit","90d Tax","90d Net","90d Net/unit","90d Net %COP",
+      // Forward courier the platform actually billed, straight off the
+      // payment file - no estimate anywhere in it. Reverse freight sits in
+      // one column beside it and is per RETURN, not per unit sold, because
+      // averaging it over everything that sold would read as near zero.
+      "Last 3 Ship","Ship/unit","Ret Ship/return",
+      "30d Net Units","30d Margin","30d Ret Charged","30d Ret Fees","30d Ret Cost/unit","30d Ship/unit","30d Ship","30d Tax","30d Net","30d Net/unit","30d Net %COP",
+      "60d Net Units","60d Margin","60d Ret Charged","60d Ret Fees","60d Ret Cost/unit","60d Ship/unit","60d Ship","60d Tax","60d Net","60d Net/unit","60d Net %COP",
+      "90d Net Units","90d Margin","90d Ret Charged","90d Ret Fees","90d Ret Cost/unit","90d Ship/unit","90d Ship","90d Tax","90d Net","90d Net/unit","90d Net %COP",
       "Focus"
   ];
 
@@ -1302,6 +1330,47 @@
       "60d Net Units":60, "60d Margin":60, "60d Ret Charged":60, "60d Ret Fees":60, "60d Ret Cost/unit":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
       "90d Net Units":90, "90d Margin":90, "90d Ret Charged":90, "90d Ret Fees":90, "90d Ret Cost/unit":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
     const money = (v) => "\u20b9" + Math.round(v).toLocaleString("en-IN");
+    // Courier is small money - two decimals, or a 25.91 average reads as 26 and
+    // stops matching the settlement file when you check it.
+    const money2 = (v) => "\u20b9" + Number(v).toFixed(2);
+    // Which cached field each courier column reads. Forward figures are per
+    // unit SOLD; the reverse one is per unit RETURNED and charged.
+    const SHIP_COLS = {
+      "Last 3 Ship":      { k: "sh_last3", dir: "f", per: 2 },
+      "Ship/unit":        { k: "sh_unit",  dir: "f", per: 2 },
+      "Ret Ship/return":  { k: "rs_unit",  dir: "r", per: 2 },
+      "30d Ship/unit":    { k: "sh30",  dir: "f", per: 2 },
+      "60d Ship/unit":    { k: "sh60",  dir: "f", per: 2 },
+      "90d Ship/unit":    { k: "sh90",  dir: "f", per: 2 },
+      "30d Ship":         { k: "shc30", dir: "f", per: 0 },
+      "60d Ship":         { k: "shc60", dir: "f", per: 0 },
+      "90d Ship":         { k: "shc90", dir: "f", per: 0 },
+    };
+    function shipCell(wc, col) {
+      const spec = SHIP_COLS[col];
+      const DASH_ = "\u2014";
+      const avail = wc && (spec.dir === "f" ? wc.sh_avail : wc.rs_avail);
+      // FirstCry prints no freight line of any kind, and Amazon prints no
+      // reverse one. A dash there is the honest answer, not a zero.
+      if (!wc || avail === false)
+        return '<td title="This platform does not report ' + (spec.dir === "f" ? "forward" : "return")
+             + ' courier charge in its payment file" style="color:#cbd5e1">' + DASH_ + "</td>";
+      const v = Number(wc[spec.k]);
+      if (!Number.isFinite(v))
+        return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
+      const txt = spec.per ? money2(v) : money(v);
+      // Zero is a real reading on Flipkart: you ship it yourself, so Flipkart
+      // never bills forward freight. Say so rather than leaving a bare 0.
+      if (v === 0 && spec.dir === "f") {
+        return '<td title="Charged nothing - Flipkart bills no forward freight on seller-shipped orders" '
+             + 'style="color:#94a3b8">' + txt + "</td>";
+      }
+      const when = (spec.dir === "f" ? wc.sh_last_on : wc.rs_last_on);
+      const tip = (col === "Last 3 Ship" ? "Average of the 3 most recent charged orders" : "")
+                + (when && col === "Last 3 Ship" ? " \u00b7 last charged " + escapeHtml(String(when)) : "");
+      return '<td' + (tip ? ' title="' + tip + '"' : "")
+           + ' style="color:#7c2d12;font-weight:600">' + txt + "</td>";
+    }
     function moneyCell(wc, col) {
       if (!wc) return null;
       const w = MONEY_WIN[col];
@@ -1408,6 +1477,9 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
+      if (SHIP_COLS[c]) {
+        return shipCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c);
+      }
       if (MONEY_WIN[c] || c === "Last 3 Settle" || c === "Settle/unit"
           || c === "Margin/unit" || c === "Margin %COP") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -1783,6 +1855,9 @@
     "Settle/unit": "All money this SKU has been paid, divided by units paid. Each order is netted (settlement minus its own fees) before adding up. From the payment files.",
     "Margin/unit": "Settle/unit minus COP. What one unit earns BEFORE the return fees this SKU causes.",
     "Margin %COP": "Margin/unit as a percentage of COP, BEFORE returns and fees. Compare it with Net %COP to see what returns cost you.",
+    "Last 3 Ship": "Forward courier per unit off this SKU's three most recent charged orders. Straight off the payment file - nothing estimated.",
+    "Ship/unit": "Every rupee of forward courier this SKU has been billed, divided by the units it shipped. Meesho charges it as Shipping Charge, Amazon as Easy Ship weight handling fees, Myntra as Logistics Commission. Flipkart reads 0 because you ship those yourself, so Flipkart bills no forward freight. FirstCry reports nothing, so it shows a dash. This money is ALREADY taken out inside Settle/unit - the column shows you how much of the deduction was courier, it is not a further cost to subtract.",
+    "Ret Ship/return": "Return freight per RETURN that was actually charged - not per unit sold, which would read as near zero. Meesho Return Shipping Charge, Flipkart Reverse Shipping Fee, Myntra reverse logistics. Amazon prints no reverse freight line, so it shows a dash. This is only the freight; the wider cost of a return is in Ret Fees.",
     "1day":"Units ordered today. Cancelled orders excluded.",
     "3day":"Units ordered in the last 3 days.", "7day":"Units ordered in the last 7 days.",
     "15day":"Units ordered in the last 15 days.", "30day":"Units ordered in the last 30 days.",
@@ -1800,6 +1875,8 @@
     COL_HELP[w+"d Ret Cost/unit"] = "What ONE return costs, shown as RTO | customer. Each side is its own fees divided by its own count, so the free courier returns do not drag the customer-return figure down. Sorting uses the customer side.";
     COL_HELP[w+"d Ret Charged"] = "Returns the platform billed you for over "+w+" days, shown as RTO / customer. The RTO figure turns red if it is above zero, because Flipkart, Meesho and Myntra should never charge for a courier return - Amazon does. The rest are priced at this platform's learned cost per return, because the deduction has not settled yet - or, for RTO on Flipkart, Meesho and Myntra, never will.";
     COL_HELP[w+"d Ret Fees"] = "Cost of these "+w+" days' returns, shown as RTO / customer. Anything on the RTO side of Flipkart, Meesho or Myntra is money to claim back. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
+    COL_HELP[w+"d Ship/unit"] = "Forward courier per unit over the last "+w+" days, on payment date. What the platform billed, nothing estimated.";
+    COL_HELP[w+"d Ship"]      = "Total forward courier billed on this SKU over the last "+w+" days.";
     COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
     COL_HELP[w+"d Net"]      = "Margin minus return fees minus tax. Everything in, less everything out, over "+w+" days.";
     COL_HELP[w+"d Net/unit"] = "Net divided by the units that stayed sold (ordered - returned). What you actually keep per unit.";
