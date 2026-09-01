@@ -69,7 +69,7 @@ td.num,th.num{text-align:right}
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-08-30n</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-01a</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -241,7 +241,7 @@ const REPORTS = [
     desc: "SKUs that sold in the last 90 days but have no cost price behind them, so every profit and margin figure for them is blank. Sorted by what is moving now \u2014 this is the order to fix the master sheet in.",
     src: "nocost", pick: () => true,
     cols: [COL.plat, COL.co, COL.sku, COL.u30, COL.u90, COL.r90, COL.spu, COL.s90, COL.rsn],
-    sort: { k: "units_30d", dir: -1 },
+    sort: { k: "units_30d", dir: -1 }, unit: "SKU",
     kpis: (rows) => [
       { l: "SKUs", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
       { l: "Units sold 90d", n: sum(rows, "units_90d").toLocaleString("en-IN") },
@@ -416,7 +416,8 @@ function render(r) {
   const n = rows.length;
   const clean = r.id === "paid";
   pill.className = "pill " + (clean ? "ok" : n === 0 ? "ok" : r.sec === "Payments" && r.id === "unpaid" ? "bad" : "hit");
-  pill.textContent = n === 0 && !clean ? "all clear" : n.toLocaleString("en-IN") + (n === 1 ? " order" : " orders");
+  const unit = r.unit || "order";
+  pill.textContent = n === 0 && !clean ? "all clear" : n.toLocaleString("en-IN") + " " + unit + (n === 1 ? "" : "s");
 
   body.className = "body" + (u.open ? " open" : "");
   if (!u.open) { body.innerHTML = ""; return; }
