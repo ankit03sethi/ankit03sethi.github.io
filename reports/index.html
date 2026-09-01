@@ -1,1 +1,492 @@
-probe
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Reports &middot; Cursive Analyst</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;color:#0f172a}
+header{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.brand{text-decoration:none;color:inherit}
+.brand-name{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.nav-sub{font-size:11px;color:#64748b;margin-top:2px}
+.back-link{color:#1f6feb;text-decoration:none;font-size:14px;font-weight:700}
+main{max-width:1200px;margin:0 auto;padding:26px 20px 80px}
+h1{font-size:24px;font-weight:800;margin:0 0 4px}
+.sub{color:#64748b;font-size:14px;margin:0 0 18px}
+.section{margin-bottom:34px}
+.section-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.section-head h2{font-size:14px;font-weight:800;margin:0;text-transform:uppercase;letter-spacing:.9px;color:#1f6feb}
+.section-head .rule{flex:1;height:1px;background:#e2e8f0}
+.section-head .cnt{font-size:11.5px;font-weight:800;color:#64748b}
+.section.missings .section-head h2{color:#b45309}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:14px;box-shadow:0 3px 14px rgba(15,23,42,.05)}
+.card.locked{opacity:.6}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;cursor:pointer}
+.card h3{font-size:16px;font-weight:800;margin:0 0 3px}
+.card p.desc{margin:0;color:#64748b;font-size:13px;max-width:700px}
+.pill{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:#ecfdf5;color:#047857}
+.pill.hit{background:#fef3c7;color:#92400e}
+.pill.bad{background:#fee2e2;color:#991b1b}
+.pill.need{background:#f1f5f9;color:#64748b}
+.kpis{display:flex;gap:24px;flex-wrap:wrap;margin:16px 0 2px}
+.kpi .n{font-size:23px;font-weight:800;letter-spacing:-.4px}
+.kpi .n.warn{color:#b45309}
+.kpi .n.bad{color:#991b1b}
+.kpi .l{font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0 0}
+.controls label{font-size:12.5px;color:#475569;font-weight:700}
+select,button,input{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;font-size:13px}
+button.ghost{cursor:pointer;font-weight:700;color:#334155}
+button.primary{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:700;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;user-select:none}
+.chip.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;font-weight:800;background:#f8fafc;position:sticky;top:0;z-index:1;cursor:pointer;user-select:none}
+th:hover{color:#1f6feb}
+th .a{opacity:.4;font-size:9px}
+th.on .a{opacity:1;color:#1f6feb}
+td.num,th.num{text-align:right}
+.st{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:#f1f5f9;color:#475569}
+.st.bad{background:#fee2e2;color:#991b1b}
+.st.warn{background:#fef3c7;color:#92400e}
+.neg{color:#991b1b;font-weight:700}
+.scroll{max-height:460px;overflow:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px}
+.muted{color:#94a3b8}
+.note{font-size:12px;color:#64748b;background:#f8fafc;border-left:3px solid #cbd5e1;padding:9px 11px;border-radius:0 8px 8px 0;margin-top:12px;line-height:1.6}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #cbd5e1;border-top-color:#1f6feb;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.body{display:none}
+.body.open{display:block}
+</style>
+</head>
+<body>
+<header>
+  <a href="/home/" class="brand"><div>
+    <div class="brand-name">Cursive Analyst</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-01a</div>
+  </div></a>
+  <a href="/analyst/" class="back-link">&larr; Back</a>
+</header>
+<main>
+  <h1>Reports</h1>
+  <p class="sub">Click any report to open it. Each one turns on by itself once the data it needs is loaded.</p>
+  <div class="controls" id="gc" style="display:none">
+    <input id="q" type="search" placeholder="Search SKU or order ref" style="min-width:230px">
+    <button class="primary" id="refresh">Refresh</button>
+    <span id="status" class="muted" style="font-size:12px"></span>
+  </div>
+  <div class="chips" id="platChips"></div>
+  <div class="chips" id="coChips" style="margin-bottom:16px"></div>
+
+  <section class="section" id="secPayments">
+    <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
+    <div id="wrapPayments"></div>
+  </section>
+
+  <section class="section" id="secReturns">
+    <div class="section-head"><h2>Returns</h2><div class="rule"></div><span class="cnt" id="cntReturns"></span></div>
+    <div id="wrapReturns"></div>
+  </section>
+
+  <section class="section missings" id="secMissings">
+    <div class="section-head"><h2>Missings</h2><div class="rule"></div><span class="cnt" id="cntMissings"></span></div>
+    <div id="wrapMissings"></div>
+  </section>
+</main>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
+const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+const $ = (s) => document.querySelector(s);
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const money = (v) => "₹" + num(v).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+const money2 = (v) => "₹" + num(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const titleCase = (s) => String(s || "").replace(/\b\w/g, (c) => c.toUpperCase());
+
+/* ---------- the reports ------------------------------------------------ */
+/* Every report is a slice of one of two RPCs. They light up on their own as
+   soon as the data behind them exists; nothing here needs configuring. */
+
+const COL = {
+  plat:   { k: "platform",     l: "Platform",  t: "plat" },
+  co:     { k: "company_name", l: "Company",   t: "txt"  },
+  ref:    { k: "order_ref",    l: "Order ref", t: "txt"  },
+  sku:    { k: "sku",          l: "SKU",       t: "txt"  },
+  msku:   { k: "master_sku",   l: "Master SKU",t: "txt"  },
+  ord:    { k: "ordered_on",   l: "Ordered",   t: "date" },
+  age:    { k: "age_days",     l: "Days old",  t: "int"  },
+  stat:   { k: "order_status", l: "Status",    t: "st"   },
+  val:    { k: "value",        l: "Order value", t: "money" },
+  ded:    { k: "deducted",     l: "Deducted",  t: "moneyneg" },
+  qty:    { k: "qty",          l: "Qty",       t: "int"  },
+  recd:   { k: "received",     l: "Received",  t: "money" },
+  cop:    { k: "cop",          l: "COP",       t: "money" },
+  profit: { k: "profit",       l: "Profit",    t: "moneysign" },
+  mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  },
+  u30:    { k: "units_30d",    l: "Units 30d", t: "int"  },
+  u90:    { k: "units_90d",    l: "Units 90d", t: "int"  },
+  r90:    { k: "returns_90d",  l: "Returns 90d", t: "int" },
+  spu:    { k: "settle_per_unit", l: "Settle/unit", t: "money" },
+  s90:    { k: "settled_90d",  l: "Settled 90d", t: "money" },
+  rsn:    { k: "reason",       l: "Why",       t: "txt"  }
+};
+
+const REPORTS = [
+  {
+    id: "unpaid", sec: "Payments",
+    title: "Payment not received",
+    desc: "Orders placed 45 or more days ago that are not cancelled, are not sitting in a returns file, and have no money against them in any payment file.",
+    src: "check", pick: (r) => r.bucket === "payment not received",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.age, COL.stat, COL.val],
+    sort: { k: "age_days", dir: -1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length, cls: rows.length ? "bad" : "" },
+      { l: "Value at stake", n: money(sum(rows, "value")), cls: rows.length ? "bad" : "" },
+      { l: "Oldest", n: (rows.length ? Math.max(...rows.map((r) => num(r.age_days))) : 0) + " days" }
+    ],
+    empty: "Nothing outstanding. Every order older than 45 days has either been paid, cancelled, or is accounted for as a return."
+  },
+  {
+    id: "paid", sec: "Payments",
+    title: "Orders paid successfully",
+    desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
+    src: "profit", pick: (r) => num(r.received) > 0,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "received", dir: -1 },
+    kpis: (rows) => {
+      const p = rows.filter((r) => r.cop_known);
+      return [
+        { l: "Orders paid", n: rows.length.toLocaleString("en-IN") },
+        { l: "Received", n: money(sum(rows, "received")) },
+        { l: "Cost of goods", n: money(sum(p, "cop")) },
+        { l: "Profit", n: money(sum(p, "profit")), cls: sum(p, "profit") < 0 ? "bad" : "" },
+        { l: "Costed", n: p.length ? Math.round((p.length / rows.length) * 100) + "%" : "0%" }
+      ];
+    },
+    empty: "No settled payments loaded yet."
+  },
+  {
+    id: "belowcop", sec: "Payments",
+    title: "Received less than COP",
+    desc: "Money came in, but less than the item cost you to buy. Every one of these is a loss on the sale itself.",
+    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0 && num(r.received) < num(r.cop),
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "profit", dir: 1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" },
+      { l: "Total loss", n: money(sum(rows, "profit")), cls: "bad" },
+      { l: "Worst single", n: money(rows.length ? Math.min(...rows.map((r) => num(r.profit))) : 0), cls: "bad" }
+    ],
+    empty: "Nothing sold below cost."
+  },
+  {
+    id: "belowpct", sec: "Payments",
+    title: "Received less than a % margin",
+    desc: "Orders whose margin fell under the percentage you set. Type the number you want to hold the line at.",
+    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0,
+    thr: { id: "pct", label: "Margin below", suffix: "%", def: 10, step: "0.5" },
+    filt: (r, v) => num(r.margin_pct) < v,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "margin_pct", dir: 1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+      { l: "Profit on them", n: money(sum(rows, "profit")), cls: sum(rows, "profit") < 0 ? "bad" : "warn" },
+      { l: "Received", n: money(sum(rows, "received")) }
+    ],
+    empty: "No paid order falls under that margin."
+  },
+  {
+    id: "belowamt", sec: "Payments",
+    title: "Received less than a profit amount",
+    desc: "Orders that left you with less rupees of profit than the figure you set, whatever the percentage says.",
+    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0,
+    thr: { id: "amt", label: "Profit below", suffix: "₹", def: 50, step: "10" },
+    filt: (r, v) => num(r.profit) < v,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "profit", dir: 1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+      { l: "Profit on them", n: money(sum(rows, "profit")), cls: sum(rows, "profit") < 0 ? "bad" : "warn" },
+      { l: "Received", n: money(sum(rows, "received")) }
+    ],
+    empty: "No paid order falls under that amount."
+  },
+  {
+    id: "retlost", sec: "Returns",
+    title: "Returned, goods never arrived",
+    desc: "The payment file says the order came back and took the money with it, but the parcel is not in any returns file. If the platform lost it, this is what to claim.",
+    src: "check", pick: (r) => r.bucket !== "payment not received",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.age, COL.stat, COL.val],
+    sort: { k: "age_days", dir: -1 },
+    kpis: (rows) => [
+      { l: "Orders", n: rows.length, cls: rows.length ? "warn" : "" },
+      { l: "Value to claim", n: money(sum(rows, "value")), cls: rows.length ? "warn" : "" },
+      { l: "Oldest", n: (rows.length ? Math.max(...rows.map((r) => num(r.age_days))) : 0) + " days" }
+    ],
+    empty: "Every return the payment files charged you for has physically come back."
+  },
+  {
+    id: "skunocop", sec: "Missings",
+    title: "Selling with no cost price",
+    desc: "SKUs that sold in the last 90 days but have no cost price behind them, so every profit and margin figure for them is blank. Sorted by what is moving now \u2014 this is the order to fix the master sheet in.",
+    src: "nocost", pick: () => true,
+    cols: [COL.plat, COL.co, COL.sku, COL.u30, COL.u90, COL.r90, COL.spu, COL.s90, COL.rsn],
+    sort: { k: "units_30d", dir: -1 }, unit: "SKU",
+    kpis: (rows) => [
+      { l: "SKUs", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+      { l: "Units sold 90d", n: sum(rows, "units_90d").toLocaleString("en-IN") },
+      { l: "Settled on them", n: money(sum(rows, "settled_90d")), cls: rows.length ? "warn" : "" },
+      { l: "Not in master", n: rows.filter((r) => r.reason !== "in master sheet, COP blank").length.toLocaleString("en-IN") }
+    ],
+    empty: "Every SKU that sold in the last 90 days has a cost price."
+  },
+  {
+    id: "nocop", sec: "Missings",
+    title: "Cost price not available",
+    desc: "Paid orders that could not be matched to a cost in the SKU master, so their cost is counted as zero and their profit is overstated. Everything known about each one is here so the SKU can be added.",
+    src: "profit", pick: (r) => !r.cop_known,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd],
+    sort: { k: "received", dir: -1 },
+    kpis: (rows) => {
+      const skus = new Set(rows.map((r) => (r.platform || "") + "|" + (r.company_name || "") + "|" + (r.sku || "")));
+      return [
+        { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+        { l: "Distinct SKUs", n: skus.size.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+        { l: "Received on them", n: money(sum(rows, "received")) }
+      ];
+    },
+    empty: "Every paid order maps to a cost price."
+  }
+];
+
+function sum(rows, k) { let t = 0; for (const r of rows) t += num(r[k]); return t; }
+
+/* ---------- state ------------------------------------------------------ */
+const state = { check: null, profit: null, nocost: null, plat: "", co: "", q: "", ui: {} };
+for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300 };
+
+/* ---------- boot ------------------------------------------------------- */
+(async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = "/home/?return=%2Freports%2F"; return; }
+  buildCards();
+  $("#gc").style.display = "flex";
+  $("#refresh").addEventListener("click", () => load(true));
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
+  await load(false);
+})();
+
+async function load(force) {
+  $("#status").innerHTML = '<span class="spin"></span> reading your data…';
+  const t0 = Date.now();
+  const [a, b, c] = await Promise.all([
+    sb.rpc("seller_order_money_check", { _days: 45 }),
+    sb.rpc("seller_paid_profit"),
+    sb.rpc("seller_skus_missing_cost")
+  ]);
+  if (a.error) console.error("money check", a.error);
+  if (b.error) console.error("paid profit", b.error);
+  if (c.error) console.error("missing cost", c.error);
+  state.check = a.error ? [] : (a.data || []);
+  state.profit = b.error ? [] : (b.data || []);
+  state.nocost = c.error ? [] : (c.data || []);
+  const bad = [a.error, b.error, c.error].filter(Boolean);
+  $("#status").textContent = bad.length
+    ? "Some data could not be read — " + bad.map((e) => e.message).join("; ")
+    : state.profit.length.toLocaleString("en-IN") + " paid orders · checked in " + ((Date.now() - t0) / 1000).toFixed(1) + "s";
+  buildChips();
+  renderAll();
+}
+
+/* ---------- chips ------------------------------------------------------ */
+function buildChips() {
+  const all = [...(state.check || []), ...(state.profit || []), ...(state.nocost || [])];
+  const plats = [...new Set(all.map((r) => r.platform).filter(Boolean))].sort();
+  const cos = [...new Set(all.map((r) => r.company_name).filter(Boolean))].sort();
+  const draw = (host, list, key, allLabel) => {
+    host.innerHTML = "";
+    const mk = (val, label) => {
+      const c = document.createElement("span");
+      c.className = "chip" + (state[key] === val ? " active" : "");
+      c.textContent = label;
+      c.addEventListener("click", () => { state[key] = val; buildChips(); renderAll(); });
+      host.appendChild(c);
+    };
+    mk("", allLabel);
+    for (const v of list) mk(v, titleCase(v));
+  };
+  draw($("#platChips"), plats, "plat", "All platforms");
+  draw($("#coChips"), cos, "co", "All companies");
+}
+
+/* ---------- card scaffolding ------------------------------------------ */
+function buildCards() {
+  for (const r of REPORTS) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.id = "card_" + r.id;
+    card.innerHTML =
+      '<div class="card-head" data-id="' + r.id + '">' +
+        "<div><h3>" + esc(r.title) + '</h3><p class="desc">' + esc(r.desc) + "</p></div>" +
+        '<span class="pill need" id="pill_' + r.id + '">…</span>' +
+      "</div>" +
+      '<div class="body" id="body_' + r.id + '"></div>';
+    card.querySelector(".card-head").addEventListener("click", () => {
+      state.ui[r.id].open = !state.ui[r.id].open;
+      render(r);
+    });
+    $("#wrap" + r.sec).appendChild(card);
+  }
+}
+
+/* ---------- rows for one report --------------------------------------- */
+function rowsFor(r) {
+  const src = state[r.src];
+  if (!src) return null;
+  const u = state.ui[r.id];
+  let out = src.filter(r.pick);
+  if (r.filt) out = out.filter((row) => r.filt(row, num(u.thr)));
+  if (state.plat) out = out.filter((row) => row.platform === state.plat);
+  if (state.co) out = out.filter((row) => row.company_name === state.co);
+  if (state.q) {
+    const q = state.q;
+    out = out.filter((row) =>
+      String(row.sku || "").toLowerCase().includes(q) ||
+      String(row.order_ref || "").toLowerCase().includes(q) ||
+      String(row.master_sku || "").toLowerCase().includes(q));
+  }
+  const s = u.sort;
+  out = out.slice().sort((x, y) => {
+    const a = x[s.k], b = y[s.k];
+    const na = Number(a), nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb) && a !== null && b !== null) return (na - nb) * s.dir;
+    return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
+  });
+  return out;
+}
+
+/* ---------- cell rendering -------------------------------------------- */
+function cell(row, c) {
+  const v = row[c.k];
+  switch (c.t) {
+    case "plat": return "<td>" + esc(titleCase(v)) + "</td>";
+    case "date": return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
+    case "int": return '<td class="num">' + (v == null ? "" : num(v).toLocaleString("en-IN")) + "</td>";
+    case "money": return '<td class="num">' + money2(v) + "</td>";
+    case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
+    case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
+    case "pct": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + num(v).toFixed(1) + "%</td>";
+    case "st": {
+      const t = String(v || "").trim();
+      if (!t) return '<td><span class="muted">—</span></td>';
+      const u = t.toUpperCase();
+      const cls = /LOST|DAMAG|F$/.test(u) ? " bad" : /RTO|RETURN|PEND/.test(u) ? " warn" : "";
+      return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
+    }
+    default: return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
+  }
+}
+
+/* ---------- render one report ----------------------------------------- */
+function render(r) {
+  const u = state.ui[r.id];
+  const card = $("#card_" + r.id);
+  const pill = $("#pill_" + r.id);
+  const body = $("#body_" + r.id);
+  const rows = rowsFor(r);
+
+  if (rows === null) {
+    card.classList.add("locked");
+    pill.className = "pill need";
+    pill.textContent = "waiting for data";
+    body.className = "body";
+    return;
+  }
+  card.classList.remove("locked");
+  const n = rows.length;
+  const clean = r.id === "paid";
+  pill.className = "pill " + (clean ? "ok" : n === 0 ? "ok" : r.sec === "Payments" && r.id === "unpaid" ? "bad" : "hit");
+  const unit = r.unit || "order";
+  pill.textContent = n === 0 && !clean ? "all clear" : n.toLocaleString("en-IN") + " " + unit + (n === 1 ? "" : "s");
+
+  body.className = "body" + (u.open ? " open" : "");
+  if (!u.open) { body.innerHTML = ""; return; }
+
+  let h = '<div class="kpis">';
+  for (const k of r.kpis(rows)) h += '<div class="kpi"><div class="n ' + (k.cls || "") + '">' + esc(String(k.n)) + '</div><div class="l">' + esc(k.l) + "</div></div>";
+  h += "</div>";
+
+  h += '<div class="controls">';
+  if (r.thr) h += "<label>" + esc(r.thr.label) + '</label><input type="number" step="' + r.thr.step + '" value="' + u.thr + '" id="thr_' + r.id + '" style="width:96px">' +
+                 '<span class="muted" style="font-size:12px">' + r.thr.suffix + "</span>";
+  h += '<button class="ghost" id="csv_' + r.id + '">Download CSV</button>';
+  if (n > u.limit) h += '<button class="ghost" id="more_' + r.id + '">Show all ' + n.toLocaleString("en-IN") + "</button>";
+  h += '<span class="muted" style="font-size:12px">' + (n > u.limit ? "showing first " + u.limit.toLocaleString("en-IN") : "showing all " + n.toLocaleString("en-IN")) + "</span>";
+  h += "</div>";
+
+  if (n === 0) {
+    h += '<div class="note">' + esc(r.empty) + "</div>";
+  } else {
+    h += '<div class="scroll"><table><thead><tr>';
+    for (const c of r.cols) {
+      const on = u.sort.k === c.k;
+      const numy = ["int", "money", "moneyneg", "moneysign", "pct"].includes(c.t);
+      h += '<th class="' + (numy ? "num " : "") + (on ? "on" : "") + '" data-k="' + c.k + '">' + esc(c.l) +
+           ' <span class="a">' + (on ? (u.sort.dir === 1 ? "▲" : "▼") : "◆") + "</span></th>";
+    }
+    h += "</tr></thead><tbody>";
+    for (const row of rows.slice(0, u.limit)) {
+      h += "<tr>";
+      for (const c of r.cols) h += cell(row, c);
+      h += "</tr>";
+    }
+    h += "</tbody></table></div>";
+  }
+  body.innerHTML = h;
+
+  body.querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
+    const k = th.dataset.k;
+    if (u.sort.k === k) u.sort.dir = -u.sort.dir; else { u.sort.k = k; u.sort.dir = -1; }
+    render(r);
+  }));
+  const thr = body.querySelector("#thr_" + r.id);
+  if (thr) thr.addEventListener("change", () => { u.thr = Number(thr.value); render(r); });
+  const more = body.querySelector("#more_" + r.id);
+  if (more) more.addEventListener("click", () => { u.limit = 1e9; render(r); });
+  body.querySelector("#csv_" + r.id).addEventListener("click", () => csv(r, rows));
+}
+
+function renderAll() {
+  for (const r of REPORTS) render(r);
+  for (const sec of ["Payments", "Returns", "Missings"]) {
+    const list = REPORTS.filter((r) => r.sec === sec);
+    const live = list.filter((r) => { const x = rowsFor(r); return x && x.length; }).length;
+    $("#cnt" + sec) && ($("#cnt" + sec).textContent = list.length + (list.length === 1 ? " report" : " reports") + (live ? " · " + live + " with hits" : ""));
+  }
+}
+
+/* ---------- csv -------------------------------------------------------- */
+function csv(r, rows) {
+  const q = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [r.cols.map((c) => q(c.l)).join(",")];
+  for (const row of rows) lines.push(r.cols.map((c) => q(row[c.k])).join(","));
+  const url = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "cursive-" + r.id + "-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+</script>
+</body>
+</html>
