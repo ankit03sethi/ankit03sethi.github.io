@@ -94,7 +94,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-01b</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-01c</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -410,6 +410,11 @@ function buildCards() {
         // render() collapses a card whose data is still null, so open it again
         // or the spinner would be sitting inside a hidden element.
         b.className = "body open";
+        // "waiting for data" is what an unopened card says; once you have
+        // clicked it, it is reading, and it should not look dead while it does.
+        const pl = $("#pill_" + r.id);
+        if (pl) { pl.className = "pill hit"; pl.textContent = "reading\u2026"; }
+        $("#card_" + r.id).classList.remove("locked");
         b.innerHTML = '<div class="note"><span class="spin"></span> reading every order\u2026 this one walks all 27,000 lines, so it takes a few seconds.</div>';
         const { data, error } = await sb.rpc(r.rpc);
         if (error) { console.error("all orders", error); b.innerHTML = '<div class="note">Could not read orders \u2014 ' + esc(error.message) + "</div>"; state.ui[r.id].loading = false; return; }
