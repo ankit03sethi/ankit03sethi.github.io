@@ -56,6 +56,31 @@ td.num,th.num{text-align:right}
 .st.bad{background:#fee2e2;color:#991b1b}
 .st.warn{background:#fef3c7;color:#92400e}
 .neg{color:#991b1b;font-weight:700}
+.fbtn{font:inherit;font-size:10.5px;width:100%;min-width:64px;padding:2px 5px;cursor:pointer;border:1px solid #e5e7eb;border-radius:5px;background:#fff;color:#475569;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:3px}
+.fbtn:hover{border-color:#cbd5e1;background:#f8fafc}
+.fbtn.on{border-color:#1f6feb;background:#eff6ff;color:#1f6feb}
+.fbtn .cap{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbtn .car{flex:none;opacity:.55;font-size:8px}
+tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3px 6px;cursor:default}
+.fpanel{position:fixed;z-index:200;width:258px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,.18);font-size:13px;overflow:hidden}
+.fpanel .fhead{padding:8px;border-bottom:1px solid #eef2f7}
+.fpanel .fhead input{width:100%;font:inherit;font-size:13px;padding:6px 9px;border:1px solid #e5e7eb;border-radius:7px}
+.fpanel .fhead input:focus{outline:none;border-color:#1f6feb}
+.fpanel .fbulk{display:flex;gap:14px;padding:6px 10px;border-bottom:1px solid #eef2f7;font-size:12px;font-weight:700}
+.fpanel .fbulk span{color:#1f6feb;cursor:pointer}
+.fpanel .fbulk span:hover{text-decoration:underline}
+.fpanel .fbulk .cnt{margin-left:auto;color:#94a3b8;font-weight:600;cursor:default}
+.fpanel .flist{max-height:270px;overflow:auto;padding:4px 0}
+.fpanel .flist label{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer}
+.fpanel .flist label:hover{background:#f1f5f9}
+.fpanel .flist label .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fpanel .flist label .c{margin-left:auto;color:#94a3b8;font-size:11px}
+.fpanel .flist .none{padding:10px;color:#94a3b8}
+.fpanel .ffoot{padding:7px 10px;border-top:1px solid #eef2f7;text-align:right}
+.fpanel .ffoot button{font:inherit;font-size:12px;font-weight:700;padding:4px 12px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;cursor:pointer}
+.st.paid{background:#ecfdf5;color:#047857}
+.st.up{background:#eff6ff;color:#1d4ed8}
+.est{color:#b45309}
 .scroll{max-height:460px;overflow:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px}
 .muted{color:#94a3b8}
 .note{font-size:12px;color:#64748b;background:#f8fafc;border-left:3px solid #cbd5e1;padding:9px 11px;border-radius:0 8px 8px 0;margin-top:12px;line-height:1.6}
@@ -69,7 +94,7 @@ td.num,th.num{text-align:right}
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-01a</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-01b</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -83,6 +108,11 @@ td.num,th.num{text-align:right}
   </div>
   <div class="chips" id="platChips"></div>
   <div class="chips" id="coChips" style="margin-bottom:16px"></div>
+
+  <section class="section" id="secOrders">
+    <div class="section-head"><h2>Orders</h2><div class="rule"></div><span class="cnt" id="cntOrders"></span></div>
+    <div id="wrapOrders"></div>
+  </section>
 
   <section class="section" id="secPayments">
     <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
@@ -138,10 +168,38 @@ const COL = {
   r90:    { k: "returns_90d",  l: "Returns 90d", t: "int" },
   spu:    { k: "settle_per_unit", l: "Settle/unit", t: "money" },
   s90:    { k: "settled_90d",  l: "Settled 90d", t: "money" },
-  rsn:    { k: "reason",       l: "Why",       t: "txt"  }
+  rsn:    { k: "reason",       l: "Why",       t: "txt"  },
+  ostat:  { k: "order_status", l: "File status", t: "txt" },
+  fstat:  { k: "status",       l: "Status",    t: "fst"  },
+  famt:   { k: "final_amount", l: "Final amount", t: "fmoney" },
+  amton:  { k: "amount_on",    l: "Money on",  t: "date" }
 };
 
 const REPORTS = [
+  {
+    id: "allorders", sec: "Orders", lazy: "orders", rpc: "seller_all_orders",
+    title: "All orders",
+    desc: "Every order line and what finally happened to it. The status here is the outcome, not what the order file said \u2014 a returned order reads Return, a cancelled one reads Cancelled, and one still owed money reads Upcoming with the amount and the date it should arrive.",
+    src: "orders", pick: () => true,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.qty, COL.fstat,
+           COL.famt, COL.amton, COL.age, COL.ostat, COL.val],
+    sort: { k: "ordered_on", dir: -1 },
+    kpis: (rows) => {
+      const by = (st) => rows.filter((r) => r.status === st);
+      const paid = by("Paid"), up = by("Upcoming");
+      const ret = rows.filter((r) => String(r.status).startsWith("Return"));
+      const oldest = up.length ? Math.max(...up.map((r) => num(r.age_days))) : 0;
+      return [
+        { l: "Orders", n: rows.length.toLocaleString("en-IN") },
+        { l: "Received", n: money(sum(paid, "final_amount")) },
+        { l: "Lost to returns", n: money(sum(ret, "final_amount")), cls: sum(ret, "final_amount") < 0 ? "bad" : "" },
+        { l: "Upcoming", n: up.length.toLocaleString("en-IN"), cls: up.length ? "warn" : "" },
+        { l: "Oldest upcoming", n: oldest + " days", cls: oldest > 45 ? "bad" : "" },
+        { l: "Cancelled", n: by("Cancelled").length.toLocaleString("en-IN") }
+      ];
+    },
+    empty: "No orders loaded yet."
+  },
   {
     id: "unpaid", sec: "Payments",
     title: "Payment not received",
@@ -272,8 +330,8 @@ const REPORTS = [
 function sum(rows, k) { let t = 0; for (const r of rows) t += num(r[k]); return t; }
 
 /* ---------- state ------------------------------------------------------ */
-const state = { check: null, profit: null, nocost: null, plat: "", co: "", q: "", ui: {} };
-for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300 };
+const state = { check: null, profit: null, nocost: null, orders: null, plat: "", co: "", q: "", ui: {} };
+for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300, picks: {} };
 
 /* ---------- boot ------------------------------------------------------- */
 (async function boot() {
@@ -310,7 +368,7 @@ async function load(force) {
 
 /* ---------- chips ------------------------------------------------------ */
 function buildChips() {
-  const all = [...(state.check || []), ...(state.profit || []), ...(state.nocost || [])];
+  const all = [...(state.check || []), ...(state.profit || []), ...(state.nocost || []), ...(state.orders || [])];
   const plats = [...new Set(all.map((r) => r.platform).filter(Boolean))].sort();
   const cos = [...new Set(all.map((r) => r.company_name).filter(Boolean))].sort();
   const draw = (host, list, key, allLabel) => {
@@ -341,16 +399,38 @@ function buildCards() {
         '<span class="pill need" id="pill_' + r.id + '">…</span>' +
       "</div>" +
       '<div class="body" id="body_' + r.id + '"></div>';
-    card.querySelector(".card-head").addEventListener("click", () => {
+    card.querySelector(".card-head").addEventListener("click", async () => {
       state.ui[r.id].open = !state.ui[r.id].open;
       render(r);
+      // Heavy reports are not fetched until you actually open them, so the page
+      // still loads in about a second.
+      if (state.ui[r.id].open && r.lazy && state[r.lazy] === null && !state.ui[r.id].loading) {
+        state.ui[r.id].loading = true;
+        const b = $("#body_" + r.id);
+        // render() collapses a card whose data is still null, so open it again
+        // or the spinner would be sitting inside a hidden element.
+        b.className = "body open";
+        b.innerHTML = '<div class="note"><span class="spin"></span> reading every order\u2026 this one walks all 27,000 lines, so it takes a few seconds.</div>';
+        const { data, error } = await sb.rpc(r.rpc);
+        if (error) { console.error("all orders", error); b.innerHTML = '<div class="note">Could not read orders \u2014 ' + esc(error.message) + "</div>"; state.ui[r.id].loading = false; return; }
+        state[r.lazy] = data || [];
+        state.ui[r.id].loading = false;
+        buildChips();
+        renderAll();
+      }
     });
     $("#wrap" + r.sec).appendChild(card);
   }
 }
 
 /* ---------- rows for one report --------------------------------------- */
-function rowsFor(r) {
+// The text a cell shows, which is what the dropdowns list and match on.
+function cellText(row, k) {
+  const v = row[k];
+  return v == null ? "" : String(v);
+}
+
+function rowsFor(r, skipCol) {
   const src = state[r.src];
   if (!src) return null;
   const u = state.ui[r.id];
@@ -364,6 +444,13 @@ function rowsFor(r) {
       String(row.sku || "").toLowerCase().includes(q) ||
       String(row.order_ref || "").toLowerCase().includes(q) ||
       String(row.master_sku || "").toLowerCase().includes(q));
+  }
+  // Values ticked in a column's dropdown. A column with nothing ticked does not
+  // filter; skipCol is left out so its own panel can still list every value.
+  for (const k of Object.keys(u.picks || {})) {
+    if (k === skipCol) continue;
+    const set = u.picks[k];
+    if (set && set.size) out = out.filter((row) => set.has(cellText(row, k)));
   }
   const s = u.sort;
   out = out.slice().sort((x, y) => {
@@ -386,6 +473,20 @@ function cell(row, c) {
     case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
     case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
     case "pct": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + num(v).toFixed(1) + "%</td>";
+    case "fst": {
+      const t = String(v || "");
+      const cls = t === "Paid" ? " paid"
+                : t === "Upcoming" ? " up"
+                : t === "Cancelled" ? ""
+                : t === "Overdue" || t.startsWith("Return") || t.startsWith("Returned") ? " bad" : "";
+      return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
+    }
+    // Blank, not zero, when no money has moved yet - the files do not say what
+    // an unpaid order will settle at, so nothing is put in its place.
+    case "fmoney": {
+      if (v == null) return '<td class="num muted">\u2014</td>';
+      return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
+    }
     case "st": {
       const t = String(v || "").trim();
       if (!t) return '<td><span class="muted">—</span></td>';
@@ -464,11 +565,131 @@ function render(r) {
   const more = body.querySelector("#more_" + r.id);
   if (more) more.addEventListener("click", () => { u.limit = 1e9; render(r); });
   body.querySelector("#csv_" + r.id).addEventListener("click", () => csv(r, rows));
+
+  installColumnFilters(r, body);
+}
+
+/* ---------- per-column value dropdowns ------------------------------- */
+function installColumnFilters(r, body) {
+  const table = body.querySelector("table");
+  if (!table || !table.tHead) return;
+  const u = state.ui[r.id];
+  const fr = document.createElement("tr");
+  fr.className = "filter-row";
+  fr.innerHTML = r.cols.map((c) =>
+    '<th><button type="button" class="fbtn" data-k="' + c.k + '">' +
+    '<span class="cap"></span><span class="car">\u25bc</span></button></th>').join("");
+  table.tHead.appendChild(fr);
+  fr.querySelectorAll(".fbtn").forEach((btn) => {
+    paintFBtn(btn, u);
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openFPanel(r, btn); });
+  });
+}
+
+function paintFBtn(btn, u) {
+  const set = (u.picks || {})[btn.dataset.k];
+  const n = set ? set.size : 0;
+  btn.classList.toggle("on", n > 0);
+  btn.querySelector(".cap").textContent =
+    n === 0 ? "All" : n === 1 ? ([...set][0] || "(blank)") : n + " picked";
+}
+
+let openPanel = null;
+function closeFPanel() {
+  if (openPanel) { openPanel.remove(); openPanel = null; }
+  document.removeEventListener("mousedown", onDocDown, true);
+  document.removeEventListener("keydown", onPanelKey, true);
+}
+function onDocDown(e) { if (openPanel && !openPanel.contains(e.target)) closeFPanel(); }
+function onPanelKey(e) { if (e.key === "Escape") closeFPanel(); }
+
+function openFPanel(r, btn) {
+  const key = btn.dataset.k;
+  const was = openPanel && openPanel.dataset.k === key && openPanel.dataset.rid === r.id;
+  closeFPanel();
+  if (was) return;
+
+  const u = state.ui[r.id];
+  if (!u.picks) u.picks = {};
+  const chosen = new Set(u.picks[key] || []);
+  const col = r.cols.find((c) => c.k === key);
+  // Every value this column holds across the rows the other filters allow, so
+  // ticking one column never hides the choices in another.
+  const counts = new Map();
+  for (const row of (rowsFor(r, key) || [])) {
+    const t = cellText(row, key);
+    counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  const values = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), undefined, { numeric: true }))
+    .map(([v, n]) => ({ v, n }));
+
+  const panel = document.createElement("div");
+  panel.className = "fpanel";
+  panel.dataset.k = key; panel.dataset.rid = r.id;
+  panel.innerHTML =
+    '<div class="fhead"><input type="search" placeholder="Search ' + esc(col ? col.l : key) + '"></div>' +
+    '<div class="fbulk"><span data-all="1">Select all</span><span data-none="1">Clear</span><span class="cnt"></span></div>' +
+    '<div class="flist"></div><div class="ffoot"><button type="button">Done</button></div>';
+  document.body.appendChild(panel);
+  openPanel = panel;
+
+  const search = panel.querySelector(".fhead input");
+  const list = panel.querySelector(".flist");
+  const cnt = panel.querySelector(".cnt");
+
+  function draw() {
+    const q = search.value.trim().toLowerCase();
+    const rows = q ? values.filter((o) => String(o.v).toLowerCase().includes(q)) : values;
+    cnt.textContent = chosen.size ? chosen.size + " picked" : rows.length + " values";
+    if (!rows.length) { list.innerHTML = '<div class="none">Nothing matches.</div>'; return; }
+    list.innerHTML = rows.slice(0, 600).map((o) =>
+      '<label><input type="checkbox" ' + (chosen.has(o.v) ? "checked" : "") +
+      ' value="' + esc(o.v) + '"><span class="v">' +
+      (o.v === "" ? "<i>(blank)</i>" : esc(o.v)) + '</span><span class="c">' + o.n + "</span></label>"
+    ).join("") + (rows.length > 600 ? '<div class="none">Showing the first 600 \u2014 type to narrow.</div>' : "");
+  }
+  function commit() {
+    if (chosen.size) u.picks[key] = new Set(chosen); else delete u.picks[key];
+    render(r);
+    // render() rebuilds the table, so re-point the button this panel belongs to
+    const nb = $("#body_" + r.id + " .fbtn[data-k='" + key + "']");
+    if (nb) paintFBtn(nb, u);
+  }
+
+  list.addEventListener("change", (e) => {
+    const cb = e.target;
+    if (!cb || cb.type !== "checkbox") return;
+    if (cb.checked) chosen.add(cb.value); else chosen.delete(cb.value);
+    cnt.textContent = chosen.size ? chosen.size + " picked" : "";
+    commit();
+  });
+  search.addEventListener("input", draw);
+  panel.querySelector("[data-all]").addEventListener("click", () => {
+    const q = search.value.trim().toLowerCase();
+    (q ? values.filter((o) => String(o.v).toLowerCase().includes(q)) : values).forEach((o) => chosen.add(o.v));
+    draw(); commit();
+  });
+  panel.querySelector("[data-none]").addEventListener("click", () => { chosen.clear(); draw(); commit(); });
+  panel.querySelector(".ffoot button").addEventListener("click", closeFPanel);
+  draw();
+
+  const b = btn.getBoundingClientRect(), w = 258;
+  panel.style.left = Math.max(8, Math.min(b.left, window.innerWidth - w - 8)) + "px";
+  panel.style.top = b.bottom + 4 + "px";
+  const h = panel.getBoundingClientRect().height;
+  if (b.bottom + 4 + h > window.innerHeight - 8) panel.style.top = Math.max(8, b.top - 4 - h) + "px";
+
+  search.focus();
+  document.addEventListener("mousedown", onDocDown, true);
+  document.addEventListener("keydown", onPanelKey, true);
+  window.addEventListener("scroll", closeFPanel, { capture: true, once: true });
+  window.addEventListener("resize", closeFPanel, { once: true });
 }
 
 function renderAll() {
   for (const r of REPORTS) render(r);
-  for (const sec of ["Payments", "Returns", "Missings"]) {
+  for (const sec of ["Orders", "Payments", "Returns", "Missings"]) {
     const list = REPORTS.filter((r) => r.sec === sec);
     const live = list.filter((r) => { const x = rowsFor(r); return x && x.length; }).length;
     $("#cnt" + sec) && ($("#cnt" + sec).textContent = list.length + (list.length === 1 ? " report" : " reports") + (live ? " · " + live + " with hits" : ""));
