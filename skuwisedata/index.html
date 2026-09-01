@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1293,17 +1293,29 @@
         return { v: -per, txt: money(-per) };
       }
       if (col.endsWith("Ret Charged")) {
-        const c = Number(wc["rc" + w]) || 0;
-        const totalRet = Number(wc["r" + w]) || 0;
-        return { v: c, txt: c + (totalRet ? " / " + totalRet : "") };
+        const cr = Number(wc["rcr" + w]) || 0;   // RTO returns the platform billed
+        const cs = Number(wc["rcs" + w]) || 0;   // customer returns it billed
+        return { v: cr + cs,
+                 html: '<b style="color:' + (cr > 0 ? "#b91c1c" : "#94a3b8") + '">' + cr + "</b>"
+                     + '<span style="color:#cbd5e1"> / </span>'
+                     + '<span style="color:#0f172a">' + cs + "</span>" };
       }
       if (col.endsWith("Net Units")) {
         const nu = sold - ret;
         return { v: nu, txt: nu.toLocaleString("en-IN") };
       }
+      // Shown as RTO / customer, because a charge on the RTO side is a billing
+      // error on Flipkart, Meesho and Myntra - it has nowhere to hide in a
+      // single total. Sorting still uses the combined figure.
       if (col.endsWith("Ret Fees")) {
-        const L = Number.isFinite(loss) ? loss : booked;
-        return { v: -L, txt: L ? money(-L) : "0" };
+        const L  = Number.isFinite(loss) ? loss : booked;
+        const lr = Number(wc["rlr" + w]) || 0;
+        const ls = Number(wc["rls" + w]) || 0;
+        if (!lr && !ls) return { v: -L, txt: L ? money(-L) : "0" };
+        const rtoTxt = '<b style="color:' + (lr > 0 ? "#b91c1c" : "#94a3b8") + '">'
+                     + Math.round(lr) + "</b>";
+        return { v: -L, html: rtoTxt + '<span style="color:#cbd5e1"> / </span>'
+                             + '<span style="color:#0f172a">' + Math.round(ls) + "</span>" };
       }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
@@ -1390,6 +1402,7 @@
                                             ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0)+"%" } : null;
         else out = moneyCell(wc, c);
         if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        if (out.html) return `<td>${out.html}</td>`;
         const neg = out.v < 0;
         return `<td style="color:${neg ? "#b91c1c" : "#0f172a"};font-weight:${neg ? 700 : 400}">${out.txt}</td>`;
       }
@@ -1618,8 +1631,8 @@
     COL_HELP[w+"d Net Units"]= "Units ordered minus units returned over "+w+" days - the units that actually stayed sold. Every money figure for this window is built on it.";
     COL_HELP[w+"d Margin"]   = "(sold - returned) x Margin/unit. Returned units are removed first, so they are charged no COP - the stock comes back to you.";
     COL_HELP[w+"d Ret Cost/unit"] = "Return fees over "+w+" days divided by the number of units returned - what one return costs you on average. Low usually means most of them are RTO, which Flipkart, Meesho and Myntra do not charge for.";
-    COL_HELP[w+"d Ret Charged"] = "How many of these "+w+" days' returns the platform has actually billed you for, out of the total returns. The rest are priced at this platform's learned cost per return, because the deduction has not settled yet - or, for RTO on Flipkart, Meesho and Myntra, never will.";
-    COL_HELP[w+"d Ret Fees"] = "Cost of the returns that happened in these "+w+" days. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
+    COL_HELP[w+"d Ret Charged"] = "Returns the platform billed you for over "+w+" days, shown as RTO / customer. The RTO figure turns red if it is above zero, because Flipkart, Meesho and Myntra should never charge for a courier return - Amazon does. The rest are priced at this platform's learned cost per return, because the deduction has not settled yet - or, for RTO on Flipkart, Meesho and Myntra, never will.";
+    COL_HELP[w+"d Ret Fees"] = "Cost of these "+w+" days' returns, shown as RTO / customer. Anything on the RTO side of Flipkart, Meesho or Myntra is money to claim back. The real deduction where the platform has already taken it, plus this platform's learned cost per return where it has not settled yet. RTO is near-free on Flipkart, Meesho and Myntra; Amazon does charge for it.";
     COL_HELP[w+"d Tax"]      = "Tax % from your master sheet applied to the net revenue. Blank in the sheet counts as 0.";
     COL_HELP[w+"d Net"]      = "Margin minus return fees minus tax. Everything in, less everything out, over "+w+" days.";
     COL_HELP[w+"d Net/unit"] = "Net divided by the units that stayed sold (ordered - returned). What you actually keep per unit.";
