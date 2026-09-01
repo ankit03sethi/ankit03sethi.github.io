@@ -92,8 +92,28 @@
     .cell-link { margin-left:6px; font-size:12px; text-decoration:none; }
     /* Header note. A real element rather than the browser's title bubble:
        it appears straight away, wraps properly and can be read. */
-    table.data thead th .wdays { display:inline-block; margin-left:6px; font-size:10px;
-        font-weight:700; color:#94a3b8; letter-spacing:0; }
+    /* Header and cell share one grid, so the day label sits exactly above the
+       number it belongs to, in every row, all the way down the table. */
+    .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
+             align-items:center; width:100%; }
+    .wgrid > span { text-align:right; padding:0 6px; }
+    .wgrid > span + span { border-left:2px solid #cbd5e1; }
+    table.data thead th .wdays { margin-top:3px; }
+    table.data thead th .wdays > span { font-size:10px; font-weight:700;
+        color:#94a3b8; letter-spacing:0; }
+    table.data thead th .wdays > span.wa { color:#1f6feb; }
+    table.data thead th .hrow { display:block; white-space:nowrap; }
+    table.data thead th .hlab { }
+    /* Sort panel: direction and, where a column carries several windows, which
+       window the order is taken from. */
+    .sortpanel { position:fixed; z-index:9999; background:#fff; border:1px solid #cbd5e1;
+                 border-radius:10px; box-shadow:0 12px 32px rgba(15,23,42,.18);
+                 padding:10px 12px 12px; min-width:224px;
+                 text-transform:none; letter-spacing:0; }
+    .sortpanel .sp-h { font-size:12.5px; font-weight:800; color:#0f172a; }
+    .sortpanel .sp-l { font-size:10.5px; letter-spacing:.5px; text-transform:uppercase;
+                       color:#64748b; font-weight:700; margin:9px 0 5px; }
+    .sortpanel .sp-row { display:flex; flex-wrap:wrap; gap:5px; }
     .pgrp { font-size:10.5px; letter-spacing:.5px; text-transform:uppercase;
             color:#64748b; font-weight:700; margin:10px 0 5px; }
     .prow { display:flex; flex-wrap:wrap; gap:5px; }
@@ -105,9 +125,6 @@
     /* Combined window cell: 30 | 60 | 90 in one place. The bar is a real
        rule, not a slash - a slash reads as "per" and these are not a ratio. */
     table.data td.wincell { white-space:nowrap; }
-    table.data td.wincell .wv { display:inline-block; min-width:26px; text-align:right; }
-    table.data td.wincell .wsep { display:inline-block; width:1px; height:11px;
-        background:#94a3b8; margin:0 7px; vertical-align:-1px; }
     .colnote { position:fixed; z-index:9999; max-width:320px; padding:9px 11px;
                background:#0f172a; color:#f8fafc; font-size:12px; line-height:1.45;
                border-radius:8px; box-shadow:0 8px 24px rgba(15,23,42,.28);
@@ -179,10 +196,9 @@
     /* Explicit low-to-high / high-to-low buttons on every column. Clicking the
        header still toggles, but nothing about a bare header says it is
        clickable, so the two directions are spelled out. */
-    table.data thead th .sort-btns { display:inline-flex; flex-direction:column; line-height:7px; margin-left:5px; vertical-align:middle; }
-    table.data thead th .sort-btn { cursor:pointer; color:#cbd5e1; font-size:9px; padding:0 1px; user-select:none; }
-    table.data thead th .sort-btn:hover { color:#1f6feb; }
-    table.data thead th .sort-btn.on { color:#1f6feb; }
+    table.data thead th .sorthint { display:inline-block; margin-left:6px; font-size:9.5px;
+        font-weight:700; color:#1f6feb; letter-spacing:0; text-transform:none; }
+    table.data thead th .hrow.sorted .hlab { color:#1f6feb; }
     table.data thead tr.filter-row th { position:sticky; top:33px; background:#fff; padding:5px 8px; border-bottom:1px solid #e5e7eb; }
     .col-filter { font:inherit; font-size:12px; width:100%; min-width:70px; padding:3px 6px; border:1px solid #e5e7eb; border-radius:5px; }
     .col-filter:focus { outline:none; border-color:#1f6feb; }
@@ -269,7 +285,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01n</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01p</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1050,19 +1066,33 @@
       el.id = "colHideStyle";
       document.head.appendChild(el);
     }
-    const sel = [];
+    const sel = [], num = [];
     orderedCols().forEach((c, i) => {
       if (state.hiddenCols.has(c) || kindHidden(c)) {
         sel.push("table.data th:nth-child(" + (i + 1) + ")",
                  "table.data td:nth-child(" + (i + 1) + ")");
       }
+      // A number column reads down the page only if the digits line up, so the
+      // header sits over the right edge of its own figures.
+      if (COMBO[c] || FLAT_KIND[c]) {
+        num.push("table.data th:nth-child(" + (i + 1) + ")",
+                 "table.data td:nth-child(" + (i + 1) + ")");
+      }
     });
-    el.textContent = sel.length ? sel.join(",") + "{display:none}" : "";
+    el.textContent = (sel.length ? sel.join(",") + "{display:none}" : "")
+      + (num.length ? num.join(",") + "{text-align:right}" : "");
   }
 
   // Units / % / Values is a view switch, not a per-column choice: it hides a
   // whole kind of number at once without touching what you ticked.
-  const kindHidden = (c) => { const k = colKind(c); return !!k && !state.kind.has(k); };
+  // Sold is exempt: what a SKU is doing is the question every other column is
+  // an answer to, so it stays on screen whichever measures are switched off.
+  const ALWAYS_ON = new Set(["Sold"]);
+  const kindHidden = (c) => {
+    if (ALWAYS_ON.has(c)) return false;
+    const k = colKind(c);
+    return !!k && !state.kind.has(k);
+  };
 
   function colGroup(c) {
     if (c === "Sold") return "Sales";
@@ -1488,7 +1518,7 @@
         const when = wc.settle_last_on ? " \u00b7 paid " + escapeHtml(String(wc.settle_last_on)) : "";
         let col2 = "#0f172a", tip = "The single most recent settled order" + when;
         if (Number.isFinite(exp) && exp > 0) {
-          col2 = v >= exp ? "#047857" : "#b91c1c";
+          col2 = v >= exp ? "#047857" : "#0f172a";
           tip = "Last order settled at " + money(v) + " against " + money(exp) + " expected" + when;
         }
         return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">' + money(v) + "</td>";
@@ -1525,8 +1555,8 @@
       let tip = "Last charged return: " + kind + when
               + (Number.isFinite(units) && units > 1 ? " \u00b7 " + units + " units" : "");
       if (wrong) tip = "RTO charged on " + pf + " - it should not have been. " + tip;
-      return '<td title="' + tip + '" style="color:#b91c1c;font-weight:'
-           + (wrong ? "800" : "600") + '">' + money(v) + (wrong ? " \u26a0" : "") + "</td>";
+      return '<td title="' + tip + '" style="color:#0f172a;font-weight:'
+           + (wrong ? "800" : "700") + '">' + money(v) + (wrong ? " \u26a0" : "") + "</td>";
     }
     function shipCell(wc, col) {
       const spec = SHIP_COLS[col];
@@ -1613,7 +1643,7 @@
       if (net <= 0) return null;
       if (col.endsWith("Net/unit")) return { v: fin / net, txt: money(fin / net) };
       if (col.endsWith("%COP"))   return cop > 0
-        ? { v: fin / net / cop * 100, txt: (fin / net / cop * 100).toFixed(0) + "%" }
+        ? { v: fin / net / cop * 100, txt: (fin / net / cop * 100).toFixed(0) }
         : null;
       return { v: fin, txt: money(fin) };
     }
@@ -1675,7 +1705,7 @@
           const when = wc.settle_last_on ? " · last paid " + escapeHtml(String(wc.settle_last_on)) : "";
           let col = "#0f172a", tip = "Average of the 3 most recent settled orders" + when;
           if (Number.isFinite(exp) && exp > 0) {
-            col = v3 >= exp ? "#047857" : "#b91c1c";
+            col = v3 >= exp ? "#047857" : "#0f172a";
             tip = "Getting " + money(v3) + " against " + money(exp) + " expected" + when;
           } else {
             tip += " · fill Expected Settlement in the master sheet to flag shortfalls";
@@ -1687,7 +1717,7 @@
         else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
                                             ? { v: su - cop, txt: money(su - cop) } : null;
         else if (c === "Margin %COP") out = (Number.isFinite(su) && Number.isFinite(cop) && cop > 0)
-                                            ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0)+"%" } : null;
+                                            ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0) } : null;
         else out = moneyCell(wc, c);
         if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
         if (out.html) return `<td>${out.html}</td>`;
@@ -1696,9 +1726,9 @@
         // other number in the column.
         if (out.warn) return '<td title="An RTO was charged here - on Flipkart,'
           + ' Meesho and Myntra that should not happen, so it is money to claim back"'
-          + ' style="color:#b91c1c;font-weight:800">' + out.txt + " \u26a0</td>";
+          + ' style="color:#0f172a;font-weight:800">' + out.txt + " \u26a0</td>";
         const neg = out.v < 0;
-        return `<td style="color:${neg ? "#b91c1c" : "#0f172a"};font-weight:${neg ? 700 : 400}">${out.txt}</td>`;
+        return `<td style="color:#0f172a;font-weight:${neg ? 700 : 400}">${out.txt}</td>`;
       }
       if (PCT_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -1709,8 +1739,10 @@
         const pct = (num / den) * 100;
         // Above a fifth of everything sold coming back is worth spotting from
         // across the table; above a third is a problem.
-        const col = pct >= 33 ? "#b91c1c" : pct >= 20 ? "#b45309" : "#475569";
-        return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${Math.round(pct)}%</td>`;
+        // No colour on the number itself - a high return rate reads as weight,
+        // not as red, so the table stays one calm sheet of figures.
+        const col = pct >= 20 ? "#0f172a" : "#475569";
+        return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${Math.round(pct)}</td>`;
       }
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -1742,8 +1774,7 @@
         return '<span class="wv"' + (st ? ' style="' + st[1] + '"' : "")
              + (ti ? ' title="' + ti[1] + '"' : "") + ">" + inner + "</span>";
       });
-      return '<td class="wincell">'
-           + parts.join('<span class="wsep"></span>') + "</td>";
+      return '<td class="wincell"><div class="wgrid">' + parts.join("") + "</div></td>";
     }
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>"
@@ -1862,14 +1893,7 @@
       th.innerHTML = headerHtml(names[i], t);
       attachColNote(th, names[i]);
       bindSortButtons(th, names[i], t, table);
-      th.addEventListener("click", () => {
-        // First click on a new column sorts high to low, which is what you want
-        // on counts and prices; clicking again flips it.
-        if (t.sort && t.sort.col === names[i]) t.sort.dir = t.sort.dir === "asc" ? "desc" : "asc";
-        else t.sort = { col: names[i], dir: "desc" };
-        if (sortKey(names[i]) && state.view === "sku_master") refresh();
-        else installedRefresh(table);
-      });
+      th.addEventListener("click", () => openSortMenu(th, names[i], t, table));
     });
 
     const fr = document.createElement("tr");
@@ -2086,27 +2110,88 @@
 
   function headerHtml(name, t) {
     const active = t.sort && t.sort.col === name ? t.sort.dir : "";
-    // A combined header carries the days it is showing, so the bars in the
-    // cells below never need decoding.
-    const days = COMBO[name]
-      ? '<span class="wdays">' + comboWins(name).join("|") + "</span>" : "";
-    return escapeHtml(colLabel(name)) + days +
-      `<span class="sort-btns">` +
-        `<span class="sort-btn${active === "asc"  ? " on" : ""}" data-dir="asc"  title="Low to high">\u25b2</span>` +
-        `<span class="sort-btn${active === "desc" ? " on" : ""}" data-dir="desc" title="High to low">\u25bc</span>` +
-      `</span>`;
+    // A combined header carries its days on a second line, laid out on the same
+    // grid as the cells, so each day label stands directly over its own number.
+    if (COMBO[name]) {
+      const wins = comboWins(name);
+      const on   = !!(t.sort && t.sort.col === name);
+      const aw   = sortWin(t, name);
+      return '<div class="hrow' + (on ? " sorted" : "") + '">'
+           + '<span class="hlab">' + escapeHtml(colLabel(name)) + "</span>"
+           + (on ? '<span class="sorthint">' + (active === "asc" ? "low first" : "high first")
+                 + "</span>" : "")
+           + "</div>"
+           + '<div class="wgrid wdays">'
+           + wins.map(w => "<span" + (on && w === aw ? ' class="wa"' : "") + ">" + w + "d</span>").join("")
+           + "</div>";
+    }
+    const on2 = !!(t.sort && t.sort.col === name);
+    return '<div class="hrow' + (on2 ? " sorted" : "") + '">'
+         + '<span class="hlab">' + escapeHtml(colLabel(name)) + "</span>"
+         + (on2 ? '<span class="sorthint">' + (active === "asc" ? "low first" : "high first")
+                + "</span>" : "")
+         + "</div>";
   }
 
-  function bindSortButtons(th, name, t, table) {
-    th.querySelectorAll(".sort-btn").forEach(btn => {
-      btn.addEventListener("click", e => {
-        e.stopPropagation();          // don't let the header's own toggle fire too
-        t.sort = { col: name, dir: btn.dataset.dir };
-        if (sortKey(name) && state.view === "sku_master") refresh();
-        else installedRefresh(table);
-      });
-    });
+  // Sort panel. A merged column holds three windows at once, so "sort by this
+  // column" is not a complete instruction until it says which window - and the
+  // two directions are spelled out rather than left to a toggle.
+  let _sortMenu = null;
+  function closeSortMenu() { if (_sortMenu) { _sortMenu.remove(); _sortMenu = null; } }
+  document.addEventListener("click", e => {
+    if (_sortMenu && !_sortMenu.contains(e.target)) closeSortMenu();
+  }, true);
+  window.addEventListener("scroll", closeSortMenu, true);
+
+  function openSortMenu(th, name, t, table) {
+    const wasOpen = !!_sortMenu && _sortMenu.dataset.col === name;
+    closeSortMenu();
+    if (wasOpen) return;
+    const wins = COMBO[name] ? comboWins(name) : [];
+    const cur  = t.sort && t.sort.col === name ? t.sort : null;
+    let win = COMBO[name] ? sortWin(t, name) : null;
+    let dir = cur ? cur.dir : "desc";
+    const el = document.createElement("div");
+    el.className = "sortpanel";
+    el.dataset.col = name;
+    const paint = () => {
+      el.innerHTML = '<div class="sp-h">' + escapeHtml(colLabel(name)) + "</div>"
+        + (wins.length
+            ? '<div class="sp-l">Go by which days</div><div class="sp-row">'
+              + wins.map(w => '<button type="button" class="pchip' + (w === win ? " on" : "")
+                            + '" data-win="' + w + '">' + w + "d</button>").join("")
+              + "</div>"
+            : "")
+        + '<div class="sp-l">Order</div><div class="sp-row">'
+        + '<button type="button" class="pchip' + (cur && cur.dir === "desc" ? " on" : "")
+        + '" data-dir="desc">High to low</button>'
+        + '<button type="button" class="pchip' + (cur && cur.dir === "asc" ? " on" : "")
+        + '" data-dir="asc">Low to high</button></div>';
+      el.querySelectorAll("[data-win]").forEach(b => b.addEventListener("click", ev => {
+        ev.stopPropagation(); win = Number(b.dataset.win); paint(); apply();
+      }));
+      el.querySelectorAll("[data-dir]").forEach(b => b.addEventListener("click", ev => {
+        ev.stopPropagation(); dir = b.dataset.dir; apply();
+      }));
+    };
+    const apply = () => {
+      t.sort = { col: name, dir: dir, win: win };
+      closeSortMenu();
+      if (sortKey(name, win) && state.view === "sku_master") refresh();
+      else installedRefresh(table);
+    };
+    paint();
+    document.body.appendChild(el);
+    const r = th.getBoundingClientRect();
+    const h = el.offsetHeight || 150;
+    el.style.top  = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - h - 8)) + "px";
+    el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8)) + "px";
+    _sortMenu = el;
   }
+
+  // The two stacked arrows are gone: every header opens the sort panel instead,
+  // which says the directions in words and, on a merged column, asks which days.
+  function bindSortButtons() {}
 
   function installedRefresh(table) {
     const t = toolsFor(state.view);
@@ -2248,23 +2333,31 @@
   };
   // A combined column sorts on the first window it is showing - that is the
   // one your eye lands on first, so it is the one the arrows should mean.
-  function sortKey(name) {
+  function sortKey(name, win) {
     if (SORT_KEYS[name]) return SORT_KEYS[name];
     if (COMBO[name]) {
       const ws = comboWins(name);
-      // Rank on a real window, not on "sold today" - 1 and 3 day are there to
-      // spot a move, never to order the table.
-      const w = ws.find(x => WIN_MAIN.includes(x)) || ws[0];
+      // The window you picked in the sort menu, or a real one - 1 and 3 day
+      // are there to spot a move, not to order the table.
+      const w = (win && ws.includes(Number(win))) ? Number(win)
+              : (ws.find(x => WIN_MAIN.includes(x)) || ws[0]);
       return SORT_KEYS[comboName(name, w)] || null;
     }
     return null;
+  }
+  // Which window a combined column is currently sorted on.
+  function sortWin(t, name) {
+    const ws = comboWins(name);
+    if (t && t.sort && t.sort.col === name && ws.includes(Number(t.sort.win)))
+      return Number(t.sort.win);
+    return ws.find(x => WIN_MAIN.includes(x)) || ws[0];
   }
 
   function serverSort() {
     if (state.view !== "sku_master") return null;
     const t = state.tools["sku_master"];
     if (!t || !t.sort) return null;
-    const key = sortKey(t.sort.col);
+    const key = sortKey(t.sort.col, t.sort.win);
     return key ? { key, dir: t.sort.dir } : null;
   }
 
