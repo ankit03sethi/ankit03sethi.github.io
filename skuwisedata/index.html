@@ -285,7 +285,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01p</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01q</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1095,12 +1095,12 @@
   };
 
   function colGroup(c) {
-    if (c === "Sold") return "Sales";
+    if (c === "Sold" || c === "Units kept") return "Sales";
     if (["Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %",
          "Returns billed","Return cost","Cost per return"].includes(c)) return "Returns";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
     if (/^Last /.test(c)) return "Latest";
-    if (["Units kept","Margin","Tax","Profit","Profit /unit","Profit % of COP",
+    if (["Margin","Tax","Profit","Profit /unit","Profit % of COP",
          "Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
     return "Product";
@@ -1334,6 +1334,10 @@
       // back. RTO never reached the buyer; a buyer return costs you freight
       // both ways.
       "Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %",
+      // What actually stayed sold: units ordered less units that came back.
+      // It belongs here, next to the returns it is derived from, not away in
+      // the money block - it is the number the return columns are leading to.
+      "Units kept",
       // Money. Settle/unit is what this SKU actually settles at per unit across
       // every order of it that has been paid - used because roughly half of any
       // recent window is still unsettled, so counting only cash received would
@@ -1345,7 +1349,7 @@
       // one column beside it and is per RETURN, not per unit sold, because
       // averaging it over everything that sold would read as near zero.
       "Last 3 Ship","Ship/unit","Ret Ship/return",
-      "Units kept","Margin","Returns billed","Return cost","Cost per return",
+      "Margin","Returns billed","Return cost","Cost per return",
       "Courier /unit","Courier total","Tax","Profit","Profit /unit","Profit % of COP",
       "Focus"
   ];
@@ -2068,11 +2072,14 @@
     COL_LABEL[w+"d Ret Cost/unit"] = w+"d Cost per return";
     COL_LABEL[w+"d Ship/unit"]     = w+"d Courier /unit";
     COL_LABEL[w+"d Ship"]          = w+"d Courier total";
-    COL_LABEL[w+"d Net Units"]     = w+"d Units kept";
+    COL_LABEL[w+"d Net Units"]     = w+"d Net sales";
     COL_LABEL[w+"d Net"]           = w+"d Profit";
     COL_LABEL[w+"d Net/unit"]      = w+"d Profit /unit";
     COL_LABEL[w+"d Net %COP"]      = w+"d Profit % of COP";
   }
+  // The merged column keeps its internal name so sorting, filters and saved
+  // column choices are untouched; only what you read changes.
+  COL_LABEL["Units kept"] = "Net sales";
   const colLabel = (c) => COL_LABEL[c] || c;
 
   // Rest the cursor on a header and a short note says what the number is.
