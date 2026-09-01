@@ -245,7 +245,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01i</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1030,6 +1030,7 @@
     if (/^\d+day$/.test(c)) return "Sales";
     if (/^\d+d (Ret|RTO|SR)/.test(c)) return "Returns";
     if (/Ship/.test(c)) return "Courier";
+    if (/^Last /.test(c)) return "Latest";
     if (/^\d+d (Net Units|Margin|Ret Fees|Tax|Net)/.test(c)
         || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") return "Money";
     if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
@@ -1165,6 +1166,11 @@
       // side to see whether this product is settling at what you expect. It is
       // a raw figure. No returns, no fees, no tax, no COP go into it.
       "Last 3 Settle",
+      // The three "latest" columns. Everything else on this page is an
+      // average over a window, which is what you want for a decision and
+      // the wrong thing for spotting a change. These are the single most
+      // recent data point, with the date on hover.
+      "Last Settle","Last Ret Charge","Last Ret Cost","Last Ship","Last Ret Ship",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
@@ -1346,6 +1352,62 @@
       "60d Ship":         { k: "shc60", dir: "f", per: 0 },
       "90d Ship":         { k: "shc90", dir: "f", per: 0 },
     };
+    // The most recent single reading, not an average. LAST_COLS are read
+    // straight off the cached row; nothing is derived or estimated.
+    const LAST_COLS = new Set(["Last Settle", "Last Ret Charge", "Last Ret Cost",
+                               "Last Ship", "Last Ret Ship"]);
+    function lastCell(wc, col, plat) {
+      const DASH_ = "\u2014";
+      if (!wc) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
+      if (col === "Last Settle") {
+        const v = Number(wc.ls_unit);
+        if (!Number.isFinite(v)) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
+        // Same test as Last 3 Settle: green at or above Expected Settlement,
+        // red below. Blank Expected Settlement means nothing to judge against.
+        const exp = Number(wc.exp_settle);
+        const when = wc.settle_last_on ? " \u00b7 paid " + escapeHtml(String(wc.settle_last_on)) : "";
+        let col2 = "#0f172a", tip = "The single most recent settled order" + when;
+        if (Number.isFinite(exp) && exp > 0) {
+          col2 = v >= exp ? "#047857" : "#b91c1c";
+          tip = "Last order settled at " + money(v) + " against " + money(exp) + " expected" + when;
+        }
+        return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">' + money(v) + "</td>";
+      }
+      if (col === "Last Ship" || col === "Last Ret Ship") {
+        const fwd = col === "Last Ship";
+        const avail = fwd ? wc.sh_avail : wc.rs_avail;
+        if (avail === false)
+          return '<td title="This platform does not report ' + (fwd ? "forward" : "return")
+               + ' courier charge in its payment file" style="color:#cbd5e1">' + DASH_ + "</td>";
+        const v2 = Number(fwd ? wc.sh_last1 : wc.rs_last1);
+        // Blank rather than a zero: the last CHARGED order is what this shows,
+        // and on Flipkart forward there has never been one.
+        if (!Number.isFinite(v2))
+          return '<td title="No forward freight has ever been charged on this SKU here"'
+               + ' style="color:#cbd5e1">' + DASH_ + "</td>";
+        const w2 = fwd ? wc.sh_last_on : wc.rs_last_on;
+        return '<td title="The last order that carried a charge'
+             + (w2 ? " \u00b7 " + escapeHtml(String(w2)) : "")
+             + '" style="color:#7c2d12;font-weight:600">' + money2(v2) + "</td>";
+      }
+      const amt = Number(wc.lr_amt);
+      if (!Number.isFinite(amt)) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
+      const v = col === "Last Ret Cost" ? Number(wc.lr_cost) : amt;
+      if (!Number.isFinite(v)) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
+      const kind = wc.lr_kind === "customer" ? "customer return" : "courier return (RTO)";
+      const when = wc.lr_on ? " on " + escapeHtml(String(wc.lr_on)) : "";
+      const units = Number(wc.lr_units);
+      // Flipkart, Meesho and Myntra should never bill for a courier return.
+      // When one of them has, that is money to claim back, so it is flagged
+      // rather than left to blend in with the customer returns.
+      const pf = String(plat || "").toLowerCase();
+      const wrong = wc.lr_kind === "rto" && /flipkart|meesho|myntra/.test(pf);
+      let tip = "Last charged return: " + kind + when
+              + (Number.isFinite(units) && units > 1 ? " \u00b7 " + units + " units" : "");
+      if (wrong) tip = "RTO charged on " + pf + " - it should not have been. " + tip;
+      return '<td title="' + tip + '" style="color:#b91c1c;font-weight:'
+           + (wrong ? "800" : "600") + '">' + money(v) + (wrong ? " \u26a0" : "") + "</td>";
+    }
     function shipCell(wc, col) {
       const spec = SHIP_COLS[col];
       const DASH_ = "\u2014";
@@ -1477,6 +1539,9 @@
     const DASH = "\u2014";
 
     const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
+      if (LAST_COLS.has(c)) {
+        return lastCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c, r.platform);
+      }
       if (SHIP_COLS[c]) {
         return shipCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c);
       }
@@ -1856,6 +1921,11 @@
     "Margin/unit": "Settle/unit minus COP. What one unit earns BEFORE the return fees this SKU causes.",
     "Margin %COP": "Margin/unit as a percentage of COP, BEFORE returns and fees. Compare it with Net %COP to see what returns cost you.",
     "Last 3 Ship": "Forward courier per unit off this SKU's three most recent charged orders. Straight off the payment file - nothing estimated.",
+    "Last Settle": "The single most recent settled order for this SKU, per unit. Every other money column here is an average over a window - this is the one that moves first when a fee changes or a price drops. Hover for the date. Green at or above Expected Settlement, red below.",
+    "Last Ret Charge": "What the platform actually deducted on the most recent return of this SKU it charged you for. The whole deduction, not per unit. Hover for the date and whether the buyer had it (customer) or it never got there (RTO). A warning triangle means an RTO was charged on Flipkart, Meesho or Myntra, which should not happen - that is money to claim back.",
+    "Last Ret Cost": "Last Ret Charge divided by the units on that return - what that one return cost you per unit. Differs from Last Ret Charge only on multi-quantity orders.",
+    "Last Ship": "Forward courier per unit on the last order this SKU was actually charged for. Where one order carried several charge lines they are added up first. A zero or blank line is skipped - it is not a cheap delivery, it is a line with nothing on it - so Flipkart shows a dash here, because it has never billed forward freight.",
+    "Last Ret Ship": "Return freight per unit on the last return this SKU was actually charged for. Amazon prints no reverse freight line, so it shows a dash.",
     "Ship/unit": "Every rupee of forward courier this SKU has been billed, divided by the units it shipped. Meesho charges it as Shipping Charge, Amazon as Easy Ship weight handling fees, Myntra as Logistics Commission. Flipkart reads 0 because you ship those yourself, so Flipkart bills no forward freight. FirstCry reports nothing, so it shows a dash. This money is ALREADY taken out inside Settle/unit - the column shows you how much of the deduction was courier, it is not a further cost to subtract.",
     "Ret Ship/return": "Return freight per RETURN that was actually charged - not per unit sold, which would read as near zero. Meesho Return Shipping Charge, Flipkart Reverse Shipping Fee, Myntra reverse logistics. Amazon prints no reverse freight line, so it shows a dash. This is only the freight; the wider cost of a return is in Ret Fees.",
     "1day":"Units ordered today. Cancelled orders excluded.",
