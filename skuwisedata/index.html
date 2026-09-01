@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1297,7 +1297,7 @@
         const cs = Number(wc["rcs" + w]) || 0;   // customer returns it billed
         return { v: cr + cs,
                  html: '<b style="color:' + (cr > 0 ? "#b91c1c" : "#94a3b8") + '">' + cr + "</b>"
-                     + '<span style="color:#cbd5e1">&nbsp;|&nbsp;</span>'
+                     + '<span style="color:#334155;font-weight:800;padding:0 3px">|</span>'
                      + '<span style="color:#0f172a">' + cs + "</span>" };
       }
       if (col.endsWith("Net Units")) {
@@ -1314,7 +1314,7 @@
         if (!lr && !ls) return { v: -L, txt: L ? money(-L) : "0" };
         const rtoTxt = '<b style="color:' + (lr > 0 ? "#b91c1c" : "#94a3b8") + '">'
                      + Math.round(lr) + "</b>";
-        return { v: -L, html: rtoTxt + '<span style="color:#cbd5e1">&nbsp;|&nbsp;</span>'
+        return { v: -L, html: rtoTxt + '<span style="color:#334155;font-weight:800;padding:0 3px">|</span>'
                              + '<span style="color:#0f172a">' + Math.round(ls) + "</span>" };
       }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
