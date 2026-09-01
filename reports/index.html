@@ -94,7 +94,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-01c</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-01d</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -172,29 +172,33 @@ const COL = {
   ostat:  { k: "order_status", l: "File status", t: "txt" },
   fstat:  { k: "status",       l: "Status",    t: "fst"  },
   famt:   { k: "final_amount", l: "Final amount", t: "fmoney" },
-  amton:  { k: "amount_on",    l: "Money on",  t: "date" }
+  amton:  { k: "amount_on",    l: "Money on",  t: "date" },
+  mstate: { k: "money_state",  l: "Money",     t: "mstate" }
 };
 
 const REPORTS = [
   {
     id: "allorders", sec: "Orders", lazy: "orders", rpc: "seller_all_orders",
     title: "All orders",
-    desc: "Every order line and what finally happened to it. The status here is the outcome, not what the order file said \u2014 a returned order reads Return, a cancelled one reads Cancelled, and one still owed money reads Upcoming with the amount and the date it should arrive.",
+    desc: "Every order line and what finally happened to it. Status is the outcome, not the raw word in the order file. Money the platform has only scheduled is shown in amber and marked Scheduled \u2014 it has not reached you, and on a return in progress it may never.",
     src: "orders", pick: () => true,
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.qty, COL.fstat,
-           COL.famt, COL.amton, COL.age, COL.ostat, COL.val],
+           COL.famt, COL.mstate, COL.amton, COL.age, COL.ostat, COL.val],
     sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => {
       const by = (st) => rows.filter((r) => r.status === st);
-      const paid = by("Paid"), up = by("Upcoming");
+      const settled = rows.filter((r) => r.money_state === "Settled" && r.status === "Paid");
+      const sched = rows.filter((r) => String(r.money_state || "").indexOf("Sched") === 0);
+      const back = by("Coming back to you");
       const ret = rows.filter((r) => String(r.status).startsWith("Return"));
-      const oldest = up.length ? Math.max(...up.map((r) => num(r.age_days))) : 0;
+      const up = by("Upcoming");
       return [
         { l: "Orders", n: rows.length.toLocaleString("en-IN") },
-        { l: "Received", n: money(sum(paid, "final_amount")) },
+        { l: "Money received", n: money(sum(settled, "final_amount")) },
+        { l: "Only scheduled", n: money(sum(sched, "final_amount")), cls: sched.length ? "warn" : "" },
         { l: "Lost to returns", n: money(sum(ret, "final_amount")), cls: sum(ret, "final_amount") < 0 ? "bad" : "" },
-        { l: "Upcoming", n: up.length.toLocaleString("en-IN"), cls: up.length ? "warn" : "" },
-        { l: "Oldest upcoming", n: oldest + " days", cls: oldest > 45 ? "bad" : "" },
+        { l: "Coming back", n: back.length.toLocaleString("en-IN"), cls: back.length ? "warn" : "" },
+        { l: "No payment yet", n: up.length.toLocaleString("en-IN") },
         { l: "Cancelled", n: by("Cancelled").length.toLocaleString("en-IN") }
       ];
     },
@@ -490,7 +494,19 @@ function cell(row, c) {
     // an unpaid order will settle at, so nothing is put in its place.
     case "fmoney": {
       if (v == null) return '<td class="num muted">\u2014</td>';
-      return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
+      // Money the platform has only scheduled is drawn in amber. It has not
+      // reached you, and on a return in progress it may never.
+      const sched = String(row.money_state || "").indexOf("Sched") === 0
+                 || String(row.money_state || "").indexOf("Part") === 0;
+      const cls = num(v) < 0 ? " neg" : sched ? " est" : "";
+      return '<td class="num' + cls + '"' + (sched ? ' title="Scheduled by the platform, not yet received"' : "") +
+             ">" + money2(v) + "</td>";
+    }
+    case "mstate": {
+      const t = String(v || "");
+      if (!t) return '<td><span class="muted">\u2014</span></td>';
+      const cls = t === "Settled" ? " paid" : " warn";
+      return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
     }
     case "st": {
       const t = String(v || "").trim();
