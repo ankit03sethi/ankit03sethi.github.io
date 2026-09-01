@@ -217,7 +217,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -360,6 +360,7 @@
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
     hScroll: 0,                // how far right the table is scrolled, kept across reloads
     hiddenCols: new Set(),     // columns switched off in the Columns picker
+    colOrder: new Map(),       // column -> position typed into the Columns picker
     loadToken: 0,              // guards a slow enrichment reply from an abandoned view
     search: "",                // the one search box, run in the database over every row
     // Paging. The table used to stop at 200 rows; it now pulls another page
@@ -919,15 +920,41 @@
   // Ticking a box applies immediately; the choice is remembered per browser.
   const COLPICK_KEY = "cursive_sku_hidden_cols_v1";
 
+  // Columns carrying a typed position come first, in that order; everything
+  // else keeps its natural place behind them. Sorting on a copy so SKU_COLS
+  // itself is never reordered.
+  function orderedCols() {
+    return SKU_COLS
+      .map((c, i) => ({ c, i, n: state.colOrder.has(c) ? Number(state.colOrder.get(c)) : null }))
+      .sort((a, b) => {
+        const ka = a.n === null ? 1e6 + a.i : a.n;
+        const kb = b.n === null ? 1e6 + b.i : b.n;
+        return ka - kb || a.i - b.i;
+      })
+      .map(x => x.c);
+  }
+
   function loadHiddenCols() {
     try {
       const raw = localStorage.getItem(COLPICK_KEY);
       if (raw) state.hiddenCols = new Set(JSON.parse(raw));
-    } catch (e) { /* blocked storage - just show everything */ }
+      const ord = localStorage.getItem(COLPICK_KEY + "_order");
+      if (ord) state.colOrder = new Map(JSON.parse(ord));
+    } catch (e) { /* blocked storage - just show everything, default order */ }
   }
   function saveHiddenCols() {
-    try { localStorage.setItem(COLPICK_KEY, JSON.stringify([...state.hiddenCols])); }
-    catch (e) { /* not fatal - the choice just will not survive a reload */ }
+    try {
+      localStorage.setItem(COLPICK_KEY, JSON.stringify([...state.hiddenCols]));
+      localStorage.setItem(COLPICK_KEY + "_order", JSON.stringify([...state.colOrder]));
+    } catch (e) { /* not fatal - the choice just will not survive a reload */ }
+  }
+
+  // Reordering changes the shape of the table, so unlike hiding it needs a
+  // repaint - but still from the rows already in hand, never a fresh query.
+  function redrawCurrentTable() {
+    if (state.view !== "sku_master") return;
+    const rows = [...state.rowsById.values()];
+    if (rows.length) redrawTable(rows);
   }
 
   // One stylesheet, rewritten on every change. Hiding column 12 means hiding
@@ -940,7 +967,7 @@
       document.head.appendChild(el);
     }
     const sel = [];
-    SKU_COLS.forEach((c, i) => {
+    orderedCols().forEach((c, i) => {
       if (state.hiddenCols.has(c)) {
         sel.push("table.data th:nth-child(" + (i + 1) + ")",
                  "table.data td:nth-child(" + (i + 1) + ")");
@@ -980,8 +1007,12 @@
       h += '<div style="margin:10px 0 4px"><b style="font-size:11px;letter-spacing:.5px;'
          + 'text-transform:uppercase;color:#64748b">' + escapeHtml(g) + "</b></div>";
       for (const c of cols) {
+        const pos = state.colOrder.has(c) ? escapeHtml(String(state.colOrder.get(c))) : "";
         h += '<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;'
            + 'font-size:12.5px;cursor:pointer;border-radius:6px">'
+           + '<input type="number" min="1" data-pos="' + escapeHtml(c) + '" value="' + pos + '"'
+           + ' title="Position from the left. Leave blank to keep the default place."'
+           + ' style="width:48px;padding:2px 4px;font-size:11.5px;text-align:center">'
            + '<input type="checkbox" data-col="' + escapeHtml(c) + '"'
            + (state.hiddenCols.has(c) ? "" : " checked") + ">"
            + "<span>" + escapeHtml(c) + "</span></label>";
@@ -998,6 +1029,35 @@
         else state.hiddenCols.add(cb.dataset.col);
         saveHiddenCols();
         applyColVisibility();
+      });
+    });
+    panel.querySelectorAll("input[data-pos]").forEach(inp => {
+      inp.addEventListener("click", e => e.stopPropagation());   // don't toggle the checkbox
+      inp.addEventListener("input", () => {
+        const col = inp.dataset.pos;
+        const raw = inp.value.trim();
+        const num = raw === "" ? null : parseInt(raw, 10);
+
+        if (num === null || !Number.isFinite(num) || num < 1) {
+          state.colOrder.delete(col);
+        } else {
+          // The number just typed wins. Whoever held it loses it, turns red for
+          // a moment so you can see what happened, and is cleared.
+          for (const other of panel.querySelectorAll("input[data-pos]")) {
+            if (other === inp) continue;
+            if (other.value.trim() !== "" && parseInt(other.value, 10) === num) {
+              other.value = "";
+              state.colOrder.delete(other.dataset.pos);
+              other.style.background = "#fee2e2";
+              other.style.borderColor = "#b91c1c";
+              setTimeout(() => { other.style.background = ""; other.style.borderColor = ""; }, 900);
+            }
+          }
+          state.colOrder.set(col, num);
+        }
+        saveHiddenCols();
+        applyColVisibility();
+        redrawCurrentTable();
       });
     });
     panel.querySelectorAll("button[data-close]").forEach(b =>
@@ -1114,7 +1174,7 @@
     // Every column is rendered every time. Hiding is a stylesheet rule keyed on
     // column position (see applyColVisibility), so ticking a box costs one style
     // update instead of rebuilding 1,000 rows - that rebuild was the lag.
-    const COLS = SKU_COLS;
+    const COLS = orderedCols();
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
     // Uploaded headers are matched case- and spacing-insensitively, so "1 Day",
