@@ -92,6 +92,22 @@
     .cell-link { margin-left:6px; font-size:12px; text-decoration:none; }
     /* Header note. A real element rather than the browser's title bubble:
        it appears straight away, wraps properly and can be read. */
+    table.data thead th .wdays { display:inline-block; margin-left:6px; font-size:10px;
+        font-weight:700; color:#94a3b8; letter-spacing:0; }
+    .pgrp { font-size:10.5px; letter-spacing:.5px; text-transform:uppercase;
+            color:#64748b; font-weight:700; margin:10px 0 5px; }
+    .prow { display:flex; flex-wrap:wrap; gap:5px; }
+    .pchip { font:inherit; font-size:11.5px; font-weight:700; padding:4px 10px;
+             border:1px solid #e2e8f0; background:#fff; color:#64748b;
+             border-radius:999px; cursor:pointer; }
+    .pchip:hover { border-color:#1f6feb; color:#1f6feb; }
+    .pchip.on { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+    /* Combined window cell: 30 | 60 | 90 in one place. The bar is a real
+       rule, not a slash - a slash reads as "per" and these are not a ratio. */
+    table.data td.wincell { white-space:nowrap; }
+    table.data td.wincell .wv { display:inline-block; min-width:26px; text-align:right; }
+    table.data td.wincell .wsep { display:inline-block; width:1px; height:11px;
+        background:#94a3b8; margin:0 7px; vertical-align:-1px; }
     .colnote { position:fixed; z-index:9999; max-width:320px; padding:9px 11px;
                background:#0f172a; color:#f8fafc; font-size:12px; line-height:1.45;
                border-radius:8px; box-shadow:0 8px 24px rgba(15,23,42,.28);
@@ -253,7 +269,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01m</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01n</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -385,13 +401,17 @@
     company: "",
     companies: [],
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
+    // Which day-windows show inside a combined column, and which kinds of
+    // measure show at all. 1 and 3 day ride along with 30/60/90 by default.
+    win: new Set([1, 3, 30, 60, 90]),
+    kind: new Set(["units", "pct", "value"]),
     rowsById: new Map(),       // id -> row, so an edited cell can find its row
     // The SKU master view opens on 30-day units, highest first. Ordered by
     // "last updated" it opened on 500 rows that had not sold a single unit -
     // every master row carries the same bulk-load timestamp, so the tie-break
     // landed on FirstCry, the one platform with no orders file at all. Opening
     // on what is actually moving is the answer to "why is everything zero".
-    tools: { sku_master: { filters: {}, sort: { col: "30day", dir: "desc" } } },
+    tools: { sku_master: { filters: {}, sort: { col: "Sold", dir: "desc" } } },
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
     hScroll: 0,                // how far right the table is scrolled, kept across reloads
@@ -998,12 +1018,18 @@
       if (raw) state.hiddenCols = new Set(JSON.parse(raw));
       const ord = localStorage.getItem(COLPICK_KEY + "_order");
       if (ord) state.colOrder = new Map(JSON.parse(ord));
+      const w = localStorage.getItem(COLPICK_KEY + "_win");
+      if (w) state.win = new Set(JSON.parse(w).map(Number));
+      const k = localStorage.getItem(COLPICK_KEY + "_kind");
+      if (k) state.kind = new Set(JSON.parse(k));
     } catch (e) { /* blocked storage - just show everything, default order */ }
   }
   function saveHiddenCols() {
     try {
       localStorage.setItem(COLPICK_KEY, JSON.stringify([...state.hiddenCols]));
       localStorage.setItem(COLPICK_KEY + "_order", JSON.stringify([...state.colOrder]));
+      localStorage.setItem(COLPICK_KEY + "_win", JSON.stringify([...state.win]));
+      localStorage.setItem(COLPICK_KEY + "_kind", JSON.stringify([...state.kind]));
     } catch (e) { /* not fatal - the choice just will not survive a reload */ }
   }
 
@@ -1026,7 +1052,7 @@
     }
     const sel = [];
     orderedCols().forEach((c, i) => {
-      if (state.hiddenCols.has(c)) {
+      if (state.hiddenCols.has(c) || kindHidden(c)) {
         sel.push("table.data th:nth-child(" + (i + 1) + ")",
                  "table.data td:nth-child(" + (i + 1) + ")");
       }
@@ -1034,13 +1060,18 @@
     el.textContent = sel.length ? sel.join(",") + "{display:none}" : "";
   }
 
+  // Units / % / Values is a view switch, not a per-column choice: it hides a
+  // whole kind of number at once without touching what you ticked.
+  const kindHidden = (c) => { const k = colKind(c); return !!k && !state.kind.has(k); };
+
   function colGroup(c) {
-    if (/^\d+day$/.test(c)) return "Sales";
-    if (/^\d+d (Ret|RTO|SR)/.test(c)) return "Returns";
-    if (/Ship/.test(c)) return "Courier";
+    if (c === "Sold") return "Sales";
+    if (["Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %",
+         "Returns billed","Return cost","Cost per return"].includes(c)) return "Returns";
+    if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
     if (/^Last /.test(c)) return "Latest";
-    if (/^\d+d (Net Units|Margin|Ret Fees|Tax|Net)/.test(c)
-        || c === "Settle/unit" || c === "Margin/unit" || c === "Margin %COP") return "Money";
+    if (["Units kept","Margin","Tax","Profit","Profit /unit","Profit % of COP",
+         "Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
     return "Product";
   }
@@ -1061,12 +1092,28 @@
     }
     const closeBtn = '<button class="btn" type="button" data-close="1"'
       + ' style="width:100%;font-size:12px;padding:6px 10px">Close</button>';
+    const chip = (label, on, kind, val) =>
+      '<button type="button" class="pchip' + (on ? " on" : "") + '"'
+      + ' data-' + kind + '="' + val + '">' + label + "</button>";
+    // Two switches before the list: which day windows go inside a combined
+    // column, then which kind of number you want to see at all. The list under
+    // them only shows what those two leave standing.
     let h = '<div style="position:sticky;top:-10px;background:#fff;padding:2px 0 8px;z-index:2">'
-          + closeBtn + "</div>";
+          + closeBtn
+          + '<div class="pgrp">Days shown in each column</div><div class="prow">'
+          + WIN_ALL.map(w => chip(w + "d", state.win.has(w), "win", w)).join("")
+          + '</div>'
+          + '<div class="pgrp">Show</div><div class="prow">'
+          + chip("Units", state.kind.has("units"), "kind", "units")
+          + chip("%",     state.kind.has("pct"),   "kind", "pct")
+          + chip("Values",state.kind.has("value"), "kind", "value")
+          + '</div></div>';
     for (const [g, cols] of groups) {
+      if (!cols.some(c => !kindHidden(c))) continue;
       h += '<div style="margin:10px 0 4px"><b style="font-size:11px;letter-spacing:.5px;'
          + 'text-transform:uppercase;color:#64748b">' + escapeHtml(g) + "</b></div>";
       for (const c of cols) {
+        if (kindHidden(c)) continue;
         const pos = state.colOrder.has(c) ? escapeHtml(String(state.colOrder.get(c))) : "";
         h += '<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;'
            + 'font-size:12.5px;cursor:pointer;border-radius:6px">'
@@ -1083,6 +1130,26 @@
 
     // Applies straight away. The panel is NOT rebuilt, so the scroll position
     // and the box you just clicked stay exactly where they were.
+    // A chip changes what the table shows, so the panel is rebuilt and the
+    // rows repainted - but always from the rows already in hand.
+    panel.querySelectorAll(".pchip").forEach(ch => {
+      ch.addEventListener("click", () => {
+        if (ch.dataset.win) {
+          const w = Number(ch.dataset.win);
+          if (state.win.has(w)) state.win.delete(w); else state.win.add(w);
+          if (!state.win.size) state.win = new Set([30, 60, 90]);
+        } else {
+          const k = ch.dataset.kind;
+          if (state.kind.has(k)) state.kind.delete(k); else state.kind.add(k);
+          if (!state.kind.size) state.kind = new Set(["units", "pct", "value"]);
+        }
+        saveHiddenCols();
+        renderColPicker();
+        redrawCurrentTable();
+        applyColVisibility();
+      });
+    });
+
     panel.querySelectorAll("input[data-col]").forEach(cb => {
       cb.addEventListener("change", () => {
         if (cb.checked) state.hiddenCols.delete(cb.dataset.col);
@@ -1165,6 +1232,55 @@
 
   // Every column the SKU Master table can show, in order. This is the single
   // list the table and the Columns picker both read.
+  // One column per measure instead of one per window. "Returns" carries the
+  // 30, 60 and 90 day figures side by side separated by a bar, because reading
+  // 12 | 20 | 31 in one place is the whole point - three columns apart you
+  // cannot see the trend without scrolling. WIN picks which of those numbers
+  // appear; KIND picks which of these columns appear at all.
+  const WIN_ALL  = [1, 3, 7, 15, 30, 60, 90];
+  const WIN_MAIN = [30, 60, 90];
+  const COMBO = {
+    "Sold":            { t: "%wday",            kind: "units", wins: WIN_ALL },
+    "Returns":         { t: "%wd Ret",          kind: "units", wins: WIN_MAIN },
+    "Return %":        { t: "%wd Ret %",        kind: "pct",   wins: WIN_MAIN },
+    "RTO":             { t: "%wd RTO",          kind: "units", wins: WIN_MAIN },
+    "RTO %":           { t: "%wd RTO %",        kind: "pct",   wins: WIN_MAIN },
+    "Buyer returns":   { t: "%wd SR",           kind: "units", wins: WIN_MAIN },
+    "Buyer return %":  { t: "%wd SR %",         kind: "pct",   wins: WIN_MAIN },
+    "Units kept":      { t: "%wd Net Units",    kind: "units", wins: WIN_MAIN },
+    "Returns billed":  { t: "%wd Ret Charged",  kind: "units", wins: WIN_MAIN },
+    "Return cost":     { t: "%wd Ret Fees",     kind: "value", wins: WIN_MAIN },
+    "Cost per return": { t: "%wd Ret Cost/unit",kind: "value", wins: WIN_MAIN },
+    "Courier /unit":   { t: "%wd Ship/unit",    kind: "value", wins: WIN_MAIN },
+    "Courier total":   { t: "%wd Ship",         kind: "value", wins: WIN_MAIN },
+    "Margin":          { t: "%wd Margin",       kind: "value", wins: WIN_MAIN },
+    "Tax":             { t: "%wd Tax",          kind: "value", wins: WIN_MAIN },
+    "Profit":          { t: "%wd Net",          kind: "value", wins: WIN_MAIN },
+    "Profit /unit":    { t: "%wd Net/unit",     kind: "value", wins: WIN_MAIN },
+    "Profit % of COP": { t: "%wd Net %COP",     kind: "pct",   wins: WIN_MAIN },
+  };
+  const comboName = (c, w) => COMBO[c].t.replace("%w", w);
+  // Windows this combo will actually show: what the user picked, kept to the
+  // windows this measure has.
+  function comboWins(c) {
+    const spec = COMBO[c];
+    const picked = spec.wins.filter(w => state.win.has(w));
+    return picked.length ? picked : spec.wins.filter(w => WIN_MAIN.includes(w));
+  }
+  // Columns that are not per-window still belong to a measure, so the
+  // Units / % / Values switch reaches them too.
+  const FLAT_KIND = {
+    "COP": "value", "Final COP": "value", "Packaging": "value", "Tax %": "pct",
+    "Expected Settlement": "value", "Selling Price": "value", "Site Price": "value",
+    "Last 3 Settle": "value", "Last Settle": "value", "Settle/unit": "value",
+    "Margin/unit": "value", "Margin %COP": "pct",
+    "Last Ret Charge": "value", "Last Ret Cost": "value",
+    "Last 3 Ship": "value", "Ship/unit": "value", "Last Ship": "value",
+    "Ret Ship/return": "value", "Last Ret Ship": "value",
+    "Ratings": "units", "Count": "units",
+  };
+  const colKind = (c) => (COMBO[c] ? COMBO[c].kind : FLAT_KIND[c] || null);
+
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
       "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku",
@@ -1183,14 +1299,11 @@
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
       "Site Price","Ratings","Count","Seller","Link",
-      "1day","3day","7day","15day","30day","60day","90day",
-      // Returns per window: total units back, then what share of what sold in
-      // the same window, then the same split by who sent it back. RTO never
-      // reached the buyer; SR is a customer return, which costs you the
-      // shipping both ways.
-      "30d Ret","30d Ret %","30d RTO","30d RTO %","30d SR","30d SR %",
-      "60d Ret","60d Ret %","60d RTO","60d RTO %","60d SR","60d SR %",
-      "90d Ret","90d Ret %","90d RTO","90d RTO %","90d SR","90d SR %",
+      "Sold",
+      // Returns: total units back, what share of what sold, then who sent it
+      // back. RTO never reached the buyer; a buyer return costs you freight
+      // both ways.
+      "Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %",
       // Money. Settle/unit is what this SKU actually settles at per unit across
       // every order of it that has been paid - used because roughly half of any
       // recent window is still unsettled, so counting only cash received would
@@ -1202,9 +1315,8 @@
       // one column beside it and is per RETURN, not per unit sold, because
       // averaging it over everything that sold would read as near zero.
       "Last 3 Ship","Ship/unit","Ret Ship/return",
-      "30d Net Units","30d Margin","30d Ret Charged","30d Ret Fees","30d Ret Cost/unit","30d Ship/unit","30d Ship","30d Tax","30d Net","30d Net/unit","30d Net %COP",
-      "60d Net Units","60d Margin","60d Ret Charged","60d Ret Fees","60d Ret Cost/unit","60d Ship/unit","60d Ship","60d Tax","60d Net","60d Net/unit","60d Net %COP",
-      "90d Net Units","90d Margin","90d Ret Charged","90d Ret Fees","90d Ret Cost/unit","90d Ship/unit","90d Ship","90d Tax","90d Net","90d Net/unit","90d Net %COP",
+      "Units kept","Margin","Returns billed","Return cost","Cost per return",
+      "Courier /unit","Courier total","Tax","Profit","Profit /unit","Profit % of COP",
       "Focus"
   ];
 
@@ -1343,10 +1455,10 @@
       "30d Net Units":30, "30d Margin":30, "30d Ret Charged":30, "30d Ret Fees":30, "30d Ret Cost/unit":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
       "60d Net Units":60, "60d Margin":60, "60d Ret Charged":60, "60d Ret Fees":60, "60d Ret Cost/unit":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
       "90d Net Units":90, "90d Margin":90, "90d Ret Charged":90, "90d Ret Fees":90, "90d Ret Cost/unit":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
-    const money = (v) => "\u20b9" + Math.round(v).toLocaleString("en-IN");
-    // Courier is small money - two decimals, or a 25.91 average reads as 26 and
-    // stops matching the settlement file when you check it.
-    const money2 = (v) => "\u20b9" + Number(v).toFixed(2);
+    // Whole numbers, no currency sign. Every money column on this page is
+    // rupees, so the symbol was 90 repetitions of the same fact per row.
+    const money = (v) => Math.round(v).toLocaleString("en-IN");
+    const money2 = (v) => Math.round(Number(v)).toLocaleString("en-IN");
     // Which cached field each courier column reads. Forward figures are per
     // unit SOLD; the reverse one is per unit RETURNED and charged.
     const SHIP_COLS = {
@@ -1458,25 +1570,22 @@
       // returns: 9,891 over 95 returns reads 104, when an RTO actually cost 0
       // and each customer return cost 157. Sorting uses the customer figure -
       // that is the one that varies and the one worth ranking on.
+      // One number: what the average return of this SKU cost, whoever sent it
+      // back. The RTO / customer split lives in its own two columns, so it does
+      // not need to be crammed in here as well. Red still means an RTO was
+      // charged on a platform that should never charge for one.
       if (col.endsWith("Ret Cost/unit")) {
         const rtoN = Number(wc["rto" + w]) || 0, srN = Number(wc["sr" + w]) || 0;
         const lr = Number(wc["rlr" + w]) || 0,   ls = Number(wc["rls" + w]) || 0;
-        if (!rtoN && !srN) return { v: 0, txt: "0" };
-        const perR = rtoN ? lr / rtoN : 0;
-        const perS = srN  ? ls / srN  : 0;
-        return { v: -perS,
-                 html: '<b style="color:' + (perR > 0 ? "#b91c1c" : "#94a3b8") + '">'
-                     + Math.round(perR) + "</b>"
-                     + '<span style="color:#334155;font-weight:800;padding:0 3px">|</span>'
-                     + '<span style="color:#0f172a">' + Math.round(perS) + "</span>" };
+        const n = rtoN + srN;
+        if (!n) return { v: 0, txt: "0" };
+        const per = (lr + ls) / n;
+        return { v: -per, txt: money(per), warn: lr > 0 };
       }
       if (col.endsWith("Ret Charged")) {
         const cr = Number(wc["rcr" + w]) || 0;   // RTO returns the platform billed
         const cs = Number(wc["rcs" + w]) || 0;   // customer returns it billed
-        return { v: cr + cs,
-                 html: '<b style="color:' + (cr > 0 ? "#b91c1c" : "#94a3b8") + '">' + cr + "</b>"
-                     + '<span style="color:#334155;font-weight:800;padding:0 3px">|</span>'
-                     + '<span style="color:#0f172a">' + cs + "</span>" };
+        return { v: cr + cs, txt: (cr + cs).toLocaleString("en-IN"), warn: cr > 0 };
       }
       if (col.endsWith("Net Units")) {
         const nu = sold - ret;
@@ -1488,12 +1597,7 @@
       if (col.endsWith("Ret Fees")) {
         const L  = Number.isFinite(loss) ? loss : booked;
         const lr = Number(wc["rlr" + w]) || 0;
-        const ls = Number(wc["rls" + w]) || 0;
-        if (!lr && !ls) return { v: -L, txt: L ? money(-L) : "0" };
-        const rtoTxt = '<b style="color:' + (lr > 0 ? "#b91c1c" : "#94a3b8") + '">'
-                     + Math.round(lr) + "</b>";
-        return { v: -L, html: rtoTxt + '<span style="color:#334155;font-weight:800;padding:0 3px">|</span>'
-                             + '<span style="color:#0f172a">' + Math.round(ls) + "</span>" };
+        return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0 };
       }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
@@ -1546,7 +1650,7 @@
     const SCRAPED_COLS = new Set(["Site Price", "Ratings", "Count", "Seller"]);
     const DASH = "\u2014";
 
-    const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>" + COLS.map(c => {
+    function renderCell(r, i, c) {
       if (LAST_COLS.has(c)) {
         return lastCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c, r.platform);
       }
@@ -1587,6 +1691,12 @@
         else out = moneyCell(wc, c);
         if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
         if (out.html) return `<td>${out.html}</td>`;
+        // warn = an RTO was billed on a platform that should never bill for
+        // one. Money to claim back, so it does not get to look like every
+        // other number in the column.
+        if (out.warn) return '<td title="An RTO was charged here - on Flipkart,'
+          + ' Meesho and Myntra that should not happen, so it is money to claim back"'
+          + ' style="color:#b91c1c;font-weight:800">' + out.txt + " \u26a0</td>";
         const neg = out.v < 0;
         return `<td style="color:${neg ? "#b91c1c" : "#0f172a"};font-weight:${neg ? 700 : 400}">${out.txt}</td>`;
       }
@@ -1600,7 +1710,7 @@
         // Above a fifth of everything sold coming back is worth spotting from
         // across the table; above a third is a problem.
         const col = pct >= 33 ? "#b91c1c" : pct >= 20 ? "#b45309" : "#475569";
-        return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${pct.toFixed(1)}%</td>`;
+        return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${Math.round(pct)}%</td>`;
       }
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -1616,7 +1726,29 @@
         return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">Open</a></td>`;
       }
       return `<td>${escapeHtml(v)}</td>`;
-    }).join("") + "</tr>"; }).join("");
+    }
+
+    // A combined column paints the same measure once per window, in order,
+    // with a bar between. Each part keeps the colour and the note the single
+    // column would have had, so nothing is lost by packing them together.
+    function renderCombo(r, i, c) {
+      const wins = comboWins(c);
+      const parts = wins.map(w => {
+        const html = renderCell(r, i, comboName(c, w));
+        const m = /^<td([^>]*)>([\s\S]*)<\/td>$/.exec(html);
+        const attrs = m ? m[1] : "", inner = m ? m[2] : html;
+        const st = /style="([^"]*)"/.exec(attrs);
+        const ti = /title="([^"]*)"/.exec(attrs);
+        return '<span class="wv"' + (st ? ' style="' + st[1] + '"' : "")
+             + (ti ? ' title="' + ti[1] + '"' : "") + ">" + inner + "</span>";
+      });
+      return '<td class="wincell">'
+           + parts.join('<span class="wsep"></span>') + "</td>";
+    }
+
+    const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>"
+      + COLS.map(c => COMBO[c] ? renderCombo(r, i, c) : renderCell(r, i, c)).join("")
+      + "</tr>"; }).join("");
     if (rowsOnly) return tr;
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
   }
@@ -1735,7 +1867,7 @@
         // on counts and prices; clicking again flips it.
         if (t.sort && t.sort.col === names[i]) t.sort.dir = t.sort.dir === "asc" ? "desc" : "asc";
         else t.sort = { col: names[i], dir: "desc" };
-        if (SORT_KEYS[names[i]] && state.view === "sku_master") refresh();
+        if (sortKey(names[i]) && state.view === "sku_master") refresh();
         else installedRefresh(table);
       });
     });
@@ -1954,7 +2086,11 @@
 
   function headerHtml(name, t) {
     const active = t.sort && t.sort.col === name ? t.sort.dir : "";
-    return escapeHtml(colLabel(name)) +
+    // A combined header carries the days it is showing, so the bars in the
+    // cells below never need decoding.
+    const days = COMBO[name]
+      ? '<span class="wdays">' + comboWins(name).join("|") + "</span>" : "";
+    return escapeHtml(colLabel(name)) + days +
       `<span class="sort-btns">` +
         `<span class="sort-btn${active === "asc"  ? " on" : ""}" data-dir="asc"  title="Low to high">\u25b2</span>` +
         `<span class="sort-btn${active === "desc" ? " on" : ""}" data-dir="desc" title="High to low">\u25bc</span>` +
@@ -1966,7 +2102,7 @@
       btn.addEventListener("click", e => {
         e.stopPropagation();          // don't let the header's own toggle fire too
         t.sort = { col: name, dir: btn.dataset.dir };
-        if (SORT_KEYS[name] && state.view === "sku_master") refresh();
+        if (sortKey(name) && state.view === "sku_master") refresh();
         else installedRefresh(table);
       });
     });
@@ -2037,6 +2173,29 @@
     "Ret Ship/return": "Average return freight per return the platform charged for. Amazon prints no reverse freight line.",
     "Last Ret Ship": "Return freight per unit on the last charged return.",
   };
+  // The combined columns. Each one is the same measure repeated for the days
+  // shown in its header, left to right.
+  Object.assign(COL_HELP, {
+    "Sold":            "Units ordered in each window. Cancelled orders left out.",
+    "Returns":         "Units that came back in each window.",
+    "Return %":        "Returns as a share of what sold in the same window.",
+    "RTO":             "Returns that never reached the buyer.",
+    "RTO %":           "RTOs as a share of what sold in the same window.",
+    "Buyer returns":   "Returns the buyer had and sent back. You pay freight both ways.",
+    "Buyer return %":  "Buyer returns as a share of what sold in the same window.",
+    "Units kept":      "Sold minus returned - the units that stayed sold.",
+    "Returns billed":  "How many returns the platform actually charged you for. Red means an RTO was billed, which is money to claim back.",
+    "Return cost":     "What those returns cost. Real deductions where settled, this platform's learned cost where not.",
+    "Cost per return": "Return cost divided by returns - what one return costs on average, whoever sent it back.",
+    "Courier /unit":   "Forward courier per unit, on payment date. What the platform billed, nothing estimated.",
+    "Courier total":   "Total forward courier billed on this SKU in each window.",
+    "Margin":          "Units kept x margin per unit. Returned units carry no COP - the stock came back.",
+    "Tax":             "Your Tax % applied to the net revenue. Blank counts as 0.",
+    "Profit":          "Margin minus return cost minus tax.",
+    "Profit /unit":    "Profit divided by the units that stayed sold.",
+    "Profit % of COP": "Profit per unit as a percentage of COP.",
+  });
+
   for (const w of [1, 3, 7, 15, 30, 60, 90]) {
     COL_HELP[w + "day"] = "Units ordered in the last " + w + (w === 1 ? " day." : " days.")
                         + " Cancelled orders left out.";
@@ -2087,11 +2246,25 @@
     "30d Net/unit":"u30", "60d Net/unit":"u60", "90d Net/unit":"u90",
     "30d Net %COP":"c30", "60d Net %COP":"c60", "90d Net %COP":"c90",
   };
+  // A combined column sorts on the first window it is showing - that is the
+  // one your eye lands on first, so it is the one the arrows should mean.
+  function sortKey(name) {
+    if (SORT_KEYS[name]) return SORT_KEYS[name];
+    if (COMBO[name]) {
+      const ws = comboWins(name);
+      // Rank on a real window, not on "sold today" - 1 and 3 day are there to
+      // spot a move, never to order the table.
+      const w = ws.find(x => WIN_MAIN.includes(x)) || ws[0];
+      return SORT_KEYS[comboName(name, w)] || null;
+    }
+    return null;
+  }
+
   function serverSort() {
     if (state.view !== "sku_master") return null;
     const t = state.tools["sku_master"];
     if (!t || !t.sort) return null;
-    const key = SORT_KEYS[t.sort.col];
+    const key = sortKey(t.sort.col);
     return key ? { key, dir: t.sort.dir } : null;
   }
 
