@@ -1330,7 +1330,7 @@
     const btn = $("#ordersSaveAllBtn");
     btn.disabled = true;
     const uid = session.user.id;
-    let totalInserted = 0, filesDone = 0;
+    let totalInserted = 0, totalDup = 0, filesDone = 0;
     const keys = jobs;   // kept for the progress line below
     for (const job of jobs) {
       const cfg = KIND_CFG[job.kind];
@@ -1393,6 +1393,7 @@
       });
       setStatus(`Saving ${s.fileName} (${payload.length} rows) — ${filesDone + 1}/${keys.length} …`, false);
       const CHUNK = 400;
+      let fileNew = 0;
       for (let i = 0; i < payload.length; i += CHUNK) {
         const slice = payload.slice(i, i + CHUNK);
         // seller_stock has a unique dedup_hash (company + platform + day + row
@@ -1405,16 +1406,28 @@
         // 400-row chunk are invisible to it — the trigger cannot see rows from
         // its own statement — so the upsert path is what makes that case safe.
         const DEDUPED = ["seller_stock", "seller_returns", "seller_manifest", "seller_payments"];
-        const { error } = DEDUPED.includes(cfg.table)
-          ? await sb.from(cfg.table).upsert(slice, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
-          : await sb.from(cfg.table).insert(slice);
+        // .select() returns only rows that were actually inserted. A row that a
+        // duplicate check swallowed (BEFORE-INSERT dedup trigger returning null,
+        // or ON CONFLICT DO NOTHING) is not in the result, so its length is the
+        // true count of NEW rows. That lets a re-upload say "0 new, all already
+        // in the system" instead of a misleading "Saved N rows".
+        const { data, error } = DEDUPED.includes(cfg.table)
+          ? await sb.from(cfg.table).upsert(slice, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true }).select("id")
+          : await sb.from(cfg.table).insert(slice).select("id");
         if (error) { setStatus(`Save error on ${s.fileName}: ${error.message}`, true); btn.disabled = false; return; }
+        fileNew += (data ? data.length : 0);
       }
-      totalInserted += payload.length;
+      totalInserted += fileNew;
+      totalDup += (payload.length - fileNew);
       filesDone++;
       delete bucket[k];
     }
-    setStatus(`✅ Saved ${totalInserted} rows from ${filesDone} file${filesDone === 1 ? "" : "s"} to Supabase.`, false);
+    setStatus(
+      totalInserted > 0
+        ? `✅ Saved ${totalInserted} new row${totalInserted === 1 ? "" : "s"} from ${filesDone} file${filesDone === 1 ? "" : "s"}` +
+          (totalDup > 0 ? ` — ${totalDup} row${totalDup === 1 ? " was" : "s were"} already in the system.` : ".")
+        : `ℹ️ Nothing new to add — all ${totalDup} row${totalDup === 1 ? " was" : "s were"} already in the system, across ${filesDone} file${filesDone === 1 ? "" : "s"}. Your data is already up to date.`,
+      false);
     const withPlats = companies.filter(c => (c.platforms || []).length > 0);
     renderKindTabs(withPlats);
     renderOrdersPickerList(withPlats);
