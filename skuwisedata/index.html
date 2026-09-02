@@ -183,8 +183,11 @@
     table.data th, table.data td { padding:12px 14px; text-align:left; border-bottom:1px solid #eef2f7; }
     /* Rows read like data you are meant to act on, not a log dump: a little
        more room and a little more weight. */
-    table.data tbody td { font-weight:600; color:#1e293b; }
-    table.data tbody td.muted { font-weight:500; }
+    table.data tbody td { font-weight:700; color:#1e293b; }
+    table.data tbody td.muted { font-weight:700; }
+    /* Every value in the body reads at one weight - positives, negatives and the
+       merged-window figures - so nothing looks louder than the rest. */
+    table.data tbody td, table.data tbody .wv { font-weight:700 !important; }
     table.data thead th { background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase;
                           font-size:11px; letter-spacing:.5px; position:sticky; top:0;
                           border-bottom:1px solid #e2e8f0; }
@@ -286,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1077,7 +1080,7 @@
       document.head.appendChild(el);
     }
     const sel = [], num = [], tdT = {}, thT = {};
-    const tint = state.view === "sku_master";
+    const tint = false;  // section background tints off by request
     orderedCols().forEach((c, i) => {
       if (state.hiddenCols.has(c) || kindHidden(c)) {
         sel.push("table.data th:nth-child(" + (i + 1) + ")",
@@ -1599,8 +1602,7 @@
       let tip = "Last charged return: " + kind + when
               + (Number.isFinite(units) && units > 1 ? " \u00b7 " + units + " units" : "");
       if (wrong) tip = "RTO charged on " + pf + " - it should not have been. " + tip;
-      return '<td title="' + tip + '" style="color:#0f172a;font-weight:'
-           + (wrong ? "800" : "700") + '">' + money(v) + (wrong ? " \u26a0" : "") + "</td>";
+      return '<td title="' + tip + '" style="color:#0f172a">' + money(v) + "</td>";
     }
     function shipCell(wc, col) {
       const spec = SHIP_COLS[col];
@@ -1860,9 +1862,8 @@
         // other number in the column.
         if (out.warn) return '<td title="An RTO was charged here - on Flipkart,'
           + ' Meesho and Myntra that should not happen, so it is money to claim back"'
-          + ' style="color:#0f172a;font-weight:800">' + out.txt + " \u26a0</td>";
-        const neg = out.v < 0;
-        return `<td style="color:#0f172a;font-weight:${neg ? 700 : 400}">${out.txt}</td>`;
+          + ' style="color:#0f172a">' + out.txt + "</td>";
+        return `<td style="color:#0f172a">${out.txt}</td>`;
       }
       if (PCT_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
