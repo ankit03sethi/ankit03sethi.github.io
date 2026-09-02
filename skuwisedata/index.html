@@ -190,6 +190,7 @@
                           border-bottom:1px solid #e2e8f0; }
     table.data tbody tr { transition:background .12s; }
     table.data tbody tr:hover { background:#eff6ff; }
+    table.data tbody tr:hover td { background:#eff6ff; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -285,7 +286,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02g</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1059,6 +1060,15 @@
 
   // One stylesheet, rewritten on every change. Hiding column 12 means hiding
   // the 12th cell of every row, which the browser does in one pass.
+  // Each block of the table gets its own faint wash so the sections read apart
+  // at a glance when you scroll sideways. The header band is a touch deeper than
+  // the cells so the boundary is clear without shouting. No reds - a warm peach
+  // marks Returns without implying every return is bad.
+  const GROUP_TD = { Sales:"#eff9f2", Returns:"#fdf4ee", Latest:"#fffcef",
+    Cash:"#eef5ff", Courier:"#eef4f9", Listing:"#f7f2fd", Money:"#f3f4f6" };
+  const GROUP_TH = { Sales:"#d9f2e1", Returns:"#fbe5d3", Latest:"#faf0c2",
+    Cash:"#dae7ff", Courier:"#dde8f1", Listing:"#e9dcf9", Money:"#e5e7eb" };
+
   function applyColVisibility() {
     let el = document.getElementById("colHideStyle");
     if (!el) {
@@ -1066,7 +1076,8 @@
       el.id = "colHideStyle";
       document.head.appendChild(el);
     }
-    const sel = [], num = [];
+    const sel = [], num = [], tdT = {}, thT = {};
+    const tint = state.view === "sku_master";
     orderedCols().forEach((c, i) => {
       if (state.hiddenCols.has(c) || kindHidden(c)) {
         sel.push("table.data th:nth-child(" + (i + 1) + ")",
@@ -1078,9 +1089,20 @@
         num.push("table.data th:nth-child(" + (i + 1) + ")",
                  "table.data td:nth-child(" + (i + 1) + ")");
       }
+      // Tints only on the analyst table - the raw order/return/payment views
+      // carry different columns, so the same positions would land on the wrong
+      // group there.
+      if (tint) {
+        const g = colGroup(c), td = GROUP_TD[g], th = GROUP_TH[g];
+        if (td) (tdT[td] = tdT[td] || []).push("table.data td:nth-child(" + (i + 1) + ")");
+        if (th) (thT[th] = thT[th] || []).push("table.data th:nth-child(" + (i + 1) + ")");
+      }
     });
-    el.textContent = (sel.length ? sel.join(",") + "{display:none}" : "")
+    let css = (sel.length ? sel.join(",") + "{display:none}" : "")
       + (num.length ? num.join(",") + "{text-align:right}" : "");
+    for (const c in tdT) css += tdT[c].join(",") + "{background:" + c + "}";
+    for (const c in thT) css += thT[c].join(",") + "{background:" + c + "}";
+    el.textContent = css;
   }
 
   // Units / % / Values is a view switch, not a per-column choice: it hides a
@@ -1355,14 +1377,13 @@
       // carries these headers, and show a dash until then.
       "Site Price","Ratings","Count","Seller","Link",
       "Sold",
+      // Net sold sits right beside Sold - units ordered less the ones that came
+      // back - so the first number you read is what actually stayed sold.
+      "Units kept",
       // Returns: total units back, what share of what sold, then who sent it
       // back. RTO never reached the buyer; a buyer return costs you freight
       // both ways.
       "Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %",
-      // What actually stayed sold: units ordered less units that came back.
-      // It belongs here, next to the returns it is derived from, not away in
-      // the money block - it is the number the return columns are leading to.
-      "Units kept",
       // The cash block, in the order the money moves: what the orders were
       // worth, what freight took, what actually landed, then everything that
       // comes off it. Counted on the payment date - see the header notes.
