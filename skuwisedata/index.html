@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02k</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02l</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -421,6 +421,8 @@
     company: "",
     companies: [],
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
+    stockMap: new Map(),       // company::platform::sku -> { qty, listing_status, ... } from the newest inventory export
+    stockHave: new Set(),      // company::platform pairs that have an inventory export at all
     // Which day-windows show inside a combined column, and which kinds of
     // measure show at all. 1 and 3 day ride along with 30/60/90 by default.
     win: new Set([1, 3, 30, 60, 90]),
@@ -500,6 +502,21 @@
       if (batch.length < PAGE) break;
     }
     state.windowCounts = m;
+    // Platform stock, off the newest inventory export per company + platform.
+    // A SKU missing from an export that exists is Inactive; a company +
+    // platform with no export at all shows a dash, not a false Inactive.
+    const sm = new Map(), have = new Set();
+    for (let from = 0; from < 200000; from += PAGE) {
+      const { data, error } = await sb.rpc("sku_stock_map").range(from, from + PAGE - 1);
+      if (error) { console.warn("sku_stock_map failed", error); break; }
+      const batch = data || [];
+      for (const r of batch) {
+        sm.set(wcKey(r.company_name, r.platform, r.sku), r);
+        have.add(wcKey(r.company_name, r.platform, ""));
+      }
+      if (batch.length < PAGE) break;
+    }
+    state.stockMap = sm; state.stockHave = have;
   }
 
   // ---- 1. Companies dropdown ----
@@ -1363,7 +1380,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
-      "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku",
+      "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
       "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -1888,6 +1905,21 @@
         const col = pct >= 20 ? "#0f172a" : "#475569";
         return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${Math.round(pct)}</td>`;
       }
+      if (c === "Stock" || c === "Qty") {
+        const st = state.stockMap.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const has = state.stockHave.has(wcKey(r.company_name, r.platform, ""));
+        if (!has) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        const inactive = !st || String(st.listing_status || "").toUpperCase() === "INACTIVE";
+        const qty = st ? Number(st.qty) : NaN;
+        if (c === "Qty") {
+          if (inactive) return `<td style="color:#cbd5e1">${DASH}</td>`;
+          return `<td>${Number.isFinite(qty) ? qty.toLocaleString("en-IN") : 0}</td>`;
+        }
+        const dot = (bg) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${bg};margin-right:5px;vertical-align:middle"></span>`;
+        if (inactive) return `<td title="Not in the latest inventory export${st ? ' (listing INACTIVE)' : ''}">${dot("#9ca3af")}Inactive</td>`;
+        if (qty > 0)  return `<td title="${escapeHtml(st.source_file || "")}">${dot("#16a34a")}In stock</td>`;
+        return `<td>${dot("#dc2626")}Out of stock</td>`;
+      }
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const n = wc ? wc[DAY_COLS[c]] : 0;
@@ -2398,6 +2430,8 @@
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
     "Master Sku": "Your own code that ties the same product across platforms.",
+    "Stock": "From the newest inventory export for this company + platform: In stock (qty > 0), Out of stock (0 or blank), Inactive (not in the export, or listing INACTIVE). Dash = no export uploaded yet.",
+    "Qty": "Stock on the platform, from the same export.",
     "COP": "What one unit costs you to buy. You fill this in.",
     "HSN": "Tax code from the master sheet.",
     "Tax %": "Tax rate you pay on this SKU. You fill this in.",
@@ -2509,7 +2543,7 @@
   const SORT_KEYS = {
     "Date":"date", "Company":"company", "Platform":"platform", "Brand":"brand",
     "Category":"category", "Sub Category":"subcategory", "Product":"product",
-    "Color":"color", "ASIN":"asin", "SKU":"sku", "Master Sku":"mastersku", "HSN":"hsn",
+    "Color":"color", "ASIN":"asin", "SKU":"sku", "Master Sku":"mastersku", "Stock":"stockstatus", "Qty":"stockqty", "HSN":"hsn",
     "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
     "Expected Settlement":"expectedsettlement", "Tax %":"tax", "Packaging":"packaging",
     "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
