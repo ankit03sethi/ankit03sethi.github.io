@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02j</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1637,7 +1637,9 @@
       if (!wc) return null;
       const w = MONEY_WIN[col];
       const su = Number(wc.settle_unit), cop = Number(wc.cop_unit);
-      const sold = Number(wc["d" + w]) || 0, ret = Number(wc["r" + w]) || 0;
+      // Pieces, not orders: d*/r* count orders now (an MOQ order of 3 is one
+      // order), u*/ur* are the units behind them. Net sales is in pieces.
+      const sold = Number(wc["u" + w]) || 0, ret = Number(wc["ur" + w]) || 0;
       // Return fees for the returns that happened in THIS window: the real
       // deduction where the platform has already taken it, and this platform's
       // learned cost for that kind of return where it has not. Without that,
@@ -1687,7 +1689,14 @@
       // its own stored figures; 30/60/90 divide the window by the units that
       // cash paid for, so the column adds down exactly like the totals do.
       if (UNIT_COLS.test(col)) {
-        const packu = Number(wc.pack_unit) || 0;
+        // Packaging is per ORDER, not per piece: an MOQ order of 3 is packed
+        // once. Spread it over the pieces so it sits next to the per-unit COP
+        // and tax, which do scale with quantity.
+        const packPer = Number(wc.pack_unit) || 0;
+        let packu = 0;
+        if (w === 0) packu = packPer / Math.max(Number(wc.ls_qty) || 1, 1);
+        else { const pu0 = Number(wc["pu" + w]) || 0;
+               packu = pu0 ? packPer * (Number(wc["po" + w]) || 0) / pu0 : 0; }
         // Two different questions, deliberately kept apart. `ret` is what
         // returns cost this sku per unit sold - that belongs inside profit.
         // `perRet` is what ONE buyer return costs, and that is what the Return
@@ -1741,7 +1750,7 @@
         const netu = Math.max(pu - ru, 0);
         const retf = Number.isFinite(loss) ? loss : booked;
         const tax2 = (Number(wc.tax_pct) || 0) / 100 * st;
-        const pack = (Number(wc.pack_unit) || 0) * pu;
+        const pack = (Number(wc.pack_unit) || 0) * (Number(wc["po" + w]) || 0);   // once per order
         if (col.endsWith("d Revenue"))  { const v = st + shc; return { v: v, txt: money(v) }; }
         if (col.endsWith("d Cash"))     return { v: st,    txt: money(st) };
         if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0" };
@@ -2421,14 +2430,14 @@
   // The combined columns. Each one is the same measure repeated for the days
   // shown in its header, left to right.
   Object.assign(COL_HELP, {
-    "Sold":            "Units ordered in each window. Cancelled orders left out.",
-    "Returns":         "Units that came back in each window.",
+    "Sold":            "Orders in each window - an MOQ order of 3 pieces counts once. Cancelled orders left out.",
+    "Returns":         "Return orders in each window.",
     "Return %":        "Returns as a share of what sold in the same window.",
     "RTO":             "Returns that never reached the buyer.",
     "RTO %":           "RTOs as a share of what sold in the same window.",
     "Buyer returns":   "Returns the buyer had and sent back. You pay freight both ways.",
     "Buyer return %":  "Buyer returns as a share of what sold in the same window.",
-    "Units kept":      "Sold minus returned - the units that stayed sold.",
+    "Units kept":      "Pieces sold minus pieces returned - counted in units, not orders.",
     "Total revenue":     "Cash that landed plus the forward courier the platform kept - what the orders were worth before freight. Counted on the payment date.",
     "Settlement":        "Cash that actually landed in the window. Revenue minus courier. Counted on the payment date, not the order date.",
     "Tax paid":          "Tax % from the master sheet on the settlement received. Blank Tax % reads as 0.",
