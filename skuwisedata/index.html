@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02l</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02m</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2612,8 +2612,13 @@
     return key ? { key, dir: t.sort.dir } : null;
   }
 
+  // One rule for matching a SKU anywhere, same as public.sku_key() in the
+  // database: lower-case and EVERY space removed - leading, trailing, and in
+  // the middle. Nothing else is touched, so "ab-cd.ef/0" and "a b -cd . ef /0"
+  // are the same SKU while "ab-cd" and "abcd" stay different.
   const wcKey = (co, plat, sku) =>
-    [co, plat, sku].map(x => String(x || "").trim().toLowerCase()).join("|");
+    [String(co || "").trim().toLowerCase(), String(plat || "").trim().toLowerCase(),
+     String(sku || "").replace(/\s+/g, "").toLowerCase()].join("|");
 
   // Product page URL, byte-for-byte the same rule the PD Tracker uses. That rule
   // lives in the database as the generated column analytics_products.product_url:
