@@ -1420,6 +1420,18 @@
       totalInserted += fileNew;
       totalDup += (payload.length - fileNew);
       filesDone++;
+      // Record that this file was taken, even when every row was already in
+      // the system. The "Last uploaded" stamps read seller_file_reads for
+      // exactly this: a re-download of an unchanged file must still move the
+      // time on the page, otherwise it is impossible to tell "file came, nothing
+      // new" from "file never arrived". The desktop watcher writes the same row.
+      try {
+        await sb.from("seller_file_reads").insert({
+          user_id: uid, company_name: s.company, platform: s.platform,
+          kind: job.kind, source_file: s.fileName,
+          rows_in_file: payload.length, rows_written: fileNew,
+        });
+      } catch (e) { console.warn("seller_file_reads:", e); }
       delete bucket[k];
     }
     setStatus(
@@ -1433,6 +1445,9 @@
     renderOrdersPickerList(withPlats);
     updateSaveButton();
     await refreshStamps();
+    // The picker rows carry their own stamps; reload those too so the row you
+    // just saved shows the new time without closing and reopening the picker.
+    try { await loadPickerLastMap(pickerKinds); renderOrdersPickerList(withPlats); } catch (e) { console.warn("picker stamps:", e); }
   });
 
   // Some exports put a banner above the table. Meesho's returns CSV opens with
