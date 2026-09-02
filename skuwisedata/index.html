@@ -285,7 +285,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-01q</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1098,6 +1098,8 @@
     if (c === "Sold" || c === "Units kept") return "Sales";
     if (["Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %",
          "Returns billed","Return cost","Cost per return"].includes(c)) return "Returns";
+    if (["Total revenue","Settlement","Tax paid","Packaging cost",
+         "Product cost","Net profit"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
     if (/^Last /.test(c)) return "Latest";
     if (["Margin","Tax","Profit","Profit /unit","Profit % of COP",
@@ -1284,6 +1286,12 @@
     "Courier /unit":   { t: "%wd Ship/unit",    kind: "value", wins: WIN_MAIN },
     "Courier total":   { t: "%wd Ship",         kind: "value", wins: WIN_MAIN },
     "Margin":          { t: "%wd Margin",       kind: "value", wins: WIN_MAIN },
+    "Total revenue":   { t: "%wd Revenue",      kind: "value", wins: WIN_MAIN },
+    "Settlement":      { t: "%wd Cash",         kind: "value", wins: WIN_MAIN },
+    "Tax paid":        { t: "%wd Tax Paid",     kind: "value", wins: WIN_MAIN },
+    "Packaging cost":  { t: "%wd Packing",      kind: "value", wins: WIN_MAIN },
+    "Product cost":    { t: "%wd Goods",        kind: "value", wins: WIN_MAIN },
+    "Net profit":      { t: "%wd Profit",       kind: "value", wins: WIN_MAIN },
     "Tax":             { t: "%wd Tax",          kind: "value", wins: WIN_MAIN },
     "Profit":          { t: "%wd Net",          kind: "value", wins: WIN_MAIN },
     "Profit /unit":    { t: "%wd Net/unit",     kind: "value", wins: WIN_MAIN },
@@ -1338,6 +1346,11 @@
       // It belongs here, next to the returns it is derived from, not away in
       // the money block - it is the number the return columns are leading to.
       "Units kept",
+      // The cash block, in the order the money moves: what the orders were
+      // worth, what freight took, what actually landed, then everything that
+      // comes off it. Counted on the payment date - see the header notes.
+      "Total revenue","Courier total","Settlement","Return cost",
+      "Tax paid","Packaging cost","Product cost","Net profit",
       // Money. Settle/unit is what this SKU actually settles at per unit across
       // every order of it that has been paid - used because roughly half of any
       // recent window is still unsettled, so counting only cash received would
@@ -1350,7 +1363,7 @@
       // averaging it over everything that sold would read as near zero.
       "Last 3 Ship","Ship/unit","Ret Ship/return",
       "Margin","Returns billed","Return cost","Cost per return",
-      "Courier /unit","Courier total","Tax","Profit","Profit /unit","Profit % of COP",
+      "Courier /unit","Tax","Profit","Profit /unit","Profit % of COP",
       "Focus"
   ];
 
@@ -1486,9 +1499,9 @@
     //                 sheet has no Tax % column, which it currently has not)
     //   final       = profit - return loss - tax
     const MONEY_WIN = {
-      "30d Net Units":30, "30d Margin":30, "30d Ret Charged":30, "30d Ret Fees":30, "30d Ret Cost/unit":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30,
-      "60d Net Units":60, "60d Margin":60, "60d Ret Charged":60, "60d Ret Fees":60, "60d Ret Cost/unit":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60,
-      "90d Net Units":90, "90d Margin":90, "90d Ret Charged":90, "90d Ret Fees":90, "90d Ret Cost/unit":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90 };
+      "30d Net Units":30, "30d Margin":30, "30d Ret Charged":30, "30d Ret Fees":30, "30d Ret Cost/unit":30, "30d Tax":30, "30d Net":30, "30d Net/unit":30, "30d Net %COP":30, "30d Revenue":30, "30d Cash":30, "30d Tax Paid":30, "30d Packing":30, "30d Goods":30, "30d Profit":30,
+      "60d Net Units":60, "60d Margin":60, "60d Ret Charged":60, "60d Ret Fees":60, "60d Ret Cost/unit":60, "60d Tax":60, "60d Net":60, "60d Net/unit":60, "60d Net %COP":60, "60d Revenue":60, "60d Cash":60, "60d Tax Paid":60, "60d Packing":60, "60d Goods":60, "60d Profit":60,
+      "90d Net Units":90, "90d Margin":90, "90d Ret Charged":90, "90d Ret Fees":90, "90d Ret Cost/unit":90, "90d Tax":90, "90d Net":90, "90d Net/unit":90, "90d Net %COP":90, "90d Revenue":90, "90d Cash":90, "90d Tax Paid":90, "90d Packing":90, "90d Goods":90, "90d Profit":90 };
     // Whole numbers, no currency sign. Every money column on this page is
     // rupees, so the symbol was 90 repetitions of the same fact per row.
     const money = (v) => Math.round(v).toLocaleString("en-IN");
@@ -1587,6 +1600,9 @@
       return '<td' + (tip ? ' title="' + tip + '"' : "")
            + ' style="color:#7c2d12;font-weight:600">' + txt + "</td>";
     }
+    // Named apart from the estimate columns so the two can never be confused:
+    // these six are cash, the older Margin / Net columns are settle-rate x units.
+    const CASH_COLS = /d (Revenue|Cash|Tax Paid|Packing|Goods|Profit)$/;
     function moneyCell(wc, col) {
       if (!wc) return null;
       const w = MONEY_WIN[col];
@@ -1632,6 +1648,34 @@
         const L  = Number.isFinite(loss) ? loss : booked;
         const lr = Number(wc["rlr" + w]) || 0;
         return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0 };
+      }
+      // The cash block. Everything below is counted on the PAYMENT date, not
+      // the order date: st is settlement that actually landed, shc the forward
+      // courier the platform billed, pu the units that cash paid for and ru how
+      // many of those came back. Revenue, courier, settlement and tax stand on
+      // their own - they do not need a COP, so they are answered before the
+      // guard that turns the estimate columns off.
+      if (CASH_COLS.test(col)) {
+        const st  = Number(wc["st"  + w]) || 0;
+        const shc = Number(wc["shc" + w]) || 0;
+        const pu  = Number(wc["pu"  + w]) || 0;
+        const ru  = Number(wc["ru"  + w]) || 0;
+        const netu = Math.max(pu - ru, 0);
+        const retf = Number.isFinite(loss) ? loss : booked;
+        const tax2 = (Number(wc.tax_pct) || 0) / 100 * st;
+        const pack = (Number(wc.pack_unit) || 0) * pu;
+        if (col.endsWith("d Revenue"))  { const v = st + shc; return { v: v, txt: money(v) }; }
+        if (col.endsWith("d Cash"))     return { v: st,    txt: money(st) };
+        if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0" };
+        if (col.endsWith("d Packing"))  return { v: -pack, txt: pack ? money(-pack) : "0" };
+        // Product cost and net profit cannot be answered without a COP, and a
+        // missing COP would quietly read as free stock and a fat profit. A dash
+        // says "fill the sheet", which is the truth.
+        if (!Number.isFinite(cop)) return null;
+        const goods = cop * netu;
+        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0" };
+        const fin2 = st - retf - tax2 - pack - goods;
+        return { v: fin2, txt: money(fin2) };
       }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
@@ -2072,6 +2116,12 @@
     COL_LABEL[w+"d Ret Cost/unit"] = w+"d Cost per return";
     COL_LABEL[w+"d Ship/unit"]     = w+"d Courier /unit";
     COL_LABEL[w+"d Ship"]          = w+"d Courier total";
+    COL_LABEL[w+"d Revenue"]       = w+"d Total revenue";
+    COL_LABEL[w+"d Cash"]          = w+"d Settlement";
+    COL_LABEL[w+"d Tax Paid"]      = w+"d Tax paid";
+    COL_LABEL[w+"d Packing"]       = w+"d Packaging cost";
+    COL_LABEL[w+"d Goods"]         = w+"d Product cost";
+    COL_LABEL[w+"d Profit"]        = w+"d Net profit";
     COL_LABEL[w+"d Net Units"]     = w+"d Net sales";
     COL_LABEL[w+"d Net"]           = w+"d Profit";
     COL_LABEL[w+"d Net/unit"]      = w+"d Profit /unit";
@@ -2276,6 +2326,12 @@
     "Buyer returns":   "Returns the buyer had and sent back. You pay freight both ways.",
     "Buyer return %":  "Buyer returns as a share of what sold in the same window.",
     "Units kept":      "Sold minus returned - the units that stayed sold.",
+    "Total revenue":     "Cash that landed plus the forward courier the platform kept - what the orders were worth before freight. Counted on the payment date.",
+    "Settlement":        "Cash that actually landed in the window. Revenue minus courier. Counted on the payment date, not the order date.",
+    "Tax paid":          "Tax % from the master sheet on the settlement received. Blank Tax % reads as 0.",
+    "Packaging cost":    "Packaging from the master sheet on every unit that shipped, returns included - the pack was already used. Blank reads as 0.",
+    "Product cost":      "COP on the units that stayed sold. Returned stock came back, so it carries no COP. Dash means no COP on the master sheet.",
+    "Net profit":        "Settlement less return charges, tax, packaging and product cost. Real cash, not an estimate. Dash means no COP on the sheet.",
     "Returns billed":  "How many returns the platform actually charged you for. Red means an RTO was billed, which is money to claim back.",
     "Return cost":     "What those returns cost. Real deductions where settled, this platform's learned cost where not.",
     "Cost per return": "Return cost divided by returns - what one return costs on average, whoever sent it back.",
@@ -2310,6 +2366,13 @@
     COL_HELP[w+"d Net"]           = "Margin minus return cost minus tax. Everything in, less everything out.";
     COL_HELP[w+"d Net/unit"]      = "Profit divided by the units that stayed sold.";
     COL_HELP[w+"d Net %COP"]      = "Profit per unit as a percentage of COP. What each rupee of stock returns.";
+    COL_HELP[w+"d Revenue"]        = "Cash that landed plus the forward courier the platform kept - what the orders were worth before freight. Counted on the payment date.";
+    COL_HELP[w+"d Cash"]           = "Cash that actually landed in the window. Revenue minus courier. Counted on the payment date, not the order date.";
+    COL_HELP[w+"d Tax Paid"]       = "Tax % from the master sheet on the settlement received. Blank Tax % reads as 0.";
+    COL_HELP[w+"d Packing"]        = "Packaging from the master sheet on every unit that shipped, returns included - the pack was already used. Blank reads as 0.";
+    COL_HELP[w+"d Goods"]          = "COP on the units that stayed sold. Returned stock came back, so it carries no COP. Dash means no COP on the master sheet.";
+    COL_HELP[w+"d Profit"]         = "Settlement less return charges, tax, packaging and product cost. Real cash, not an estimate. Dash means no COP on the sheet.";
+
   }
 
   const SORT_KEYS = {
@@ -2337,6 +2400,13 @@
     "30d Net":"f30", "60d Net":"f60", "90d Net":"f90",
     "30d Net/unit":"u30", "60d Net/unit":"u60", "90d Net/unit":"u90",
     "30d Net %COP":"c30", "60d Net %COP":"c60", "90d Net %COP":"c90",
+    "30d Revenue":"rev30",  "60d Revenue":"rev60",  "90d Revenue":"rev90",
+    "30d Cash":"cash30",    "60d Cash":"cash60",    "90d Cash":"cash90",
+    "30d Ship":"shc30",     "60d Ship":"shc60",     "90d Ship":"shc90",
+    "30d Tax Paid":"taxp30","60d Tax Paid":"taxp60","90d Tax Paid":"taxp90",
+    "30d Packing":"pack30", "60d Packing":"pack60", "90d Packing":"pack90",
+    "30d Goods":"goods30",  "60d Goods":"goods60",  "90d Goods":"goods90",
+    "30d Profit":"prof30",  "60d Profit":"prof60",  "90d Profit":"prof90",
   };
   // A combined column sorts on the first window it is showing - that is the
   // one your eye lands on first, so it is the one the arrows should mean.
