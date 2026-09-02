@@ -285,7 +285,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1372,19 +1372,12 @@
       // The same seven figures per unit, with the last paid order beside them.
       "Rev per unit","Courier per unit","Settled per unit","Return per unit",
       "Tax per unit","Pack per unit","Profit per unit",
-      // Money. Settle/unit is what this SKU actually settles at per unit across
-      // every order of it that has been paid - used because roughly half of any
-      // recent window is still unsettled, so counting only cash received would
-      // halve the figure. Margin and margin % do not move by window; only the
-      // totals do.
-      "Settle/unit","Margin/unit","Margin %COP",
-      // Forward courier the platform actually billed, straight off the
-      // payment file - no estimate anywhere in it. Reverse freight sits in
-      // one column beside it and is per RETURN, not per unit sold, because
-      // averaging it over everything that sold would read as near zero.
-      "Last 3 Ship","Ship/unit","Ret Ship/return",
-      "Margin","Returns billed","Return cost","Cost per return",
-      "Courier /unit","Tax","Profit","Profit /unit","Profit % of COP",
+      // The table ends here. Everything that used to follow - the settle-rate
+      // estimates (Settle/unit, Margin/unit, Margin % of COP), the older
+      // courier averages, and the second Margin / Tax / Profit set - was the
+      // pre-cash way of guessing these same figures from an average settle
+      // rate. The cash block above answers all of it from money that actually
+      // moved, so keeping both only invited reading the guess by mistake.
       "Focus"
   ];
 
