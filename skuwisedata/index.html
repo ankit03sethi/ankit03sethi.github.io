@@ -285,7 +285,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1639,21 +1639,19 @@
       // settled - only 17% of Flipkart's recent returns had been charged yet.
       const loss = Number(wc["rle" + w]);
       const booked = Number(wc["rl" + w]) || 0;
-      // Split the same way as the two columns beside it, because dividing the
-      // whole fee by every return blends the free RTOs into the paid customer
-      // returns: 9,891 over 95 returns reads 104, when an RTO actually cost 0
-      // and each customer return cost 157. Sorting uses the customer figure -
-      // that is the one that varies and the one worth ranking on.
-      // One number: what the average return of this SKU cost, whoever sent it
-      // back. The RTO / customer split lives in its own two columns, so it does
-      // not need to be crammed in here as well. Red still means an RTO was
-      // charged on a platform that should never charge for one.
+      // What one BUYER return cost: the return money the platform actually took,
+      // over the buyer returns it actually billed. RTOs are left out of both
+      // sides on purpose - most of them are billed at nothing, and counting
+      // them dragged the average down to a figure no single return ever cost
+      // (12,089 over 77 billed buyer returns is 157; spread over 115 returns
+      // including the free RTOs it read 105). Only returns that were charged
+      // count, so an unsettled return does not dilute it either.
       if (col.endsWith("Ret Cost/unit")) {
-        const rtoN = Number(wc["rto" + w]) || 0, srN = Number(wc["sr" + w]) || 0;
-        const lr = Number(wc["rlr" + w]) || 0,   ls = Number(wc["rls" + w]) || 0;
-        const n = rtoN + srN;
-        if (!n) return { v: 0, txt: "0" };
-        const per = (lr + ls) / n;
+        const nSR = Number(wc["rcs" + w]) || 0;   // buyer returns the platform billed
+        const ls  = Number(wc["rls" + w]) || 0;   // what it took for them
+        const lr  = Number(wc["rlr" + w]) || 0;   // RTO charges - flag only, not counted
+        if (!nSR) return null;
+        const per = ls / nSR;
         return { v: -per, txt: money(per), warn: lr > 0 };
       }
       if (col.endsWith("Ret Charged")) {
@@ -1803,7 +1801,7 @@
       if (SHIP_COLS[c]) {
         return shipCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c);
       }
-      if (MONEY_WIN[c] || c === "Last 3 Settle" || c === "Settle/unit"
+      if (c in MONEY_WIN || c === "Last 3 Settle" || c === "Settle/unit"
           || c === "Margin/unit" || c === "Margin %COP") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const su = wc ? Number(wc.settle_unit) : NaN;
@@ -2424,7 +2422,7 @@
     "Profit per unit":    "What one unit actually left you with. Dash means no COP on the master sheet.",
     "Returns billed":  "How many returns the platform actually charged you for. Red means an RTO was billed, which is money to claim back.",
     "Return cost":     "What those returns cost. Real deductions where settled, this platform's learned cost where not.",
-    "Cost per return": "Return cost divided by returns - what one return costs on average, whoever sent it back.",
+    "Cost per return": "What one buyer return cost: return money taken, divided by the buyer returns actually billed. RTOs are excluded - they are mostly billed at nothing and would drag the average down.",
     "Courier /unit":   "Forward courier per unit, on payment date. What the platform billed, nothing estimated.",
     "Courier total":   "Total forward courier billed on this SKU in each window.",
     "Margin":          "Units kept x margin per unit. Returned units carry no COP - the stock came back.",
@@ -2447,7 +2445,7 @@
     COL_HELP[w+"d SR %"]          = "Buyer returns as a share of what sold in the same "+w+" days.";
     COL_HELP[w+"d Ret Charged"]   = "How many returns the platform billed you for, shown RTO / buyer. Red on the RTO side means money to claim back.";
     COL_HELP[w+"d Ret Fees"]      = "What those returns cost, shown RTO / buyer. Real deductions where settled, this platform's learned cost where not.";
-    COL_HELP[w+"d Ret Cost/unit"] = "What ONE return costs, shown RTO / buyer. Each side uses its own count.";
+    COL_HELP[w+"d Ret Cost/unit"] = "What one buyer return cost: return money taken over the buyer returns actually billed. RTOs excluded - mostly billed at nothing. Dash means no buyer return was charged in this window.";
     COL_HELP[w+"d Ship/unit"]     = "Forward courier per unit over the last "+w+" days, on payment date.";
     COL_HELP[w+"d Ship"]          = "Total forward courier billed on this SKU over "+w+" days.";
     COL_HELP[w+"d Net Units"]     = "Sold minus returned - the units that stayed sold.";
