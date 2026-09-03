@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02m</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02n</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -343,6 +343,9 @@
         <span class="clear" id="allSearchClear" title="Clear">&#10005;</span>
       </span>
       <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
+      <button class="btn" id="scrapeResetBtn" type="button"
+              title="Clear Site Price / Ratings / Count / Seller for the rows shown below and re-check them first"
+              style="font-size:12px; padding:5px 11px; margin-left:12px; color:#b91c1c; border-color:#fecaca;">Delete data</button>
       <span id="colPickWrap" style="position:relative; margin-left:12px;">
         <button class="btn" id="colPickBtn" type="button"
                 style="font-size:12px; padding:5px 11px;">Columns</button>
@@ -1287,6 +1290,40 @@
   }
 
   function installColPicker() {
+    // Delete data: only the rows that survived every filter (company, platform,
+    // search, column dropdowns). Wipes the four listing columns for them and
+    // puts those listings at the front of the check queue, so the desktop app
+    // re-checks them before anything else - same as PD Tracker's re-check.
+    const resetBtn = document.getElementById("scrapeResetBtn");
+    if (resetBtn && !resetBtn.dataset.wired) {
+      resetBtn.dataset.wired = "1";
+      resetBtn.addEventListener("click", async () => {
+        if (state.view !== "sku_master") { alert("Open the SKU master table first."); return; }
+        const table = document.querySelector("table.data");
+        if (!table) return;
+        const ids = [...table.querySelectorAll("tbody tr")]
+          .filter(tr => tr.style.display !== "none" && tr.dataset.id)
+          .map(tr => Number(tr.dataset.id)).filter(Number.isFinite);
+        if (!ids.length) { alert("No rows are showing."); return; }
+        if (!confirm(`Delete Site Price / Ratings / Count / Seller for the ${ids.length.toLocaleString("en-IN")} row${ids.length === 1 ? "" : "s"} showing now, and re-check them first?\n\nMaster sheet, orders and money are not touched.`)) return;
+        resetBtn.disabled = true; resetBtn.textContent = "Deleting…";
+        try {
+          let reset = 0, queued = 0;
+          for (let i = 0; i < ids.length; i += 500) {
+            const { data, error } = await sb.rpc("sku_listing_reset", { p_ids: ids.slice(i, i + 500) });
+            if (error) throw error;
+            reset += Number(data?.reset) || 0; queued += Number(data?.queued) || 0;
+          }
+          state.listingStats = new Map();
+          await refresh();
+          alert(`Deleted ${reset.toLocaleString("en-IN")} and queued ${queued.toLocaleString("en-IN")} for re-check. The desktop app picks them up within a minute and does them first.`);
+        } catch (e) {
+          console.error(e); alert("Could not delete: " + (e.message || e));
+        } finally {
+          resetBtn.disabled = false; resetBtn.textContent = "Delete data";
+        }
+      });
+    }
     const btn = document.getElementById("colPickBtn");
     const panel = document.getElementById("colPickPanel");
     if (!btn || !panel) return;
@@ -1953,7 +1990,7 @@
       return '<td class="wincell"><div class="wgrid">' + parts.join("") + "</div></td>";
     }
 
-    const tr = rows.map((r, i0) => { const i = startIndex + i0; return "<tr>"
+    const tr = rows.map((r, i0) => { const i = startIndex + i0; return `<tr data-id="${r.id}">`
       + COLS.map(c => COMBO[c] ? renderCombo(r, i, c) : renderCell(r, i, c)).join("")
       + "</tr>"; }).join("");
     if (rowsOnly) return tr;
