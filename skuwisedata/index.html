@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02p</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02q</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -906,9 +906,13 @@
       .map(r => wcKey(r.company_name, r.platform, r.seller_sku))
       .filter(k => k && k !== "||" && !state.listingStats.has(k)))];
     if (!keys.length) return;
-    const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: keys });
-    if (error) { console.warn("sku_listing_stats failed", error); return; }
-    for (const r of (data || [])) state.listingStats.set(wcKey(r.company_name, r.platform, r.sku), r);
+    // 500 keys per call: a reply is capped at 1,000 rows, and with more than
+    // that many rows loaded the ones past the cap simply came back empty.
+    for (let i = 0; i < keys.length; i += 500) {
+      const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: keys.slice(i, i + 500) });
+      if (error) { console.warn("sku_listing_stats failed", error); throw error; }
+      for (const r of (data || [])) state.listingStats.set(wcKey(r.company_name, r.platform, r.sku), r);
+    }
   }
 
   async function loadMoreRows() {
@@ -2781,8 +2785,10 @@
     _softBusy = true;
     try {
       const rows = [...state.rowsById.values()];
+      const prev = state.listingStats;
       state.listingStats = new Map();
-      await loadListingStats(rows);
+      try { await loadListingStats(rows); }
+      catch (e) { state.listingStats = prev; return; }   // keep what we had rather than blanking the table
       const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
       const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller" };
       const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
