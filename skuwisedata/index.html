@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02n</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02o</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1314,8 +1314,7 @@
             if (error) throw error;
             reset += Number(data?.reset) || 0; queued += Number(data?.queued) || 0;
           }
-          state.listingStats = new Map();
-          await refresh();
+          await softRefreshListing();
           alert(`Deleted ${reset.toLocaleString("en-IN")} and queued ${queued.toLocaleString("en-IN")} for re-check. The desktop app picks them up within a minute and does them first.`);
         } catch (e) {
           console.error(e); alert("Could not delete: " + (e.message || e));
@@ -1963,7 +1962,7 @@
         return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}</td>`;
       }
       let v = shownVal(r, i, c);
-      if (v === DASH && !SCRAPED_COLS.has(c)) v = "";
+      if (v === DASH) v = "";   // an empty cell is an empty cell, in every column
       // Bold the two anchor columns for scannability
       if (c === "Master Sku" || c === "SKU") return `<td><b>${escapeHtml(v)}</b></td>`;
       // A listing URL is only useful if you can click it.
@@ -2737,9 +2736,49 @@
       txt.innerHTML = `<b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> ${escapeHtml(when)}`;
     } catch (e) { /* the strip is decoration; never break the page over it */ }
   }
+  // Soft refresh: re-read the four listing columns for the rows already on
+  // screen and write them into the existing cells. The table is not rebuilt,
+  // so every filter, dropdown tick, sort and scroll position stays exactly
+  // where it was - a full Reload was throwing all of that away.
+  let _softBusy = false;
+  async function softRefreshListing() {
+    if (_softBusy || state.view !== "sku_master") return;
+    const table = document.querySelector("#tableWrap table.data");
+    if (!table) return;
+    _softBusy = true;
+    try {
+      const rows = [...state.rowsById.values()];
+      state.listingStats = new Map();
+      await loadListingStats(rows);
+      const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
+      const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller" };
+      const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
+      if (!idx.length) return;
+      const blank = v => v == null || String(v).trim() === "";
+      for (const tr of table.querySelectorAll("tbody tr")) {
+        const r = state.rowsById.get(String(tr.dataset.id));
+        if (!r) continue;
+        const st = state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        for (const [c, i] of idx) {
+          const td = tr.cells[i]; if (!td) continue;
+          const v = st ? st[want[c]] : null;
+          const txt = blank(v) ? "" : String(v);
+          if (td.textContent !== txt) td.textContent = txt;
+        }
+      }
+    } catch (e) { console.warn("soft refresh:", e); }
+    finally { _softBusy = false; }
+  }
+  let _softTimer = null;
+  function startSoftRefresh() {
+    if (_softTimer) clearInterval(_softTimer);
+    _softTimer = setInterval(softRefreshListing, 60000);
+  }
+
   function startScrapeBar() {
     if (_scrapeTimer) clearInterval(_scrapeTimer);
     refreshScrapeBar();
+    startSoftRefresh();
     // 60s, not 20s. Three times fewer calls for a strip whose whole job is to
     // say "still moving" — at a thousand customers with a tab open, the 20s
     // version was 4,300 requests a day each.
