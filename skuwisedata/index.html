@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04w</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04x</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -847,7 +847,8 @@
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
     const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
                    "Our Price": "our_price", "Our Assured": "our_assured",
-                   "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured" };
+                   "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
+                   "Return Type": "return_type" };
     const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
@@ -861,6 +862,9 @@
       for (const [c, i] of idx) {
         const td = tr.cells[i]; if (!td) continue;
         let v = st[want[c]];
+        // Return Type: only overwrite once the page has said something; until
+        // then the cell keeps the master sheet's value.
+        if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         const txt = !blank(v) ? String(v)
                   : EXTRA.has(c) ? ""
@@ -1470,7 +1474,7 @@
   const colKind = (c) => (COMBO[c] ? COMBO[c].kind : FLAT_KIND[c] || null);
 
   const SKU_COLS = [
-      "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Non Returnable","Type",
+      "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
       "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
@@ -1553,6 +1557,17 @@
       // was cut (12307, 12308, ...), which read as nonsense against a list that
       // starts at the top.
       if (col === "S.NO") return String(i + 1);
+      // Return Type: what the product page says, ahead of the master sheet's
+      // Non Returnable column (which keeps feeding rows not yet checked).
+      if (col === "Return Type") {
+        const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        if (st && !blank(st.return_type)) return String(st.return_type);
+        for (const k of Object.keys(rd)) {
+          const nk = normHdr(k);
+          if ((nk === "returntype" || nk === "nonreturnable") && !blank(rd[k])) return safeCell(rd[k]);
+        }
+        return "";
+      }
       // Amazon and FirstCry have exactly one identifier and it is already in the
       // ASIN column. This has to come before the uploaded file is consulted:
       // the master file carries a stray "3" here on 1,789 Amazon rows, which is
@@ -2536,7 +2551,7 @@
   }
 
   // Display column -> the sort key sku_master_page() understands. Anything not
-  // listed here (Focus, Link, Vertical, Non Returnable, Listed By, S.NO) has no
+  // listed here (Focus, Link, Vertical, Return Type, Listed By, S.NO) has no
   // database expression behind it, so those still sort the rows on screen.
   // Hover help. These columns are arithmetic on six inputs, and a header alone
   // cannot say which file each one came from.
@@ -2551,7 +2566,7 @@
     "Platform": "Which marketplace this row is for.",
     "Brand": "Brand name from the master sheet.",
     "Vertical": "Your own grouping from the master sheet.",
-    "Non Returnable": "Marked non-returnable in the master sheet.",
+    "Return Type": "The return / replacement line on the product page, in the marketplace's own words (7-Day Return, No Returns...). Falls back to the master sheet's Non Returnable column until the page has been checked.",
     "Type": "Product type from the master sheet.",
     "Category": "Category from the master sheet.",
     "Sub Category": "Sub category from the master sheet.",
