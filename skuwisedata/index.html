@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02t</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02u</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -438,6 +438,7 @@
     // on what is actually moving is the answer to "why is everything zero".
     tools: { sku_master: { filters: {}, sort: { col: "Sold", dir: "desc" } } },
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
+    platformSellers: new Map(),// company|platform -> our own seller name on that marketplace
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
     hScroll: 0,                // how far right the table is scrolled, kept across reloads
     hiddenCols: new Set(),     // columns switched off in the Columns picker
@@ -525,6 +526,13 @@
 
   // ---- 1. Companies dropdown ----
   async function loadCompanies() {
+    // Our own seller name per company + platform (e.g. Shopperskart on
+    // Flipkart sells as "365available"). Shown after Platform, and it is the
+    // name the Flipkart other-sellers list is searched for.
+    try {
+      const { data: ps } = await sb.rpc("sku_platform_seller_names");
+      state.platformSellers = new Map((ps || []).map(x => [wcKey(x.company_name, x.platform, ""), x.seller_name]));
+    } catch (e) { console.warn("platform seller names:", e); }
     const { data, error } = await sb.from("seller_companies")
       .select("name").eq("user_id", state.session.user.id).order("name");
     if (error) { console.warn(error); return; }
@@ -838,7 +846,9 @@
     if (!table) return;
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
     const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
-                   "Other Seller": "alt_seller", "Other Price": "alt_price" };
+                   "Our Price": "our_price", "Our Assured": "our_assured",
+                   "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -850,9 +860,10 @@
       const stt = String(st.last_check_status || "");
       for (const [c, i] of idx) {
         const td = tr.cells[i]; if (!td) continue;
-        const v = st[want[c]];
+        let v = st[want[c]];
+        if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         const txt = !blank(v) ? String(v)
-                  : (c === "Other Seller" || c === "Other Price") ? ""
+                  : EXTRA.has(c) ? ""
                   : stt === "multi_product" ? "MP"
                   : stt === "not_found"     ? "NA" : "";
         if (td.textContent !== txt) td.textContent = txt;
@@ -1191,7 +1202,7 @@
     if (/^Last /.test(c)) return "Latest";
     if (["Margin","Tax","Profit","Profit /unit","Profit % of COP",
          "Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
-    if (["Site Price","Ratings","Count","Seller","Other Seller","Other Price","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","Link"].includes(c)) return "Listing";
     return "Product";
   }
 
@@ -1459,13 +1470,13 @@
   const colKind = (c) => (COMBO[c] ? COMBO[c].kind : FLAT_KIND[c] || null);
 
   const SKU_COLS = [
-      "S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type",
+      "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Non Returnable","Type",
       "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
       "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Seller","Other Seller","Other Price","Link",
+      "Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -1569,19 +1580,22 @@
       }
       // Live listing values from the scraper. Ahead of the uploaded file for the
       // same reason the IDs are: this is the page as it reads today.
-      if (col === "Site Price" || col === "Ratings" || col === "Count" || col === "Seller" || col === "Other Seller" || col === "Other Price") {
+      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured"].includes(col)) {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
           // Other Seller / Other Price: Flipkart's "See other sellers" list,
           // the cheapest seller WITHOUT the Assured tick. Blank when every
           // seller has the tick, or on platforms without such a list.
-          const v = col === "Site Price"   ? st.price
-                  : col === "Ratings"      ? st.rating
-                  : col === "Count"        ? st.review_count
-                  : col === "Other Seller" ? st.alt_seller
-                  : col === "Other Price"  ? st.alt_price
-                  :                          st.seller;
-          if (col === "Other Seller" || col === "Other Price") return blank(v) ? "" : String(v);
+          const v = col === "Site Price"    ? st.price
+                  : col === "Ratings"       ? st.rating
+                  : col === "Count"         ? st.review_count
+                  : col === "Our Price"     ? st.our_price
+                  : col === "Our Assured"   ? (st.our_assured ? "F Assured" : "")
+                  : col === "Other Seller"  ? st.alt_seller
+                  : col === "Other Price"   ? st.alt_price
+                  : col === "Other Assured" ? (st.alt_assured ? "F Assured" : "")
+                  :                           st.seller;
+          if (col !== "Site Price" && col !== "Ratings" && col !== "Count" && col !== "Seller") return blank(v) ? "" : String(v);
           if (!blank(v)) return String(v);
           // The link was opened but gave no single product: MP = the page
           // showed many products, NA = it showed none. Said in every one of the
@@ -1607,6 +1621,7 @@
         case "Date":              return fmtDate(r.created_at || r.updated_at);
         case "Company":           return r.company_name || "—";
         case "Platform":          return r.platform || "—";
+        case "Platform Seller":   return state.platformSellers.get(wcKey(r.company_name, r.platform, "")) || "";
         case "Brand":             return r.brand || "—";
         case "Category":          return r.category || "—";
         case "Sub Category":      return r.sub_category || "—";
@@ -2546,8 +2561,12 @@
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
     "Master Sku": "Your own code that ties the same product across platforms.",
-    "Other Seller": "Flipkart only: from 'See other sellers', the cheapest seller WITHOUT the Assured (blue tick) badge.",
+    "Platform Seller": "Our own seller name on this company + platform (e.g. Shopperskart sells on Flipkart as 365available).",
+    "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
+    "Our Assured": "F Assured when our Platform Seller carries the Assured badge in that list.",
+    "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
+    "Other Assured": "F Assured when that seller carries the Assured badge.",
     "Stock": "From the newest inventory export for this company + platform: In stock (qty > 0), Out of stock (0 or blank), Inactive (not in the export, or listing INACTIVE). Dash = no export uploaded yet.",
     "Qty": "Stock on the platform, from the same export.",
     "COP": "What one unit costs you to buy. You fill this in.",
@@ -2665,7 +2684,8 @@
     "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
     "Expected Settlement":"expectedsettlement", "Tax %":"tax", "Packaging":"packaging",
     "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
-    "Other Seller":"otherseller", "Other Price":"otherprice",
+    "Other Seller":"otherseller", "Other Price":"otherprice", "Other Assured":"otherassured",
+    "Our Price":"ourprice", "Our Assured":"ourassured",
     "1day":"d1", "3day":"d3", "7day":"d7", "15day":"d15", "30day":"d30",
     "60day":"d60", "90day":"d90",
     "30d Ret":"r30",   "60d Ret":"r60",   "90d Ret":"r90",
