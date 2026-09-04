@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04y</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04z</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -583,6 +583,23 @@
     state.company = c.dataset.c || "";
     saveFilters();
     refresh();
+  });
+  // The dropdown columns after Color. Each cell holds one of these or nothing.
+  const TAG_COLS = { "Mapped": ["Our mapped", "We mapped"], "MOQ": ["MOQ"] };
+  document.getElementById("tableWrap").addEventListener("change", async (e) => {
+    const sel = e.target.closest("select.tagsel"); if (!sel) return;
+    const id = sel.dataset.id, col = sel.dataset.col, val = sel.value;
+    const r = state.rowsById.get(String(id));
+    sel.disabled = true;
+    try {
+      const { data, error } = await sb.rpc("sku_master_set_tag", { p_id: Number(id), p_key: col, p_value: val });
+      if (error) throw error;
+      if (r) r.listing_data = data || {};
+      sel.style.background = val ? "#eff6ff" : "#fff";
+    } catch (err) {
+      console.error(err); alert("Could not save: " + (err.message || err));
+      sel.value = String(((r && r.listing_data) || {})[col] || "");
+    } finally { sel.disabled = false; }
   });
   // Clear filters: company, platform, search box, every column filter and the
   // sort go back to default in one click, and the saved copy goes with them.
@@ -1489,7 +1506,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
       "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -2061,6 +2078,13 @@
         const n = wc ? wc[DAY_COLS[c]] : 0;
         return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}</td>`;
       }
+      // Two hand-picked marks per row, saved to the master row the moment they
+      // change. The options are fixed; a blank first entry clears the mark.
+      if (TAG_COLS[c]) {
+        const cur = String((r.listing_data || {})[c] || "");
+        const opts = [""].concat(TAG_COLS[c]).map(o => `<option value="${escapeHtml(o)}"${o === cur ? " selected" : ""}>${escapeHtml(o || "\u2014")}</option>`).join("");
+        return `<td><select class="tagsel" data-col="${escapeHtml(c)}" data-id="${r.id}" style="font:inherit;padding:2px 4px;border:1px solid #e2e8f0;border-radius:6px;background:${cur ? "#eff6ff" : "#fff"}">${opts}</select></td>`;
+      }
       let v = shownVal(r, i, c);
       if (v === DASH) v = "";   // an empty cell is an empty cell, in every column
       // Bold the two anchor columns for scannability
@@ -2103,6 +2127,8 @@
     if (!td) return "";
     const inp = td.querySelector("input");
     if (inp) return inp.type === "checkbox" ? (inp.checked ? "yes" : "") : inp.value;
+    const sel = td.querySelector("select");
+    if (sel) return sel.value;
     return td.textContent.trim();
   }
 
@@ -2586,6 +2612,8 @@
     "Sub Category": "Sub category from the master sheet.",
     "Product": "Product name from the master sheet.",
     "Color": "Colour from the master sheet.",
+    "Mapped": "Your own mark: Our mapped or We mapped. Pick it here; it is saved at once.",
+    "MOQ": "Mark the SKU as MOQ. Pick it here; it is saved at once.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
