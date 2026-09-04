@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02r</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02s</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -823,8 +823,39 @@
     const list = rows || [];
     await Promise.all([loadPlatformIds(list), loadListingStats(list)]);
     if (token !== state.loadToken) return;
-    if (state.loaded !== list.length) return;   // more rows arrived meanwhile
+    // More rows arrived while these loaded: a full redraw would drop them, so
+    // write the listing values into the cells that are already there instead.
+    if (state.loaded !== list.length) { paintListingCells(); return; }
     redrawTable(list);
+  }
+
+  // Write Site Price / Ratings / Count / Seller from state.listingStats into
+  // the cells already on screen. Nothing is rebuilt, so filters, sort and
+  // scroll are untouched, and a row whose values have not arrived yet is left
+  // as it is rather than blanked.
+  function paintListingCells() {
+    const table = document.querySelector("#tableWrap table.data");
+    if (!table) return;
+    const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
+    const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller" };
+    const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
+    if (!idx.length) return;
+    const blank = v => v == null || String(v).trim() === "";
+    for (const tr of table.querySelectorAll("tbody tr")) {
+      const r = state.rowsById.get(String(tr.dataset.id));
+      if (!r) continue;
+      const st = state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+      if (!st) continue;                      // not loaded yet - leave the cell alone
+      const stt = String(st.last_check_status || "");
+      for (const [c, i] of idx) {
+        const td = tr.cells[i]; if (!td) continue;
+        const v = st[want[c]];
+        const txt = !blank(v) ? String(v)
+                  : stt === "multi_product" ? "MP"
+                  : stt === "not_found"     ? "NA" : "";
+        if (td.textContent !== txt) td.textContent = txt;
+      }
+    }
   }
 
   function redrawTable(rows) {
@@ -901,16 +932,16 @@
   // Latest scraped listing values — what the product page says right now, put
   // there by the desktop app's listing scraper. Same keying and same reason for
   // sending only the visible keys as loadPlatformIds.
-  async function loadListingStats(rows) {
+  async function loadListingStats(rows, force) {
     const keys = [...new Set(rows
       .map(r => wcKey(r.company_name, r.platform, r.seller_sku))
-      .filter(k => k && k !== "||" && !state.listingStats.has(k)))];
+      .filter(k => k && k !== "||" && (force || !state.listingStats.has(k))))];
     if (!keys.length) return;
     // 500 keys per call: a reply is capped at 1,000 rows, and with more than
     // that many rows loaded the ones past the cap simply came back empty.
     for (let i = 0; i < keys.length; i += 500) {
       const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: keys.slice(i, i + 500) });
-      if (error) { console.warn("sku_listing_stats failed", error); throw error; }
+      if (error) { console.warn("sku_listing_stats failed", error); continue; }   // keep going; what we have stays
       for (const r of (data || [])) state.listingStats.set(wcKey(r.company_name, r.platform, r.sku), r);
     }
   }
@@ -1321,7 +1352,11 @@
             if (error) throw error;
             reset += Number(data?.reset) || 0; queued += Number(data?.queued) || 0;
           }
-          await softRefreshListing();
+          for (const id of ids) {
+            const r = state.rowsById.get(String(id));
+            if (r) state.listingStats.set(wcKey(r.company_name, r.platform, r.seller_sku), { price: null, rating: null, review_count: null, seller: null, last_check_status: null });
+          }
+          paintListingCells();
           alert(`Deleted ${reset.toLocaleString("en-IN")} and queued ${queued.toLocaleString("en-IN")} for re-check. The desktop app picks them up within a minute and does them first.`);
         } catch (e) {
           console.error(e); alert("Could not delete: " + (e.message || e));
@@ -2807,30 +2842,8 @@
     if (!table) return;
     _softBusy = true;
     try {
-      const rows = [...state.rowsById.values()];
-      const prev = state.listingStats;
-      state.listingStats = new Map();
-      try { await loadListingStats(rows); }
-      catch (e) { state.listingStats = prev; return; }   // keep what we had rather than blanking the table
-      const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
-      const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller" };
-      const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
-      if (!idx.length) return;
-      const blank = v => v == null || String(v).trim() === "";
-      for (const tr of table.querySelectorAll("tbody tr")) {
-        const r = state.rowsById.get(String(tr.dataset.id));
-        if (!r) continue;
-        const st = state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        for (const [c, i] of idx) {
-          const td = tr.cells[i]; if (!td) continue;
-          const v = st ? st[want[c]] : null;
-          const stt = st ? String(st.last_check_status || "") : "";
-          const txt = !blank(v) ? String(v)
-                    : stt === "multi_product" ? "MP"
-                    : stt === "not_found"     ? "NA" : "";
-          if (td.textContent !== txt) td.textContent = txt;
-        }
-      }
+      await loadListingStats([...state.rowsById.values()], true);   // fresh values written over the old ones
+      paintListingCells();
     } catch (e) { console.warn("soft refresh:", e); }
     finally { _softBusy = false; }
   }
