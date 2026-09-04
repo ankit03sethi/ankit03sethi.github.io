@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02s</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02t</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -837,7 +837,8 @@
     const table = document.querySelector("#tableWrap table.data");
     if (!table) return;
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
-    const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller" };
+    const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
+                   "Other Seller": "alt_seller", "Other Price": "alt_price" };
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -851,6 +852,7 @@
         const td = tr.cells[i]; if (!td) continue;
         const v = st[want[c]];
         const txt = !blank(v) ? String(v)
+                  : (c === "Other Seller" || c === "Other Price") ? ""
                   : stt === "multi_product" ? "MP"
                   : stt === "not_found"     ? "NA" : "";
         if (td.textContent !== txt) td.textContent = txt;
@@ -1189,7 +1191,7 @@
     if (/^Last /.test(c)) return "Latest";
     if (["Margin","Tax","Profit","Profit /unit","Profit % of COP",
          "Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
-    if (["Site Price","Ratings","Count","Seller","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Seller","Other Seller","Other Price","Link"].includes(c)) return "Listing";
     return "Product";
   }
 
@@ -1463,7 +1465,7 @@
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Seller","Link",
+      "Site Price","Ratings","Count","Seller","Other Seller","Other Price","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -1567,13 +1569,19 @@
       }
       // Live listing values from the scraper. Ahead of the uploaded file for the
       // same reason the IDs are: this is the page as it reads today.
-      if (col === "Site Price" || col === "Ratings" || col === "Count" || col === "Seller") {
+      if (col === "Site Price" || col === "Ratings" || col === "Count" || col === "Seller" || col === "Other Seller" || col === "Other Price") {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
-          const v = col === "Site Price" ? st.price
-                  : col === "Ratings"    ? st.rating
-                  : col === "Count"      ? st.review_count
-                  :                        st.seller;
+          // Other Seller / Other Price: Flipkart's "See other sellers" list,
+          // the cheapest seller WITHOUT the Assured tick. Blank when every
+          // seller has the tick, or on platforms without such a list.
+          const v = col === "Site Price"   ? st.price
+                  : col === "Ratings"      ? st.rating
+                  : col === "Count"        ? st.review_count
+                  : col === "Other Seller" ? st.alt_seller
+                  : col === "Other Price"  ? st.alt_price
+                  :                          st.seller;
+          if (col === "Other Seller" || col === "Other Price") return blank(v) ? "" : String(v);
           if (!blank(v)) return String(v);
           // The link was opened but gave no single product: MP = the page
           // showed many products, NA = it showed none. Said in every one of the
@@ -2538,6 +2546,8 @@
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
     "Master Sku": "Your own code that ties the same product across platforms.",
+    "Other Seller": "Flipkart only: from 'See other sellers', the cheapest seller WITHOUT the Assured (blue tick) badge.",
+    "Other Price": "That seller's price.",
     "Stock": "From the newest inventory export for this company + platform: In stock (qty > 0), Out of stock (0 or blank), Inactive (not in the export, or listing INACTIVE). Dash = no export uploaded yet.",
     "Qty": "Stock on the platform, from the same export.",
     "COP": "What one unit costs you to buy. You fill this in.",
@@ -2655,6 +2665,7 @@
     "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
     "Expected Settlement":"expectedsettlement", "Tax %":"tax", "Packaging":"packaging",
     "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
+    "Other Seller":"otherseller", "Other Price":"otherprice",
     "1day":"d1", "3day":"d3", "7day":"d7", "15day":"d15", "30day":"d30",
     "60day":"d60", "90day":"d90",
     "30d Ret":"r30",   "60d Ret":"r60",   "90d Ret":"r90",
