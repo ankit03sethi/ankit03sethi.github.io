@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ab</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ac</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -589,7 +589,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Stock Qty": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" } };
   // Suggested Price cell text: the price, or why there is none.
   function suggText(st) {
     if (!st) return "";
@@ -1527,7 +1527,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Stock Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
       "COP","Margin","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -2652,7 +2652,6 @@
     "File Price": "Your Selling Price in the latest Flipkart listing file for this company.",
     "Suggested Price": "Flipkart: the Selling Price to put in the file. Someone else has the buy box: his site price - 2. We have it: cheapest F Assured other seller - 2; nobody else on the listing: the master sheet's Selling Price; others but none Assured: Hold. Never above MRP, never below the floor where the settlement would drop under COP (+tax on COP) + packaging + Margin. Green = raise, red = cut.",
     "Margin": "Rupees the Flipkart settlement must leave over COP + tax + packaging. Blank = 10. Type a number; it saves at once.",
-    "Stock Qty": "The stock count the Flipkart price/stock file will carry for this SKU. Type a number; it saves at once.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
     "Other Assured": "F Assured when that seller carries the Assured badge.",
