@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02q</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02r</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2770,7 +2770,30 @@
       const when = d.toLocaleString("en-IN", {
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
       });
-      txt.innerHTML = `<b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> ${escapeHtml(when)}`;
+      // Which ROW on screen was checked last: find the last-checked SKU among
+      // the rows in the table and read its S.NO. If that SKU is not among the
+      // rows loaded (or is filtered out), say the SKU instead of a number.
+      let rowNo = null;
+      try {
+        const key = wcKey(p.last_company, p.last_platform, p.last_sku);
+        const table = document.querySelector("#tableWrap table.data");
+        if (table && key !== "||") {
+          const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
+          const sno = heads.indexOf("S.NO");
+          for (const tr of table.querySelectorAll("tbody tr")) {
+            const r = state.rowsById.get(String(tr.dataset.id));
+            if (!r || wcKey(r.company_name, r.platform, r.seller_sku) !== key) continue;
+            if (tr.style.display === "none") break;
+            rowNo = sno >= 0 ? (tr.cells[sno] ? tr.cells[sno].textContent.trim() : null) : null;
+            if (!rowNo) rowNo = String([...tr.parentNode.children].indexOf(tr) + 1);
+            break;
+          }
+        }
+      } catch (e) { /* strip only */ }
+      const who = rowNo ? `Row <b>${escapeHtml(rowNo)}</b>`
+                        : `<b>${escapeHtml(String(p.last_sku || ""))}</b> <span class="sep">|</span> ${escapeHtml(String(p.last_platform || ""))}`;
+      txt.innerHTML = `${who} <span class="sep">|</span> ${escapeHtml(when)}`
+        + ` <span class="sep">|</span> ${checked.toLocaleString("en-IN")} of ${total.toLocaleString("en-IN")} checked`;
     } catch (e) { /* the strip is decoration; never break the page over it */ }
   }
   // Soft refresh: re-read the four listing columns for the rows already on
