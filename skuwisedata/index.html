@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04z</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04aa</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -532,7 +532,7 @@
     // name the Flipkart other-sellers list is searched for.
     try {
       const { data: ps } = await sb.rpc("sku_platform_seller_names");
-      state.platformSellers = new Map((ps || []).map(x => [wcKey(x.company_name, x.platform, ""), x.seller_name]));
+      state.platformSellers = new Map((ps || []).map(x => [psKey(x.company_name, x.platform), x.seller_name]));
     } catch (e) { console.warn("platform seller names:", e); }
     const { data, error } = await sb.from("seller_companies")
       .select("name").eq("user_id", state.session.user.id).order("name");
@@ -586,8 +586,28 @@
   });
   // The dropdown columns after Color. Each cell holds one of these or nothing.
   const TAG_COLS = { "Mapped": ["Our mapped", "We mapped"], "MOQ": ["MOQ"] };
+  // Typed-number columns saved the same way. Margin defaults to 10 when blank
+  // (the rupees over cost that the Suggested Price must leave in the settlement);
+  // Stock Qty is what the Flipkart price/stock file will carry.
+  const NUM_COLS = { "Margin": { def: "10" }, "Stock Qty": { def: "" } };
+  // Suggested Price cell text: the price, or why there is none.
+  function suggText(st) {
+    if (!st) return "";
+    if (st.sugg_price != null) return String(st.sugg_price);
+    const n = String(st.sugg_note || "");
+    if (n === "hold") return "Hold";
+    if (n === "same") return "Same";
+    if (n.startsWith("floor ")) return "Floor \u20b9" + n.slice(6);
+    if (n === "no seller name") return "No seller name";
+    return "";
+  }
+  function suggColor(st) {
+    if (!st || st.sugg_price == null) return "#64748b";
+    if (st.file_price == null) return "#0f172a";
+    return st.sugg_price > st.file_price ? "#047857" : st.sugg_price < st.file_price ? "#b91c1c" : "#0f172a";
+  }
   document.getElementById("tableWrap").addEventListener("change", async (e) => {
-    const sel = e.target.closest("select.tagsel"); if (!sel) return;
+    const sel = e.target.closest("select.tagsel, input.tagnum"); if (!sel) return;
     const id = sel.dataset.id, col = sel.dataset.col, val = sel.value;
     const r = state.rowsById.get(String(id));
     sel.disabled = true;
@@ -879,8 +899,8 @@
     const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
-                   "Return Type": "return_type" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured"]);
+                   "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -897,6 +917,7 @@
         // then the cell keeps the master sheet's value.
         if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
+        if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         const txt = !blank(v) ? String(v)
                   : EXTRA.has(c) ? ""
                   : stt === "multi_product" ? "MP"
@@ -1237,7 +1258,7 @@
     if (/^Last /.test(c)) return "Latest";
     if (["Margin","Tax","Profit","Profit /unit","Profit % of COP",
          "Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
-    if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Link"].includes(c)) return "Listing";
     return "Product";
   }
 
@@ -1506,12 +1527,12 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
-      "COP","HSN","Tax %","Packaging","Final COP","Expected Settlement",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Stock Qty",
+      "COP","Margin","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Link",
+      "Site Price","Ratings","Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","File Price","Suggested Price","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -1626,7 +1647,7 @@
       }
       // Live listing values from the scraper. Ahead of the uploaded file for the
       // same reason the IDs are: this is the page as it reads today.
-      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured"].includes(col)) {
+      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price"].includes(col)) {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
           // Other Seller / Other Price: Flipkart's "See other sellers" list,
@@ -1637,6 +1658,8 @@
                   : col === "Count"         ? st.review_count
                   : col === "Our Price"     ? st.our_price
                   : col === "Our Assured"   ? (st.our_assured ? "F Assured" : "")
+                  : col === "File Price"    ? st.file_price
+                  : col === "Suggested Price" ? suggText(st)
                   : col === "Other Seller"  ? st.alt_seller
                   : col === "Other Price"   ? st.alt_price
                   : col === "Other Assured" ? (st.alt_assured ? "F Assured" : "")
@@ -1667,7 +1690,7 @@
         case "Date":              return fmtDate(r.created_at || r.updated_at);
         case "Company":           return r.company_name || "—";
         case "Platform":          return r.platform || "—";
-        case "Platform Seller":   return state.platformSellers.get(wcKey(r.company_name, r.platform, "")) || "";
+        case "Platform Seller":   return state.platformSellers.get(psKey(r.company_name, r.platform)) || "";
         case "Brand":             return r.brand || "—";
         case "Category":          return r.category || "—";
         case "Sub Category":      return r.sub_category || "—";
@@ -2084,6 +2107,11 @@
         const cur = String((r.listing_data || {})[c] || "");
         const opts = [""].concat(TAG_COLS[c]).map(o => `<option value="${escapeHtml(o)}"${o === cur ? " selected" : ""}>${escapeHtml(o || "\u2014")}</option>`).join("");
         return `<td><select class="tagsel" data-col="${escapeHtml(c)}" data-id="${r.id}" style="font:inherit;padding:2px 4px;border:1px solid #e2e8f0;border-radius:6px;background:${cur ? "#eff6ff" : "#fff"}">${opts}</select></td>`;
+      }
+      if (NUM_COLS[c]) {
+        const ld = r.listing_data || {}, rd = r.raw_data || {};
+        const cur = String(ld[c] != null && ld[c] !== "" ? ld[c] : (rd[c] != null ? rd[c] : "")).trim();
+        return `<td><input class="tagnum" type="number" step="1" data-col="${escapeHtml(c)}" data-id="${r.id}" value="${escapeHtml(cur)}" placeholder="${escapeHtml(NUM_COLS[c].def)}" style="font:inherit;width:64px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:6px;background:${cur ? "#eff6ff" : "#fff"}"></td>`;
       }
       let v = shownVal(r, i, c);
       if (v === DASH) v = "";   // an empty cell is an empty cell, in every column
@@ -2621,6 +2649,10 @@
     "Platform Seller": "Our own seller name on this company + platform (e.g. Shopperskart sells on Flipkart as 365available).",
     "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
     "Our Assured": "F Assured when our Platform Seller carries the Assured badge in that list.",
+    "File Price": "Your Selling Price in the latest Flipkart listing file for this company.",
+    "Suggested Price": "Flipkart: the Selling Price to put in the file. Someone else has the buy box: his site price - 2. We have it: cheapest F Assured other seller - 2; nobody else on the listing: the master sheet's Selling Price; others but none Assured: Hold. Never above MRP, never below the floor where the settlement would drop under COP (+tax on COP) + packaging + Margin. Green = raise, red = cut.",
+    "Margin": "Rupees the Flipkart settlement must leave over COP + tax + packaging. Blank = 10. Type a number; it saves at once.",
+    "Stock Qty": "The stock count the Flipkart price/stock file will carry for this SKU. Type a number; it saves at once.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
     "Other Assured": "F Assured when that seller carries the Assured badge.",
@@ -2815,6 +2847,10 @@
   const wcKey = (co, plat, sku) =>
     [String(co || "").trim().toLowerCase(), String(plat || "").trim().toLowerCase(),
      String(sku || "").replace(/\s+/g, "").toLowerCase()].join("|");
+
+  // Company + platform key for the seller-name map. The server hands the
+  // company back as its space-free key, so spaces are dropped here too.
+  const psKey = (co, plat) => [String(co || "").replace(/\\s+/g, "").toLowerCase(), String(plat || "").trim().toLowerCase()].join("|");
 
   // Product page URL, byte-for-byte the same rule the PD Tracker uses. That rule
   // lives in the database as the generated column analytics_products.product_url:
