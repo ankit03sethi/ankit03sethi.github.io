@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ac</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ad</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2849,7 +2849,7 @@
 
   // Company + platform key for the seller-name map. The server hands the
   // company back as its space-free key, so spaces are dropped here too.
-  const psKey = (co, plat) => [String(co || "").replace(/\s+/g, "").toLowerCase(), String(plat || "").trim().toLowerCase()].join("|");
+  const psKey = (co, plat) => [String(co || "").trim().toLowerCase(), String(plat || "").trim().toLowerCase()].join("|");
 
   // Product page URL, byte-for-byte the same rule the PD Tracker uses. That rule
   // lives in the database as the generated column analytics_products.product_url:
