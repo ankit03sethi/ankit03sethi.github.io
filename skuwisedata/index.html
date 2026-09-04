@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02o</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-02p</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -470,6 +470,7 @@
       .gte("created_at", since).limit(1);
     if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
     await loadCompanies();
+    restoreFilters();
     startScrapeBar();
     await refreshMasterStamp();
     // The rolling day counts are loaded ONCE here, before the first table is
@@ -563,6 +564,7 @@
     document.querySelectorAll("#platformRow .plat-chip").forEach(x => x.classList.remove("active"));
     c.classList.add("active");
     state.platform = c.dataset.p || "";
+    saveFilters();
     refresh();
   });
   document.getElementById("companyRow").addEventListener("click", (e) => {
@@ -570,6 +572,7 @@
     document.querySelectorAll("#companyRow .plat-chip").forEach(x => x.classList.remove("active"));
     c.classList.add("active");
     state.company = c.dataset.c || "";
+    saveFilters();
     refresh();
   });
   // Reload re-reads the day counts too, so a fresh orders file shows up here
@@ -1533,6 +1536,12 @@
                   : col === "Count"      ? st.review_count
                   :                        st.seller;
           if (!blank(v)) return String(v);
+          // The link was opened but gave no single product: MP = the page
+          // showed many products, NA = it showed none. Said in every one of the
+          // four columns so it is visible whichever of them is on screen.
+          const stt = String(st.last_check_status || "");
+          if (stt === "multi_product") return "MP";
+          if (stt === "not_found")     return "NA";
         }
       }
       // A Link the master file did not carry is built from the marketplace ID
@@ -2031,10 +2040,34 @@
     return state.tools[view];
   }
 
+  // Filters, sort and the company/platform chips survive a browser reload.
+  const FILTER_KEY = "skuwise_filters_v1";
+  function saveFilters() {
+    try {
+      const t = toolsFor("sku_master");
+      const picks = Object.fromEntries(Object.entries(t.picks || {}).map(([k, s]) => [k, [...s]]));
+      localStorage.setItem(FILTER_KEY, JSON.stringify({ picks, sort: t.sort, company: state.company, platform: state.platform }));
+    } catch (e) { /* storage blocked - filters just will not survive a reload */ }
+  }
+  function restoreFilters() {
+    try {
+      const raw = localStorage.getItem(FILTER_KEY); if (!raw) return;
+      const saved = JSON.parse(raw);
+      const t = toolsFor("sku_master");
+      t.picks = {};
+      for (const [k, arr] of Object.entries(saved.picks || {})) if (Array.isArray(arr) && arr.length) t.picks[k] = new Set(arr);
+      if (saved.sort && saved.sort.col) t.sort = saved.sort;
+      state.company = saved.company || ""; state.platform = saved.platform || "";
+      document.querySelectorAll("#companyRow .plat-chip").forEach(x => x.classList.toggle("active", (x.dataset.c || "") === state.company));
+      document.querySelectorAll("#platformRow .plat-chip").forEach(x => x.classList.toggle("active", (x.dataset.p || "") === state.platform));
+    } catch (e) { /* ignore */ }
+  }
+
   function applyTableTools() {
     const table = $("#tableWrap").querySelector("table.data");
     if (!table) return;
     const t = toolsFor(state.view);
+    if (state.view === "sku_master") saveFilters();
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
     const body = table.querySelector("tbody");
     const rows = [...body.rows];
@@ -2762,7 +2795,10 @@
         for (const [c, i] of idx) {
           const td = tr.cells[i]; if (!td) continue;
           const v = st ? st[want[c]] : null;
-          const txt = blank(v) ? "" : String(v);
+          const stt = st ? String(st.last_check_status || "") : "";
+          const txt = !blank(v) ? String(v)
+                    : stt === "multi_product" ? "MP"
+                    : stt === "not_found"     ? "NA" : "";
           if (td.textContent !== txt) td.textContent = txt;
         }
       }
