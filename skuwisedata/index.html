@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04x</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04y</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -331,6 +331,7 @@
     <div class="plat-chip" data-p="meesho">Meesho</div>
     <div class="plat-chip" data-p="myntra">Myntra</div>
     <div class="plat-chip" data-p="firstcry">FirstCry</div>
+    <button class="btn" id="clearFiltersBtn" title="Company, platform, search, every column filter and the sort - all back to default" style="margin-left:auto; color:#b91c1c; border-color:#fecaca; background:#fff">Clear filters</button>
   </div>
 
   <div class="kpi-grid" id="kpis"></div>
@@ -581,6 +582,19 @@
     c.classList.add("active");
     state.company = c.dataset.c || "";
     saveFilters();
+    refresh();
+  });
+  // Clear filters: company, platform, search box, every column filter and the
+  // sort go back to default in one click, and the saved copy goes with them.
+  document.getElementById("clearFiltersBtn").addEventListener("click", () => {
+    state.company = ""; state.platform = "";
+    document.querySelectorAll("#companyRow .plat-chip").forEach(x => x.classList.toggle("active", !x.dataset.c));
+    document.querySelectorAll("#platformRow .plat-chip").forEach(x => x.classList.toggle("active", !x.dataset.p));
+    for (const t of Object.values(state.tools || {})) { t.picks = {}; t.filters = {}; t.sort = null; }
+    const se = document.getElementById("allSearch"); if (se) se.value = "";
+    const sw = document.getElementById("allSearchWrap"); if (sw) sw.classList.remove("on");
+    state.search = "";
+    try { localStorage.removeItem(FILTER_KEY); } catch (e) { /* ignore */ }
     refresh();
   });
   // Reload re-reads the day counts too, so a fresh orders file shows up here
