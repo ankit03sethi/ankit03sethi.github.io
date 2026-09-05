@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ad</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ae</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -585,7 +585,7 @@
     refresh();
   });
   // The dropdown columns after Color. Each cell holds one of these or nothing.
-  const TAG_COLS = { "Mapped": ["Our mapped", "We mapped"], "MOQ": ["MOQ"] };
+  const TAG_COLS = { "MOQ": ["MOQ"] };
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
@@ -899,8 +899,8 @@
     const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
-                   "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price"]);
+                   "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -918,6 +918,7 @@
         if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
+        if (c === "Mapped") v = st.mapped ? "Yes" : "";
         const txt = !blank(v) ? String(v)
                   : EXTRA.has(c) ? ""
                   : stt === "multi_product" ? "MP"
@@ -1647,7 +1648,7 @@
       }
       // Live listing values from the scraper. Ahead of the uploaded file for the
       // same reason the IDs are: this is the page as it reads today.
-      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price"].includes(col)) {
+      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Mapped"].includes(col)) {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
           // Other Seller / Other Price: Flipkart's "See other sellers" list,
@@ -1660,6 +1661,7 @@
                   : col === "Our Assured"   ? (st.our_assured ? "F Assured" : "")
                   : col === "File Price"    ? st.file_price
                   : col === "Suggested Price" ? suggText(st)
+                  : col === "Mapped"        ? (st.mapped ? "Yes" : "")
                   : col === "Other Seller"  ? st.alt_seller
                   : col === "Other Price"   ? st.alt_price
                   : col === "Other Assured" ? (st.alt_assured ? "F Assured" : "")
@@ -2640,7 +2642,7 @@
     "Sub Category": "Sub category from the master sheet.",
     "Product": "Product name from the master sheet.",
     "Color": "Colour from the master sheet.",
-    "Mapped": "Your own mark: Our mapped or We mapped. Pick it here; it is saved at once.",
+    "Mapped": "Yes once any seller other than us has been seen on the listing (Flipkart sellers list, or a different buy-box seller). Set automatically by the checker and never cleared. Mapped rows are checked first, at least once a day.",
     "MOQ": "Mark the SKU as MOQ. Pick it here; it is saved at once.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
