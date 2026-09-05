@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-05b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-05c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -591,7 +591,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Expected Settlement": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Expected Settlement": { def: "" } };
   // Suggested Price cell text: the price, or why there is none.
   function suggText(st) {
     if (!st) return "";
@@ -1531,7 +1531,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
-      "COP","Margin","Auto Margin","HSN","Tax %","Packaging","Final COP","Expected Settlement",
+      "COP","Margin","Auto Margin","Auto %","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
