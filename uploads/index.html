@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-05a</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-05b</span></div>
     </div>
   </a>
   </div>
@@ -1811,12 +1811,10 @@
             if (code == null || String(code).trim() === "") continue;
             rows.push({ code: String(code), qty: r[cQty] == null ? null : String(r[cQty]), status: cSt >= 0 && r[cSt] != null ? String(r[cSt]) : null });
           }
-          for (let i = 0; i < rows.length; i += 2000) {
-            const { data, error: e2 } = await sb.rpc("sku_kit_qty_set", { p_rows: rows.slice(i, i + 2000) });
-            if (e2) throw e2;
-            nKit += Number(data) || 0;
-            if (i === 0 && rows.length > 2000) { /* later chunks merge via upsert */ }
-          }
+          // One call: the server replaces the whole set, so it must see it all at once.
+          const { data, error: e2 } = await sb.rpc("sku_kit_qty_set", { p_rows: rows });
+          if (e2) throw e2;
+          nKit = Number(data) || 0;
         }
       } catch (e3) { console.warn("kit qty:", e3); }
       setStatus(`✅ Saved ${f.name} — ${nA} loose item${nA===1?"":"s"}, ${nB} made item${nB===1?"":"s"}, ${nC} kit${nC===1?"":"s"}, ${nR} recipe line${nR===1?"":"s"}, ${nM} movement${nM===1?"":"s"}. Kit Qty updated for ${nKit} kit${nKit===1?"":"s"} on the SKU page.`, false);
