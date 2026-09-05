@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-04ae</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-05a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -531,6 +531,8 @@
     // Flipkart sells as "365available"). Shown after Platform, and it is the
     // name the Flipkart other-sellers list is searched for.
     try {
+      const { data: kq } = await sb.rpc("sku_kit_qty");
+      state.kitQty = new Map((kq || []).map(x => [String(x.k_code || ""), x]));
       const { data: ps } = await sb.rpc("sku_platform_seller_names");
       state.platformSellers = new Map((ps || []).map(x => [psKey(x.company_name, x.platform), x.seller_name]));
     } catch (e) { console.warn("platform seller names:", e); }
@@ -1528,7 +1530,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
       "COP","Margin","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -1610,6 +1612,13 @@
       // was cut (12307, 12308, ...), which read as nonsense against a list that
       // starts at the top.
       if (col === "S.NO") return String(i + 1);
+      // Kit Qty: the C Kits tab of the Warehouse Stock workbook, kit code = Master SKU.
+      if (col === "Kit Qty") {
+        const k = state.kitQty && state.kitQty.get(String(r.master_sku || "").replace(/\s+/g, "").toLowerCase());
+        if (!k) return "";
+        if (k.qty == null) return "";
+        return k.qty < 0 ? "Deleted" : String(k.qty);
+      }
       // Return Type: what the product page says, ahead of the master sheet's
       // Non Returnable column (which keeps feeding rows not yet checked).
       if (col === "Return Type") {
@@ -2654,6 +2663,7 @@
     "File Price": "Your Selling Price in the latest Flipkart listing file for this company.",
     "Suggested Price": "Flipkart: the Selling Price to put in the file. Someone else has the buy box: his site price - 2. We have it: cheapest F Assured other seller - 2; nobody else on the listing: the master sheet's Selling Price; others but none Assured: Hold. Never above MRP, never below the floor where the settlement would drop under COP (+tax on COP) + packaging + Margin. Green = raise, red = cut.",
     "Margin": "Rupees the Flipkart settlement must leave over COP + tax + packaging. Blank = 10. Type a number; it saves at once.",
+    "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
     "Other Assured": "F Assured when that seller carries the Assured badge.",
