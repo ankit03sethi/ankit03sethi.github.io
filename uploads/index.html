@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-05b</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-05c</span></div>
     </div>
   </a>
   </div>
@@ -1799,17 +1799,17 @@
       try {
         const g = XLSX.utils.sheet_to_json(wb.Sheets["C Kits"], { header: 1, defval: null });
         const nk = h => String(h == null ? "" : h).toLowerCase().replace(/[^a-z0-9]+/g, "");
-        let hi = -1, cCode = -1, cQty = -1, cSt = -1;
+        let hi = -1, cCode = -1, cQty = -1, cSt = -1, cPr = -1;
         for (let i = 0; i < Math.min(g.length, 10); i++) {
           const ks = (g[i] || []).map(nk); const a = ks.indexOf("code"), b = ks.indexOf("qty");
-          if (a >= 0 && b >= 0) { hi = i; cCode = a; cQty = b; cSt = ks.indexOf("status"); break; }
+          if (a >= 0 && b >= 0) { hi = i; cCode = a; cQty = b; cSt = ks.indexOf("status"); cPr = ks.indexOf("price"); break; }
         }
         if (hi >= 0) {
           const rows = [];
           for (let i = hi + 1; i < g.length; i++) {
             const r = g[i] || []; const code = r[cCode];
             if (code == null || String(code).trim() === "") continue;
-            rows.push({ code: String(code), qty: r[cQty] == null ? null : String(r[cQty]), status: cSt >= 0 && r[cSt] != null ? String(r[cSt]) : null });
+            rows.push({ code: String(code), qty: r[cQty] == null ? null : String(r[cQty]), status: cSt >= 0 && r[cSt] != null ? String(r[cSt]) : null, price: cPr >= 0 && r[cPr] != null ? String(r[cPr]) : null });
           }
           // One call: the server replaces the whole set, so it must see it all at once.
           const { data, error: e2 } = await sb.rpc("sku_kit_qty_set", { p_rows: rows });
@@ -1817,7 +1817,7 @@
           nKit = Number(data) || 0;
         }
       } catch (e3) { console.warn("kit qty:", e3); }
-      setStatus(`✅ Saved ${f.name} — ${nA} loose item${nA===1?"":"s"}, ${nB} made item${nB===1?"":"s"}, ${nC} kit${nC===1?"":"s"}, ${nR} recipe line${nR===1?"":"s"}, ${nM} movement${nM===1?"":"s"}. Kit Qty updated for ${nKit} kit${nKit===1?"":"s"} on the SKU page.`, false);
+      setStatus(`✅ Saved ${f.name} — ${nA} loose item${nA===1?"":"s"}, ${nB} made item${nB===1?"":"s"}, ${nC} kit${nC===1?"":"s"}, ${nR} recipe line${nR===1?"":"s"}, ${nM} movement${nM===1?"":"s"}. Kit Qty and COP updated for ${nKit} kit${nKit===1?"":"s"} on the SKU page.`, false);
       await refreshWarehouseStamp();
     } catch (err) {
       console.error(err);
