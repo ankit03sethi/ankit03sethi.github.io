@@ -54,6 +54,14 @@
     .chip { display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:999px; padding:3px 8px 3px 10px; font-size:12px; font-weight:700; }
     .chip button { border:none; background:none; color:#1e40af; cursor:pointer; font-size:14px; line-height:1; padding:0; }
     .chips .all { font-size:12px; font-weight:600; color:#94a3b8; }
+    .combo { position:relative; }
+    .combo input { padding-right:34px; }
+    .combo .arrow { position:absolute; right:10px; top:50%; transform:translateY(-50%); color:#64748b; pointer-events:none; font-size:12px; }
+    .combo .list { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:20; background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 10px 30px rgba(15,23,42,.14); max-height:260px; overflow-y:auto; padding:4px; }
+    .combo .list[hidden] { display:none; }
+    .combo .list div { padding:8px 10px; border-radius:7px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .combo .list div:hover, .combo .list div.hi { background:#eff6ff; color:#1e40af; }
+    .combo .list .note { color:#94a3b8; font-weight:500; cursor:default; }
   </style>
 </head>
 <body>
@@ -108,8 +116,8 @@
           <div class="picker" data-k="company">Company<select><option value="">All companies &mdash; add&hellip;</option></select><div class="chips"></div></div>
           <div class="picker" data-k="platform">Platform<select><option value="">All platforms &mdash; add&hellip;</option></select><div class="chips"></div></div>
           <div class="picker" data-k="courier">Courier<select><option value="">All couriers &mdash; add&hellip;</option></select><div class="chips"></div></div>
-          <div class="picker" data-k="master">Master SKU<input type="text" list="masterList" placeholder="All master SKUs &mdash; type to add&hellip;"><datalist id="masterList"></datalist><div class="chips"></div></div>
-          <div class="picker" data-k="sku">Seller SKU<input type="text" placeholder="All seller SKUs &mdash; type &amp; Enter&hellip;"><div class="chips"></div></div>
+          <div class="picker" data-k="master">Master SKU<div class="combo"><input type="text" autocomplete="off" placeholder="All master SKUs &mdash; search&hellip;"><span class="arrow">&#9660;</span><div class="list" hidden></div></div><div class="chips"></div></div>
+          <div class="picker" data-k="sku">Seller SKU<div class="combo"><input type="text" autocomplete="off" placeholder="All seller SKUs &mdash; search&hellip;"><span class="arrow">&#9660;</span><div class="list" hidden></div></div><div class="chips"></div></div>
         </div>
       </div>
       <div class="actions">
@@ -155,20 +163,58 @@
     if (!chosen[k].some(z => z.toLowerCase() === v.toLowerCase())) chosen[k].push(v);
     renderChips(k);
   }
+  let masters = []; // all master SKUs (filtered in the browser)
+  const skuCache = new Map(); // seller SKU search -> results (looked up in the database)
+  async function skuSearch(q) {
+    q = q.trim();
+    if (skuCache.has(q)) return skuCache.get(q);
+    const { data } = await sb.rpc("label_sort_sku_search", { p_q: q });
+    const list = Array.isArray(data) ? data : [];
+    skuCache.set(q, list);
+    return list;
+  }
+  // searchable dropdown: type to filter, click (or Enter) to add as a chip
+  function setupCombo(p, k, source) {
+    const inp = p.querySelector("input"), list = p.querySelector(".list");
+    let items = [], hi = -1, seq = 0;
+    const render = () => {
+      list.innerHTML = "";
+      if (!items.length) { const d = document.createElement("div"); d.className = "note"; d.textContent = inp.value.trim() ? "No match — press Enter to add as typed" : "Type to search…"; list.appendChild(d); }
+      items.forEach((v, i) => { const d = document.createElement("div"); d.textContent = v; if (i === hi) d.className = "hi"; d.addEventListener("mousedown", (e) => { e.preventDefault(); pick(v); }); list.appendChild(d); });
+      if (items.length >= 60) { const d = document.createElement("div"); d.className = "note"; d.textContent = "Type more to narrow down…"; list.appendChild(d); }
+      list.hidden = false;
+    };
+    const pick = (v) => { addChoice(k, v); inp.value = ""; hi = -1; refresh(); inp.focus(); };
+    const refresh = async () => {
+      const my = ++seq, q = inp.value.trim();
+      const res = await source(q);
+      if (my !== seq) return;
+      items = res.filter(v => !chosen[k].some(z => z.toLowerCase() === String(v).toLowerCase())).slice(0, 60);
+      hi = items.length ? 0 : -1; render();
+    };
+    inp.addEventListener("focus", refresh);
+    inp.addEventListener("input", refresh);
+    inp.addEventListener("blur", () => { list.hidden = true; });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); if (items.length) { hi = (hi + 1) % items.length; render(); } }
+      else if (e.key === "ArrowUp") { e.preventDefault(); if (items.length) { hi = (hi - 1 + items.length) % items.length; render(); } }
+      else if (e.key === "Enter") { e.preventDefault(); if (hi >= 0 && items[hi]) pick(items[hi]); else if (inp.value.trim()) pick(inp.value); }
+      else if (e.key === "Escape") { list.hidden = true; }
+    });
+  }
   for (const p of pickers) {
     const k = p.dataset.k;
-    const sel = p.querySelector("select"), txt = p.querySelector("input[type=text]");
+    const sel = p.querySelector("select"), combo = p.querySelector(".combo");
     if (sel) sel.addEventListener("change", () => { addChoice(k, sel.value); sel.value = ""; });
-    if (txt) {
-      txt.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addChoice(k, txt.value); txt.value = ""; } });
-      txt.addEventListener("change", () => { if (txt.value.trim()) { addChoice(k, txt.value); txt.value = ""; } });
-    }
+    if (combo) setupCombo(combo, k, k === "master"
+      ? async (q) => { const n = q.toLowerCase(); return n ? masters.filter(v => v.toLowerCase().includes(n)) : masters; }
+      : skuSearch);
     renderChips(k);
   }
   function fillOptions(opts) {
     const fill = (k, list) => { const sel = document.querySelector(`.picker[data-k="${k}"] select`); for (const v of list || []) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); } };
     fill("company", opts.companies); fill("platform", opts.platforms); fill("courier", opts.couriers);
-    const dl = document.getElementById("masterList"); for (const v of opts.masters || []) { const o = document.createElement("option"); o.value = v; dl.appendChild(o); }
+    masters = (opts.masters || []).map(String);
   }
 
   (async () => {
