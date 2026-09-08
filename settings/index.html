@@ -214,7 +214,7 @@
   function fillOptions(opts) {
     const fill = (k, list) => { const sel = document.querySelector(`.picker[data-k="${k}"] select`); for (const v of list || []) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); } };
     fill("company", opts.companies); fill("platform", opts.platforms); fill("courier", opts.couriers);
-    masters = (opts.masters || []).map(String);
+    masters = (opts.masters || []).map(String).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   }
 
   (async () => {
