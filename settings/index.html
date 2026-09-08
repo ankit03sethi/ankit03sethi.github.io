@@ -122,7 +122,7 @@
     placeholder.hidden = !!name;
     if (name) history.replaceState(null, "", "#" + name); else history.replaceState(null, "", location.pathname);
   };
-  tabs.forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  tabs.forEach(b => b.addEventListener("click", () => showTab(b.classList.contains("active") ? "" : b.dataset.tab))); // click again = close
   if (location.hash && tabs.some(b => "#" + b.dataset.tab === location.hash)) showTab(location.hash.slice(1));
 
   const inputs = Array.from(document.querySelectorAll("input.lsort"));
