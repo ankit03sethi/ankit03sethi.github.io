@@ -189,6 +189,17 @@
     .catch(() => { /* silent — hardcoded fallback still works */ });
 </script>
 
+<script>
+  // Other Settings card: open / close the panel (plain script, works even if the module below is slow)
+  (function () {
+    const panel = document.getElementById("settingsPanel");
+    const open = (e) => { if (e) e.preventDefault(); panel.hidden = false; panel.style.display = "block"; panel.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    document.getElementById("settingsCard").addEventListener("click", open);
+    document.getElementById("settingsClose").addEventListener("click", () => { panel.hidden = true; panel.style.display = "none"; if (location.hash === "#settings") history.replaceState(null, "", location.pathname + location.search); });
+    if (location.hash === "#settings") open();
+  })();
+</script>
+
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -208,10 +219,8 @@
         for (const i of inputs) i.value = data && data[i.dataset.k] ? data[i.dataset.k] : "";
       } catch (e) { console.warn("label_sort_config", e); loaded = false; }
     };
-    const open = (e) => { if (e) e.preventDefault(); panel.hidden = false; load(); panel.scrollIntoView({ behavior: "smooth", block: "start" }); };
-    document.getElementById("settingsCard").addEventListener("click", open);
-    document.getElementById("settingsClose").addEventListener("click", () => { panel.hidden = true; if (location.hash === "#settings") history.replaceState(null, "", location.pathname + location.search); });
-    if (location.hash === "#settings") open();
+    document.getElementById("settingsCard").addEventListener("click", () => load());
+    if (location.hash === "#settings") load();
     document.getElementById("labelSortSave").addEventListener("click", async () => {
       const cfg = {};
       for (const i of inputs) { const v = Number(i.value); if (v > 0) cfg[i.dataset.k] = v; }
