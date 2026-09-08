@@ -662,43 +662,17 @@
       //
       // Paginate — Supabase PostgREST caps each response at 1000 rows even if you .limit(5000).
       // Fetch in chunks of 1000 until we get an empty page (or hit a hard safety cap of 20k).
+      // One server call (scanner_orders) returns only the orders still to be packed
+      // in the window — shipped / delivered / cancelled / returned rows are left out
+      // on the server — plus the manifest rows already tagged __file_tag=manifest.
+      // The daily order export re-stamps every row's dispatch_date, so filtering by
+      // status server-side is what keeps this to a couple of thousand rows instead
+      // of the whole month (that was the "Loading 3000…" wait).
       let orders = [];
-      const PAGE = 1000, HARD_CAP = 20000;
-      let from_i = 0;
-      while (from_i < HARD_CAP) {
-        let q = sb.from("seller_orders").select("id, order_date, dispatch_date, company_name, platform, raw_data")
-          .eq("user_id", state.session.user.id)
-          .range(from_i, from_i + PAGE - 1);
-        if (from) q = q.gte("dispatch_date", from);
-        if (to)   q = q.lte("dispatch_date", to);
-        // Live progress: show "Loading 1000, 2000…" so user knows it's still working
-        btn.textContent = `Loading ${orders.length ? orders.length : ""}…`;
-        const { data, error } = await q;
-        if (error) throw error;
-        const chunk = data || [];
-        orders.push(...chunk);
-        if (chunk.length < PAGE) break;
-        from_i += PAGE;
-      }
-      // Manifests live in seller_manifest now, not behind a tag in seller_orders,
-      // so they have to be fetched separately and folded in. The tag is put back
-      // on the way in: every reader below still identifies a manifest row by it,
-      // and the join logic is unchanged.
       {
-        let mFrom = 0;
-        while (mFrom < HARD_CAP) {
-          let mq = sb.from("seller_manifest").select("id, order_date, dispatch_date, company_name, platform, raw_data")
-            .eq("user_id", state.session.user.id)
-            .range(mFrom, mFrom + PAGE - 1);
-          if (from) mq = mq.gte("dispatch_date", from);
-          if (to)   mq = mq.lte("dispatch_date", to);
-          const { data: mData, error: mErr } = await mq;
-          if (mErr) throw mErr;
-          const mChunk = (mData || []).map(r => ({ ...r, raw_data: { ...(r.raw_data || {}), __file_tag: "manifest" } }));
-          orders.push(...mChunk);
-          if ((mData || []).length < PAGE) break;
-          mFrom += PAGE;
-        }
+        const { data, error } = await sb.rpc("scanner_orders", { p_from: from || null, p_to: to || null });
+        if (error) throw error;
+        orders = Array.isArray(data) ? data : [];
       }
 
       // On Meesho, swap the orders CSV for the manifest and carry the CSV's
