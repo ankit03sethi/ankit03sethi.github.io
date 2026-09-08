@@ -224,23 +224,24 @@
     const load = async () => {
       if (loaded) return; loaded = true;
       try {
-        await sb.auth.getSession(); // make sure the saved login is restored before asking the server
-        const { data } = await sb.rpc("label_sort_config", {});
+        const { data: { session } } = await sb.auth.getSession(); // saved login must be restored before asking the server
+        msg.style.color = "#64748b"; msg.textContent = session ? "Signed in as " + (session.user.email || session.user.id) : "Not signed in — log in first";
+        const { data, error } = await sb.rpc("label_sort_config", {});
+        if (error) throw error;
         for (const i of inputs) i.value = data && data[i.dataset.k] ? data[i.dataset.k] : "";
-      } catch (e) { console.warn("label_sort_config", e); loaded = false; }
+      } catch (e) { console.warn("label_sort_config", e); loaded = false; msg.style.color = "#b91c1c"; msg.textContent = "Could not load: " + (e.message || e); }
     };
     document.getElementById("settingsCard").addEventListener("click", () => load());
     if (location.hash === "#settings") load();
     document.getElementById("labelSortSave").addEventListener("click", async () => {
       const cfg = {};
       for (const i of inputs) { const v = Number(i.value); if (v > 0) cfg[i.dataset.k] = v; }
-      msg.textContent = "Saving…";
+      msg.style.color = "#64748b"; msg.textContent = "Saving…";
       try {
-        const { error } = await sb.rpc("label_sort_set", { p_cfg: cfg });
+        const { data, error } = await sb.rpc("label_sort_set", { p_cfg: cfg });
         if (error) throw error;
-        msg.textContent = "Saved — the app uses this on the next label file";
-        setTimeout(() => { msg.textContent = ""; }, 4000);
-      } catch (e) { msg.textContent = ""; alert("Could not save: " + (e.message || e)); }
+        msg.style.color = "#16a34a"; msg.textContent = "Saved: " + JSON.stringify(data || cfg) + " — the app uses this on the next label file";
+      } catch (e) { msg.style.color = "#b91c1c"; msg.textContent = "Could not save: " + (e.message || e) + (e.code ? " (" + e.code + ")" : ""); }
     });
   }
 
