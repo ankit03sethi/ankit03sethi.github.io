@@ -42,6 +42,18 @@
     #msg { font-size:13px; font-weight:700; color:#64748b; }
     .example { margin-top:22px; padding:14px 16px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:12px; font-size:13px; color:#475569; line-height:1.6; }
     .example b { color:#0f172a; }
+    .fields label span.hint { font-weight:500; color:#64748b; font-size:11px; }
+    .only { margin-top:26px; }
+    .only h3 { margin:0 0 4px; font-size:16px; font-weight:800; }
+    .only .help { margin:0 0 14px; }
+    .pickers { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+    .picker { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:700; color:#0f172a; }
+    .picker select, .picker input[type=text] { padding:9px 10px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; font-weight:600; background:#fff; width:100%; }
+    .picker select:focus, .picker input:focus { outline:2px solid #1f6feb; border-color:#1f6feb; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; min-height:22px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:999px; padding:3px 8px 3px 10px; font-size:12px; font-weight:700; }
+    .chip button { border:none; background:none; color:#1e40af; cursor:pointer; font-size:14px; line-height:1; padding:0; }
+    .chips .all { font-size:12px; font-weight:600; color:#94a3b8; }
   </style>
 </head>
 <body>
@@ -73,18 +85,13 @@
 
   <div class="layout">
     <nav class="side">
-      <button data-tab="printsort">
+      <button class="active" data-tab="printsort">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print sorting
       </button>
     </nav>
 
-    <section class="pane placeholder" id="placeholder" style="color:#64748b; font-size:14px; display:flex; align-items:center; gap:10px;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Choose a setting on the left.
-    </section>
-
-    <section class="pane" data-tab="printsort" hidden>
+    <section class="pane" data-tab="printsort">
       <h2>Print sorting</h2>
       <p class="help">When a label PDF is cropped, the labels are put in this order. Give each option a number &mdash; <b>1</b> is grouped first, <b>2</b> inside it, and so on. Leave a box blank to ignore it.</p>
       <div class="fields">
@@ -93,6 +100,17 @@
         <label>Courier<input class="lsort" data-k="courier" type="number" min="1" max="9" placeholder="&ndash;"></label>
         <label>Master SKU<input class="lsort" data-k="master" type="number" min="1" max="9" placeholder="&ndash;"></label>
         <label>Seller SKU<input class="lsort" data-k="sku" type="number" min="1" max="9" placeholder="&ndash;"></label>
+      </div>
+      <div class="only">
+        <h3>Print only these</h3>
+        <p class="help">Pick what should go into the combined <b>All labels - print.pdf</b> (the file you print from). Nothing picked = everything. Each company's own <b>&hellip; - print.pdf</b> always keeps all its labels.</p>
+        <div class="pickers">
+          <div class="picker" data-k="company">Company<select><option value="">All companies &mdash; add&hellip;</option></select><div class="chips"></div></div>
+          <div class="picker" data-k="platform">Platform<select><option value="">All platforms &mdash; add&hellip;</option></select><div class="chips"></div></div>
+          <div class="picker" data-k="courier">Courier<select><option value="">All couriers &mdash; add&hellip;</option></select><div class="chips"></div></div>
+          <div class="picker" data-k="master">Master SKU<input type="text" list="masterList" placeholder="All master SKUs &mdash; type to add&hellip;"><datalist id="masterList"></datalist><div class="chips"></div></div>
+          <div class="picker" data-k="sku">Seller SKU<input type="text" placeholder="All seller SKUs &mdash; type &amp; Enter&hellip;"><div class="chips"></div></div>
+        </div>
       </div>
       <div class="actions">
         <button class="btn" id="saveBtn" disabled>Save</button>
@@ -112,32 +130,58 @@
   const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
   const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
 
-  // left tabs -> panes
-  const tabs = Array.from(document.querySelectorAll(".side button[data-tab]"));
-  const panes = Array.from(document.querySelectorAll(".pane[data-tab]"));
-  const placeholder = document.getElementById("placeholder");
-  const showTab = (name) => {
-    tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === name));
-    panes.forEach(p => { p.hidden = p.dataset.tab !== name; });
-    placeholder.hidden = !!name;
-    if (name) history.replaceState(null, "", "#" + name); else history.replaceState(null, "", location.pathname);
-  };
-  tabs.forEach(b => b.addEventListener("click", () => showTab(b.classList.contains("active") ? "" : b.dataset.tab))); // click again = close
-  if (location.hash && tabs.some(b => "#" + b.dataset.tab === location.hash)) showTab(location.hash.slice(1));
-
   const inputs = Array.from(document.querySelectorAll("input.lsort"));
   const msg = document.getElementById("msg");
   const saveBtn = document.getElementById("saveBtn");
   const say = (text, color) => { msg.textContent = text; msg.style.color = color || "#64748b"; };
+
+  // ---- "print only these" pickers: chosen values as chips ----
+  const pickers = Array.from(document.querySelectorAll(".picker"));
+  const chosen = { company: [], platform: [], courier: [], master: [], sku: [] };
+  const LABEL = { company: "Company", platform: "Platform", courier: "Courier", master: "Master SKU", sku: "Seller SKU" };
+  function renderChips(k) {
+    const box = document.querySelector(`.picker[data-k="${k}"] .chips`);
+    box.innerHTML = "";
+    if (!chosen[k].length) { const a = document.createElement("span"); a.className = "all"; a.textContent = "All"; box.appendChild(a); return; }
+    for (const v of chosen[k]) {
+      const c = document.createElement("span"); c.className = "chip"; c.textContent = v;
+      const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.title = "Remove";
+      x.addEventListener("click", () => { chosen[k] = chosen[k].filter(z => z !== v); renderChips(k); });
+      c.appendChild(x); box.appendChild(c);
+    }
+  }
+  function addChoice(k, v) {
+    v = String(v || "").trim(); if (!v) return;
+    if (!chosen[k].some(z => z.toLowerCase() === v.toLowerCase())) chosen[k].push(v);
+    renderChips(k);
+  }
+  for (const p of pickers) {
+    const k = p.dataset.k;
+    const sel = p.querySelector("select"), txt = p.querySelector("input[type=text]");
+    if (sel) sel.addEventListener("change", () => { addChoice(k, sel.value); sel.value = ""; });
+    if (txt) {
+      txt.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addChoice(k, txt.value); txt.value = ""; } });
+      txt.addEventListener("change", () => { if (txt.value.trim()) { addChoice(k, txt.value); txt.value = ""; } });
+    }
+    renderChips(k);
+  }
+  function fillOptions(opts) {
+    const fill = (k, list) => { const sel = document.querySelector(`.picker[data-k="${k}"] select`); for (const v of list || []) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); } };
+    fill("company", opts.companies); fill("platform", opts.platforms); fill("courier", opts.couriers);
+    const dl = document.getElementById("masterList"); for (const v of opts.masters || []) { const o = document.createElement("option"); o.value = v; dl.appendChild(o); }
+  }
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { location.href = "/home/?return=%2Fsettings%2F"; return; }
     document.getElementById("who").textContent = session.user.email || "";
     try {
-      const { data, error } = await sb.rpc("label_sort_config", {});
+      const [{ data, error }, { data: opts, error: e2 }] = await Promise.all([sb.rpc("label_sort_config", {}), sb.rpc("label_sort_options", {})]);
       if (error) throw error;
+      if (!e2 && opts) fillOptions(opts);
       for (const i of inputs) i.value = data && data[i.dataset.k] ? data[i.dataset.k] : "";
+      const only = data && data.only && typeof data.only === "object" ? data.only : {};
+      for (const k of Object.keys(chosen)) { chosen[k] = Array.isArray(only[k]) ? only[k].map(String) : []; renderChips(k); }
       say("");
     } catch (e) { say("Could not load: " + (e.message || e), "#b91c1c"); }
     saveBtn.disabled = false;
@@ -146,12 +190,17 @@
   saveBtn.addEventListener("click", async () => {
     const cfg = {};
     for (const i of inputs) { const v = Number(i.value); if (v > 0) cfg[i.dataset.k] = v; }
+    const only = {};
+    for (const k of Object.keys(chosen)) if (chosen[k].length) only[k] = chosen[k];
+    if (Object.keys(only).length) cfg.only = only;
     saveBtn.disabled = true; say("Saving…");
     try {
       const { data, error } = await sb.rpc("label_sort_set", { p_cfg: cfg });
       if (error) throw error;
-      const order = Object.entries(data || cfg).sort((a, b) => a[1] - b[1]).map(([k]) => ({ company: "Company", platform: "Platform", courier: "Courier", master: "Master SKU", sku: "Seller SKU" })[k]).join(" → ");
-      say("Saved" + (order ? ": " + order : " (no sorting)") + " — the app uses this on the next label file.", "#16a34a");
+      const saved = data || cfg;
+      const order = Object.entries(saved).filter(([, v]) => Number(v) > 0).sort((a, b) => a[1] - b[1]).map(([k]) => LABEL[k]).join(" → ");
+      const filt = Object.entries(saved.only || {}).map(([k, v]) => LABEL[k] + ": " + v.join(", ")).join("; ");
+      say("Saved" + (order ? ": " + order : " (no sorting)") + (filt ? " · only " + filt : " · printing everything") + " — the app uses this on the next label file.", "#16a34a");
     } catch (e) { say("Could not save: " + (e.message || e), "#b91c1c"); }
     saveBtn.disabled = false;
   });
