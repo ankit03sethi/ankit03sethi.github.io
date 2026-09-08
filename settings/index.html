@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Cursive Analyst — Other Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding: 16px 32px; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+    .brand-box { width:44px; height:44px; background:#1f6feb; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+    .brand-wordmark { font-family:'Dancing Script', cursive; font-size:24px; color:#0f172a; line-height:1; }
+    .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
+    .back-link { color:#1f6feb; text-decoration:none; font-size:14px; font-weight:600; }
+    main { max-width:1000px; margin:0 auto; padding:36px 20px 60px; }
+    .title { display:flex; align-items:center; gap:14px; margin:0 0 22px; }
+    .title .ico { width:48px; height:48px; background:#eff6ff; color:#1f6feb; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+    .title h1 { margin:0; font-size:26px; font-weight:800; }
+    .title p { margin:2px 0 0; color:#64748b; font-size:14px; }
+    .layout { display:grid; grid-template-columns:240px 1fr; gap:20px; align-items:start; }
+    @media (max-width: 720px) { .layout { grid-template-columns:1fr; } }
+    .side { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:10px; box-shadow:0 6px 24px rgba(15,23,42,.06); }
+    .side button { display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:none; background:none; padding:12px 14px; border-radius:10px; font-size:14px; font-weight:700; color:#334155; cursor:pointer; }
+    .side button:hover { background:#f1f5f9; }
+    .side button.active { background:#eff6ff; color:#1f6feb; }
+    .pane { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:26px 28px; box-shadow:0 6px 24px rgba(15,23,42,.06); }
+    .pane h2 { margin:0 0 6px; font-size:20px; font-weight:800; }
+    .pane .help { margin:0 0 18px; color:#64748b; font-size:14px; line-height:1.55; }
+    .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; max-width:760px; }
+    .fields label { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:700; color:#0f172a; }
+    .fields input { padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:18px; font-weight:800; text-align:center; }
+    .fields input:focus { outline:2px solid #1f6feb; border-color:#1f6feb; }
+    .actions { display:flex; align-items:center; gap:14px; margin-top:20px; flex-wrap:wrap; }
+    .btn { background:#1f6feb; color:#fff; border:none; border-radius:10px; padding:11px 24px; font-size:14px; font-weight:800; cursor:pointer; }
+    .btn:disabled { opacity:.6; cursor:default; }
+    #msg { font-size:13px; font-weight:700; color:#64748b; }
+    .example { margin-top:22px; padding:14px 16px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:12px; font-size:13px; color:#475569; line-height:1.6; }
+    .example b { color:#0f172a; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Cursive Analyst &middot; Other Settings</div>
+    </div>
+  </a>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <span id="who" style="font-size:12px; color:#64748b;"></span>
+    <a href="/analyst/" class="back-link">&larr; Back</a>
+  </div>
+</header>
+
+<main>
+  <div class="title">
+    <div class="ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+    <div>
+      <h1>Other Settings</h1>
+      <p>Preferences the Cursive Analyst desktop app reads from your account</p>
+    </div>
+  </div>
+
+  <div class="layout">
+    <nav class="side">
+      <button class="active" data-tab="printsort">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print sorting
+      </button>
+    </nav>
+
+    <section class="pane" data-tab="printsort">
+      <h2>Print sorting</h2>
+      <p class="help">When a label PDF is cropped, the labels are put in this order. Give each option a number &mdash; <b>1</b> is grouped first, <b>2</b> inside it, and so on. Leave a box blank to ignore it.</p>
+      <div class="fields">
+        <label>Company<input class="lsort" data-k="company" type="number" min="1" max="9" placeholder="&ndash;"></label>
+        <label>Platform<input class="lsort" data-k="platform" type="number" min="1" max="9" placeholder="&ndash;"></label>
+        <label>Courier<input class="lsort" data-k="courier" type="number" min="1" max="9" placeholder="&ndash;"></label>
+        <label>Master SKU<input class="lsort" data-k="master" type="number" min="1" max="9" placeholder="&ndash;"></label>
+        <label>Seller SKU<input class="lsort" data-k="sku" type="number" min="1" max="9" placeholder="&ndash;"></label>
+      </div>
+      <div class="actions">
+        <button class="btn" id="saveBtn" disabled>Save</button>
+        <span id="msg">Loading…</span>
+      </div>
+      <div class="example">
+        <b>Example:</b> Master SKU = 1, Courier = 2 &rarr; all labels of the same master SKU come together, and inside each master SKU they are grouped by courier.<br>
+        Courier = 1, Master SKU = 2 &rarr; each courier's labels together, and inside a courier the same master SKUs together.
+      </div>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+
+  const inputs = Array.from(document.querySelectorAll("input.lsort"));
+  const msg = document.getElementById("msg");
+  const saveBtn = document.getElementById("saveBtn");
+  const say = (text, color) => { msg.textContent = text; msg.style.color = color || "#64748b"; };
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "/home/?return=%2Fsettings%2F"; return; }
+    document.getElementById("who").textContent = session.user.email || "";
+    try {
+      const { data, error } = await sb.rpc("label_sort_config", {});
+      if (error) throw error;
+      for (const i of inputs) i.value = data && data[i.dataset.k] ? data[i.dataset.k] : "";
+      say("");
+    } catch (e) { say("Could not load: " + (e.message || e), "#b91c1c"); }
+    saveBtn.disabled = false;
+  })();
+
+  saveBtn.addEventListener("click", async () => {
+    const cfg = {};
+    for (const i of inputs) { const v = Number(i.value); if (v > 0) cfg[i.dataset.k] = v; }
+    saveBtn.disabled = true; say("Saving…");
+    try {
+      const { data, error } = await sb.rpc("label_sort_set", { p_cfg: cfg });
+      if (error) throw error;
+      const order = Object.entries(data || cfg).sort((a, b) => a[1] - b[1]).map(([k]) => ({ company: "Company", platform: "Platform", courier: "Courier", master: "Master SKU", sku: "Seller SKU" })[k]).join(" → ");
+      say("Saved" + (order ? ": " + order : " (no sorting)") + " — the app uses this on the next label file.", "#16a34a");
+    } catch (e) { say("Could not save: " + (e.message || e), "#b91c1c"); }
+    saveBtn.disabled = false;
+  });
+</script>
+</body>
+</html>
