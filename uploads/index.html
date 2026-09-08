@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-08a</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-08b</span></div>
     </div>
   </a>
   </div>
@@ -199,20 +199,23 @@
       <button class="btn" id="closeChecklistBtn" style="padding:4px 10px; font-size:12px;">Close</button>
     </div>
   </div>
-  <div id="checklistBody" style="padding:14px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px;"></div>
+  <div id="checklistBody" style="padding:6px 16px 14px;"></div>
   <style>
-    .ck-co { border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
-    .ck-co h4 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; }
-    .ck-co h4 span { font-weight:600; color:#64748b; font-size:12px; }
-    .ck-pf { margin-top:6px; }
-    .ck-pf b { display:block; font-size:12px; text-transform:capitalize; color:#334155; margin:4px 0 2px; }
-    .ck-it { display:flex; align-items:center; gap:8px; font-size:13px; padding:2px 0; }
-    .ck-dot { width:10px; height:10px; border-radius:50%; border:2px solid #cbd5e1; background:#fff; flex:none; }
+    .ck-pf { margin-top:12px; }
+    .ck-pf h4 { margin:0 0 4px; font-size:14px; text-transform:capitalize; display:flex; align-items:center; gap:10px; }
+    .ck-pf h4 span { font-weight:600; color:#64748b; font-size:12px; }
+    .ck-row { display:grid; grid-template-columns:190px 1fr; gap:8px 14px; align-items:start; padding:7px 0; border-top:1px solid #f1f5f9; }
+    .ck-row .ck-co { font-size:13px; font-weight:700; color:#0f172a; padding-top:3px; }
+    .ck-row .ck-co small { display:block; font-weight:600; color:#94a3b8; font-size:11px; }
+    .ck-items { display:flex; flex-wrap:wrap; gap:6px 8px; }
+    .ck-it { display:inline-flex; align-items:center; gap:7px; font-size:12px; padding:4px 10px 4px 8px; border:1px solid #e5e7eb; border-radius:999px; background:#fff; white-space:nowrap; }
+    .ck-dot { width:9px; height:9px; border-radius:50%; border:2px solid #cbd5e1; background:#fff; flex:none; }
+    .ck-it.done { border-color:#bbf7d0; background:#f0fdf4; color:#0f172a; }
     .ck-it.done .ck-dot { background:#16a34a; border-color:#16a34a; }
-    .ck-it.done { color:#0f172a; }
     .ck-it:not(.done) { color:#64748b; }
-    .ck-it .ck-t { margin-left:auto; font-size:11px; color:#16a34a; font-weight:700; white-space:nowrap; }
+    .ck-it .ck-t { font-size:11px; color:#16a34a; font-weight:700; }
     .ck-it:not(.done) .ck-t { color:#94a3b8; font-weight:500; }
+    @media (max-width:640px) { .ck-row { grid-template-columns:1fr; } }
   </style>
 </div>
 
@@ -2365,27 +2368,33 @@
     cnt.textContent = done + "/" + rows.length;
     head.textContent = rows.length ? (rows.length - done ? (rows.length - done) + " left to download" : "all done for today") : "";
     cnt.style.color = rows.length && done === rows.length ? "#bbf7d0" : "";
-    const byCo = new Map();
-    for (const r of rows) { if (!byCo.has(r.company_name)) byCo.set(r.company_name, new Map()); const pf = byCo.get(r.company_name); if (!pf.has(r.platform)) pf.set(r.platform, []); pf.get(r.platform).push(r); }
+    // platform section -> one row per company -> file chips in download order
+    const PF_ORDER = ["meesho", "flipkart", "amazon", "firstcry", "myntra"];
+    const KIND_ORDER = ["orders", "manifest", "orders_file", "returns", "returns_delivery", "returns_intransit", "stock", "payments", "payments_settled", "payments_upcoming", "payments_advice", "payments_sr_pre", "payments_sr_post", "myntra_style"];
+    const ordIx = (arr, v) => { const i = arr.indexOf(v); return i < 0 ? 99 : i; };
+    const byPf = new Map();
+    for (const r of rows) { if (!byPf.has(r.platform)) byPf.set(r.platform, new Map()); const cos = byPf.get(r.platform); if (!cos.has(r.company_name)) cos.set(r.company_name, []); cos.get(r.company_name).push(r); }
     const fmt = (t) => t ? new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "";
     const fmtOld = (t) => t ? new Date(t).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "never";
     body.innerHTML = "";
-    for (const [co, pfs] of [...byCo.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-      const all = [...pfs.values()].flat(), d = all.filter(r => r.done_today).length;
-      const card = document.createElement("div"); card.className = "ck-co";
-      card.innerHTML = "<h4>" + co + "<span>" + d + "/" + all.length + "</span></h4>";
-      for (const [pf, items] of [...pfs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-        const sec = document.createElement("div"); sec.className = "ck-pf";
-        sec.innerHTML = "<b>" + pf + "</b>";
-        for (const r of items.sort((a, b) => (CK_LABEL[a.kind] || a.kind).localeCompare(CK_LABEL[b.kind] || b.kind))) {
+    for (const [pf, cos] of [...byPf.entries()].sort((a, b) => ordIx(PF_ORDER, a[0]) - ordIx(PF_ORDER, b[0]) || a[0].localeCompare(b[0]))) {
+      const all = [...cos.values()].flat(), d = all.filter(r => r.done_today).length;
+      const sec = document.createElement("div"); sec.className = "ck-pf";
+      sec.innerHTML = "<h4>" + pf + "<span>" + d + "/" + all.length + "</span></h4>";
+      for (const [co, items] of [...cos.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        const cd = items.filter(r => r.done_today).length;
+        const row = document.createElement("div"); row.className = "ck-row";
+        row.innerHTML = '<div class="ck-co">' + co + "<small>" + cd + "/" + items.length + (cd === items.length ? " done" : " done") + "</small></div>";
+        const wrap = document.createElement("div"); wrap.className = "ck-items";
+        for (const r of items.sort((a, b) => ordIx(KIND_ORDER, a.kind) - ordIx(KIND_ORDER, b.kind))) {
           const it = document.createElement("div"); it.className = "ck-it" + (r.done_today ? " done" : "");
           it.title = r.source_file ? "Last file: " + r.source_file : "";
           it.innerHTML = '<span class="ck-dot"></span><span>' + (CK_LABEL[r.kind] || r.kind) + '</span><span class="ck-t">' + (r.done_today ? fmt(r.last_read) : fmtOld(r.last_read)) + "</span>";
-          sec.appendChild(it);
+          wrap.appendChild(it);
         }
-        card.appendChild(sec);
+        row.appendChild(wrap); sec.appendChild(row);
       }
-      body.appendChild(card);
+      body.appendChild(sec);
     }
     if (!rows.length) body.innerHTML = '<div style="color:#64748b">Nothing to check yet — the list fills in from files the app has read in the last 30 days.</div>';
   }
