@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-05c</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-08a</span></div>
     </div>
   </a>
   </div>
@@ -186,6 +186,34 @@
 <div class="top-actions">
   <button class="btn primary" id="openCompaniesBtn">&#127970; Companies <span id="companiesCount" style="font-weight:600; opacity:.8;"></span></button>
   <button class="btn" id="openSkuWiseBtn" style="display:none;">&#128202; SKU Wise Data</button>
+  <button class="btn" id="openChecklistBtn" style="margin-left:auto;">&#9989; Today's checklist <span id="checklistCount" style="font-weight:600; opacity:.8;"></span></button>
+</div>
+
+<!-- Today's upload checklist: every company / platform / file the app has read in the last 30 days.
+     Green dot + time = read again today; hollow dot = still to download. -->
+<div class="panel" id="checklistPanel" style="display:none; margin-top:16px;">
+  <div class="panel-head">
+    <span>Today's checklist <span id="checklistHead" style="font-weight:600; color:#64748b; margin-left:8px;"></span></span>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" id="refreshChecklistBtn" style="padding:4px 10px; font-size:12px;">Refresh</button>
+      <button class="btn" id="closeChecklistBtn" style="padding:4px 10px; font-size:12px;">Close</button>
+    </div>
+  </div>
+  <div id="checklistBody" style="padding:14px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px;"></div>
+  <style>
+    .ck-co { border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
+    .ck-co h4 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; }
+    .ck-co h4 span { font-weight:600; color:#64748b; font-size:12px; }
+    .ck-pf { margin-top:6px; }
+    .ck-pf b { display:block; font-size:12px; text-transform:capitalize; color:#334155; margin:4px 0 2px; }
+    .ck-it { display:flex; align-items:center; gap:8px; font-size:13px; padding:2px 0; }
+    .ck-dot { width:10px; height:10px; border-radius:50%; border:2px solid #cbd5e1; background:#fff; flex:none; }
+    .ck-it.done .ck-dot { background:#16a34a; border-color:#16a34a; }
+    .ck-it.done { color:#0f172a; }
+    .ck-it:not(.done) { color:#64748b; }
+    .ck-it .ck-t { margin-left:auto; font-size:11px; color:#16a34a; font-weight:700; white-space:nowrap; }
+    .ck-it:not(.done) .ck-t { color:#94a3b8; font-weight:500; }
+  </style>
 </div>
 
 <!-- SKU Wise Data panel (hidden by default; toggled by the top button) -->
@@ -2325,6 +2353,53 @@
     if (n.includes("first") || n.includes("cry")) return "firstcry";
     return n;
   }
+  // ---- Today's checklist ----------------------------------------------------
+  const CK_LABEL = { orders: "Orders CSV", orders_file: "Orders file", manifest: "Manifest", returns: "Returns", returns_delivery: "Returns (delivery)", returns_intransit: "Returns (in transit)", stock: "Inventory", payments: "Payments", payments_settled: "Payments (settled)", payments_upcoming: "Payments (upcoming)", payments_advice: "Payment advice", payments_sr_pre: "SR pre", payments_sr_post: "SR post", myntra_style: "Style file" };
+  const ckPanel = document.getElementById("checklistPanel");
+  async function loadChecklist() {
+    const body = document.getElementById("checklistBody"), head = document.getElementById("checklistHead"), cnt = document.getElementById("checklistCount");
+    const { data, error } = await sb.rpc("upload_checklist", {});
+    if (error) { body.innerHTML = '<div style="color:#b91c1c">Could not load: ' + (error.message || error) + "</div>"; return; }
+    const rows = data || [];
+    const done = rows.filter(r => r.done_today).length;
+    cnt.textContent = done + "/" + rows.length;
+    head.textContent = rows.length ? (rows.length - done ? (rows.length - done) + " left to download" : "all done for today") : "";
+    cnt.style.color = rows.length && done === rows.length ? "#bbf7d0" : "";
+    const byCo = new Map();
+    for (const r of rows) { if (!byCo.has(r.company_name)) byCo.set(r.company_name, new Map()); const pf = byCo.get(r.company_name); if (!pf.has(r.platform)) pf.set(r.platform, []); pf.get(r.platform).push(r); }
+    const fmt = (t) => t ? new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "";
+    const fmtOld = (t) => t ? new Date(t).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "never";
+    body.innerHTML = "";
+    for (const [co, pfs] of [...byCo.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const all = [...pfs.values()].flat(), d = all.filter(r => r.done_today).length;
+      const card = document.createElement("div"); card.className = "ck-co";
+      card.innerHTML = "<h4>" + co + "<span>" + d + "/" + all.length + "</span></h4>";
+      for (const [pf, items] of [...pfs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        const sec = document.createElement("div"); sec.className = "ck-pf";
+        sec.innerHTML = "<b>" + pf + "</b>";
+        for (const r of items.sort((a, b) => (CK_LABEL[a.kind] || a.kind).localeCompare(CK_LABEL[b.kind] || b.kind))) {
+          const it = document.createElement("div"); it.className = "ck-it" + (r.done_today ? " done" : "");
+          it.title = r.source_file ? "Last file: " + r.source_file : "";
+          it.innerHTML = '<span class="ck-dot"></span><span>' + (CK_LABEL[r.kind] || r.kind) + '</span><span class="ck-t">' + (r.done_today ? fmt(r.last_read) : fmtOld(r.last_read)) + "</span>";
+          sec.appendChild(it);
+        }
+        card.appendChild(sec);
+      }
+      body.appendChild(card);
+    }
+    if (!rows.length) body.innerHTML = '<div style="color:#64748b">Nothing to check yet — the list fills in from files the app has read in the last 30 days.</div>';
+  }
+  document.getElementById("openChecklistBtn").addEventListener("click", () => {
+    const open = ckPanel.style.display !== "none";
+    ckPanel.style.display = open ? "none" : "";
+    if (!open) { loadChecklist(); ckPanel.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+  document.getElementById("closeChecklistBtn").addEventListener("click", () => { ckPanel.style.display = "none"; });
+  document.getElementById("refreshChecklistBtn").addEventListener("click", loadChecklist);
+  // the button badge (done/total) loads with the page and refreshes every 2 minutes
+  const ckBadge = async () => { try { const { data } = await sb.rpc("upload_checklist", {}); if (data) { const d = data.filter(r => r.done_today).length; document.getElementById("checklistCount").textContent = d + "/" + data.length; if (ckPanel.style.display !== "none") loadChecklist(); } } catch { /* ignore */ } };
+  sb.auth.getSession().then(({ data }) => { if (data && data.session) { ckBadge(); setInterval(ckBadge, 120000); } });
+
   function setStatus(msg, isError) {
     const el = $("#upStatus");
     if (!el) return;
