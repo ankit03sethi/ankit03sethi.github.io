@@ -125,8 +125,13 @@
 
   </div>
 
-  <!-- Settings panel (opens from the Other Settings card) -->
-  <section id="settingsPanel" hidden style="margin-top:28px; background:#fff; border:1px solid #e5e7eb; border-radius:20px; box-shadow:0 6px 24px rgba(15,23,42,.06); overflow:hidden;">
+  <!-- Settings dialog (opens from the Other Settings card) -->
+  <div id="settingsOverlay" hidden style="position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:50; display:none; align-items:flex-start; justify-content:center; padding:60px 16px; overflow:auto;">
+  <section id="settingsPanel" style="width:100%; max-width:960px; background:#fff; border:1px solid #e5e7eb; border-radius:20px; box-shadow:0 24px 60px rgba(15,23,42,.25); overflow:hidden;">
+    <div style="display:flex; align-items:center; gap:12px; padding:18px 24px 0;">
+      <div style="width:40px; height:40px; background:#eff6ff; color:#1f6feb; border-radius:12px; display:flex; align-items:center; justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <h2 style="margin:0; font-size:20px; font-weight:800;">Other Settings</h2>
+    </div>
     <div style="display:flex; align-items:center; gap:4px; padding:10px 16px 0; border-bottom:1px solid #e5e7eb;">
       <button class="stab active" data-tab="printsort" style="border:none; background:none; padding:10px 14px; font-size:14px; font-weight:800; color:#1f6feb; border-bottom:3px solid #1f6feb; cursor:pointer;">Print sorting</button>
       <span style="margin-left:auto;"><button id="settingsClose" style="border:none; background:none; color:#64748b; font-size:22px; cursor:pointer; line-height:1;" title="Close">&times;</button></span>
@@ -146,6 +151,7 @@
       </div>
     </div>
   </section>
+  </div>
 </main>
 
 <!-- Subscription gate — checks that the signed-in user has a valid 30-day Cursive Analyst purchase.
@@ -192,10 +198,13 @@
 <script>
   // Other Settings card: open / close the panel (plain script, works even if the module below is slow)
   (function () {
-    const panel = document.getElementById("settingsPanel");
-    const open = (e) => { if (e) e.preventDefault(); panel.hidden = false; panel.style.display = "block"; panel.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    const ov = document.getElementById("settingsOverlay");
+    const open = (e) => { if (e) e.preventDefault(); ov.hidden = false; ov.style.display = "flex"; document.body.style.overflow = "hidden"; };
+    const close = () => { ov.hidden = true; ov.style.display = "none"; document.body.style.overflow = ""; if (location.hash === "#settings") history.replaceState(null, "", location.pathname + location.search); };
     document.getElementById("settingsCard").addEventListener("click", open);
-    document.getElementById("settingsClose").addEventListener("click", () => { panel.hidden = true; panel.style.display = "none"; if (location.hash === "#settings") history.replaceState(null, "", location.pathname + location.search); });
+    document.getElementById("settingsClose").addEventListener("click", close);
+    ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !ov.hidden) close(); });
     if (location.hash === "#settings") open();
   })();
 </script>
@@ -215,6 +224,7 @@
     const load = async () => {
       if (loaded) return; loaded = true;
       try {
+        await sb.auth.getSession(); // make sure the saved login is restored before asking the server
         const { data } = await sb.rpc("label_sort_config", {});
         for (const i of inputs) i.value = data && data[i.dataset.k] ? data[i.dataset.k] : "";
       } catch (e) { console.warn("label_sort_config", e); loaded = false; }
