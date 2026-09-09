@@ -60,7 +60,7 @@
     const perms = access.perms || {};
     let k = key;
     for (;;) {
-      if (perms[k] !== undefined && perms[k] !== null && perms[k] !== "") return perms[k];
+      if (perms[k] !== undefined && perms[k] !== null) return perms[k];   // "" = explicitly none (same rule as has_perm in the database)
       const i = k.lastIndexOf(".");
       if (i < 0) return "";
       k = k.slice(0, i);
