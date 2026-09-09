@@ -411,7 +411,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=8"></script>
+<script src="/analyst-access.js?v=9"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -471,6 +471,7 @@
     if (!CA.access.active) { $("#locker").classList.add("show"); return; }
     if (!CA.anyOn("skuwise")) { alert("You do not have access to SKU Wise Data. Ask the account owner."); location.href = "/analyst/"; return; }
     CA.apply();
+    if (!canFin()) { const pt = document.querySelector('.tab[data-view="payments"]'); if (pt) pt.style.display = "none"; }
     // start on the first tab the employee may see
     const firstTab = [...document.querySelectorAll(".tab[data-view]")].find(t => t.style.display !== "none");
     if (firstTab && !firstTab.classList.contains("active")) { document.querySelectorAll(".tab[data-view]").forEach(t => t.classList.toggle("active", t === firstTab)); state.view = firstTab.dataset.view; }
@@ -1246,8 +1247,16 @@
   // Sold is exempt: what a SKU is doing is the question every other column is
   // an answer to, so it stays on screen whichever measures are switched off.
   const ALWAYS_ON = new Set(["Sold"]);
+  // Financial columns need the "Financial data" permission. Prices stay visible
+  // (listing work needs them); cost, margin, settlement, revenue and profit do not.
+  const FIN_KEEP = new Set(["Selling Price","Site Price","Other Price","Our Price","File Price","Suggested Price"]);
+  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
+  const canFin = () => !window.CA || !CA.access || CA.can("skuwise.financial", "view");
+  const finHidden = (c) => !canFin() && !FIN_KEEP.has(c) && (FIN_EXTRA.has(c) || colKind(c) === "value");
+  const FIN_RAW = /price|amount|settle|value|profit|cost|revenue|margin|fee|charge|tax|gst|total|payment|payout|commission|\brs\b|₹|mrp|discount|invoice/i;
   const kindHidden = (c) => {
     if (ALWAYS_ON.has(c)) return false;
+    if (finHidden(c)) return true;
     const k = colKind(c);
     return !!k && !state.kind.has(k);
   };
@@ -1298,7 +1307,7 @@
           + '<div class="pgrp">Show</div><div class="prow">'
           + chip("Units", state.kind.has("units"), "kind", "units")
           + chip("%",     state.kind.has("pct"),   "kind", "pct")
-          + chip("Values",state.kind.has("value"), "kind", "value")
+          + (canFin() ? chip("Values",state.kind.has("value"), "kind", "value") : "")
           + '</div></div>';
     for (const [g, cols] of groups) {
       if (!cols.some(c => !kindHidden(c))) continue;
@@ -1572,7 +1581,7 @@
     if (!rowsOnly || !state.genericCols) {
       const rawKeys = new Set();
       rows.slice(0, 20).forEach(r => Object.keys(r.raw_data || {}).forEach(k => rawKeys.add(k)));
-      state.genericCols = Array.from(rawKeys).slice(0, 10);
+      state.genericCols = Array.from(rawKeys).filter(k => canFin() || !FIN_RAW.test(k)).slice(0, 10);
     }
     const cols = state.genericCols;
     const th = `
