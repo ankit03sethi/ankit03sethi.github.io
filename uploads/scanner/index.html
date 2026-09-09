@@ -343,6 +343,7 @@
   </div>
 </div>
 
+<script src="/analyst-access.js?v=1"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -367,13 +368,13 @@
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { location.href = "/home/?return=%2Fuploads%2Fscanner%2F"; return; }
     state.session = session;
-    $("#emailChip").textContent = session.user.email;
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: rows } = await sb.from("analytics_wallet_transactions")
-      .select("id").eq("user_id", session.user.id)
-      .eq("type", "debit_service").eq("service_tag", "analyst")
-      .gte("created_at", since).limit(1);
-    if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
+    try { await CA.load(sb); } catch (e) { $("#loadInfo").textContent = "Could not check access: " + (e.message || e); return; }
+    state.uid = CA.ownerId();
+    $("#emailChip").textContent = CA.who();
+    if (!CA.access.active) { $("#locker").classList.add("show"); return; }
+    if (!CA.can("scanner", "view")) { $("#loadInfo").textContent = "You do not have access to the Scanner. Ask the account owner."; $("#loadBtn").disabled = true; return; }
+    state.canScan = CA.can("scanner", "edit");
+    if (!state.canScan) { $("#manualInput").disabled = true; $("#manualBtn").disabled = true; $("#manualInput").placeholder = "View only — scanning needs edit access"; }
     await loadCompanies();
     // Default: today's date in both fields → auto-load today's orders
     const today = new Date().toISOString().slice(0, 10);
@@ -388,7 +389,7 @@
 
   async function loadCompanies() {
     const { data } = await sb.from("seller_companies")
-      .select("name").eq("user_id", state.session.user.id).order("name");
+      .select("name").eq("user_id", state.uid).order("name");
     state.companies = (data || []).map(c => c.name);
     const sel = $("#companySel");
     sel.innerHTML = "<option value=''>All companies</option>" +
@@ -763,7 +764,7 @@
       // Reset button so user can re-load (e.g. after changing filters)
       btn.disabled = false; btn.textContent = "Load orders →";
       // Start camera straight away (only first time)
-      if (!state.scanner) startScanner();
+      if (!state.scanner && state.canScan !== false) startScanner();
     } catch (e) {
       $("#loadInfo").textContent = "Load error: " + (e.message || e);
       btn.disabled = false; btn.textContent = "Load orders →";
@@ -1104,7 +1105,7 @@
   async function saveScanEvent(barcode, status, match) {
     try {
       await sb.from("scan_events").insert({
-        user_id: state.session.user.id,
+        user_id: state.uid,
         barcode: barcode,
         status: status,
         order_row_id: match ? match.row.id : null,
