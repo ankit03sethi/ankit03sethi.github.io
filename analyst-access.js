@@ -120,6 +120,7 @@
     root.querySelectorAll("[data-perm-page]").forEach(el => { if (!anyOn(el.dataset.permPage)) el.style.display = "none"; });
     root.querySelectorAll("[data-perm-edit]").forEach(el => {
       if (!can(el.dataset.permEdit, "edit")) {
+        if (el.hasAttribute("data-hide")) { el.style.display = "none"; return; }
         el.disabled = true; el.style.opacity = ".45"; el.style.pointerEvents = "none";
         el.title = "View only — ask the account owner for edit access";
       }
