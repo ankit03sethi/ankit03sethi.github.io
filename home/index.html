@@ -576,6 +576,11 @@ async function showHome(session) {
     location.href = ret;
     return;
   }
+  // Employee logins (Cursive Analyst) go straight to the Analyst hub — the home dashboard is the owner's.
+  try {
+    const { data: acc } = await sb.rpc("my_access");
+    if (acc && acc.is_owner === false) { location.href = "/analyst/"; return; }
+  } catch (_) { /* not an employee */ }
   hide($("#loginView")); show($("#homeView"));
   $("#emailChip").textContent = session.user.email;
   show($("#emailChip"));
