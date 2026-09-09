@@ -82,7 +82,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-09d</span></div>
+      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-09e</span></div>
     </div>
   </a>
   <div style="display:flex; align-items:center; gap:16px;">
@@ -96,16 +96,16 @@
     <h1>Stock In/Out</h1>
     <div class="sub" id="sub">Loading…</div>
     <div style="margin-left:auto; display:flex; gap:8px;">
-      <button class="btn ghost" id="dlBtn" title="Download the workbook with every web edit already in it">&#8681; Download workbook</button>
-      <a class="btn ghost" href="/uploads/" style="text-decoration:none;">Upload workbook</a>
+      <button class="btn ghost" id="dlBtn" data-perm="stock.download" title="Download the workbook with every web edit already in it">&#8681; Download workbook</button>
+      <a class="btn ghost" href="/uploads/" data-perm="uploads.warehouse" style="text-decoration:none;">Upload workbook</a>
     </div>
   </div>
 
   <div class="tabs">
-    <button class="on" data-tab="A">A &middot; Loose items <span id="nA"></span></button>
-    <button data-tab="B">B &middot; Made items <span id="nB"></span></button>
-    <button data-tab="C">C &middot; Kits <span id="nC"></span></button>
-    <button data-tab="M">Movements <span id="nM"></span></button>
+    <button class="on" data-tab="A" data-perm="stock.A">A &middot; Loose items <span id="nA"></span></button>
+    <button data-tab="B" data-perm="stock.B">B &middot; Made items <span id="nB"></span></button>
+    <button data-tab="C" data-perm="stock.C">C &middot; Kits <span id="nC"></span></button>
+    <button data-tab="M" data-perm="stock.M">Movements <span id="nM"></span></button>
   </div>
 
   <div class="bar">
@@ -132,6 +132,7 @@
   </div>
 </main>
 
+<script src="/analyst-access.js?v=1"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -193,8 +194,8 @@
           <td class=name>${esc(r.name || "")}${r.color ? ' <span class=pill>' + esc(r.color) + "</span>" : ""}</td>
           <td>${esc(r.subcategory || "")}</td>
           <td class=num>${fmt(r.price)}</td>
-          <td><span class="seg"><button data-set="0" data-k="${esc(k)}" class="${!del && v.opening === 0 ? "on zero" : ""}" ${del ? "disabled" : ""}>0</button><button data-set="200" data-k="${esc(k)}" class="${!del && v.opening === 200 ? "on" : ""}" ${del ? "disabled" : ""}>200</button>${!del && v.opening !== 0 && v.opening !== 200 ? '<span class="other">' + fmt(v.opening) + "</span>" : ""}</span></td>
-          <td><input type="checkbox" class="chk" data-del="${esc(k)}" ${del ? "checked" : ""}></td>
+          <td><span class="seg"><button data-set="0" data-k="${esc(k)}" class="${!del && v.opening === 0 ? "on zero" : ""}" ${del || !canEditA ? "disabled" : ""}>0</button><button data-set="200" data-k="${esc(k)}" class="${!del && v.opening === 200 ? "on" : ""}" ${del || !canEditA ? "disabled" : ""}>200</button>${!del && v.opening !== 0 && v.opening !== 200 ? '<span class="other">' + fmt(v.opening) + "</span>" : ""}</span></td>
+          <td><input type="checkbox" class="chk" data-del="${esc(k)}" ${del ? "checked" : ""} ${canEditA ? "" : "disabled"}></td>
           <td class=num>${r.used_by || 0}</td>
         </tr>`;
       }).join("");
@@ -225,12 +226,15 @@
   }
 
   // ---- editing (event delegation) ----
+  let canEditA = true;
   $("#tbl").addEventListener("change", (e) => {
     const t = e.target;
+    if (!canEditA) { render(); return; }
     if (t.classList.contains("qty")) { const k = t.dataset.k; const v = Number(t.value); if (Number.isFinite(v)) { const cur = edits.get(k) || {}; cur.opening_qty = v; edits.set(k, cur); } render(); }
     if (t.dataset.del !== undefined) { const k = t.dataset.del; const cur = edits.get(k) || {}; cur.status = t.checked ? "Deleted" : ""; edits.set(k, cur); render(); }
   });
   $("#tbl").addEventListener("click", (e) => {
+    if (!canEditA) return;
     const sb2 = e.target.closest("button[data-set]");
     if (sb2) { const k = sb2.dataset.k; const cur = edits.get(k) || {}; cur.opening_qty = Number(sb2.dataset.set); edits.set(k, cur); render(); return; }
     const b = e.target.closest("button[data-in],button[data-out]"); if (!b) return;
@@ -274,7 +278,7 @@
 
   $("#dlBtn").addEventListener("click", async () => {
     const { data: { session } } = await sb.auth.getSession(); if (!session) return;
-    const { data, error } = await sb.storage.from("warehouse-files").createSignedUrl(session.user.id + "/warehouse-stock.xlsx", 120);
+    const { data, error } = await sb.storage.from("warehouse-files").createSignedUrl(CA.ownerId() + "/warehouse-stock.xlsx", 120);
     if (error || !data) { alert("No workbook uploaded yet."); return; }
     const a = document.createElement("a"); a.href = data.signedUrl; a.download = "Warehouse Stock.xlsx"; document.body.appendChild(a); a.click(); a.remove();
   });
@@ -287,7 +291,15 @@
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { location.href = "/home/?return=%2Fstock%2F"; return; }
-    $("#who").textContent = session.user.email || "";
+    try { await CA.load(sb); } catch (e) { $("#sub").textContent = "Could not check access: " + (e.message || e); return; }
+    $("#who").textContent = CA.who();
+    if (!CA.access.active) { $("#sub").textContent = "Cursive Analyst subscription required."; return; }
+    if (!CA.anyOn("stock")) { $("#sub").textContent = "You do not have access to Stock In/Out. Ask the account owner."; $(".tabs").style.display = "none"; return; }
+    CA.apply();
+    // first visible tab
+    const firstTab = [...document.querySelectorAll(".tabs button")].find(b => b.style.display !== "none");
+    if (firstTab && !firstTab.classList.contains("on")) { document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === firstTab)); tab = firstTab.dataset.tab; }
+    canEditA = CA.can("stock.A", "edit");
     await load();
   })();
 </script>
