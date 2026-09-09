@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09g</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09h</span></div>
     </div>
   </a>
   </div>
@@ -453,7 +453,7 @@
     </div>
     <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt,.zip" style="display:none;" />
 
-    <div class="up-item" data-perm="uploads.master">
+    <div class="up-item" data-perm-page="master" id="masterRow">
       <div class="up-left">
         <div class="up-icon">&#128193;</div>
         <div>
@@ -690,7 +690,7 @@
     OWNER_ID = CA.ownerId();
     $("#emailChip").textContent = CA.who();
     if (!CA.access.active) { $("#locker").classList.add("show"); return; }
-    if (location.hash === "#master") setTimeout(() => { const el = document.querySelector('[data-perm="uploads.master"]'); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 600);
+    if (location.hash === "#master") setTimeout(() => { const el = document.getElementById("masterRow"); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 600);
     if (!(CA.anyOn("uploads") || CA.anyOn("master") || CA.can("uploads.master", "view"))) { setStatus("You do not have access to Uploads. Ask the account owner.", true); $("#uploadsPanel").style.display = "none"; document.querySelector(".top-actions").style.display = "none"; return; }
     CA.apply();
     // Master SKU: 1 download (view) · 2 upload · 3 delete old · 4 edit old · 5 add new
