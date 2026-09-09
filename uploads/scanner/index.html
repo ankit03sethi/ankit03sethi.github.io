@@ -510,7 +510,8 @@
   const COURIERS_BY_PLATFORM = {
     "":         [], // "All" → no courier filter
     flipkart:   [{ id:"ekart", name:"Ekart",       prefixes:["FMPP","FMPC","FMPR","FMPF","FMFC","FMFR"] },
-                 { id:"delhivery", name:"Delhivery", prefixes:["DL","SF"] },
+                 { id:"shadowfax", name:"Shadowfax", prefixes:["SF"] },
+                 { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
                  { id:"bluedart", name:"Blue Dart", prefixes:["BD"] }],
     amazon:     [{ id:"amazon-shipping", name:"Amazon Shipping", prefixes:["TBA"] },
                  { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
@@ -520,8 +521,11 @@
                  { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
                  { id:"xpressbees", name:"XpressBees", prefixes:["XB"] },
                  { id:"ecomexpress", name:"Ecom Express", prefixes:["EE","EX"] }],
-    myntra:     [{ id:"myntra-jeeves", name:"Myntra Jeeves", prefixes:["MJ","MY"] },
-                 { id:"ekart", name:"Ekart", prefixes:["FMPP","FMPR"] }],
+    // Myntra AWBs: MYE* = Ekart (C = COD, P = prepaid), MYS* = Shadowfax, SF = Shadowfax, all-digit = Delhivery
+    myntra:     [{ id:"ekart", name:"Ekart", prefixes:["MYE","FMPP","FMPR"] },
+                 { id:"shadowfax", name:"Shadowfax", prefixes:["MYS","SF"] },
+                 { id:"myntra-jeeves", name:"Myntra Jeeves", prefixes:["MJ"] }],
+    // FirstCry AWBs are all digits (XpressBees); FC = FirstCry Express
     firstcry:   [{ id:"firstcry-express", name:"FirstCry Express", prefixes:["FC"] },
                  { id:"delhivery", name:"Delhivery", prefixes:["DL"] },
                  { id:"bluedart", name:"Blue Dart", prefixes:["BD"] }],
@@ -1045,6 +1049,8 @@
         if (P.length > bestLen && tid.startsWith(P)) { best = c.name; bestLen = P.length; }
       }
     }
+    // no letter prefix: an all-digit AWB is XpressBees on FirstCry, Delhivery elsewhere
+    if (!best && /^\d{11,15}$/.test(tid)) best = String((row && row.platform) || "").toLowerCase() === "firstcry" ? "Xpressbees" : "Delhivery";
     return best;
   }
 
