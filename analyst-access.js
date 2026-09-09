@@ -15,15 +15,17 @@
       { key: "uploads.returns",     label: "Returns file" },
       { key: "uploads.inventory",   label: "Inventory file" },
       { key: "uploads.payments",    label: "Payments file" },
-      { key: "uploads.master",         label: "Master SKU: 1 · Download", levels: ["view"] },
-      { key: "uploads.master.upload",  label: "Master SKU: 2 · Upload file", levels: ["edit"] },
-      { key: "uploads.master.replace", label: "Master SKU: 3 · Delete old data (replace everything)", levels: ["edit"] },
-      { key: "uploads.master.update",  label: "Master SKU: 4 · Edit old rows", levels: ["edit"] },
-      { key: "uploads.master.append",  label: "Master SKU: 5 · Add new rows", levels: ["edit"] },
       { key: "uploads.warehouse",   label: "Warehouse stock file" },
       { key: "uploads.companies",   label: "Companies" },
       { key: "uploads.checklist",   label: "Today's checklist", levels: ["view"] },
       { key: "uploads.skuwise",     label: "SKU wise data panel", levels: ["view"] },
+    ]},
+    { page: "master", label: "Master SKU file", items: [
+      { key: "uploads.master",         label: "1 · Download", levels: ["view"] },
+      { key: "uploads.master.upload",  label: "2 · Upload file", levels: ["edit"] },
+      { key: "uploads.master.replace", label: "3 · Delete old data (replace everything)", levels: ["edit"] },
+      { key: "uploads.master.update",  label: "4 · Edit old rows", levels: ["edit"] },
+      { key: "uploads.master.append",  label: "5 · Add new rows", levels: ["edit"] },
     ]},
     { page: "scanner", label: "Scanner", items: [
       { key: "scanner", label: "Scanner (edit = can scan)" },
@@ -92,7 +94,9 @@
     if (access.is_owner) return true;
     const g = CATALOG.find(x => x.page === page);
     if (!g) return can(page, "view");
-    return g.items.some(it => can(it.key, "view"));
+    if (g.items.some(it => can(it.key, "view"))) return true;
+    // the Master SKU file lives on the Uploads page
+    return page === "uploads" ? anyOn("master") : false;
   }
 
   async function load(sb) {
