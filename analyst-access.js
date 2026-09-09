@@ -37,7 +37,8 @@
       { key: "reports.missings", label: "Missings", levels: ["view"] },
     ]},
     { page: "skuwise", label: "SKU-wise data", items: [
-      { key: "skuwise.sku_master", label: "SKU Master (edit = tags, seller names, reset listings)" },
+      { key: "skuwise.sku_master", label: "SKU Master (edit = tags, seller names)" },
+      { key: "skuwise.delete",     label: "Delete data button (clear site price / ratings / seller for shown rows)", levels: ["edit"] },
       { key: "skuwise.orders",   label: "Orders",   levels: ["view"] },
       { key: "skuwise.returns",  label: "Returns",  levels: ["view"] },
       { key: "skuwise.payments", label: "Payments", levels: ["view"] },
