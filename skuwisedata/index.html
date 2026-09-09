@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-07a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-09k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -345,7 +345,7 @@
       </span>
       <span id="rowCount" style="color:#64748b; font-weight:600; font-size:12px;"></span>
       <button class="btn" id="scrapeResetBtn" type="button" data-perm-edit="skuwise.delete" data-hide
-              title="Clear Site Price / Ratings / Count / Seller for the rows shown below and re-check them first"
+              title="Clear Site Price / Ratings / Count / Seller / Last updated for the rows shown below and re-check them first"
               style="font-size:12px; padding:5px 11px; margin-left:12px; color:#b91c1c; border-color:#fecaca;">Delete data</button>
       <span id="colPickWrap" style="position:relative; margin-left:12px;">
         <button class="btn" id="colPickBtn" type="button"
@@ -361,7 +361,7 @@
       <div class="empty">Loading&hellip;</div>
     </div>
     <div class="scrape-bar" id="scrapeBar" style="display:none;">
-      <span class="dot"></span><span id="scrapeText">Checking listing scrape&hellip;</span>
+      <span class="dot"></span><span id="scrapeText">Checking listing updates&hellip;</span>
     </div>
   </div>
 </div>
@@ -906,8 +906,9 @@
     const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
-                   "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped"]);
+                   "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
+                   "Last updated": "last_checked_at" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -926,6 +927,7 @@
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         if (c === "Mapped") v = st.mapped ? "Yes" : "";
+        if (c === "Last updated") v = lastUpdatedText(st);
         const txt = !blank(v) ? String(v)
                   : EXTRA.has(c) ? ""
                   : stt === "multi_product" ? "MP"
@@ -1006,8 +1008,16 @@
     for (const r of (pid || [])) state.platformIds.set(wcKey(r.company_name, r.platform, r.sku), r);
   }
 
-  // Latest scraped listing values — what the product page says right now, put
-  // there by the desktop app's listing scraper. Same keying and same reason for
+  // "Last updated" cell text, the same way the PD Tracker shows it: the local
+  // date and time of the last listing check, or Pending when it has not run.
+  function lastUpdatedText(st) {
+    if (!st || !st.last_checked_at) return "Pending";
+    const d = new Date(st.last_checked_at);
+    return isNaN(d.getTime()) ? "Pending" : d.toLocaleString("en-IN");
+  }
+
+  // Latest live listing values — what the product page says right now, put
+  // there by the desktop app's listing check. Same keying and same reason for
   // sending only the visible keys as loadPlatformIds.
   async function loadListingStats(rows, force) {
     const keys = [...new Set(rows
@@ -1271,10 +1281,10 @@
          "Rev per unit","Courier per unit","Settled per unit","Return per unit",
          "Tax per unit","Pack per unit","Profit per unit"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
+    if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
     if (["Margin","Tax","Profit","Profit /unit","Profit % of COP",
          "Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
-    if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Link"].includes(c)) return "Listing";
     return "Product";
   }
 
@@ -1548,7 +1558,7 @@
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","File Price","Suggested Price","Link",
+      "Site Price","Ratings","Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","File Price","Suggested Price","Last updated","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -1668,8 +1678,12 @@
       for (const k of Object.keys(rd)) {
         if (normHdr(k) === want && !blank(rd[k])) return safeCell(rd[k]);
       }
-      // Live listing values from the scraper. Ahead of the uploaded file for the
-      // same reason the IDs are: this is the page as it reads today.
+      // Live listing values from the listing check. Ahead of the uploaded file
+      // for the same reason the IDs are: this is the page as it reads today.
+      if (col === "Last updated") {
+        const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        return st ? lastUpdatedText(st) : "";
+      }
       if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Mapped"].includes(col)) {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
@@ -2145,6 +2159,7 @@
       if (c === "Link" && /^https?:\/\//i.test(v)) {
         return `<td><a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">Open</a></td>`;
       }
+      if (c === "Last updated") return `<td style="white-space:nowrap">${escapeHtml(v)}</td>`;
       return `<td>${escapeHtml(v)}</td>`;
     }
 
@@ -2175,6 +2190,17 @@
   // ---- Per-column filter + sort, applied to whatever table is on screen -----
   // Works on the rendered DOM rather than the data, so it covers every column of
   // every view — including the editable cells, whose value lives in an input.
+  // Milliseconds for a cell that reads as an en-IN date/time, else null.
+  function dateMs(s) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?)?$/i.exec(String(s || "").trim());
+    if (!m) return null;
+    let h = Number(m[4] || 0);
+    const ap = (m[7] || "").toLowerCase();
+    if (ap === "pm" && h < 12) h += 12;
+    if (ap === "am" && h === 12) h = 0;
+    return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), h, Number(m[5] || 0), Number(m[6] || 0)).getTime();
+  }
+
   function cellText(td) {
     if (!td) return "";
     const inp = td.querySelector("input");
@@ -2261,6 +2287,14 @@
         const dir = t.sort.dir === "asc" ? 1 : -1;
         rows.sort((a, b) => {
           const x = cellText(a.cells[i]), y = cellText(b.cells[i]);
+          // "09/09/2026, 10:23:15 am" — a date column sorts by time, not by the
+          // day digits, and Pending rows go last either way.
+          const dx = dateMs(x), dy = dateMs(y);
+          if (dx !== null || dy !== null) {
+            if (dx === null) return 1;
+            if (dy === null) return -1;
+            return (dx - dy) * dir;
+          }
           const nx = parseFloat(String(x).replace(/[^\d.-]/g, ""));
           const ny = parseFloat(String(y).replace(/[^\d.-]/g, ""));
           const bothNum = !isNaN(nx) && !isNaN(ny) && String(x).trim() !== "" && String(y).trim() !== "";
@@ -2689,7 +2723,8 @@
     "Final COP": "COP plus packaging - the full cost of one unit.",
     "Expected Settlement": "What you expect the platform to pay per unit. You fill this in.",
     "Selling Price": "Your listed price from the master sheet.",
-    "Site Price": "Price found on the live listing by the scraper.",
+    "Site Price": "Price found on the live listing.",
+    "Last updated": "When the live listing was last checked. Pending = not checked yet.",
     "Ratings": "Star rating on the live listing.",
     "Count": "Number of ratings on the live listing.",
     "Seller": "Seller name shown on the live listing.",
@@ -2941,7 +2976,7 @@
       bar.classList.toggle("down",  down);
       // Row number and when it happened. Everything else was noise — the point
       // of the strip is only "is it moving, and when did it last move".
-      if (!lastMs) { txt.innerHTML = "Nothing scraped yet"; return; }
+      if (!lastMs) { txt.innerHTML = "Nothing checked yet"; return; }
       if (down) {
         const why = pingAge > 300 ? "desktop app not running" : "no activity for 15+ minutes";
         txt.innerHTML = `<b>${checked.toLocaleString("en-IN")}</b> <span class="sep">|</span> `
