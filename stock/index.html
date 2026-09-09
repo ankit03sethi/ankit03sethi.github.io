@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Cursive Analyst — Stock In/Out</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding: 14px 28px; background:#fff; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:5; }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; }
+    .brand-box { width:44px; height:44px; background:#1f6feb; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+    .brand-wordmark { font-family:'Dancing Script', cursive; font-size:24px; color:#0f172a; line-height:1; }
+    .nav-sub { font-size:11px; color:#64748b; margin-top:2px; }
+    .back-link { color:#1f6feb; text-decoration:none; font-size:14px; font-weight:600; }
+    main { max-width:1240px; margin:0 auto; padding:22px 20px 70px; }
+    .head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+    .head h1 { margin:0; font-size:24px; font-weight:800; }
+    .head .sub { color:#64748b; font-size:13px; }
+    .tabs { display:flex; gap:6px; margin:0 0 14px; flex-wrap:wrap; }
+    .tabs button { border:1px solid #e5e7eb; background:#fff; padding:9px 16px; border-radius:999px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
+    .tabs button.on { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+    .tabs button span { font-weight:600; opacity:.75; margin-left:6px; }
+    .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .bar input[type=search] { flex:1; min-width:220px; padding:10px 14px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; }
+    .bar select { padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:13px; font-weight:600; background:#fff; }
+    .btn { background:#1f6feb; color:#fff; border:none; border-radius:10px; padding:10px 20px; font-size:14px; font-weight:800; cursor:pointer; }
+    .btn.ghost { background:#fff; color:#1f6feb; border:1px solid #bfdbfe; }
+    .btn:disabled { opacity:.55; cursor:default; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 6px 24px rgba(15,23,42,.05); overflow:hidden; }
+    .wrap { overflow:auto; max-height:70vh; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th { position:sticky; top:0; background:#f1f5f9; text-align:left; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:#475569; padding:9px 10px; border-bottom:1px solid #e5e7eb; z-index:1; }
+    td { padding:6px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; white-space:nowrap; }
+    tr:hover td { background:#fafcff; }
+    td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+    td.code { font-weight:800; }
+    td.name { white-space:normal; min-width:200px; color:#334155; }
+    tr.deleted td { color:#94a3b8; }
+    tr.deleted td.code { text-decoration: line-through; }
+    tr.dirty td { background:#fffbeb; }
+    input.qty { width:84px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:800; text-align:right; }
+    input.qty:focus { outline:2px solid #1f6feb; border-color:#1f6feb; }
+    .io { display:inline-flex; align-items:center; gap:4px; }
+    .io input { width:64px; padding:6px 6px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; text-align:right; }
+    .io button { border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 9px; font-weight:800; cursor:pointer; font-size:13px; }
+    .io button.in { color:#16a34a; } .io button.out { color:#dc2626; }
+    .stock { font-weight:800; }
+    .stock.zero { color:#dc2626; } .stock.neg { color:#b91c1c; background:#fef2f2; border-radius:6px; padding:2px 6px; }
+    .chk { width:16px; height:16px; }
+    .pill { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#f1f5f9; color:#475569; }
+    .pill.miss { background:#fef2f2; color:#b91c1c; }
+    .savebar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:10px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    #msg { font-size:13px; font-weight:700; color:#64748b; }
+    .pending { font-size:12px; color:#92400e; background:#fef3c7; border:1px solid #fde68a; padding:4px 10px; border-radius:999px; }
+    .empty { padding:40px; text-align:center; color:#64748b; }
+    .empty a { color:#1f6feb; font-weight:700; }
+    .parts { color:#64748b; font-size:12px; white-space:normal; max-width:520px; }
+    .parts b { color:#0f172a; }
+    .parts .lim { color:#dc2626; font-weight:800; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand">
+    <div class="brand-box">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
+    </div>
+    <div>
+      <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
+      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-09a</span></div>
+    </div>
+  </a>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <span id="who" style="font-size:12px; color:#64748b;"></span>
+    <a href="/analyst/" class="back-link">&larr; Back</a>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Stock In/Out</h1>
+    <div class="sub" id="sub">Loading…</div>
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <button class="btn ghost" id="dlBtn" title="Download the workbook with every web edit already in it">&#8681; Download workbook</button>
+      <a class="btn ghost" href="/uploads/" style="text-decoration:none;">Upload workbook</a>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="on" data-tab="A">A &middot; Loose items <span id="nA"></span></button>
+    <button data-tab="B">B &middot; Made items <span id="nB"></span></button>
+    <button data-tab="C">C &middot; Kits <span id="nC"></span></button>
+    <button data-tab="M">Movements <span id="nM"></span></button>
+  </div>
+
+  <div class="bar">
+    <input type="search" id="q" placeholder="Search code, name, product, subcategory…">
+    <select id="filt">
+      <option value="">All items</option>
+      <option value="instock">In stock</option>
+      <option value="zero">Zero / missing</option>
+      <option value="deleted">Deleted</option>
+      <option value="changed">Changed today</option>
+    </select>
+    <span id="count" style="font-size:12px; color:#64748b;"></span>
+  </div>
+
+  <div class="card">
+    <div class="wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+    <div class="savebar" id="savebar" hidden>
+      <button class="btn" id="saveBtn">Save changes</button>
+      <span class="pending" id="pendingTxt"></span>
+      <button class="btn ghost" id="discardBtn">Discard</button>
+      <span id="msg"></span>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const fmt = (n) => n == null ? "—" : (Math.round(Number(n) * 100) / 100).toLocaleString("en-IN");
+
+  let data = { loose: [], made: [], kits: [], movements: [] };
+  let tab = "A";
+  // pending web edits, keyed by code: { opening_qty?, status? } and a list of new movements
+  const edits = new Map(); const moves = [];
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  function setSub() {
+    const l = data.loose.length, z = data.loose.filter(r => !isDel(r) && Number(r.stock) <= 0).length, d = data.loose.filter(isDel).length;
+    $("#sub").textContent = l ? `${l} loose items · ${z} at zero · ${d} deleted` + (data.updated_at ? ` · workbook data as of ${new Date(data.updated_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : "") : "";
+    $("#nA").textContent = data.loose.length || ""; $("#nB").textContent = data.made.length || ""; $("#nC").textContent = data.kits.length || ""; $("#nM").textContent = data.movements.length || "";
+  }
+  const isDel = (r) => String(r.status || "").trim().toLowerCase() === "deleted";
+  const key = (c) => String(c || "").trim().toUpperCase();
+
+  // effective (unsaved) view of a loose row
+  function eff(r) {
+    const e = edits.get(key(r.code)) || {};
+    const status = e.status !== undefined ? e.status : (r.status || "");
+    const opening = e.opening_qty !== undefined ? Number(e.opening_qty) : Number(r.opening_qty || 0);
+    const pendingIn = moves.filter(m => key(m.code) === key(r.code)).reduce((a, m) => a + (m.type === "Sell" ? -m.qty : m.qty), 0);
+    const stock = status.toLowerCase() === "deleted" ? 0 : opening + Number(r.received || 0) - Number(r.sold || 0) + Number(r.adjusted || 0) + pendingIn;
+    return { status, opening, stock, dirty: edits.has(key(r.code)) || pendingIn !== 0 };
+  }
+
+  function matches(r, q) {
+    if (!q) return true;
+    return [r.code, r.name, r.product, r.subcategory, r.sku, r.color].some(v => String(v || "").toLowerCase().includes(q));
+  }
+
+  function render() {
+    const q = $("#q").value.trim().toLowerCase(), f = $("#filt").value;
+    const thead = $("#tbl thead"), tbody = $("#tbl tbody");
+    let rows = [];
+    if (tab === "A") {
+      thead.innerHTML = "<tr><th>Code</th><th>Item</th><th>Subcategory</th><th class=num>Price</th><th class=num>Opening qty</th><th class=num>In</th><th class=num>Out</th><th class=num>Stock</th><th>Stock in / out</th><th>Deleted</th><th class=num>Used by</th></tr>";
+      rows = data.loose.filter(r => matches(r, q)).filter(r => {
+        const v = eff(r);
+        if (f === "instock") return v.stock > 0 && v.status.toLowerCase() !== "deleted";
+        if (f === "zero") return v.stock <= 0 && v.status.toLowerCase() !== "deleted";
+        if (f === "deleted") return v.status.toLowerCase() === "deleted";
+        if (f === "changed") return v.dirty;
+        return true;
+      });
+      tbody.innerHTML = rows.map(r => {
+        const v = eff(r); const del = v.status.toLowerCase() === "deleted"; const k = key(r.code);
+        return `<tr class="${del ? "deleted" : ""}${v.dirty ? " dirty" : ""}" data-k="${esc(k)}">
+          <td class=code>${esc(r.code)}</td>
+          <td class=name>${esc(r.name || "")}${r.color ? ' <span class=pill>' + esc(r.color) + "</span>" : ""}</td>
+          <td>${esc(r.subcategory || "")}</td>
+          <td class=num>${fmt(r.price)}</td>
+          <td class=num><input class="qty" data-k="${esc(k)}" type="number" step="1" value="${v.opening}" ${del ? "disabled" : ""}></td>
+          <td class=num>${fmt(r.received || 0)}</td>
+          <td class=num>${fmt(r.sold || 0)}</td>
+          <td class=num><span class="stock ${v.stock < 0 ? "neg" : v.stock === 0 ? "zero" : ""}">${fmt(v.stock)}</span></td>
+          <td><span class=io><input type="number" min="1" step="1" placeholder="qty" data-io="${esc(k)}" ${del ? "disabled" : ""}><button class=in data-in="${esc(k)}" title="Stock in (Receive)" ${del ? "disabled" : ""}>+ In</button><button class=out data-out="${esc(k)}" title="Stock out (Sell)" ${del ? "disabled" : ""}>&minus; Out</button></span></td>
+          <td><input type="checkbox" class="chk" data-del="${esc(k)}" ${del ? "checked" : ""}></td>
+          <td class=num>${r.used_by || 0}</td>
+        </tr>`;
+      }).join("");
+    } else if (tab === "B" || tab === "C") {
+      const list = tab === "B" ? data.made : data.kits;
+      thead.innerHTML = `<tr><th>Code</th><th>${tab === "B" ? "Item" : "Kit / Marketplace SKU"}</th><th class=num>Qty</th><th>Status</th><th>Parts (limiting part in red)</th>${tab === "C" ? "<th class=num>Price</th>" : ""}</tr>`;
+      rows = list.filter(r => matches(r, q)).filter(r => {
+        if (f === "instock") return Number(r.qty) > 0; if (f === "zero") return Number(r.qty) <= 0 && !isDel(r); if (f === "deleted") return isDel(r); if (f === "changed") return false; return true;
+      });
+      tbody.innerHTML = rows.map(r => {
+        const qty = Number(r.qty);
+        const parts = (r.items || []).map(it => `<b class="${key(it.code) === key(r.limiting) ? "lim" : ""}">${esc(it.code)}</b>${it.qty && Number(it.qty) !== 1 ? "×" + esc(it.qty) : ""}`).join(", ");
+        return `<tr class="${isDel(r) ? "deleted" : ""}"><td class=code>${esc(r.code)}</td><td class=name>${esc(r.name || "")}${r.sku ? " <span class=pill>" + esc(r.sku) + "</span>" : ""}</td>
+          <td class=num><span class="stock ${qty < 0 ? "neg" : qty === 0 ? "zero" : ""}">${qty < 0 ? "part missing" : fmt(qty)}</span></td>
+          <td>${isDel(r) ? "<span class='pill miss'>Deleted</span>" : ""}</td><td class=parts>${parts || "<i>no parts listed</i>"}</td>${tab === "C" ? "<td class=num>" + fmt(r.price) + "</td>" : ""}</tr>`;
+      }).join("");
+    } else {
+      thead.innerHTML = "<tr><th>Date</th><th>Type</th><th>Code</th><th class=num>Qty</th><th>Note</th><th>In workbook</th></tr>";
+      const pend = moves.map(m => ({ ...m, date: today(), pending: true }));
+      rows = [...pend, ...data.movements].filter(r => matches(r, q) && (f !== "changed" || r.pending));
+      tbody.innerHTML = rows.map(r => `<tr class="${r.pending ? "dirty" : ""}"><td>${esc(r.date)}</td><td>${esc(r.type)}</td><td class=code>${esc(r.code)}</td><td class=num>${fmt(r.qty)}</td><td class=name>${esc(r.note || "")}</td><td>${r.pending ? "<span class=pill>not saved yet</span>" : r.in_file ? "yes" : "<span class=pill>pending</span>"}</td></tr>`).join("");
+    }
+    if (!rows.length) tbody.innerHTML = `<tr><td colspan=12 class=empty>${data.loose.length ? "Nothing matches." : 'No workbook yet — upload <b>Warehouse Stock.xlsx</b> on the <a href="/uploads/">Uploads page</a> first.'}</td></tr>`;
+    $("#count").textContent = rows.length ? rows.length + " rows" : "";
+    const n = edits.size + moves.length;
+    $("#savebar").hidden = n === 0;
+    $("#pendingTxt").textContent = n ? `${edits.size} item${edits.size === 1 ? "" : "s"} changed · ${moves.length} in/out entr${moves.length === 1 ? "y" : "ies"}` : "";
+  }
+
+  // ---- editing (event delegation) ----
+  $("#tbl").addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.classList.contains("qty")) { const k = t.dataset.k; const v = Number(t.value); if (Number.isFinite(v)) { const cur = edits.get(k) || {}; cur.opening_qty = v; edits.set(k, cur); } render(); }
+    if (t.dataset.del !== undefined) { const k = t.dataset.del; const cur = edits.get(k) || {}; cur.status = t.checked ? "Deleted" : ""; edits.set(k, cur); render(); }
+  });
+  $("#tbl").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-in],button[data-out]"); if (!b) return;
+    const k = b.dataset.in || b.dataset.out; const inp = $(`input[data-io="${CSS.escape(k)}"]`); const q = Number(inp && inp.value);
+    if (!(q > 0)) { inp && inp.focus(); return; }
+    const row = data.loose.find(r => key(r.code) === k);
+    moves.push({ code: row ? row.code : k, type: b.dataset.in !== undefined ? "Receive" : "Sell", qty: q, note: "web " + (b.dataset.in !== undefined ? "stock in" : "stock out") });
+    render();
+  });
+  $("#tbl").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.dataset.io !== undefined) { e.preventDefault(); const k = e.target.dataset.io; $(`button[data-in="${CSS.escape(k)}"]`).click(); }
+  });
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b)); tab = b.dataset.tab; render(); }));
+  $("#q").addEventListener("input", render); $("#filt").addEventListener("change", render);
+  $("#discardBtn").addEventListener("click", () => { edits.clear(); moves.length = 0; render(); });
+
+  // ---- save: DB first (recalc), then the workbook file ----
+  $("#saveBtn").addEventListener("click", async () => {
+    const say = (t, c) => { $("#msg").textContent = t; $("#msg").style.color = c || "#64748b"; };
+    const p_edits = [...edits.entries()].map(([code, e]) => ({ code, ...e }));
+    const p_moves = moves.map(m => ({ code: m.code, type: m.type, qty: m.qty, note: m.note }));
+    $("#saveBtn").disabled = true; say("Saving…");
+    try {
+      const { data: r, error } = await sb.rpc("warehouse_edit", { p_edits, p_moves });
+      if (error) throw error;
+      // movements just added carry no id back; fetch the newest un-filed ones so the file patch can mark them
+      const { data: v2 } = await sb.rpc("warehouse_view", {});
+      const fresh = ((v2 && v2.movements) || []).filter(m => !m.in_file);
+      say(`Saved · ${r.kit_rows_pushed} kit quantities recalculated. Updating the workbook…`);
+      const { data: { session } } = await sb.auth.getSession();
+      const fp = await fetch(SB_URL + "/functions/v1/warehouse-file-patch", { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ edits: p_edits, moves: fresh.map(m => ({ id: m.id, date: m.date, type: m.type, code: m.code, qty: m.qty, note: m.note })) }) });
+      const fj = await fp.json().catch(() => ({}));
+      edits.clear(); moves.length = 0;
+      await load();
+      if (fj.ok) say(`Saved — ${r.edited} item${r.edited === 1 ? "" : "s"}, ${r.movements_added} in/out entr${r.movements_added === 1 ? "y" : "ies"}, ${r.kit_rows_pushed} kit quantities updated, workbook file updated.` + (fj.missing && fj.missing.length ? " Not in the file: " + fj.missing.join(", ") : ""), "#16a34a");
+      else say(`Saved in the database (${r.kit_rows_pushed} kit quantities), but the workbook file was not updated: ${fj.error || fp.status}`, "#b45309");
+    } catch (e) { say("Could not save: " + (e.message || e), "#b91c1c"); }
+    $("#saveBtn").disabled = false;
+  });
+
+  $("#dlBtn").addEventListener("click", async () => {
+    const { data: { session } } = await sb.auth.getSession(); if (!session) return;
+    const { data, error } = await sb.storage.from("warehouse-files").createSignedUrl(session.user.id + "/warehouse-stock.xlsx", 120);
+    if (error || !data) { alert("No workbook uploaded yet."); return; }
+    const a = document.createElement("a"); a.href = data.signedUrl; a.download = "Warehouse Stock.xlsx"; document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  async function load() {
+    const { data: v, error } = await sb.rpc("warehouse_view", {});
+    if (error) { $("#sub").textContent = "Could not load: " + error.message; return; }
+    data = v || data; setSub(); render();
+  }
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "/home/?return=%2Fstock%2F"; return; }
+    $("#who").textContent = session.user.email || "";
+    await load();
+  })();
+</script>
+</body>
+</html>
