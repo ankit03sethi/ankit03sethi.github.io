@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09d</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09e</span></div>
     </div>
   </a>
   </div>
@@ -180,6 +180,7 @@
     <span class="email-chip" id="emailChip"></span>
     <a class="btn-link" href="/analyst/" data-owner-only>Install app</a>
     <a class="btn-link" href="/home/">Home</a>
+    <a class="btn-link" href="#" id="signOutLink" style="color:#b91c1c;">Sign out</a>
   </div>
 </header>
 
@@ -667,6 +668,7 @@
   const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
   const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
   window.__sb = sb;
+  document.getElementById("signOutLink").addEventListener("click", async (e) => { e.preventDefault(); await sb.auth.signOut(); location.href = "/home/"; });
 
   const $ = (s) => document.querySelector(s);
   let session = null;
