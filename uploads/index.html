@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-08c</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09a</span></div>
     </div>
   </a>
   </div>
@@ -1826,30 +1826,34 @@
         .upload(whPath(), f, { upsert: true, contentType: f.type ||
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       if (error) { setStatus("Upload failed: " + error.message, true); return; }
-      // The C Kits tab drives the Kit Qty column on the SKU page: kit code =
-      // Master SKU. Header row is found by name, so column order does not matter.
+      // The whole workbook (A Loose / B Made / C Kits / Movements) goes to the
+      // server as rows: the Stock In/Out page edits it there, and the server
+      // recomputes every kit quantity the way the sheet's formulas do (so the
+      // Kit Qty column on the SKU page no longer depends on Excel's cached values).
       let nKit = 0;
       try {
-        const g = XLSX.utils.sheet_to_json(wb.Sheets["C Kits"], { header: 1, defval: null });
         const nk = h => String(h == null ? "" : h).toLowerCase().replace(/[^a-z0-9]+/g, "");
-        let hi = -1, cCode = -1, cQty = -1, cSt = -1, cPr = -1;
-        for (let i = 0; i < Math.min(g.length, 10); i++) {
-          const ks = (g[i] || []).map(nk); const a = ks.indexOf("code"), b = ks.indexOf("qty");
-          if (a >= 0 && b >= 0) { hi = i; cCode = a; cQty = b; cSt = ks.indexOf("status"); cPr = ks.indexOf("price"); break; }
-        }
-        if (hi >= 0) {
-          const rows = [];
-          for (let i = hi + 1; i < g.length; i++) {
-            const r = g[i] || []; const code = r[cCode];
-            if (code == null || String(code).trim() === "") continue;
-            rows.push({ code: String(code), qty: r[cQty] == null ? null : String(r[cQty]), status: cSt >= 0 && r[cSt] != null ? String(r[cSt]) : null, price: cPr >= 0 && r[cPr] != null ? String(r[cPr]) : null });
-          }
-          // One call: the server replaces the whole set, so it must see it all at once.
-          const { data, error: e2 } = await sb.rpc("sku_kit_qty_set", { p_rows: rows });
-          if (e2) throw e2;
-          nKit = Number(data) || 0;
-        }
-      } catch (e3) { console.warn("kit qty:", e3); }
+        const cell = v => v == null ? null : (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).trim());
+        const table = (tab) => {
+          const g = XLSX.utils.sheet_to_json(wb.Sheets[tab], { header: 1, defval: null });
+          let hi = -1, cols = {};
+          for (let i = 0; i < Math.min(g.length, 10); i++) { const ks = (g[i] || []).map(nk); if (ks.indexOf("code") >= 0) { hi = i; ks.forEach((k, j) => { if (k && cols[k] === undefined) cols[k] = j; }); break; } }
+          if (hi < 0) return [];
+          const out = [];
+          for (let i = hi + 1; i < g.length; i++) { const r = g[i] || []; if (r[cols.code] == null || String(r[cols.code]).trim() === "") continue; out.push({ r, row_no: i + 1, get: (k) => cols[k] === undefined ? null : cell(r[cols[k]]) }); }
+          return out;
+        };
+        const items = (row, n) => { const o = []; for (let k = 1; k <= n; k++) { const c = row.get("item" + k); if (c) o.push({ code: c, qty: row.get("qty" + k) }); } return o; };
+        const payload = {
+          loose: table("A Loose").map(x => ({ code: x.get("code"), category: x.get("category"), subcategory: x.get("subcategory"), product: x.get("product"), color: x.get("color"), price: x.get("price"), item_name: x.get("itemname"), unit: x.get("unit"), pcs_per_pack: x.get("pcsperpack"), opening_qty: x.get("openingqty"), sold_b: x.get("soldasb"), sold_c: x.get("soldasc"), status: x.get("status"), notes: x.get("notes"), row_no: x.row_no })),
+          made:  table("B Made").map(x => ({ code: x.get("code"), item_name: x.get("itemname"), status: x.get("status"), notes: x.get("notes"), items: items(x, 8), row_no: x.row_no })),
+          kits:  table("C Kits").map(x => ({ code: x.get("code"), kit_name: x.get("kitname"), marketplace_sku: x.get("marketplacesku"), status: x.get("status"), notes: x.get("notes"), price: x.get("price"), items: items(x, 21), row_no: x.row_no })),
+          movements: table("Movements").map(x => ({ date: x.get("date"), type: x.get("type"), code: x.get("code"), qty: x.get("qty"), note: x.get("note"), row_no: x.row_no })),
+        };
+        const { data, error: e2 } = await sb.rpc("warehouse_import", { p: payload });
+        if (e2) throw e2;
+        nKit = Number(data && data.kit_rows_pushed) || 0;
+      } catch (e3) { console.warn("warehouse import:", e3); setStatus("Saved the file, but the stock tables could not be updated: " + (e3.message || e3), true); return; }
       setStatus(`✅ Saved ${f.name} — ${nA} loose item${nA===1?"":"s"}, ${nB} made item${nB===1?"":"s"}, ${nC} kit${nC===1?"":"s"}, ${nR} recipe line${nR===1?"":"s"}, ${nM} movement${nM===1?"":"s"}. Kit Qty and COP updated for ${nKit} kit${nKit===1?"":"s"} on the SKU page.`, false);
       await refreshWarehouseStamp();
     } catch (err) {
