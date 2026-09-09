@@ -56,6 +56,13 @@
     .pill { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#f1f5f9; color:#475569; }
     .pill.miss { background:#fef2f2; color:#b91c1c; }
     .savebar[hidden] { display:none; }
+    .seg { display:inline-flex; align-items:center; gap:0; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; }
+    .seg button { border:none; background:#fff; padding:6px 14px; font-weight:800; font-size:13px; color:#64748b; cursor:pointer; }
+    .seg button + button { border-left:1px solid #cbd5e1; }
+    .seg button.on { background:#16a34a; color:#fff; }
+    .seg button.on.zero { background:#dc2626; }
+    .seg button:disabled { opacity:.5; cursor:default; }
+    .seg .other { padding:0 10px; font-size:12px; font-weight:700; color:#b45309; }
     .savebar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:10px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     #msg { font-size:13px; font-weight:700; color:#64748b; }
     .pending { font-size:12px; color:#92400e; background:#fef3c7; border:1px solid #fde68a; padding:4px 10px; border-radius:999px; }
@@ -75,7 +82,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-09b</span></div>
+      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-09c</span></div>
     </div>
   </a>
   <div style="display:flex; align-items:center; gap:16px;">
@@ -167,7 +174,7 @@
     const thead = $("#tbl thead"), tbody = $("#tbl tbody");
     let rows = [];
     if (tab === "A") {
-      thead.innerHTML = "<tr><th>Code</th><th>Item</th><th>Subcategory</th><th class=num>Price</th><th class=num>Opening qty</th><th class=num>In</th><th class=num>Out</th><th class=num>Stock</th><th>Stock in / out</th><th>Deleted</th><th class=num>Used by</th></tr>";
+      thead.innerHTML = "<tr><th>Code</th><th>Item</th><th>Subcategory</th><th class=num>Price</th><th>Stock</th><th>Deleted</th><th class=num>Used by</th></tr>";
       rows = data.loose.filter(r => matches(r, q)).filter(r => {
         const v = eff(r);
         if (f === "instock") return v.stock > 0 && v.status.toLowerCase() !== "deleted";
@@ -183,11 +190,7 @@
           <td class=name>${esc(r.name || "")}${r.color ? ' <span class=pill>' + esc(r.color) + "</span>" : ""}</td>
           <td>${esc(r.subcategory || "")}</td>
           <td class=num>${fmt(r.price)}</td>
-          <td class=num><input class="qty" data-k="${esc(k)}" type="number" step="1" value="${v.opening}" ${del ? "disabled" : ""}></td>
-          <td class=num>${fmt(r.received || 0)}</td>
-          <td class=num>${fmt(r.sold || 0)}</td>
-          <td class=num><span class="stock ${v.stock < 0 ? "neg" : v.stock === 0 ? "zero" : ""}">${fmt(v.stock)}</span></td>
-          <td><span class=io><input type="number" min="1" step="1" placeholder="qty" data-io="${esc(k)}" ${del ? "disabled" : ""}><button class=in data-in="${esc(k)}" title="Stock in (Receive)" ${del ? "disabled" : ""}>+ In</button><button class=out data-out="${esc(k)}" title="Stock out (Sell)" ${del ? "disabled" : ""}>&minus; Out</button></span></td>
+          <td><span class="seg"><button data-set="0" data-k="${esc(k)}" class="${!del && v.opening === 0 ? "on zero" : ""}" ${del ? "disabled" : ""}>0</button><button data-set="200" data-k="${esc(k)}" class="${!del && v.opening === 200 ? "on" : ""}" ${del ? "disabled" : ""}>200</button>${!del && v.opening !== 0 && v.opening !== 200 ? '<span class="other">' + fmt(v.opening) + "</span>" : ""}</span></td>
           <td><input type="checkbox" class="chk" data-del="${esc(k)}" ${del ? "checked" : ""}></td>
           <td class=num>${r.used_by || 0}</td>
         </tr>`;
@@ -215,7 +218,7 @@
     $("#count").textContent = rows.length ? rows.length + " rows" : "";
     const n = edits.size + moves.length;
     $("#savebar").hidden = n === 0;
-    $("#pendingTxt").textContent = n ? `${edits.size} item${edits.size === 1 ? "" : "s"} changed · ${moves.length} in/out entr${moves.length === 1 ? "y" : "ies"}` : "";
+    $("#pendingTxt").textContent = n ? `${edits.size} item${edits.size === 1 ? "" : "s"} changed` : "";
   }
 
   // ---- editing (event delegation) ----
@@ -225,6 +228,8 @@
     if (t.dataset.del !== undefined) { const k = t.dataset.del; const cur = edits.get(k) || {}; cur.status = t.checked ? "Deleted" : ""; edits.set(k, cur); render(); }
   });
   $("#tbl").addEventListener("click", (e) => {
+    const sb2 = e.target.closest("button[data-set]");
+    if (sb2) { const k = sb2.dataset.k; const cur = edits.get(k) || {}; cur.opening_qty = Number(sb2.dataset.set); edits.set(k, cur); render(); return; }
     const b = e.target.closest("button[data-in],button[data-out]"); if (!b) return;
     const k = b.dataset.in || b.dataset.out; const inp = $(`input[data-io="${CSS.escape(k)}"]`); const q = Number(inp && inp.value);
     if (!(q > 0)) { inp && inp.focus(); return; }
