@@ -129,6 +129,18 @@
       </div>
     </a>
 
+    <a href="/uploads/#master" data-perm-page="master" style="text-decoration:none; color:inherit;">
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:20px; padding:40px 28px; text-align:center; box-shadow:0 6px 24px rgba(15,23,42,.06); transition:transform .12s, box-shadow .12s; cursor:pointer;"
+           onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 32px rgba(31,111,235,.18)';"
+           onmouseout="this.style.transform=''; this.style.boxShadow='0 6px 24px rgba(15,23,42,.06)';">
+        <div style="width:80px; height:80px; background:#eff6ff; color:#1f6feb; border-radius:20px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16"/><path d="M10 4v16"/></svg>
+        </div>
+        <h2 style="margin:0 0 6px; font-size:22px; font-weight:800;">Master SKU Data</h2>
+        <p style="margin:0; color:#64748b; font-size:14px;">Download, upload &amp; maintain the Master SKU mapping file</p>
+      </div>
+    </a>
+
     <a href="/stock/" data-perm-page="stock" style="text-decoration:none; color:inherit;">
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:20px; padding:40px 28px; text-align:center; box-shadow:0 6px 24px rgba(15,23,42,.06); transition:transform .12s, box-shadow .12s; cursor:pointer;"
            onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 32px rgba(31,111,235,.18)';"
@@ -186,7 +198,7 @@
     .catch(() => { /* silent — hardcoded fallback still works */ });
 </script>
 
-<script src="/analyst-access.js?v=3"></script>
+<script src="/analyst-access.js?v=4"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
