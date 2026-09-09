@@ -541,14 +541,38 @@
     else sel.value = allLabel ? "" : opts[0][0];
   }
 
-  // Counts rows by a key function, remembering the first spelling of each name.
+  // One shipment = one label = one tracking id / AWB. A multi-item order has
+  // several rows but is packed and scanned once, so every count here is of
+  // shipments, not rows.
+  function trackingOf(row) {
+    const rd = (row && row.raw_data) || {};
+    for (const [k, v] of Object.entries(rd)) {
+      if (v === null || v === undefined) continue;
+      if (!TRACKING_FIELDS.includes(norm(k))) continue;
+      const s = String(v).trim();
+      if (s.length >= 4) return s;
+    }
+    return "";
+  }
+  function unitOf(row) {
+    if (row && row.__unit) return row.__unit;
+    const t = trackingOf(row);
+    return t ? "tid:" + t.toLowerCase() : "row:" + ((row && row.id) || Math.random());
+  }
+  function countShipments(rows) {
+    const seen = new Set();
+    for (const r of rows) seen.add(unitOf(r));
+    return seen.size;
+  }
+  // Counts shipments by a key function, remembering the first spelling of each name.
   function countBy(rows, keyFn, nameFn) {
     const m = new Map();
     for (const r of rows) {
       const k = keyFn(r);
       if (!k) continue;
-      const cur = m.get(k) || { name: nameFn(r), n: 0 };
-      cur.n++;
+      const cur = m.get(k) || { name: nameFn(r), n: 0, units: new Set() };
+      const u = unitOf(r);
+      if (!cur.units.has(u)) { cur.units.add(u); cur.n++; }
       m.set(k, cur);
     }
     return m;
@@ -560,11 +584,11 @@
     const sel = $("#courierSel");
     const counts = new Map();
     for (const r of rows) {
-      const name = courierOf(r);
-      if (!name) continue;
+      const name = courierOf(r) || "Unknown courier";
       const k = normCourier(name);
-      const cur = counts.get(k) || { name, n: 0 };
-      cur.n++;
+      const cur = counts.get(k) || { name, n: 0, units: new Set() };
+      const u = unitOf(r);
+      if (!cur.units.has(u)) { cur.units.add(u); cur.n++; }
       counts.set(k, cur);
     }
     if (counts.size === 0) return;          // nothing to go on — leave the guess
@@ -712,7 +736,7 @@
         btn.disabled = false; btn.textContent = "Load orders →";
         return;
       }
-      $("#loadInfo").textContent = `Loaded ${state.orders.length} orders (${state.barcodeIndex.size} scannable).`
+      $("#loadInfo").textContent = `Loaded ${countShipments(state.orders)} shipments (${state.orders.length} rows, ${state.barcodeIndex.size} barcodes).`
         + (joined.note ? " " + joined.note : "");
       $("#scanArea").style.display = "block";
       refreshCounters();
@@ -993,10 +1017,9 @@
   // prefix can't shadow a four-letter one.
   function courierOf(row) {
     const rd = (row && row.raw_data) || {};
-    const named = String(rd["Courier"] || rd["Courier Partner"] || "").trim();
+    const named = String(rd["Courier"] || rd["Courier Partner"] || rd["carrier"] || rd["Carrier"] || rd["Courier Code"] || rd["courier code"] || "").trim();
     if (named) return named;
-    const tid = String(rd["Tracking ID"] || rd["Tracking Id"] || rd["AWB No"] || rd["AWB"]
-                    || rd["Waybill"] || rd["Tracking Number"] || "").toUpperCase();
+    const tid = trackingOf(row).toUpperCase();
     if (!tid) return "";
     const list = COURIERS_BY_PLATFORM[String((row && row.platform) || "").toLowerCase()] || [];
     let best = "", bestLen = 0;
