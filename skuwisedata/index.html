@@ -305,12 +305,12 @@
 </div>
 
 <div class="tabs" id="mainTabs">
-  <div class="tab active" data-view="sku_master">SKU Master</div>
-  <div class="tab" data-view="orders">Orders</div>
-  <div class="tab" data-view="returns">Returns</div>
-  <div class="tab" data-view="payments">Payments</div>
-  <div class="tab" data-view="stock">Stock</div>
-  <div class="tab" data-view="uploads">Uploads</div>
+  <div class="tab active" data-view="sku_master" data-perm="skuwise.sku_master">SKU Master</div>
+  <div class="tab" data-view="orders" data-perm="skuwise.orders">Orders</div>
+  <div class="tab" data-view="returns" data-perm="skuwise.returns">Returns</div>
+  <div class="tab" data-view="payments" data-perm="skuwise.payments">Payments</div>
+  <div class="tab" data-view="stock" data-perm="skuwise.stock">Stock</div>
+  <div class="tab" data-view="uploads" data-perm="skuwise.uploads">Uploads</div>
 </div>
 
 <!-- Data view (orders/returns/payments/stock/sku_master) -->
@@ -411,6 +411,7 @@
   </div>
 </div>
 
+<script src="/analyst-access.js?v=1"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -464,13 +465,15 @@
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { location.href = "/home/?return=%2Fskuwisedata%2F"; return; }
     state.session = session;
-    $("#emailChip").textContent = session.user.email;
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: rows } = await sb.from("analytics_wallet_transactions")
-      .select("id").eq("user_id", session.user.id)
-      .eq("type", "debit_service").eq("service_tag", "analyst")
-      .gte("created_at", since).limit(1);
-    if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
+    try { await CA.load(sb); } catch (e) { alert("Could not check access: " + (e.message || e)); return; }
+    state.uid = CA.ownerId();
+    $("#emailChip").textContent = CA.who();
+    if (!CA.access.active) { $("#locker").classList.add("show"); return; }
+    if (!CA.anyOn("skuwise")) { alert("You do not have access to SKU Wise Data. Ask the account owner."); location.href = "/analyst/"; return; }
+    CA.apply();
+    // start on the first tab the employee may see
+    const firstTab = [...document.querySelectorAll(".tab[data-view]")].find(t => t.style.display !== "none");
+    if (firstTab && !firstTab.classList.contains("active")) { document.querySelectorAll(".tab[data-view]").forEach(t => t.classList.toggle("active", t === firstTab)); state.view = firstTab.dataset.view; }
     await loadCompanies();
     restoreFilters();
     startScrapeBar();
@@ -537,7 +540,7 @@
       state.platformSellers = new Map((ps || []).map(x => [psKey(x.company_name, x.platform), x.seller_name]));
     } catch (e) { console.warn("platform seller names:", e); }
     const { data, error } = await sb.from("seller_companies")
-      .select("name").eq("user_id", state.session.user.id).order("name");
+      .select("name").eq("user_id", state.uid).order("name");
     if (error) { console.warn(error); return; }
     state.companies = (data || []).map(x => x.name);
     const row = $("#companyRow");
@@ -676,7 +679,7 @@
     const all = [];
     for (let from = 0; from < CAP; from += PAGE) {
       let q = sb.from("seller_orders").select("*")
-        .eq("user_id", state.session.user.id)
+        .eq("user_id", state.uid)
         .eq("platform", "meesho")
         .order("order_date", { ascending: false, nullsFirst: false })
         .range(from, from + PAGE - 1);
@@ -692,7 +695,7 @@
     // way in so everything below still recognises them the same way.
     for (let from = 0; from < CAP; from += PAGE) {
       let mq = sb.from("seller_manifest").select("*")
-        .eq("user_id", state.session.user.id)
+        .eq("user_id", state.uid)
         .eq("platform", "meesho")
         .order("order_date", { ascending: false, nullsFirst: false })
         .range(from, from + PAGE - 1);
@@ -814,7 +817,7 @@
     // the real number instead of the size of the page.
     if (state.view === "sku_master" && (ss || state.search)) {
       let cq = sb.from("seller_sku_master").select("id", { count: "exact", head: true })
-        .eq("user_id", state.session.user.id);
+        .eq("user_id", state.uid);
       if (state.platform) cq = cq.eq("platform", state.platform);
       if (state.company)  cq = cq.eq("company_name", state.company);
       const { count: real } = await cq;
@@ -955,7 +958,7 @@
   // now two queries that run at the same time; together they take under 100ms.
   function fetchRowPage(table, dateCol, from) {
     let q = sb.from(table).select("*")
-      .eq("user_id", state.session.user.id)
+      .eq("user_id", state.uid)
       .order(dateCol, { ascending: false, nullsFirst: false })
       .range(from, from + state.pageSize - 1);
     // These apply to the SKU Master view too — the chips at the top of the page
@@ -968,7 +971,7 @@
   // Head-only count over a single indexed column: an index-only scan, ~35ms.
   function fetchRowCount(table) {
     let q = sb.from(table).select("id", { count: "exact", head: true })
-      .eq("user_id", state.session.user.id);
+      .eq("user_id", state.uid);
     if (state.platform) q = q.eq("platform", state.platform);
     if (state.company)  q = q.eq("company_name", state.company);
     return q;
@@ -3068,7 +3071,7 @@
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await sb.from("seller_sku_master")
           .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at")
-          .eq("user_id", state.session.user.id)
+          .eq("user_id", state.uid)
           .order("master_sku", { ascending: true })
           .range(from, from + PAGE - 1);
         if (error) { setStatus("Download error: " + error.message, true); return; }
@@ -3137,7 +3140,7 @@
 
       // Build long-format upsert rows
       const outRows = [];
-      const uid = state.session.user.id;
+      const uid = state.uid;
       for (const r of rows) {
         const master = String(r[idx.master] || "").trim();
         if (!master) continue;
@@ -3233,7 +3236,7 @@
     if (!state.session) return;
     const { data, error } = await sb.from("seller_sku_master")
       .select("updated_at,source_file")
-      .eq("user_id", state.session.user.id)
+      .eq("user_id", state.uid)
       .order("updated_at", { ascending: false })
       .limit(1);
     const el = $("#masterFileStamp");
