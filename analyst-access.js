@@ -73,14 +73,9 @@
   function levelOf(key) {
     if (!access) return "";
     if (access.is_owner) return "edit";
+    // Exact key only — an option the owner never ticked is "none" (same rule as has_perm in the database)
     const perms = access.perms || {};
-    let k = key;
-    for (;;) {
-      if (perms[k] !== undefined && perms[k] !== null) return perms[k];   // "" = explicitly none (same rule as has_perm in the database)
-      const i = k.lastIndexOf(".");
-      if (i < 0) return "";
-      k = k.slice(0, i);
-    }
+    return perms[key] || "";
   }
   function can(key, level) {
     if (!access) return false;
