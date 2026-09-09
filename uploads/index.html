@@ -186,7 +186,7 @@
 
 <div class="top-actions">
   <button class="btn primary" id="openCompaniesBtn" data-perm="uploads.companies">&#127970; Companies <span id="companiesCount" style="font-weight:600; opacity:.8;"></span></button>
-  <button class="btn" id="openSkuWiseBtn" data-perm="uploads.skuwise" style="display:none;">&#128202; SKU Wise Data</button>
+  <button class="btn" id="openSkuWiseBtn" data-perm-page="skuwise" style="display:none;">&#128202; SKU Wise Data</button>
   <button class="btn" id="openEmployeesBtn" data-owner-only>&#128101; Employees</button>
   <button class="btn" id="openChecklistBtn" data-perm="uploads.checklist" style="margin-left:auto;">&#9989; Today's checklist <span id="checklistCount" style="font-weight:600; opacity:.8;"></span></button>
 </div>
@@ -661,7 +661,7 @@
   })();
 </script>
 
-<script src="/analyst-access.js?v=4"></script>
+<script src="/analyst-access.js?v=5"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
