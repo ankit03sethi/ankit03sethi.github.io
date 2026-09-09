@@ -483,11 +483,24 @@
     }
 
     const multi = shipments.filter(r => r.__extraKeys).length;
+    // A manifest only lists what had a label when it was downloaded. Ready-to-ship
+    // orders that are not on any manifest yet still have to be packed, so they are
+    // kept as their own shipments (scannable by Sub Order No) instead of vanishing.
+    const onManifest = new Set(manifest.map(subOf).filter(Boolean));
+    const extra = [];
+    for (const r of meesho) {
+      if (isManifest(r)) continue;
+      const k = subOf(r);
+      if (!k || onManifest.has(k)) continue;
+      onManifest.add(k);
+      extra.push({ ...r, __unit: "sub:" + k, __noManifest: true });
+    }
     return {
-      rows: rows.filter(r => !isMeesho(r)).concat(shipments),
+      rows: rows.filter(r => !isMeesho(r)).concat(shipments, extra),
       note: `Meesho: ${shipments.length} shipments from ${merged.length} manifest rows`
             + (multi ? ` (${multi} multi-order)` : "")
-            + `, ${enriched} matched to the orders CSV.`,
+            + `, ${enriched} matched to the orders CSV`
+            + (extra.length ? `, ${extra.length} ready-to-ship orders not on a manifest yet.` : "."),
     };
   }
 
