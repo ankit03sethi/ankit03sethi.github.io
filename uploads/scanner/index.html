@@ -492,6 +492,9 @@
       if (isManifest(r)) continue;
       const k = subOf(r);
       if (!k || onManifest.has(k)) continue;
+      // only orders that already have a label (READY_TO_SHIP); PENDING / HOLD cannot be packed yet
+      const st = String((r.raw_data || {})["Reason for Credit Entry"] || r.o_status || "").toUpperCase();
+      if (st && !/READY/.test(st)) continue;
       onManifest.add(k);
       extra.push({ ...r, __unit: "sub:" + k, __noManifest: true });
     }
