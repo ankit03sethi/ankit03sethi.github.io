@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09c</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09d</span></div>
     </div>
   </a>
   </div>
@@ -468,7 +468,7 @@
         <div class="up-actions">
           <button class="up-btn" id="masterSampleBtn" title="Download a blank template with dropdowns">&#11015; Sample Template</button>
           <button class="up-btn primary" id="masterUploadBtn">&#8593; Upload</button>
-          <button class="up-btn" id="masterDownloadBtn" title="Download all current SKU mappings">&#11015; Download</button>
+          <button class="up-btn" id="masterDownloadBtn" data-perm="uploads.master" title="Download all current SKU mappings">&#11015; Download</button>
           <button class="up-btn" id="masterReportBtn" title="Download report of skipped &amp; duplicate rows from the last upload" disabled>&#11015; Report</button>
         </div>
       </div>
@@ -690,9 +690,16 @@
     if (!CA.access.active) { $("#locker").classList.add("show"); return; }
     if (!CA.anyOn("uploads")) { setStatus("You do not have access to Uploads. Ask the account owner.", true); $("#uploadsPanel").style.display = "none"; document.querySelector(".top-actions").style.display = "none"; return; }
     CA.apply();
-    if (!(CA.can("uploads.master.replace", "edit") || CA.can("uploads.master.append", "edit"))) { const b = $("#masterUploadBtn"); b.disabled = true; b.style.opacity = ".45"; b.title = "View only"; }
+    // Master SKU: 1 download (view) · 2 upload · 3 delete old · 4 edit old · 5 add new
+    if (!CA.can("uploads.master.upload", "edit") || !(CA.can("uploads.master.replace", "edit") || CA.can("uploads.master.update", "edit") || CA.can("uploads.master.append", "edit"))) {
+      const b = $("#masterUploadBtn"); b.disabled = true; b.style.opacity = ".45"; b.title = "No upload permission";
+    }
     if (!CA.can("uploads.master.replace", "edit")) $("#skuModeReplace").style.display = "none";
-    if (!CA.can("uploads.master.append", "edit")) $("#skuModeMerge").style.display = "none";
+    if (!(CA.can("uploads.master.update", "edit") || CA.can("uploads.master.append", "edit"))) $("#skuModeMerge").style.display = "none";
+    else if (!CA.access.is_owner) {
+      const u = CA.can("uploads.master.update", "edit"), a = CA.can("uploads.master.append", "edit");
+      $("#skuModeMerge .up-name").textContent = u && a ? "Only add new data (update edited rows)" : u ? "Update edited rows only (no new rows)" : "Add new rows only (existing rows untouched)";
+    }
     if (!CA.access.is_owner && CA.access.companies && CA.access.companies.length) { const b = $("#companiesSaveBtn"); b.disabled = true; b.title = "Only the account owner can change companies when your access is limited to some companies"; }
     await refreshMasterStamp();
     await refreshWarehouseStamp();
@@ -2337,6 +2344,24 @@
     // For replace mode, everything is effectively "new" after wipe
     if (mode === "replace") { edited = 0; added = rows.length; }
 
+    // Employee permissions: 4 = edit old rows, 5 = add new rows. Rows the person may not touch are dropped here
+    // (the database refuses them anyway).
+    let rowsToSave = rows, notAllowedEdit = 0, notAllowedNew = 0;
+    const mayUpdate = window.CA ? CA.can("uploads.master.update", "edit") : true;
+    const mayAppend = window.CA ? CA.can("uploads.master.append", "edit") : true;
+    if (mode === "merge" && (!mayUpdate || !mayAppend)) {
+      rowsToSave = rows.filter(r => {
+        const k = (r.company_name || "") + "|" + r.platform + "|" + normSkuLocal(r.seller_sku) + "|" + (r.asin || "");
+        const exists = existingKeys.has(k);
+        if (exists && !mayUpdate) { notAllowedEdit++; return false; }
+        if (!exists && !mayAppend) { notAllowedNew++; return false; }
+        return true;
+      });
+      if (!mayUpdate) edited = 0;
+      if (!mayAppend) added = 0;
+      if (!rowsToSave.length) { setStatus(`Nothing saved: ${notAllowedEdit ? notAllowedEdit + " existing rows (no edit permission)" : ""}${notAllowedEdit && notAllowedNew ? ", " : ""}${notAllowedNew ? notAllowedNew + " new rows (no add permission)" : ""}.`, true); return; }
+    }
+
     if (mode === "replace") {
       setStatus(`Removing old rows before saving ${rows.length} new mappings …`, false);
       const delRes = await sb.from("seller_sku_master").delete().eq("user_id", uid);
@@ -2346,16 +2371,16 @@
     const CHUNK = 75;
     let done = 0, failed = 0;
     const nowIso = new Date().toISOString();
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const slice = rows.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: nowIso }));
+    for (let i = 0; i < rowsToSave.length; i += CHUNK) {
+      const slice = rowsToSave.slice(i, i + CHUNK).map(x => ({ ...x, updated_at: nowIso }));
       try {
         let res;
         if (mode === "replace") {
           res = await sb.from("seller_sku_master").insert(slice);
         } else {
-          // merge: upsert on composite key — updates existing, inserts new
+          // merge: upsert on composite key — updates existing, inserts new (add-only users never touch existing rows)
           res = await sb.from("seller_sku_master")
-            .upsert(slice, { onConflict: "user_id,company_name,platform,seller_sku_norm,asin" });
+            .upsert(slice, { onConflict: "user_id,company_name,platform,seller_sku_norm,asin", ignoreDuplicates: !mayUpdate });
         }
         if (res.error) {
           failed += slice.length;
@@ -2368,18 +2393,19 @@
         failed += slice.length;
         console.warn("network error", netErr);
       }
-      setStatus(`Uploading ${done}/${rows.length} (file total ${totalRaw} rows)${failed ? " · " + failed + " failed" : ""}`, false);
+      setStatus(`Uploading ${done}/${rowsToSave.length} (file total ${totalRaw} rows)${failed ? " · " + failed + " failed" : ""}`, false);
     }
+    if (notAllowedEdit || notAllowedNew) setStatus(`Skipped by permission: ${notAllowedEdit ? notAllowedEdit + " existing rows" : ""}${notAllowedEdit && notAllowedNew ? ", " : ""}${notAllowedNew ? notAllowedNew + " new rows" : ""}.`, false);
     const total = totalRaw;
     const verb = mode === "replace" ? "Replaced" : "Merged";
     // Cap edited/added by actually-successful rows so the sub-numbers stay consistent when there are failures.
-    const doneRatio = rows.length ? (done / rows.length) : 0;
+    const doneRatio = rowsToSave.length ? (done / rowsToSave.length) : 0;
     const editedDone = Math.round(edited * doneRatio);
     const addedDone  = Math.round(added  * doneRatio);
     const dupeRows = window._skuStagedDupeRows || [];
     const skippedRowList = window._skuStagedSkippedRows || [];
     const msg = failed
-      ? `⚠ ${verb} ${done}/${rows.length} (${failed} failed) · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)`
+      ? `⚠ ${verb} ${done}/${rowsToSave.length} (${failed} failed) · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)`
       : `✅ ${verb} from ${fName} · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates removed + ${skippedNoMaster} skipped(no master SKU)`;
     setStatus(msg, failed > 0);
     // Stash dupe/skipped rows so the Report button can build the XLSX on demand
