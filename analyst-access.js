@@ -56,6 +56,16 @@
 
   let access = null;
 
+  // Until we know who is signed in, keep every permission-gated element invisible so an
+  // employee never sees tabs flash and then vanish.
+  try {
+    const st = document.createElement("style");
+    st.textContent = "html.ca-pending [data-perm], html.ca-pending [data-perm-page], html.ca-pending [data-owner-only] { visibility: hidden !important; }";
+    (document.head || document.documentElement).appendChild(st);
+    document.documentElement.classList.add("ca-pending");
+  } catch (e) { /* ignore */ }
+  const reveal = () => document.documentElement.classList.remove("ca-pending");
+
   function levelOf(key) {
     if (!access) return "";
     if (access.is_owner) return "edit";
@@ -91,6 +101,7 @@
     if (error) throw error;
     access = data || {};
     window.CA_ACCESS = access;
+    if (access.is_owner) reveal();      // owners see everything; employees are revealed by apply()
     return access;
   }
 
@@ -109,6 +120,7 @@
       }
     });
     if (access && !access.is_owner) root.querySelectorAll("[data-owner-only]").forEach(el => { el.style.display = "none"; });
+    reveal();
   }
 
   // Small badge text for headers: "Employee of owner@x.com"
