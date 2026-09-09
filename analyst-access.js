@@ -18,7 +18,6 @@
       { key: "uploads.warehouse",   label: "Warehouse stock file" },
       { key: "uploads.companies",   label: "Companies" },
       { key: "uploads.checklist",   label: "Today's checklist", levels: ["view"] },
-      { key: "uploads.skuwise",     label: "SKU wise data panel", levels: ["view"] },
     ]},
     { page: "master", label: "Master SKU file", items: [
       { key: "uploads.master",         label: "1 · Download", levels: ["view"] },
