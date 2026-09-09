@@ -102,6 +102,7 @@
     </div>
   </a>
   <div class="topbar-right">
+    <a id="employeesChip" href="/uploads/#employees" class="email-chip hidden" style="cursor:pointer;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;text-decoration:none;" title="Give your staff a login and choose what each may see or change">&#128101; Employees</a>
     <button id="cartChip" type="button" class="email-chip" style="cursor:pointer;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;opacity:0.75;" title="View cart">
       &#128722; Cart <span id="cartCount" style="background:#92400e;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;min-width:18px;text-align:center;">0</span>
     </button>
@@ -580,6 +581,7 @@ async function showHome(session) {
   try {
     const { data: acc } = await sb.rpc("my_access");
     if (acc && acc.is_owner === false) { location.href = "/analyst/"; return; }
+    if (acc && acc.is_owner) show($("#employeesChip"));
   } catch (_) { /* not an employee */ }
   hide($("#loginView")); show($("#homeView"));
   $("#emailChip").textContent = session.user.email;
