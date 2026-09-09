@@ -20,12 +20,12 @@
       { key: "uploads.checklist",   label: "Today's checklist", levels: ["view"] },
     ]},
     { page: "master", label: "Master SKU file", items: [
-      { key: "uploads.master.sample",  label: "0 · Sample template", levels: ["view"] },
-      { key: "uploads.master",         label: "1 · Download", levels: ["view"] },
-      { key: "uploads.master.upload",  label: "2 · Upload file", levels: ["edit"] },
-      { key: "uploads.master.replace", label: "3 · Delete old data (replace everything)", levels: ["edit"] },
-      { key: "uploads.master.update",  label: "4 · Edit old rows", levels: ["edit"] },
-      { key: "uploads.master.append",  label: "5 · Add new rows", levels: ["edit"] },
+      { key: "uploads.master.sample",  label: "1 · Download sample file (blank template)", levels: ["view"] },
+      { key: "uploads.master",         label: "2 · Download existing data", levels: ["view"] },
+      { key: "uploads.master.upload",  label: "3 · Upload file", levels: ["edit"] },
+      { key: "uploads.master.replace", label: "4 · Delete old data (replace everything)", levels: ["edit"] },
+      { key: "uploads.master.update",  label: "5 · Edit old rows", levels: ["edit"] },
+      { key: "uploads.master.append",  label: "6 · Add new rows", levels: ["edit"] },
     ]},
     { page: "scanner", label: "Scanner", items: [
       { key: "scanner", label: "Scanner (edit = can scan)" },
