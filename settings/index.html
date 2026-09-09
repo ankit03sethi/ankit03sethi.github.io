@@ -132,6 +132,7 @@
   </div>
 </main>
 
+<script src="/analyst-access.js?v=1"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -220,7 +221,15 @@
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { location.href = "/home/?return=%2Fsettings%2F"; return; }
-    document.getElementById("who").textContent = session.user.email || "";
+    let canEdit = true;
+    try {
+      await CA.load(sb);
+      document.getElementById("who").textContent = CA.who();
+      if (!CA.access.active) { say("Cursive Analyst subscription required.", "#b91c1c"); return; }
+      if (!CA.can("settings", "view")) { say("You do not have access to Settings. Ask the account owner.", "#b91c1c"); document.querySelector("main").style.display = "none"; return; }
+      canEdit = CA.can("settings", "edit");
+      if (!canEdit) { document.querySelectorAll("main input, main select, main button").forEach(el => { if (el !== saveBtn) el.disabled = true; }); }
+    } catch (e) { say("Could not check access: " + (e.message || e), "#b91c1c"); return; }
     try {
       const [{ data, error }, { data: opts, error: e2 }] = await Promise.all([sb.rpc("label_sort_config", {}), sb.rpc("label_sort_options", {})]);
       if (error) throw error;
@@ -230,7 +239,8 @@
       for (const k of Object.keys(chosen)) { chosen[k] = Array.isArray(only[k]) ? only[k].map(String) : []; renderChips(k); }
       say("");
     } catch (e) { say("Could not load: " + (e.message || e), "#b91c1c"); }
-    saveBtn.disabled = false;
+    saveBtn.disabled = !canEdit;
+    if (!canEdit) { saveBtn.title = "View only"; document.querySelectorAll("main input, main select, main button").forEach(el => { el.disabled = true; }); say("View only — ask the account owner for edit access.", "#b45309"); }
   })();
 
   saveBtn.addEventListener("click", async () => {
