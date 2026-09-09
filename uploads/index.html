@@ -172,21 +172,22 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09a</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09b</span></div>
     </div>
   </a>
   </div>
   <div class="topbar-right">
     <span class="email-chip" id="emailChip"></span>
-    <a class="btn-link" href="/analyst/">Install app</a>
+    <a class="btn-link" href="/analyst/" data-owner-only>Install app</a>
     <a class="btn-link" href="/home/">Home</a>
   </div>
 </header>
 
 <div class="top-actions">
-  <button class="btn primary" id="openCompaniesBtn">&#127970; Companies <span id="companiesCount" style="font-weight:600; opacity:.8;"></span></button>
-  <button class="btn" id="openSkuWiseBtn" style="display:none;">&#128202; SKU Wise Data</button>
-  <button class="btn" id="openChecklistBtn" style="margin-left:auto;">&#9989; Today's checklist <span id="checklistCount" style="font-weight:600; opacity:.8;"></span></button>
+  <button class="btn primary" id="openCompaniesBtn" data-perm="uploads.companies">&#127970; Companies <span id="companiesCount" style="font-weight:600; opacity:.8;"></span></button>
+  <button class="btn" id="openSkuWiseBtn" data-perm="uploads.skuwise" style="display:none;">&#128202; SKU Wise Data</button>
+  <button class="btn" id="openEmployeesBtn" data-owner-only>&#128101; Employees</button>
+  <button class="btn" id="openChecklistBtn" data-perm="uploads.checklist" style="margin-left:auto;">&#9989; Today's checklist <span id="checklistCount" style="font-weight:600; opacity:.8;"></span></button>
 </div>
 
 <!-- Today's upload checklist: every company / platform / file the app has read in the last 30 days.
@@ -218,6 +219,61 @@
     .ck-it .ck-t { font-size:11px; color:#16a34a; font-weight:700; }
     .ck-it:not(.done) .ck-t { color:#94a3b8; font-weight:500; }
     @media (max-width:640px) { .ck-row { grid-template-columns:1fr; } }
+  </style>
+</div>
+
+<!-- Employees: the account owner gives other people a login and ticks what each may see or change. -->
+<div class="panel" id="employeesPanel" style="display:none; margin-top:16px;">
+  <div class="panel-head">
+    <span>Employees <span id="empHead" style="font-weight:600; color:#64748b; margin-left:8px;"></span></span>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" id="empAddBtn" style="padding:4px 10px; font-size:12px;">+ Add employee</button>
+      <button class="btn" id="closeEmployeesBtn" style="padding:4px 10px; font-size:12px;">Close</button>
+    </div>
+  </div>
+  <div style="padding:6px 16px 14px;">
+    <p style="margin:6px 0 12px; color:#64748b; font-size:13px;">Each employee signs in at <b>cursive.world/home</b> with the email and password you set here and sees only what is ticked below. <b>View</b> = can see it, <b>Edit</b> = can upload / change it. Untick every company to allow all companies.</p>
+
+    <div id="empAddForm" style="display:none; border:1px solid #dbeafe; background:#eff6ff; border-radius:12px; padding:14px; margin-bottom:14px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px;">
+        <div><label class="emp-lbl">Name</label><input id="empName" type="text" placeholder="e.g. Ramesh" class="emp-in"></div>
+        <div><label class="emp-lbl">Email (their login)</label><input id="empEmail" type="email" placeholder="ramesh@example.com" class="emp-in" autocomplete="off"></div>
+        <div><label class="emp-lbl">Password (min 8)</label><input id="empPass" type="text" placeholder="they can change it later" class="emp-in" autocomplete="off"></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+        <button class="btn primary" id="empCreateBtn">Create login</button>
+        <button class="btn" id="empCancelAddBtn">Cancel</button>
+        <span id="empAddMsg" style="font-size:12px; color:#64748b;"></span>
+      </div>
+      <p style="margin:8px 0 0; font-size:12px; color:#64748b;">Permissions and companies are set on the employee's card after the login is created.</p>
+    </div>
+
+    <div id="empList"></div>
+  </div>
+  <style>
+    .emp-lbl { display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .emp-in { width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font:inherit; font-size:13px; box-sizing:border-box; }
+    .emp-card { border:1px solid #e5e7eb; border-radius:12px; margin-bottom:12px; background:#fff; }
+    .emp-card.disabled { opacity:.7; }
+    .emp-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; }
+    .emp-top b { font-size:14px; }
+    .emp-top .em { color:#64748b; font-size:12px; }
+    .emp-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#dcfce7; color:#166534; }
+    .emp-badge.off { background:#fee2e2; color:#991b1b; }
+    .emp-body { padding:12px 14px; display:none; }
+    .emp-card.open .emp-body { display:block; }
+    .emp-cos { display:flex; flex-wrap:wrap; gap:6px 10px; margin:6px 0 12px; }
+    .emp-cos label { font-size:12px; display:inline-flex; gap:5px; align-items:center; border:1px solid #e5e7eb; border-radius:999px; padding:3px 10px; background:#f8fafc; }
+    .emp-grid { width:100%; border-collapse:collapse; font-size:13px; }
+    .emp-grid th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; padding:6px 8px; border-bottom:1px solid #e5e7eb; }
+    .emp-grid td { padding:5px 8px; border-bottom:1px solid #f1f5f9; }
+    .emp-grid tr.grp td { background:#f8fafc; font-weight:800; font-size:12px; padding-top:9px; }
+    .emp-grid tr.grp .quick { font-weight:600; font-size:11px; color:#1f6feb; cursor:pointer; margin-left:10px; }
+    .emp-grid td.c { text-align:center; width:64px; }
+    .emp-grid input[type=radio], .emp-grid input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
+    .emp-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    .emp-actions .danger { color:#b91c1c; border-color:#fecaca; }
+    .emp-msg { font-size:12px; color:#64748b; }
   </style>
 </div>
 
@@ -281,7 +337,7 @@
   <div class="up-status" id="upStatus"></div>
   <div class="up-list">
 
-    <div class="up-item kind-row" data-kind="orders">
+    <div class="up-item kind-row" data-kind="orders" data-perm="uploads.orders">
       <div class="up-left">
         <div class="up-icon">&#128179;</div>
         <div>
@@ -295,12 +351,12 @@
           <div class="stamp none kind-stamp" data-kind="orders">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="orders">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="orders" data-perm-edit="uploads.orders">&#8593; Upload</button>
         </div>
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="manifest">
+    <div class="up-item kind-row" data-kind="manifest" data-perm="uploads.manifest">
       <div class="up-left">
         <div class="up-icon" style="background:#fce7f3; color:#ec4899;">&#128230;</div>
         <div>
@@ -314,12 +370,12 @@
           <div class="stamp none kind-stamp" data-kind="manifest">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="manifest">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="manifest" data-perm-edit="uploads.manifest">&#8593; Upload</button>
         </div>
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="orders_file">
+    <div class="up-item kind-row" data-kind="orders_file" data-perm="uploads.orders_file">
       <div class="up-left">
         <div class="up-icon" style="background:#e0e7ff; color:#4338ca;">&#128193;</div>
         <div>
@@ -333,12 +389,12 @@
           <div class="stamp none kind-stamp" data-kind="orders_file">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="orders_file">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="orders_file" data-perm-edit="uploads.orders_file">&#8593; Upload</button>
         </div>
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="returns">
+    <div class="up-item kind-row" data-kind="returns" data-perm="uploads.returns">
       <div class="up-left">
         <div class="up-icon" style="background:#fee2e2; color:#dc2626;">&#8618;</div>
         <div>
@@ -352,12 +408,12 @@
           <div class="stamp none kind-stamp" data-kind="returns">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="returns">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="returns" data-perm-edit="uploads.returns">&#8593; Upload</button>
         </div>
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="inventory">
+    <div class="up-item kind-row" data-kind="inventory" data-perm="uploads.inventory">
       <div class="up-left">
         <div class="up-icon" style="background:#ede9fe; color:#6d28d9;">&#128200;</div>
         <div>
@@ -371,12 +427,12 @@
           <div class="stamp none kind-stamp" data-kind="inventory">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="inventory">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="inventory" data-perm-edit="uploads.inventory">&#8593; Upload</button>
         </div>
       </div>
     </div>
 
-    <div class="up-item kind-row" data-kind="payments">
+    <div class="up-item kind-row" data-kind="payments" data-perm="uploads.payments">
       <div class="up-left">
         <div class="up-icon" style="background:#dcfce7; color:#166534;">&#128176;</div>
         <div>
@@ -390,13 +446,13 @@
           <div class="stamp none kind-stamp" data-kind="payments">Never</div>
         </div>
         <div class="up-actions">
-          <button class="up-btn primary kind-upload-btn" data-kind="payments">&#8593; Upload</button>
+          <button class="up-btn primary kind-upload-btn" data-kind="payments" data-perm-edit="uploads.payments">&#8593; Upload</button>
         </div>
       </div>
     </div>
     <input id="ordersFileInput" type="file" accept=".csv,.xlsx,.xls,.tsv,.txt,.zip" style="display:none;" />
 
-    <div class="up-item">
+    <div class="up-item" data-perm="uploads.master">
       <div class="up-left">
         <div class="up-icon">&#128193;</div>
         <div>
@@ -419,7 +475,7 @@
     </div>
     <input id="masterFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
 
-    <div class="up-item" id="warehouseRow">
+    <div class="up-item" id="warehouseRow" data-perm="uploads.warehouse">
       <div class="up-left">
         <div class="up-icon" style="background:#dcfce7; color:#166534;">&#127981;</div>
         <div>
@@ -434,7 +490,7 @@
         </div>
         <div class="up-actions">
           <button class="up-btn" id="warehouseTemplateBtn" title="A ready-made workbook with a worked example inside it">&#11015; Blank Template</button>
-          <button class="up-btn primary" id="warehouseUploadBtn">&#8593; Upload</button>
+          <button class="up-btn primary" id="warehouseUploadBtn" data-perm-edit="uploads.warehouse">&#8593; Upload</button>
           <button class="up-btn" id="warehouseDownloadBtn" title="Download the copy you last uploaded">&#11015; Download</button>
         </div>
       </div>
@@ -493,11 +549,11 @@
     <div class="modal-body">
       <p style="margin:0 0 12px; color:#64748b; font-size:13px;">Add each of your companies and tick the platforms it sells on. The Cursive Analyst desktop app will auto-create a folder for each company on your PC.</p>
       <div id="companiesList"></div>
-      <button class="co-add" id="companiesAddBtn">+ Add another company</button>
+      <button class="co-add" id="companiesAddBtn" data-perm-edit="uploads.companies">+ Add another company</button>
     </div>
     <div class="modal-foot">
       <button class="btn" id="companiesCancelBtn">Cancel</button>
-      <button class="btn primary" id="companiesSaveBtn">Save companies</button>
+      <button class="btn primary" id="companiesSaveBtn" data-perm-edit="uploads.companies">Save companies</button>
     </div>
   </div>
 </div>
@@ -604,14 +660,17 @@
   })();
 </script>
 
+<script src="/analyst-access.js?v=2"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
   const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
   const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+  window.__sb = sb;
 
   const $ = (s) => document.querySelector(s);
   let session = null;
+  let OWNER_ID = null;   // whose data this page works on: the owner for employees
 
   const PLATFORMS = ["amazon","flipkart","meesho","myntra","firstcry"];
   const PLAT_LABEL = { amazon:"Amazon", flipkart:"Flipkart", meesho:"Meesho", myntra:"Myntra", firstcry:"FirstCry" };
@@ -625,13 +684,16 @@
     const { data } = await sb.auth.getSession();
     if (!data.session) { location.href = "/home/?return=%2Fuploads%2F"; return; }
     session = data.session;
-    $("#emailChip").textContent = session.user.email;
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: rows } = await sb.from("analytics_wallet_transactions")
-      .select("id").eq("user_id", session.user.id)
-      .eq("type", "debit_service").eq("service_tag", "analyst")
-      .gte("created_at", since).limit(1);
-    if (!rows || rows.length === 0) { $("#locker").classList.add("show"); return; }
+    try { await CA.load(sb); } catch (e) { setStatus("Could not check access: " + (e.message || e), true); return; }
+    OWNER_ID = CA.ownerId();
+    $("#emailChip").textContent = CA.who();
+    if (!CA.access.active) { $("#locker").classList.add("show"); return; }
+    if (!CA.anyOn("uploads")) { setStatus("You do not have access to Uploads. Ask the account owner.", true); $("#uploadsPanel").style.display = "none"; document.querySelector(".top-actions").style.display = "none"; return; }
+    CA.apply();
+    if (!(CA.can("uploads.master.replace", "edit") || CA.can("uploads.master.append", "edit"))) { const b = $("#masterUploadBtn"); b.disabled = true; b.style.opacity = ".45"; b.title = "View only"; }
+    if (!CA.can("uploads.master.replace", "edit")) $("#skuModeReplace").style.display = "none";
+    if (!CA.can("uploads.master.append", "edit")) $("#skuModeMerge").style.display = "none";
+    if (!CA.access.is_owner && CA.access.companies && CA.access.companies.length) { const b = $("#companiesSaveBtn"); b.disabled = true; b.title = "Only the account owner can change companies when your access is limited to some companies"; }
     await refreshMasterStamp();
     await refreshWarehouseStamp();
     await loadCompanies();
@@ -641,7 +703,7 @@
   // ---- COMPANIES ----
   async function loadCompanies() {
     const { data, error } = await sb.from("seller_companies")
-      .select("id, name, platforms").eq("user_id", session.user.id).order("name");
+      .select("id, name, platforms").eq("user_id", OWNER_ID).order("name");
     if (error) { console.warn(error); return; }
     companies = (data || []).map(c => ({ id: c.id, name: c.name, platforms: c.platforms || [] }));
     $("#companiesCount").textContent = companies.length ? "(" + companies.length + ")" : "";
@@ -708,7 +770,7 @@
   });
   $("#companiesSaveBtn").addEventListener("click", async () => {
     const draft = (renderCompaniesList._draft || []).filter(c => (c.name || "").trim());
-    const uid = session.user.id;
+    const uid = OWNER_ID;
     // Wipe old and re-insert (simple + safe since we always work off draft)
     const { error: delErr } = await sb.from("seller_companies").delete().eq("user_id", uid);
     if (delErr) { alert("Save failed: " + delErr.message); return; }
@@ -1362,7 +1424,7 @@
     if (jobs.length === 0) return;
     const btn = $("#ordersSaveAllBtn");
     btn.disabled = true;
-    const uid = session.user.id;
+    const uid = OWNER_ID;
     let totalInserted = 0, totalDup = 0, filesDone = 0;
     const keys = jobs;   // kept for the progress line below
     for (const job of jobs) {
@@ -1624,7 +1686,7 @@
     try {
       const { data, error } = await sb.from("seller_sku_master")
         .select("updated_at, created_at")
-        .eq("user_id", session.user.id)
+        .eq("user_id", OWNER_ID)
         .order("updated_at", { ascending: false, nullsFirst: false })
         .limit(1);
       if (error) { el.textContent = "Never"; el.classList.add("none"); return; }
@@ -1667,7 +1729,7 @@
       if (!document.querySelector(`.kind-stamp[data-kind="${kind}"]`)) continue;
       let q = sb.from(cfg.table)
         .select("pushed_at, source_file, company_name, platform, raw_data")
-        .eq("user_id", session.user.id)
+        .eq("user_id", OWNER_ID)
         .order("pushed_at", { ascending: false })
         .limit(1);
       // If this kind has a tag, filter to only rows with that tag; otherwise exclude any tagged rows
@@ -1754,7 +1816,7 @@
   // lives so it is not stranded on whichever desk it was last edited on.
   const WH_BUCKET = "warehouse-files";
   const WH_NAME   = "warehouse-stock.xlsx";
-  const whPath = () => `${session.user.id}/${WH_NAME}`;
+  const whPath = () => `${OWNER_ID}/${WH_NAME}`;
 
   $("#warehouseTemplateBtn").addEventListener("click", () => {
     const a = document.createElement("a");
@@ -1772,7 +1834,7 @@
     if (!el || !session) return;
     try {
       const { data, error } = await sb.storage.from(WH_BUCKET)
-        .list(session.user.id, { search: WH_NAME });
+        .list(OWNER_ID, { search: WH_NAME });
       const hit = !error && (data || []).find(f => f.name === WH_NAME);
       if (!hit) { el.textContent = "Never"; el.classList.add("none"); el.classList.remove("today"); return; }
       const iso = hit.updated_at || hit.created_at;
@@ -1881,7 +1943,7 @@
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await sb.from("seller_sku_master")
           .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at, raw_data")
-          .eq("user_id", session.user.id)
+          .eq("user_id", OWNER_ID)
           .order("master_sku", { ascending: true })
           .range(from, from + PAGE - 1);
         if (error) { setStatus("Download error: " + error.message, true); return; }
@@ -1996,7 +2058,7 @@
       while (true) {
         const { data, error } = await sb.from("seller_sku_master")
           .select("master_sku, seller_sku, platform, company_name, brand, category, sub_category, color, product, hsn, asin, raw_data, created_at, updated_at")
-          .eq("user_id", session.user.id)
+          .eq("user_id", OWNER_ID)
           .order("master_sku", { ascending: true })
           .range(from, from + PAGE - 1);
         if (error) throw error;
@@ -2154,7 +2216,7 @@
         setStatus("No platform SKU columns found. Detected: " + headers.join(", "), true); return;
       }
       const outRows = [];
-      const uid = session.user.id;
+      const uid = OWNER_ID;
       let skippedNoMaster = 0;
       const skippedRows = [];  // rows that had no Master SKU — kept for the report
       // Preserve every cell as-is (empty ones kept) — the original file structure is stored intact
@@ -2442,6 +2504,154 @@
       el.style.color      = "#166534";
     }
   }
+</script>
+<script type="module">
+  // ---- Employees admin panel (owner only) ---------------------------------
+  (function () {
+    const sbE = window.__sb; if (!sbE) return;
+    const $ = (s) => document.querySelector(s);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const FN = "https://bttppihskbfmxwujyztj.supabase.co/functions/v1/analyst-member-admin";
+    let members = [], cosAll = [], openId = null;
+
+    async function callFn(body) {
+      const { data: { session } } = await sbE.auth.getSession();
+      const r = await fetch(FN, { method: "POST", headers: { "Content-Type": "application/json", apikey: "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ", Authorization: "Bearer " + session.access_token }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || ("HTTP " + r.status));
+      return j;
+    }
+    async function loadAll() {
+      const [{ data: m, error }, { data: c }] = await Promise.all([
+        sbE.from("analyst_members").select("*").order("created_at"),
+        sbE.from("seller_companies").select("name").order("name"),
+      ]);
+      if (error) { $("#empList").innerHTML = `<p style="color:#b91c1c;">${esc(error.message)}</p>`; return; }
+      members = m || []; cosAll = (c || []).map(x => x.name);
+      render();
+    }
+    const levelsOf = (it) => it.levels || ["view", "edit"];
+    function render() {
+      $("#empHead").textContent = members.length ? `(${members.length})` : "";
+      if (!members.length) { $("#empList").innerHTML = `<p style="color:#64748b; font-size:13px;">No employees yet. Click <b>+ Add employee</b>.</p>`; return; }
+      $("#empList").innerHTML = members.map(m => {
+        const perms = m.perms || {}; const cos = m.companies || [];
+        const rows = CA.CATALOG.map(g => {
+          const head = `<tr class="grp"><td colspan="4">${esc(g.label)}<span class="quick" data-quick="view" data-page="${g.page}">all view</span><span class="quick" data-quick="edit" data-page="${g.page}">all edit</span><span class="quick" data-quick="none" data-page="${g.page}">none</span></td></tr>`;
+          const items = g.items.map(it => {
+            const lv = levelsOf(it); const cur = perms[it.key] || "";
+            const cell = (level) => lv.includes(level)
+              ? `<td class="c"><input type="radio" name="p_${m.id}_${it.key}" value="${level}" data-key="${it.key}" ${cur === level ? "checked" : ""}></td>`
+              : `<td class="c" style="color:#cbd5e1;">—</td>`;
+            return `<tr><td>${esc(it.label)}</td><td class="c"><input type="radio" name="p_${m.id}_${it.key}" value="" data-key="${it.key}" ${cur === "" ? "checked" : ""}></td>${cell("view")}${cell("edit")}</tr>`;
+          }).join("");
+          return head + items;
+        }).join("");
+        return `<div class="emp-card ${m.status !== "active" ? "disabled" : ""} ${openId === m.id ? "open" : ""}" data-id="${m.id}">
+          <div class="emp-top" data-toggle="${m.id}">
+            <b>${esc(m.name || m.email)}</b><span class="em">${esc(m.email)}</span>
+            <span class="emp-badge ${m.status === "active" ? "" : "off"}">${m.status === "active" ? "active" : "disabled"}</span>
+            <span class="em" style="margin-left:auto;">${cos.length ? "Companies: " + esc(cos.join(", ")) : "All companies"} · ${Object.values(perms).filter(v => v === "edit").length} edit / ${Object.values(perms).filter(v => v === "view").length} view</span>
+          </div>
+          <div class="emp-body">
+            <div class="emp-lbl">Companies this employee may see (none ticked = all)</div>
+            <div class="emp-cos">${cosAll.map(n => `<label><input type="checkbox" data-co="${esc(n)}" ${cos.includes(n) ? "checked" : ""}>${esc(n)}</label>`).join("") || "<span style='color:#94a3b8; font-size:12px;'>No companies added yet.</span>"}</div>
+            <table class="emp-grid"><thead><tr><th>What</th><th class="c">None</th><th class="c">View</th><th class="c">Edit</th></tr></thead><tbody>${rows}</tbody></table>
+            <div class="emp-actions">
+              <button class="btn primary" data-save="${m.id}">Save permissions</button>
+              <button class="btn" data-toggle-status="${m.id}">${m.status === "active" ? "Disable login" : "Enable login"}</button>
+              <button class="btn" data-pass="${m.id}">Set new password</button>
+              <button class="btn danger" data-remove="${m.id}">Remove employee</button>
+              <span class="emp-msg" data-msg="${m.id}"></span>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+    }
+    function collect(card) {
+      const perms = {};
+      card.querySelectorAll("input[type=radio][data-key]:checked").forEach(r => { perms[r.dataset.key] = r.value; });
+      // page-level summary so the database can answer "any access to Uploads?" quickly
+      for (const g of CA.CATALOG) {
+        const vals = g.items.map(it => perms[it.key] || "");
+        perms[g.page] = vals.includes("edit") ? "edit" : vals.includes("view") ? "view" : "";
+      }
+      const companies = [...card.querySelectorAll("input[type=checkbox][data-co]:checked")].map(c => c.dataset.co);
+      return { perms, companies: companies.length ? companies : null };
+    }
+    const msg = (id, t, c) => { const el = document.querySelector(`[data-msg="${id}"]`); if (el) { el.textContent = t; el.style.color = c || "#64748b"; } };
+
+    $("#empList").addEventListener("click", async (e) => {
+      const t = e.target;
+      const top = t.closest("[data-toggle]");
+      if (top && !t.closest("button")) { const id = Number(top.dataset.toggle); openId = openId === id ? null : id; render(); return; }
+      const q = t.closest(".quick");
+      if (q) {
+        const card = t.closest(".emp-card"); const page = q.dataset.page; const mode = q.dataset.quick;
+        const g = CA.CATALOG.find(x => x.page === page);
+        for (const it of g.items) {
+          const lv = levelsOf(it);
+          const want = mode === "none" ? "" : lv.includes(mode) ? mode : lv[lv.length - 1];
+          const r = card.querySelector(`input[type=radio][data-key="${it.key}"][value="${want}"]`); if (r) r.checked = true;
+        }
+        return;
+      }
+      const card = t.closest(".emp-card"); if (!card) return;
+      const id = Number(card.dataset.id);
+      if (t.dataset.save) {
+        const { perms, companies } = collect(card);
+        msg(id, "Saving…");
+        const { error } = await sbE.from("analyst_members").update({ perms, companies }).eq("id", id);
+        if (error) { msg(id, "Could not save: " + error.message, "#b91c1c"); return; }
+        msg(id, "Saved — takes effect on the employee's next page load.", "#16a34a");
+        const m = members.find(x => x.id === id); if (m) { m.perms = perms; m.companies = companies; }
+        card.querySelector(".emp-top .em:last-child").textContent = `${companies ? "Companies: " + companies.join(", ") : "All companies"} · ${Object.values(perms).filter(v => v === "edit").length} edit / ${Object.values(perms).filter(v => v === "view").length} view`;
+      } else if (t.dataset.toggleStatus) {
+        const m = members.find(x => x.id === id); const next = m.status === "active" ? "disabled" : "active";
+        const { error } = await sbE.from("analyst_members").update({ status: next }).eq("id", id);
+        if (error) { msg(id, error.message, "#b91c1c"); return; }
+        m.status = next; render();
+      } else if (t.dataset.pass) {
+        const p = prompt("New password for this employee (at least 8 characters):"); if (!p) return;
+        msg(id, "Updating…");
+        try { await callFn({ action: "password", id, password: p }); msg(id, "Password changed.", "#16a34a"); }
+        catch (err) { msg(id, err.message, "#b91c1c"); }
+      } else if (t.dataset.remove) {
+        const m = members.find(x => x.id === id);
+        if (!confirm(`Remove ${m.name || m.email}? Their login will stop working.`)) return;
+        msg(id, "Removing…");
+        try { await callFn({ action: "delete", id }); openId = null; await loadAll(); }
+        catch (err) { msg(id, err.message, "#b91c1c"); }
+      }
+    });
+
+    $("#empAddBtn").addEventListener("click", () => { $("#empAddForm").style.display = ""; $("#empName").focus(); });
+    $("#empCancelAddBtn").addEventListener("click", () => { $("#empAddForm").style.display = "none"; });
+    $("#empCreateBtn").addEventListener("click", async () => {
+      const name = $("#empName").value.trim(), email = $("#empEmail").value.trim(), password = $("#empPass").value;
+      const say = (t, c) => { $("#empAddMsg").textContent = t; $("#empAddMsg").style.color = c || "#64748b"; };
+      if (!email || password.length < 8) { say("Email and a password of at least 8 characters are needed.", "#b91c1c"); return; }
+      $("#empCreateBtn").disabled = true; say("Creating login…");
+      try {
+        const j = await callFn({ action: "create", name, email, password, perms: {}, companies: null });
+        say("Created. Now tick their permissions below and click Save.", "#16a34a");
+        $("#empName").value = ""; $("#empEmail").value = ""; $("#empPass").value = "";
+        openId = j.member ? j.member.id : null;
+        await loadAll();
+        $("#empAddForm").style.display = "none";
+      } catch (err) { say(err.message, "#b91c1c"); }
+      $("#empCreateBtn").disabled = false;
+    });
+
+    const openBtn = document.getElementById("openEmployeesBtn");
+    if (openBtn) openBtn.addEventListener("click", async () => {
+      ["uploadsPanel", "skuWisePanel", "checklistPanel"].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+      $("#employeesPanel").style.display = "";
+      $("#empList").innerHTML = "<p style='color:#64748b; font-size:13px;'>Loading…</p>";
+      await loadAll();
+    });
+    $("#closeEmployeesBtn").addEventListener("click", () => { $("#employeesPanel").style.display = "none"; const up = document.getElementById("uploadsPanel"); if (up) up.style.display = ""; });
+  })();
 </script>
 </body>
 </html>
