@@ -109,27 +109,28 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
   <div class="chips" id="platChips"></div>
   <div class="chips" id="coChips" style="margin-bottom:16px"></div>
 
-  <section class="section" id="secOrders">
+  <section class="section" id="secOrders" data-perm="reports.orders">
     <div class="section-head"><h2>Orders</h2><div class="rule"></div><span class="cnt" id="cntOrders"></span></div>
     <div id="wrapOrders"></div>
   </section>
 
-  <section class="section" id="secPayments">
+  <section class="section" id="secPayments" data-perm="reports.payments">
     <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
     <div id="wrapPayments"></div>
   </section>
 
-  <section class="section" id="secReturns">
+  <section class="section" id="secReturns" data-perm="reports.returns">
     <div class="section-head"><h2>Returns</h2><div class="rule"></div><span class="cnt" id="cntReturns"></span></div>
     <div id="wrapReturns"></div>
   </section>
 
-  <section class="section missings" id="secMissings">
+  <section class="section missings" id="secMissings" data-perm="reports.missings">
     <div class="section-head"><h2>Missings</h2><div class="rule"></div><span class="cnt" id="cntMissings"></span></div>
     <div id="wrapMissings"></div>
   </section>
 </main>
 
+<script src="/analyst-access.js?v=1"></script>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -341,6 +342,10 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
 (async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { location.href = "/home/?return=%2Freports%2F"; return; }
+  try { await CA.load(sb); } catch (e) { $("#status").textContent = "Could not check access: " + (e.message || e); return; }
+  if (!CA.access.active) { $("#status").textContent = "Cursive Analyst subscription required."; return; }
+  if (!CA.anyOn("reports")) { $("#status").textContent = "You do not have access to Reports. Ask the account owner."; document.querySelectorAll("main .section").forEach(s => s.style.display = "none"); return; }
+  CA.apply();
   buildCards();
   $("#gc").style.display = "flex";
   $("#refresh").addEventListener("click", () => load(true));
