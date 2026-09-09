@@ -67,8 +67,11 @@
     }
   }
   function can(key, level) {
+    if (!access) return false;
+    if (access.is_owner) return true;
+    // edit must be ticked on the exact item; a page-level setting only grants view (same rule as has_perm in the database)
+    if (level === "edit") return (access.perms || {})[key] === "edit";
     const l = levelOf(key);
-    if (level === "edit") return l === "edit";
     return l === "view" || l === "edit";
   }
   // Does the employee have any access at all on a page?
