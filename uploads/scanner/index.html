@@ -486,24 +486,24 @@
     // A manifest only lists what had a label when it was downloaded. Ready-to-ship
     // orders that are not on any manifest yet still have to be packed, so they are
     // kept as their own shipments (scannable by Sub Order No) instead of vanishing.
+    // Only what is on a manifest is scanned. Ready-to-ship orders that are not on
+    // any manifest yet are counted so the packer knows they exist, but not listed.
     const onManifest = new Set(manifest.map(subOf).filter(Boolean));
-    const extra = [];
+    let notOnManifest = 0;
     for (const r of meesho) {
       if (isManifest(r)) continue;
       const k = subOf(r);
       if (!k || onManifest.has(k)) continue;
-      // only orders that already have a label (READY_TO_SHIP); PENDING / HOLD cannot be packed yet
       const st = String((r.raw_data || {})["Reason for Credit Entry"] || r.o_status || "").toUpperCase();
       if (st && !/READY/.test(st)) continue;
-      onManifest.add(k);
-      extra.push({ ...r, __unit: "sub:" + k, __noManifest: true });
+      onManifest.add(k); notOnManifest++;
     }
     return {
-      rows: rows.filter(r => !isMeesho(r)).concat(shipments, extra),
+      rows: rows.filter(r => !isMeesho(r)).concat(shipments),
       note: `Meesho: ${shipments.length} shipments from ${merged.length} manifest rows`
             + (multi ? ` (${multi} multi-order)` : "")
             + `, ${enriched} matched to the orders CSV`
-            + (extra.length ? `, ${extra.length} ready-to-ship orders not on a manifest yet.` : "."),
+            + (notOnManifest ? `; ${notOnManifest} ready-to-ship orders are not on any manifest yet (not listed).` : "."),
     };
   }
 
