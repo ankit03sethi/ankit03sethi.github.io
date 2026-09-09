@@ -43,6 +43,7 @@
       { key: "skuwise.returns",  label: "Returns",  levels: ["view"] },
       { key: "skuwise.payments", label: "Payments", levels: ["view"] },
       { key: "skuwise.stock",    label: "Stock" },
+      { key: "skuwise.financial", label: "Financial data (cost, margin, revenue, settlement, profit columns; Payments tab)", levels: ["view"] },
       { key: "skuwise.uploads",  label: "Uploads tab", levels: ["view"] },
     ]},
     { page: "settings", label: "Settings", items: [
