@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09i</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09j</span></div>
     </div>
   </a>
   </div>
@@ -661,7 +661,7 @@
   })();
 </script>
 
-<script src="/analyst-access.js?v=7"></script>
+<script src="/analyst-access.js?v=9"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -2019,6 +2019,19 @@
     if (!rep) { alert("No upload report available yet. Upload a Master SKU file first."); return; }
     try {
       const wb = XLSX.utils.book_new();
+      if (rep.summary) {
+        const s = rep.summary;
+        const ws0 = XLSX.utils.aoa_to_sheet([["Upload summary", rep.fileName || ""], [], ["Rows in file", s.total], ["Added", s.added], ["Updated", s.updated], ["Duplicates removed", s.duplicates], ["No Master SKU (skipped)", s.noMaster], ["Failed (database refused)", s.failed], ["Not allowed (permission)", s.notAllowed]]);
+        XLSX.utils.book_append_sheet(wb, ws0, "Summary");
+      }
+      if (rep.failedRows && rep.failedRows.length) {
+        const ws = XLSX.utils.json_to_sheet(rep.failedRows);
+        XLSX.utils.book_append_sheet(wb, ws, "Failed rows");
+      }
+      if (rep.permSkippedRows && rep.permSkippedRows.length) {
+        const ws = XLSX.utils.json_to_sheet(rep.permSkippedRows);
+        XLSX.utils.book_append_sheet(wb, ws, "Not allowed");
+      }
       if (rep.dupeRows && rep.dupeRows.length) {
         const ws = XLSX.utils.json_to_sheet(rep.dupeRows);
         XLSX.utils.book_append_sheet(wb, ws, "Duplicates removed");
@@ -2350,19 +2363,24 @@
     // Employee permissions: 4 = edit old rows, 5 = add new rows. Rows the person may not touch are dropped here
     // (the database refuses them anyway).
     let rowsToSave = rows, notAllowedEdit = 0, notAllowedNew = 0;
+    const permSkippedRows = [];   // rows dropped by permission, for the error report
+    const failedRows = [];        // rows the database refused, with the reason
     const mayUpdate = window.CA ? CA.can("uploads.master.update", "edit") : true;
     const mayAppend = window.CA ? CA.can("uploads.master.append", "edit") : true;
     if (mode === "merge" && (!mayUpdate || !mayAppend)) {
       rowsToSave = rows.filter(r => {
         const k = (r.company_name || "") + "|" + r.platform + "|" + normSkuLocal(r.seller_sku) + "|" + (r.asin || "");
         const exists = existingKeys.has(k);
-        if (exists && !mayUpdate) { notAllowedEdit++; return false; }
-        if (!exists && !mayAppend) { notAllowedNew++; return false; }
+        if (exists && !mayUpdate) { notAllowedEdit++; permSkippedRows.push({ Reason: "Existing row — you do not have Edit old rows permission", ...(r.raw_data || {}) }); return false; }
+        if (!exists && !mayAppend) { notAllowedNew++; permSkippedRows.push({ Reason: "New row — you do not have Add new rows permission", ...(r.raw_data || {}) }); return false; }
         return true;
       });
       if (!mayUpdate) edited = 0;
       if (!mayAppend) added = 0;
-      if (!rowsToSave.length) { setStatus(`Nothing saved: ${notAllowedEdit ? notAllowedEdit + " existing rows (no edit permission)" : ""}${notAllowedEdit && notAllowedNew ? ", " : ""}${notAllowedNew ? notAllowedNew + " new rows (no add permission)" : ""}.`, true); return; }
+      if (!rowsToSave.length) {
+        window._skuLastReport = { dupeRows: window._skuStagedDupeRows || [], skippedRowList: window._skuStagedSkippedRows || [], failedRows: [], permSkippedRows, fileName: fName, summary: { total: totalRaw, added: 0, updated: 0, duplicates: dupes, noMaster: skippedNoMaster, failed: 0, notAllowed: notAllowedEdit + notAllowedNew } };
+        const rb = document.getElementById("masterReportBtn"); if (rb) { rb.disabled = false; rb.textContent = "⬇ Report (" + permSkippedRows.length + ")"; rb.style.background = "#fef2f2"; rb.style.borderColor = "#fecaca"; rb.style.color = "#b91c1c"; }
+        setStatus(`Nothing saved: ${notAllowedEdit ? notAllowedEdit + " existing rows (no edit permission)" : ""}${notAllowedEdit && notAllowedNew ? ", " : ""}${notAllowedNew ? notAllowedNew + " new rows (no add permission)" : ""}.`, true); return; }
     }
 
     if (mode === "replace") {
@@ -2387,6 +2405,7 @@
         }
         if (res.error) {
           failed += slice.length;
+          for (const x of slice) failedRows.push({ Reason: res.error.message, ...(x.raw_data || {}) });
           console.warn("chunk error", i, res.error);
           setStatus(`Chunk error at ${i}: ${res.error.message}. Continuing …`, true);
         } else {
@@ -2394,6 +2413,7 @@
         }
       } catch (netErr) {
         failed += slice.length;
+        for (const x of slice) failedRows.push({ Reason: "Network error — try again: " + (netErr.message || netErr), ...(x.raw_data || {}) });
         console.warn("network error", netErr);
       }
       setStatus(`Uploading ${done}/${rowsToSave.length} (file total ${totalRaw} rows)${failed ? " · " + failed + " failed" : ""}`, false);
@@ -2407,19 +2427,23 @@
     const addedDone  = Math.round(added  * doneRatio);
     const dupeRows = window._skuStagedDupeRows || [];
     const skippedRowList = window._skuStagedSkippedRows || [];
+    const permSkipped = notAllowedEdit + notAllowedNew;
+    const problems = failed + permSkipped + dupes + skippedNoMaster;
     const msg = failed
-      ? `⚠ ${verb} ${done}/${rowsToSave.length} (${failed} failed) · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)`
-      : `✅ ${verb} from ${fName} · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates removed + ${skippedNoMaster} skipped(no master SKU)`;
-    setStatus(msg, failed > 0);
+      ? `⚠ ${verb} ${done}/${rowsToSave.length} (${failed} failed) · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates + ${skippedNoMaster} skipped(no master)${permSkipped ? " + " + permSkipped + " not allowed" : ""}`
+      : `✅ ${verb} from ${fName} · File total: ${total} = ${addedDone} added + ${editedDone} updated + ${dupes} duplicates removed + ${skippedNoMaster} skipped(no master SKU)${permSkipped ? " + " + permSkipped + " not allowed (permission)" : ""}`;
+    setStatus(msg + (problems ? ` — ${problems} row${problems === 1 ? "" : "s"} need attention: click ⬇ Report next to Master SKU File for the list.` : ""), failed > 0);
     // Stash dupe/skipped rows so the Report button can build the XLSX on demand
-    window._skuLastReport = { dupeRows, skippedRowList, fileName: fName };
+    window._skuLastReport = { dupeRows, skippedRowList, failedRows, permSkippedRows, fileName: fName, summary: { total, added: addedDone, updated: editedDone, duplicates: dupes, noMaster: skippedNoMaster, failed, notAllowed: permSkipped } };
     const reportBtn = document.getElementById("masterReportBtn");
     if (reportBtn) {
-      const hasSomething = (dupeRows.length + skippedRowList.length) > 0;
+      const hasSomething = (dupeRows.length + skippedRowList.length + failedRows.length + permSkippedRows.length) > 0;
       reportBtn.disabled = !hasSomething;
       reportBtn.title = hasSomething
-        ? `Report: ${dupeRows.length} duplicates + ${skippedRowList.length} skipped rows`
-        : "No skipped or duplicate rows from the last upload";
+        ? `Report: ${failedRows.length} failed + ${permSkippedRows.length} not allowed + ${dupeRows.length} duplicates + ${skippedRowList.length} skipped rows`
+        : "No problem rows in the last upload";
+      if (hasSomething) { reportBtn.style.background = "#fef2f2"; reportBtn.style.borderColor = "#fecaca"; reportBtn.style.color = "#b91c1c"; reportBtn.textContent = "⬇ Report (" + (failedRows.length + permSkippedRows.length + dupeRows.length + skippedRowList.length) + ")"; }
+      else { reportBtn.style.background = ""; reportBtn.style.borderColor = ""; reportBtn.style.color = ""; reportBtn.textContent = "⬇ Report"; }
     }
     await refreshMasterStamp();
     // Clear staged so accidental double-clicks don't re-run
