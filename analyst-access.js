@@ -20,6 +20,7 @@
       { key: "uploads.checklist",   label: "Today's checklist", levels: ["view"] },
     ]},
     { page: "master", label: "Master SKU file", items: [
+      { key: "uploads.master.sample",  label: "0 · Sample template", levels: ["view"] },
       { key: "uploads.master",         label: "1 · Download", levels: ["view"] },
       { key: "uploads.master.upload",  label: "2 · Upload file", levels: ["edit"] },
       { key: "uploads.master.replace", label: "3 · Delete old data (replace everything)", levels: ["edit"] },
