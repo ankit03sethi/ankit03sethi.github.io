@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10u</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10v</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -715,12 +715,12 @@
     const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price");
     if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon"].includes(pf)) {
       const es = expSettleCalc(rr), td = tr.cells[iE];
-      td.textContent = es.val == null ? DASH : String(es.val); td.title = es.why;
+      td.textContent = es.val == null ? "—" : String(es.val); td.title = es.why;
       td.style.color = es.val == null ? "#cbd5e1" : tone; td.style.fontWeight = es.manual ? "600" : "";
     }
     if (iS >= 0 && tr.cells[iS] && pf === "amazon") {
       const es = expSettleCalc(rr), td = tr.cells[iS];
-      if (es.val == null) { td.textContent = DASH; td.title = es.why; td.style.color = "#cbd5e1"; }
+      if (es.val == null) { td.textContent = "—"; td.title = es.why; td.style.color = "#cbd5e1"; }
       else { const ad = amazonAddRs(rr); td.textContent = String(Math.round(es.val + ad.val)); td.title = "Expected Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + "). The price the Amazon file gets."; td.style.color = tone; }
     }
   }
@@ -747,17 +747,20 @@
       ctl.blur();
     }
   });
-  tableWrapEl.addEventListener("change", (e) => {
-    const ctl = e.target.closest(".edin"); if (!ctl) return;
+  // Every keystroke is an edit-in-waiting (so the computed cells follow as you
+  // type); change (blur / Enter / pick) also tidies the typed number.
+  function noteEdit(ctl, commit) {
     const id = ctl.dataset.id, col = ctl.dataset.col, orig = ctl.dataset.orig || "";
     let val = String(ctl.value || "").trim();
-    if (ctl.classList.contains("tagnum")) { val = val.replace(/[^\d.-]/g, ""); ctl.value = val; }
+    if (ctl.classList.contains("tagnum")) { val = val.replace(/[^\d.-]/g, ""); if (commit) ctl.value = val; }
     const k = pendKey(id, col);
     if (val === orig) { PENDING.delete(k); ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!val); }
     else { PENDING.set(k, { id, col, val }); ctl.classList.add("dirty"); }
     updateEditBar();
     repaintComputed(id);
-  });
+  }
+  tableWrapEl.addEventListener("input", (e) => { const ctl = e.target.closest(".edin"); if (ctl && ctl.tagName === "INPUT") noteEdit(ctl, false); });
+  tableWrapEl.addEventListener("change", (e) => { const ctl = e.target.closest(".edin"); if (ctl) noteEdit(ctl, true); });
   document.getElementById("editSaveBtn").addEventListener("click", async () => {
     const items = Array.from(PENDING.values()); if (!items.length) return;
     const btn = document.getElementById("editSaveBtn");
