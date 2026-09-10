@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10p</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10q</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2291,8 +2291,13 @@
         let ph = null, tip = null;
         if (c === "Amazon Add Rs" && String(r.platform || "").toLowerCase() === "amazon") {
           const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-          if (wc && wc.ls_ship != null) { ph = String(Math.round(Number(wc.ls_ship))); tip = "Courier charged on the last non-returned order" + (wc.ls_key ? " " + wc.ls_key : "") + ": " + wc.ls_ship + ". Blank = this (updates with every new order); type to override."; }
-          else tip = "No courier line on the last order yet - 65 until one settles.";
+          // The courier actually charged wins over anything typed: it moves with
+          // every new clean order. The typed number is only the stand-in until
+          // a courier line has settled.
+          if (wc && wc.ls_ship != null) {
+            return '<td title="' + escapeHtml("Courier charged on the last non-returned order" + (wc.ls_key ? " " + wc.ls_key : "") + ": " + wc.ls_ship + ". Updates with every new order. Typed stand-in: " + (cur || "65")) + '" style="color:#334155;font-weight:600">' + Math.round(Number(wc.ls_ship)) + "</td>";
+          }
+          tip = "No courier line settled on the last order yet - the typed number (or 65) is used until one does.";
         }
         return editCell("tagnum", c, r.id, cur, null, ph, tip);
       }
@@ -2861,7 +2866,7 @@
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
-    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Blank = the courier charged on this SKU's last non-returned order (shown grey, moves with every new order); 65 until one settles. Type a number to fix it.",
+    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Shows the courier actually charged on this SKU's last non-returned order and moves with every new order. The typed number (file or page) is only the stand-in until a courier line has settled; blank = 65.",
     "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
