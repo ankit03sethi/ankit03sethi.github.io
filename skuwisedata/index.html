@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2177,9 +2177,15 @@
         const cop = num(rd0["COP"]);
         if (cop == null || cop <= 0) return '<td title="No COP on the master sheet" style="color:#cbd5e1">' + DASH + "</td>";
         const tax = num(rd0["Tax %"]) || 0, pack = num(rd0["Packaging"]) || 0;
-        const am = num(ld0["Auto Margin"]) ?? num(rd0["Auto Margin"]) ?? 50;
-        const ap = num(ld0["Auto %"]) ?? num(rd0["Auto %"]) ?? 50;
-        const ev = Math.ceil(cop * (1 + tax / 100) + pack + Math.min(am, cop * ap / 100));
+        // Typed wins: Auto Margin alone, Auto % alone, the smaller when both;
+        // nothing typed = the smaller of 50 and half the COP.
+        const am = num(ld0["Auto Margin"]) ?? num(rd0["Auto Margin"]);
+        const ap = num(ld0["Auto %"]) ?? num(rd0["Auto %"]);
+        const mg = (am != null && ap != null) ? Math.min(am, cop * ap / 100)
+                 : am != null ? am
+                 : ap != null ? cop * ap / 100
+                 : Math.min(50, cop * 0.5);
+        const ev = Math.ceil(cop * (1 + tax / 100) + pack + mg);
         return '<td title="COP + tax + packaging + the smaller of Auto Margin and COP x Auto %. Computed, not typed." style="color:#334155">' + ev + "</td>";
       }
       if (NUM_COLS[c]) {
@@ -2747,8 +2753,8 @@
     "File Price": "Your Selling Price in the latest Flipkart listing file for this company.",
     "Suggested Price": "Flipkart: the Selling Price to put in the file. Someone else has the buy box: his site price - 2, down to the floor (COP + tax + packaging + Floor Margin) but never below it. We have it and an F Assured other seller sits on the listing: his price - 2, same floor. Every other case (alone, page not checked yet, only non-Assured others): the price that lands the Expected Settlement. Never above MRP. Green = raise, red = cut.",
     "Margin": "Floor: the settlement never goes below COP + tax + packaging + this, whether or not a competitor is being priced against. Blank = 10. Type a number; it saves at once.",
-    "Auto Margin": "Used only when a listing has no competitor to price against: settlement target = COP + tax + packaging + Auto Margin. Blank = 50. With Auto % also set, the smaller of the two applies.",
-    "Auto %": "Auto Margin as a percent of COP. With both set, the smaller of Auto Margin and COP x Auto % applies.",
+    "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and half the COP.",
+    "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and half the COP.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
     "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Blank = 65.",
     "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
