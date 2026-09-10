@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10x</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10y</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1448,8 +1448,8 @@
          "Returns billed","Return cost","Cost per return"].includes(c)) return "Returns";
     if (["Total revenue","Settlement","Tax paid","Packaging cost",
          "Product cost","Net profit","Profit % rev","Profit % cost",
-         "Rev per unit","Courier per unit","Settled per unit","Last Settled Order","Return per unit","Last Return Order",
-         "Tax per unit","Pack per unit","Profit per unit"].includes(c)) return "Cash";
+         "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
+         "Tax per order","Pack per order","Profit per order"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
     if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
@@ -1685,13 +1685,13 @@
     "Net profit":      { t: "%wd Profit",       kind: "value", wins: WIN_MAIN },
     "Profit % rev":    { t: "%wd Net %Rev",     kind: "pct",   wins: WIN_MAIN },
     "Profit % cost":   { t: "%wd Net %Cost",    kind: "pct",   wins: WIN_MAIN },
-    "Rev per unit":    { t: "%wd Rev/u",        kind: "value", wins: WIN_CASH },
-    "Courier per unit":{ t: "%wd Ship/u",       kind: "value", wins: WIN_CASH },
-    "Settled per unit":{ t: "%wd Settle/u",     kind: "value", wins: WIN_CASH },
-    "Return per unit": { t: "%wd Ret/u",        kind: "value", wins: WIN_CASH },
-    "Tax per unit":    { t: "%wd Tax/u",        kind: "value", wins: WIN_CASH },
-    "Pack per unit":   { t: "%wd Pack/u",       kind: "value", wins: WIN_CASH },
-    "Profit per unit": { t: "%wd Net/u",        kind: "value", wins: WIN_CASH },
+    "Rev per order":    { t: "%wd Rev/u",        kind: "value", wins: WIN_CASH },
+    "Courier per order":{ t: "%wd Ship/u",       kind: "value", wins: WIN_CASH },
+    "Settled per order":{ t: "%wd Settle/u",     kind: "value", wins: WIN_CASH },
+    "Return per order": { t: "%wd Ret/u",        kind: "value", wins: WIN_CASH },
+    "Tax per order":    { t: "%wd Tax/u",        kind: "value", wins: WIN_CASH },
+    "Pack per order":   { t: "%wd Pack/u",       kind: "value", wins: WIN_CASH },
+    "Profit per order": { t: "%wd Net/u",        kind: "value", wins: WIN_CASH },
     // 2026-09-10: the settle-rate estimates (Margin / Tax / Profit / Profit
     // per unit / Profit % of COP = average settle x units) are gone. "Margin"
     // as a combo also hid the typed reprice Margin field under three guessed
@@ -1743,8 +1743,8 @@
       "Profit % rev","Profit % cost",
       // The same seven figures per unit, with the last paid order beside them.
       // Each "Last" figure names the order it was read from, right beside it.
-      "Rev per unit","Courier per unit","Settled per unit","Last Settled Order","Return per unit","Last Return Order",
-      "Tax per unit","Pack per unit","Profit per unit",
+      "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
+      "Tax per order","Pack per order","Profit per order",
       // The table ends here. Everything that used to follow - the settle-rate
       // estimates (Settle/unit, Margin/unit, Margin % of COP), the older
       // courier averages, and the second Margin / Tax / Profit set - was the
@@ -2085,18 +2085,15 @@
       // many of those came back. Revenue, courier, settlement and tax stand on
       // their own - they do not need a COP, so they are answered before the
       // guard that turns the estimate columns off.
-      // The same cash row, per unit. Window 0 is the last paid order and reads
-      // its own stored figures; 30/60/90 divide the window by the units that
-      // cash paid for, so the column adds down exactly like the totals do.
+      // The same cash row, per ORDER (2026-09-10: it was per unit). Window 0 is
+      // the last clean paid order, whole - settlement x its units, its own
+      // courier line, packaging once, COP x units. 30/60/90 divide the window
+      // by the orders that cash paid for.
       if (UNIT_COLS.test(col)) {
-        // Packaging is per ORDER, not per piece: an MOQ order of 3 is packed
-        // once. Spread it over the pieces so it sits next to the per-unit COP
-        // and tax, which do scale with quantity.
+        // Packaging is per order: an MOQ order of 3 is packed once.
         const packPer = Number(wc.pack_unit) || 0;
-        let packu = 0;
-        if (w === 0) packu = packPer / Math.max(Number(wc.ls_qty) || 1, 1);
-        else { const pu0 = Number(wc["pu" + w]) || 0;
-               packu = pu0 ? packPer * (Number(wc["po" + w]) || 0) / pu0 : 0; }
+        const packu = packPer;
+        const units0 = Math.max(Number(wc.ls_qty) || 1, 1);
         // Two different questions, deliberately kept apart. `ret` is what
         // returns cost this sku per unit sold - that belongs inside profit.
         // `perRet` is what ONE buyer return costs, and that is what the Return
@@ -2108,19 +2105,22 @@
         if (w === 0) {
           settle = Number(wc.ls_unit);
           if (!Number.isFinite(settle)) return null;
-          ship = Number(wc.sh_last1) || 0;
+          settle = settle * units0;                       // the whole order
+          // Courier billed on this same order when the platform reported one;
+          // else the last charged courier rate x this order's units.
+          ship = wc.ls_ship_o != null ? Number(wc.ls_ship_o) : (Number(wc.sh_last1) || 0) * units0;
           // ls_unit is now the last order this sku was NEVER charged a return
           // on, so nothing comes off it here. A return that happened on some
           // other order has no business in this order's profit - that mixing is
           // what made Last profit read negative on skus that sell fine.
           ret  = 0;
-          perRet = wc.lr_kind === "customer" ? Number(wc.lr_cost) : NaN;
+          perRet = wc.lr_kind === "customer" ? Number(wc.lr_amt) : NaN;   // the whole return charge
         } else {
-          const u = Number(wc["pu" + w]) || 0;
-          if (u <= 0) return null;
-          settle = (Number(wc["st" + w]) || 0) / u;
-          ship   = (Number(wc["shc" + w]) || 0) / u;
-          ret    = (Number.isFinite(loss) ? loss : booked) / u;
+          const po = Number(wc["po" + w]) || 0;   // orders the cash paid for
+          if (po <= 0) return null;
+          settle = (Number(wc["st" + w]) || 0) / po;
+          ship   = (Number(wc["shc" + w]) || 0) / po;
+          ret    = (Number.isFinite(loss) ? loss : booked) / po;
           const nSR = Number(wc["rcs" + w]) || 0;
           perRet = nSR ? (Number(wc["rls" + w]) || 0) / nSR : NaN;
         }
@@ -2134,10 +2134,10 @@
         if (col.endsWith("d Tax/u"))    return { v: -taxu,   txt: taxu ? money(-taxu) : "0" };
         if (col.endsWith("d Pack/u"))   return { v: -packu,  txt: packu ? money(-packu) : "0" };
         if (!Number.isFinite(cop)) return null;
-        let goodsu = cop;
+        let goodsu = cop * units0;                        // COP x the order's units
         if (w !== 0) {
-          const u = Number(wc["pu" + w]) || 0;
-          goodsu = cop * Math.max(u - (Number(wc["ru" + w]) || 0), 0) / u;
+          const u = Number(wc["pu" + w]) || 0, po = Number(wc["po" + w]) || 1;
+          goodsu = cop * Math.max(u - (Number(wc["ru" + w]) || 0), 0) / po;
         }
         const v = settle - ret - taxu - packu - goodsu;
         return { v: v, txt: money(v) };
@@ -2227,7 +2227,7 @@
 
     function renderCell(r, i, c) {
       // The order id behind the "Last" box next door - Settle order is the last
-      // clean paid order (Settled per unit and Profit per unit both read from
+      // clean paid order (Settled per order and Profit per order both read from
       // it); Return order is the last order the platform charged a return on.
       if (c === "Last Settled Order" || c === "Last Return Order") {
         const wc0 = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -2728,7 +2728,7 @@
     "Ret Ship/return": "Return courier /return", "Last Ret Ship": "Return courier last",
     // The merged header for the cash block's return column. It is the cost of
     // one buyer return, not a share of every unit, so it says so.
-    "Return per unit": "Cost per return",
+    "Return per order": "Cost per return",
   };
   for (const w of [1, 3, 7, 15, 30, 60, 90]) COL_LABEL[w + "day"] = w + "d Sold";
   for (const w of [30, 60, 90]) {
@@ -2750,13 +2750,13 @@
     COL_LABEL[w+"d Profit"]        = w+"d Net profit";
     COL_LABEL[w+"d Net %Rev"]      = w+"d Profit % of revenue";
     COL_LABEL[w+"d Net %Cost"]     = w+"d Profit % of cost";
-    COL_LABEL[w+"d Rev/u"]        = w+"d Revenue /unit";
-    COL_LABEL[w+"d Ship/u"]       = w+"d Courier /unit";
-    COL_LABEL[w+"d Settle/u"]     = w+"d Settled /unit";
+    COL_LABEL[w+"d Rev/u"]        = w+"d Revenue /order";
+    COL_LABEL[w+"d Ship/u"]       = w+"d Courier /order";
+    COL_LABEL[w+"d Settle/u"]     = w+"d Settled /order";
     COL_LABEL[w+"d Ret/u"]        = w+"d Cost per return";
-    COL_LABEL[w+"d Tax/u"]        = w+"d Tax /unit";
-    COL_LABEL[w+"d Pack/u"]       = w+"d Packaging /unit";
-    COL_LABEL[w+"d Net/u"]        = w+"d Profit /unit";
+    COL_LABEL[w+"d Tax/u"]        = w+"d Tax /order";
+    COL_LABEL[w+"d Pack/u"]       = w+"d Packaging /order";
+    COL_LABEL[w+"d Net/u"]        = w+"d Profit /order";
 
     COL_LABEL[w+"d Net Units"]     = w+"d Net sales";
     COL_LABEL[w+"d Net"]           = w+"d Profit";
@@ -2961,7 +2961,7 @@
     "Settle/unit": "Average money the platform has paid you per unit, across every paid order. Fees already taken out.",
     "Last 3 Settle": "Same thing but only the 3 most recent paid orders. Green means it meets Expected Settlement, red means short.",
     "Last Settle": "The single most recent paid order, per unit. Moves first when something changes.",
-    "Margin/unit": "Settled per unit minus COP. Before returns and tax.",
+    "Margin/unit": "Settled per order minus COP. Before returns and tax.",
     "Margin %COP": "Margin as a percentage of what the unit cost you.",
 
     "Last Ret Charge": "The full amount the platform deducted on the last return it charged you for.",
@@ -2992,15 +2992,15 @@
     "Net profit":        "Settlement less return charges, tax, packaging and product cost. Real cash, not an estimate. Dash means no COP on the sheet.",
     "Profit % rev":      "Net profit as a share of total revenue - how much of every rupee that came in you keep.",
     "Profit % cost":     "Net profit as a share of product cost - what every rupee of stock returned.",
-    "Rev per unit":       "What one unit was worth before freight came off. Last is the most recent paid order.",
-    "Courier per unit":   "Forward courier per unit. Last is the most recent charged order; zero and blank lines are skipped.",
-    "Settled per unit":   "Cash that landed per unit. Last is the most recent paid order that was never charged a return.",
-    "Return per unit":    "What one buyer return cost. RTOs excluded - they are mostly billed at nothing. Last is the most recent charged buyer return.",
-    "Tax per unit":       "Tax % from the master sheet on the settlement per unit. Blank Tax % reads as 0.",
-    "Pack per unit":      "Packaging from the master sheet. Blank reads as 0.",
-    "Last Settled Order":       "The order id behind Settled per unit - Last and Profit per unit - Last: the most recent paid order that was never charged a return.",
-    "Last Return Order":       "The order id behind Return per unit - Last: the most recent order the platform charged a return on.",
-    "Profit per unit":    "What one unit actually left you with. Last is the last clean order - never returned - so no return comes off it. The 30/60/90 figures do carry the return cost, spread over the units. Dash means no COP on the master sheet.",
+    "Rev per order":      "What one order was worth before freight came off (settlement + courier). Last is the most recent paid order that was never charged a return, whole order. 30/60/90: the window total over the orders paid in it.",
+    "Courier per order":  "Forward courier per order. Last is the courier billed on that same order (else the last charged rate x its units). 30/60/90: courier total over orders paid.",
+    "Settled per order":  "Cash that landed per order. Last is the most recent paid order that was never charged a return - the whole order, all its units. 30/60/90: settlement total over orders paid.",
+    "Return per order":   "What one buyer return cost, whole charge. RTOs excluded - they are mostly billed at nothing. Last is the most recent charged buyer return.",
+    "Tax per order":      "Tax % from the master sheet on the settlement per order. Blank Tax % reads as 0.",
+    "Pack per order":     "Packaging from the master sheet, once per order. Blank reads as 0.",
+    "Last Settled Order":       "The order id behind Settled per order - Last and Profit per order - Last: the most recent paid order that was never charged a return.",
+    "Last Return Order":       "The order id behind Return per order - Last: the most recent order the platform charged a return on.",
+    "Profit per order":   "What one order actually left you with: settlement - tax - packaging - COP x units. Last is the last clean order - never returned - so no return comes off it. The 30/60/90 figures do carry the return cost, spread over the orders paid. Dash = no COP on the master sheet.",
     "Returns billed":  "How many returns the platform actually charged you for. Red means an RTO was billed, which is money to claim back.",
     "Return cost":     "What the platform actually deducted for those returns, on payment date. A return it has not billed yet is not counted.",
     "Cost per return": "What one buyer return cost: return money taken, divided by the buyer returns actually billed. RTOs are excluded - they are mostly billed at nothing and would drag the average down.",
@@ -3008,7 +3008,7 @@
     "Courier total":   "Total forward courier billed on this SKU in each window.",
 
     "Profit /unit":    "Profit divided by the units that stayed sold.",
-    "Profit % of COP": "Profit per unit as a percentage of COP.",
+    "Profit % of COP": "Profit per order as a percentage of COP.",
   });
 
   for (const w of [1, 3, 7, 15, 30, 60, 90]) {
@@ -3032,7 +3032,7 @@
     COL_HELP[w+"d Tax"]           = "Your Tax % applied to the net revenue. Blank counts as 0.";
     COL_HELP[w+"d Net"]           = "Margin minus return cost minus tax. Everything in, less everything out.";
     COL_HELP[w+"d Net/unit"]      = "Profit divided by the units that stayed sold.";
-    COL_HELP[w+"d Net %COP"]      = "Profit per unit as a percentage of COP. What each rupee of stock returns.";
+    COL_HELP[w+"d Net %COP"]      = "Profit per order as a percentage of COP. What each rupee of stock returns.";
     COL_HELP[w+"d Revenue"]        = "Cash that landed plus the forward courier the platform kept - what the orders were worth before freight. Counted on the payment date.";
     COL_HELP[w+"d Cash"]           = "Cash that actually landed in the window. Revenue minus courier. Counted on the payment date, not the order date.";
     COL_HELP[w+"d Tax Paid"]       = "Tax % from the master sheet on the settlement received. Blank Tax % reads as 0.";
@@ -3041,13 +3041,13 @@
     COL_HELP[w+"d Profit"]         = "Settlement less return charges, tax, packaging and product cost. Real cash, not an estimate. Dash means no COP on the sheet.";
     COL_HELP[w+"d Net %Rev"]       = "Net profit as a share of total revenue - how much of every rupee that came in you keep.";
     COL_HELP[w+"d Net %Cost"]      = "Net profit as a share of product cost - what every rupee of stock returned.";
-    COL_HELP[w+"d Rev/u"]         = "What one unit was worth before freight came off. Last is the most recent paid order that was never charged a return.";
-    COL_HELP[w+"d Ship/u"]        = "Forward courier per unit. Last is the most recent charged order; zero and blank lines are skipped.";
-    COL_HELP[w+"d Settle/u"]      = "Cash that landed per unit. Last is the most recent paid order that was never charged a return.";
+    COL_HELP[w+"d Rev/u"]         = "What one order was worth before freight came off. Last is the most recent paid order that was never charged a return, whole order.";
+    COL_HELP[w+"d Ship/u"]        = "Forward courier per order. Last is the courier billed on that same order.";
+    COL_HELP[w+"d Settle/u"]      = "Cash that landed per order. Last is the most recent paid order that was never charged a return - all its units.";
     COL_HELP[w+"d Ret/u"]         = "What one buyer return cost: return money taken over the buyer returns actually billed. RTOs excluded. Last is the most recent charged buyer return. This is a cost per return, not a share of every unit, so it does not add down into Profit /unit - profit carries the return cost spread over units.";
-    COL_HELP[w+"d Tax/u"]         = "Tax % from the master sheet on the settlement per unit. Blank Tax % reads as 0.";
-    COL_HELP[w+"d Pack/u"]        = "Packaging from the master sheet. Blank reads as 0.";
-    COL_HELP[w+"d Net/u"]         = "What one unit actually left you with. Last is the last clean order - one never charged a return - so nothing comes off it for returns. The 30/60/90 figures do carry the return cost spread over the units they paid for. Dash means no COP on the master sheet.";
+    COL_HELP[w+"d Tax/u"]         = "Tax % from the master sheet on the settlement per order. Blank Tax % reads as 0.";
+    COL_HELP[w+"d Pack/u"]        = "Packaging from the master sheet, once per order. Blank reads as 0.";
+    COL_HELP[w+"d Net/u"]         = "What one order actually left you with: settlement - tax - packaging - COP x units. Last is the last clean order - one never charged a return - so nothing comes off it for returns. 30/60/90 carry the return cost over the orders paid.";
 
 
   }
