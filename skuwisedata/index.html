@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10w</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10x</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -621,11 +621,11 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "50" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
-  // Auto Margin (50) and COP x Auto % (50%). Returns { val, why, manual }.
+  // Auto Margin (50) and COP x Auto % (100%). Returns { val, why, manual }.
   function expSettleCalc(r) {
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
     const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
@@ -640,7 +640,7 @@
              : (am != null && ap != null) ? Math.min(am, cop * ap / 100)
              : am != null ? am
              : ap != null ? cop * ap / 100
-             : Math.min(50, cop * 0.5);
+             : Math.min(50, cop);
     return { val: Math.ceil(cop * (1 + tax / 100) + pack + mg), why: "COP + tax + packaging + " + (mm != null ? "Manual Margin" : "the smaller of Auto Margin and COP x Auto %") + ". Computed, not typed." };
   }
   // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
@@ -2327,7 +2327,7 @@
         return editCell("tagsel", c, r.id, cur, TAG_COLS[c]);
       }
       // Flipkart: Expected Settlement is computed, not typed - COP + tax +
-      // packaging + the smaller of Auto Margin (50) and COP x Auto % (50%).
+      // packaging + the smaller of Auto Margin (50) and COP x Auto % (100%).
       // The same formula the Suggested Price and the reprice file use.
       if (c === "Expected Settlement" && ["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase())) {
         const es = expSettleCalc(r);
@@ -2931,8 +2931,8 @@
     "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
     "Our Assured": "F Assured when our Platform Seller carries the Assured badge in that list.",
     "Margin": "Floor: the settlement never goes below COP + tax + packaging + this, whether or not a competitor is being priced against. Blank = 10. Type a number; it saves at once.",
-    "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and half the COP.",
-    "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and half the COP.",
+    "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
+    "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
@@ -2948,7 +2948,7 @@
     "Tax %": "Tax rate you pay on this SKU. You fill this in.",
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
-    "Expected Settlement": "Flipkart + Amazon + Meesho: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
+    "Expected Settlement": "Flipkart + Amazon + Meesho: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (100%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
     "Selling Price": "Amazon: Expected Settlement + Amazon Add Rs - the price the Amazon file gets. Flipkart: live price from the last price/inventory file (Flipkart pricing runs on Expected Settlement). Meesho: what the last order sold at (Supplier Discounted Price). Others: from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
