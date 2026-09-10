@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10z</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-11a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1095,7 +1095,12 @@
         // then the cell keeps the master sheet's value.
         if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
         // MOQ: only overwrite once the page has stated one; a typed stand-in stays until then.
-        if (c === "MOQ") { if (!blank(v) && td.textContent.trim() !== String(v)) { td.className = ""; td.title = "Min order quantity on the Flipkart page: " + v + ". Re-read on every check."; td.style.fontWeight = "600"; td.textContent = String(v); } continue; }
+        if (c === "MOQ") {
+          if (!blank(v)) { if (td.textContent.trim() !== String(v)) { td.className = ""; td.title = "Min order quantity on the Flipkart page: " + v + ". Re-read on every check."; td.style.color = "#334155"; td.style.fontWeight = "600"; td.textContent = String(v); } }
+          // Page checked and no MOQ line: an orders-based (blue) reading gives way.
+          else if (["ok", "out_of_stock"].includes(stt) && td.style.fontWeight === "600" && !td.querySelector(".edin")) { td.textContent = ""; td.style.fontWeight = ""; td.title = "Flipkart page checked: no MOQ line - normal listing (blank = 1)."; }
+          continue;
+        }
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         if (c === "Mapped") v = st.mapped ? "Yes" : "";
@@ -2368,9 +2373,13 @@
         if (c === "MOQ") {
           const st0 = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
           if (st0 && st0.moq != null) return '<td title="' + escapeHtml("Min order quantity on the Flipkart page: " + st0.moq + ". Re-read on every check." + (cur ? " Typed stand-in: " + cur : "")) + '" style="color:#334155;font-weight:600">' + escapeHtml(String(st0.moq)) + "</td>";
-          // No page reading yet: the orders say it. Smallest quantity across the
-          // last 3 orders (any status) when that is 2 or more.
-          const wc0 = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+          // A checked page is final either way: a page without the line is a
+          // normal listing, so the orders are not consulted. Only a listing the
+          // page check has not reached yet falls back to what the orders say -
+          // smallest quantity across the last 3 orders (any status), 2 or more.
+          const checked0 = !!(st0 && ["ok", "out_of_stock"].includes(String(st0.last_check_status || "")));
+          if (checked0) tip = "Flipkart page checked: no MOQ line - normal listing (blank = 1).";
+          const wc0 = checked0 ? null : state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
           if (wc0 && wc0.moq_o != null) return '<td title="' + escapeHtml("From orders: each of the last 3 orders was for " + wc0.moq_o + " or more (page check has not stated an MOQ yet)." + (cur ? " Typed stand-in: " + cur : "")) + '" style="color:#1d4ed8;font-weight:600">' + escapeHtml(String(wc0.moq_o)) + "</td>";
           tip = String(r.platform || "").toLowerCase() === "flipkart" ? "No MOQ line on the Flipkart page (or not checked yet). Type a number to set it until then." : "Type the minimum order quantity; blank = 1.";
         }
