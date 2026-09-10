@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10y</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10z</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -617,11 +617,11 @@
     refresh();
   });
   // The dropdown columns after Color. Each cell holds one of these or nothing.
-  const TAG_COLS = { "MOQ": ["MOQ"] };
+  const TAG_COLS = {};   // MOQ moved to the typed columns (site value wins)
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -1076,7 +1076,7 @@
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
-                   "Last updated": "last_checked_at", "Selling Price": "file_price" };
+                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq" };
     const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
@@ -1094,6 +1094,8 @@
         // Return Type: only overwrite once the page has said something; until
         // then the cell keeps the master sheet's value.
         if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
+        // MOQ: only overwrite once the page has stated one; a typed stand-in stays until then.
+        if (c === "MOQ") { if (!blank(v) && td.textContent.trim() !== String(v)) { td.className = ""; td.title = "Min order quantity on the Flipkart page: " + v + ". Re-read on every check."; td.style.fontWeight = "600"; td.textContent = String(v); } continue; }
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         if (c === "Mapped") v = st.mapped ? "Yes" : "";
@@ -2361,6 +2363,17 @@
         const ld = r.listing_data || {}, rd = r.raw_data || {};
         const cur = String(ld[c] != null && ld[c] !== "" ? ld[c] : (rd[c] != null ? rd[c] : "")).trim();
         let ph = null, tip = null;
+        // MOQ: what the Flipkart page says ("Min order quantity is N units") wins;
+        // typed only stands in until the page has been checked.
+        if (c === "MOQ") {
+          const st0 = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+          if (st0 && st0.moq != null) return '<td title="' + escapeHtml("Min order quantity on the Flipkart page: " + st0.moq + ". Re-read on every check." + (cur ? " Typed stand-in: " + cur : "")) + '" style="color:#334155;font-weight:600">' + escapeHtml(String(st0.moq)) + "</td>";
+          // No page reading yet: the orders say it. Smallest quantity across the
+          // last 3 orders (any status) when that is 2 or more.
+          const wc0 = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+          if (wc0 && wc0.moq_o != null) return '<td title="' + escapeHtml("From orders: each of the last 3 orders was for " + wc0.moq_o + " or more (page check has not stated an MOQ yet)." + (cur ? " Typed stand-in: " + cur : "")) + '" style="color:#1d4ed8;font-weight:600">' + escapeHtml(String(wc0.moq_o)) + "</td>";
+          tip = String(r.platform || "").toLowerCase() === "flipkart" ? "No MOQ line on the Flipkart page (or not checked yet). Type a number to set it until then." : "Type the minimum order quantity; blank = 1.";
+        }
         if (c === "Amazon Add Rs" && String(r.platform || "").toLowerCase() === "amazon") {
           const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
           // The courier actually charged wins over anything typed: it moves with
@@ -2922,7 +2935,7 @@
     "Product": "Product name from the master sheet.",
     "Color": "Colour from the master sheet.",
     "Mapped": "Yes once any seller other than us has been seen on the listing (Flipkart sellers list, or a different buy-box seller). Set automatically by the checker and never cleared. Mapped rows are checked first, at least once a day.",
-    "MOQ": "Mark the SKU as MOQ. Pick it here; it is saved at once.",
+    "MOQ": "Minimum order quantity. Flipkart: read off the product page (Min order quantity is N units) on every check - that value wins. Blank = 1 (normal listing). Type a number only as a stand-in until the page has been checked; file and page stay in sync.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
