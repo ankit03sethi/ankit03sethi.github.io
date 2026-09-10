@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-10c</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11a</span></div>
     </div>
   </a>
   </div>
@@ -1965,17 +1965,35 @@
       // Amazon Add Rs in the file = the courier actually charged on the SKU's last
       // non-returned order (it wins over anything typed). Typed value only where
       // no courier line has settled yet.
-      const courier = new Map();
+      // Everything beyond the master row, per id: our seller name, the page
+      // check (return type, mapped, MOQ line, when), the last clean order's
+      // courier, the orders-side MOQ reading.
+      const courier = new Map(), extra = new Map();
       try {
         const { data: ex } = await sb.rpc("sku_master_export_extras");
-        for (const x of (ex || [])) if (x.ls_ship != null) courier.set(String(x.id), Math.round(Number(x.ls_ship)));
-      } catch (e) { console.warn("courier lookup skipped", e); }
+        for (const x of (ex || [])) { extra.set(String(x.id), x); if (x.ls_ship != null) courier.set(String(x.id), Math.round(Number(x.ls_ship))); }
+      } catch (e) { console.warn("extras lookup skipped", e); }
+      // MOQ the way the SKU Wise page settles it: the page check answers until 3
+      // orders have been placed after it, then those 3 do; an unchecked listing
+      // goes by its latest orders; else whatever was typed.
+      const moqOf = (id, typed) => {
+        const x = extra.get(String(id)); if (!x) return typed;
+        const checked = ["ok", "out_of_stock"].includes(String(x.last_check_status || "")) && !!x.last_checked_at;
+        const chkAt = checked ? Date.parse(x.last_checked_at) : NaN;
+        const cnt = Number(x.moq_o_cnt) || 0, oldest = x.moq_o_on ? Date.parse(x.moq_o_on) : NaN;
+        const ordersAfter = cnt >= 3 && Number.isFinite(oldest) && Number.isFinite(chkAt) && oldest > chkAt;
+        if (checked && !ordersAfter) return x.last_moq != null ? Number(x.last_moq) : "";
+        if (cnt > 0) return Number(x.moq_o) >= 2 ? Number(x.moq_o) : "";
+        return typed;
+      };
 
       // Round-trip export in the SAME shape as the sample (24 cols)
       // Same shape as the sample, pricing columns included. Those five carry the value
       // in force right now - what was typed on the SKU Wise Data page wins over the
       // last file - so an edited download re-uploads as the latest everywhere.
-      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Final COP","Expected Settlement","Selling Price"];
+      // 2026-09-11: the SKU Wise page's own column order (A-T, X-AG, AH, AI-AK),
+      // plus Non Returnable from the file. 35 columns, same as the sample.
+      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Non Returnable","Return Type","Type","Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Final COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %","Selling Price"];
       // Expected Settlement is computed on Flipkart / Amazon / Meesho - the same
       // rule the SKU Wise page and the reprice use: Manual Settlement as typed,
       // else COP + tax + packaging + Manual Margin, else the smaller of Auto
@@ -1999,20 +2017,25 @@
         const exp = ["flipkart", "amazon", "meesho"].includes(pf) ? expSettle(rd, ld) : (rd["Expected Settlement"] ?? "");
         const addRs = courier.has(String(r.id)) ? courier.get(String(r.id)) : (numOf(eff("Amazon Add Rs")) ?? 50);
         const sell = pf === "amazon" ? (exp === "" ? "" : Math.round(Number(exp) + Number(addRs))) : (rd["Selling Price"] ?? "");
+        const x = extra.get(String(r.id)) || {};
         return [
           i + 1,
           rd["Date"] ?? "",
           rd["Listed By"] ?? "",
           rd["Company"] ?? "",
           titleCase(r.platform || rd["Platform"] || ""),
+          x.platform_seller ?? "",
           r.brand || rd["Brand"] || "",
           rd["Vertical"] ?? "",
           rd["Non Returnable"] ?? "",
+          x.return_type ?? "",
           rd["Type"] ?? "",
           r.category || rd["Category"] || "",
           r.sub_category || rd["Sub Category"] || "",
           r.product || rd["Product"] || "",
           r.color || rd["Color"] || "",
+          x.mapped ? "Yes" : "",
+          moqOf(r.id, eff("MOQ")),
           rd["ASIN"] ?? "",
           rd["Other Listing Id"] ?? rd["Other Listind Id"] ?? "",
           r.seller_sku || rd["SKU"] || "",
@@ -2021,10 +2044,10 @@
           r.hsn || rd["HSN"] || "",
           rd["Tax %"] ?? "",
           rd["Packaging"] ?? "",
-          eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
-          (courier.has(String(r.id)) ? courier.get(String(r.id)) : eff("Amazon Add Rs")), eff("Max Step %"),
           rd["Final COP"] ?? "",
+          eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
           exp,
+          (courier.has(String(r.id)) ? courier.get(String(r.id)) : eff("Amazon Add Rs")), eff("Max Step %"),
           sell,
         ];
       });
