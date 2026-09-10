@@ -1890,6 +1890,7 @@ $("#recreateBtn").addEventListener("click", async () => {
 async function tryPrefillFromUrl() {
   const qp = new URLSearchParams(location.search);
   if (qp.get("new") !== "1") return;
+  const leadName = (qp.get("name") || "").trim().toUpperCase();
   const email = qp.get("email") || "";
   const mobile = qp.get("mobile") || "";
   const service = qp.get("service") || "";
@@ -1904,7 +1905,7 @@ async function tryPrefillFromUrl() {
   // When creating a quote from a lead that has no customer name captured yet,
   // default to "DEAR CUSTOMER" so we never send a blank/awkward salutation.
   // (The lead prefill URL only carries email/mobile/service — no name.)
-  $("#custName").value = "DEAR CUSTOMER";
+  $("#custName").value = leadName || "DEAR CUSTOMER";
   $("#custEmail").value = (email || "").toUpperCase();
   $("#custPhone").value = mobile;
   // Remember for backend auto-move
