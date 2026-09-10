@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10o</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10p</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -653,7 +653,7 @@
     bar.style.display = n ? "flex" : "none";
     document.getElementById("editCount").textContent = n + (n === 1 ? " change" : " changes") + " not saved yet";
   }
-  function editCell(kind, c, id, cur, opts) {
+  function editCell(kind, c, id, cur, opts, ph, tip) {
     const pk = PENDING.get(pendKey(id, c));
     const shown = pk ? pk.val : cur;
     const cls = "edin locked " + kind + (pk ? " dirty" : shown ? " set" : "");
@@ -662,9 +662,9 @@
       const o = [""].concat(opts).map(x => `<option value="${escapeHtml(x)}"${x === shown ? " selected" : ""}>${escapeHtml(x || "—")}</option>`).join("");
       ctl = `<select class="${cls}" data-col="${escapeHtml(c)}" data-id="${id}" data-orig="${escapeHtml(cur)}">${o}</select>`;
     } else {
-      ctl = `<input class="${cls}" type="text" inputmode="decimal" autocomplete="off" data-col="${escapeHtml(c)}" data-id="${id}" data-orig="${escapeHtml(cur)}" value="${escapeHtml(shown)}" placeholder="${escapeHtml((NUM_COLS[c] || {}).def || "")}">`;
+      ctl = `<input class="${cls}" type="text" inputmode="decimal" autocomplete="off" data-col="${escapeHtml(c)}" data-id="${id}" data-orig="${escapeHtml(cur)}" value="${escapeHtml(shown)}" placeholder="${escapeHtml(ph != null ? ph : ((NUM_COLS[c] || {}).def || ""))}">`;
     }
-    return `<td class="edcell">${ctl}<button type="button" class="edpen" title="Edit">&#9998;</button></td>`;
+    return `<td class="edcell"${tip ? ' title="' + escapeHtml(tip) + '"' : ""}>${ctl}<button type="button" class="edpen" title="Edit">&#9998;</button></td>`;
   }
   const tableWrapEl = document.getElementById("tableWrap");
   tableWrapEl.addEventListener("click", (e) => {
@@ -2263,7 +2263,7 @@
       // Flipkart: Expected Settlement is computed, not typed - COP + tax +
       // packaging + the smaller of Auto Margin (50) and COP x Auto % (50%).
       // The same formula the Suggested Price and the reprice file use.
-      if (c === "Expected Settlement" && String(r.platform || "").toLowerCase() === "flipkart") {
+      if (c === "Expected Settlement" && ["flipkart", "amazon"].includes(String(r.platform || "").toLowerCase())) {
         const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
         const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
         // Manual Settlement typed = that is the Expected Settlement, full stop.
@@ -2288,7 +2288,13 @@
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
         const cur = String(ld[c] != null && ld[c] !== "" ? ld[c] : (rd[c] != null ? rd[c] : "")).trim();
-        return editCell("tagnum", c, r.id, cur, null);
+        let ph = null, tip = null;
+        if (c === "Amazon Add Rs" && String(r.platform || "").toLowerCase() === "amazon") {
+          const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+          if (wc && wc.ls_ship != null) { ph = String(Math.round(Number(wc.ls_ship))); tip = "Courier charged on the last non-returned order" + (wc.ls_key ? " " + wc.ls_key : "") + ": " + wc.ls_ship + ". Blank = this (updates with every new order); type to override."; }
+          else tip = "No courier line on the last order yet - 65 until one settles.";
+        }
+        return editCell("tagnum", c, r.id, cur, null, ph, tip);
       }
       let v = shownVal(r, i, c);
       if (v === DASH) v = "";   // an empty cell is an empty cell, in every column
@@ -2855,7 +2861,7 @@
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
-    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Blank = 65.",
+    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Blank = the courier charged on this SKU's last non-returned order (shown grey, moves with every new order); 65 until one settles. Type a number to fix it.",
     "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
@@ -2867,7 +2873,7 @@
     "Tax %": "Tax rate you pay on this SKU. You fill this in.",
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
-    "Expected Settlement": "Flipkart: computed - COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Other platforms: you fill this in.",
+    "Expected Settlement": "Flipkart + Amazon: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
     "Selling Price": "Your listed price from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
