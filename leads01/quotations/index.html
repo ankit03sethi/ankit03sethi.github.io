@@ -391,9 +391,12 @@ async function refreshSession() {
     $("#signOutBtn").classList.remove("hidden");
     // Fetch the signed-in user's employee identity so we can auto-fill #empCode
     // on any NEW quotation the user creates (and prevent hand-typed impersonation).
-    await loadMyIdentity();
-    await loadList();
-    await loadCatalogOptions();
+    // 2026-09-10: the three loads used to run one after another (~4-5 s of
+    // edge-function round trips before the quote form could open). Now they
+    // run together, and when the page was opened from a lead's Send Quote
+    // button the list is not fetched at all - the Back button loads it.
+    const fromLead = new URLSearchParams(location.search).get("new") === "1";
+    await Promise.all([loadMyIdentity(), loadCatalogOptions(), fromLead ? Promise.resolve() : loadList()]);
   } else {
     $("#loginPanel").classList.remove("hidden");
     $("#app").classList.add("hidden");
@@ -435,6 +438,9 @@ async function loadMyIdentity() {
     _me = null;
     _meIsFallback = true;
   }
+  // A new-quote form opened from a lead may already be on screen: fill the
+  // employee code now that we know who is signed in.
+  if (!_currentQuote && !$("#builderView").classList.contains("hidden")) applyMyIdentityToEmpCode();
 }
 
 // Apply _me to the #empCode field (called by openBuilder for NEW quotes only).
@@ -1896,9 +1902,10 @@ async function tryPrefillFromUrl() {
   const service = qp.get("service") || "";
   const customerKey = qp.get("customer_key") || "";
   if (!email && !mobile) return;
-  // Wait until app + catalog are ready
+  // Open the form as soon as the session is known - the catalog (needed only
+  // to add the service line) and the employee identity fill in when they land.
   await new Promise(r => {
-    const check = () => { if (_session && _catalog) r(); else setTimeout(check, 200); };
+    const check = () => { if (_session) r(); else setTimeout(check, 100); };
     check();
   });
   openBuilder(null);
@@ -1912,6 +1919,12 @@ async function tryPrefillFromUrl() {
   window._prefill_customer_key = customerKey;
   window._prefill_service_name = service;
   // If service tag matches a catalog service, auto-add it
+  if (service && !_catalog) {
+    await new Promise(r => {
+      const check = () => { if (_catalog) r(); else setTimeout(check, 100); };
+      check();
+    });
+  }
   if (service && _catalog) {
     const serviceKey = service.toLowerCase().replace(/[^a-z]/g, "");
     const svcMatch = (_catalog.services || []).find(s =>
@@ -2235,8 +2248,9 @@ refreshSession()
     console.warn("refreshSession failed:", err);
     document.getElementById("loginPanel")?.classList.remove("hidden");
     document.getElementById("app")?.classList.add("hidden");
-  })
-  .then(() => tryPrefillFromUrl().catch(err => console.warn("tryPrefillFromUrl failed:", err)));
+  });
+// Runs alongside refreshSession, not after it: it waits for the session itself.
+tryPrefillFromUrl().catch(err => console.warn("tryPrefillFromUrl failed:", err));
 </script>
 
 <script src="/admin/admin-forgot-btn.js?v=2026082102" defer></script>
