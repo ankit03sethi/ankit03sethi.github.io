@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-09j</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-10a</span></div>
     </div>
   </a>
   </div>
@@ -1952,7 +1952,7 @@
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await sb.from("seller_sku_master")
-          .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at, raw_data, listing_data")
+          .select("id, platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at, raw_data, listing_data")
           .eq("user_id", OWNER_ID)
           .order("master_sku", { ascending: true })
           .range(from, from + PAGE - 1);
@@ -1962,12 +1962,20 @@
         if (data.length < PAGE) break;
       }
       if (all.length === 0) { setStatus("Nothing to download yet — upload a Master SKU file first.", true); return; }
+      // Amazon Add Rs in the file = the courier actually charged on the SKU's last
+      // non-returned order (it wins over anything typed). Typed value only where
+      // no courier line has settled yet.
+      const courier = new Map();
+      try {
+        const { data: ex } = await sb.rpc("sku_master_export_extras");
+        for (const x of (ex || [])) if (x.ls_ship != null) courier.set(String(x.id), Math.round(Number(x.ls_ship)));
+      } catch (e) { console.warn("courier lookup skipped", e); }
 
       // Round-trip export in the SAME shape as the sample (24 cols)
       // Same shape as the sample, pricing columns included. Those five carry the value
       // in force right now - what was typed on the SKU Wise Data page wins over the
       // last file - so an edited download re-uploads as the latest everywhere.
-      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Final COP","Expected Settlement","Selling Price"];
+      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Final COP","Expected Settlement","Selling Price"];
       const rows = all.map((r, i) => {
         const rd = r.raw_data || {}, ld = r.listing_data || {};
         const eff = (k) => (ld[k] != null && String(ld[k]).trim() !== "") ? ld[k] : (rd[k] ?? "");
@@ -1994,6 +2002,7 @@
           rd["Tax %"] ?? "",
           rd["Packaging"] ?? "",
           eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
+          (courier.has(String(r.id)) ? courier.get(String(r.id)) : eff("Amazon Add Rs")), eff("Max Step %"),
           rd["Final COP"] ?? "",
           rd["Expected Settlement"] ?? "",
           rd["Selling Price"] ?? "",
