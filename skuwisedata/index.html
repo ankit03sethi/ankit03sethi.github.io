@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-09k</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -479,7 +479,7 @@
     await loadCompanies();
     restoreFilters();
     startScrapeBar();
-    await refreshMasterStamp();
+    refreshMasterStamp();          // not awaited: the stamp is decoration, the table is not
     // The rolling day counts are loaded ONCE here, before the first table is
     // drawn. They used to be fetched after each render and pasted in a moment
     // later, which meant a sort by 30day drew the right rows with 0 in every
@@ -501,31 +501,40 @@
     // there are more selling SKUs than that - the missing ones were the reason
     // a 30day sort showed rows ordered correctly by the database with 0 in
     // their day cells: the row was ranked on a count the browser never held.
-    const m = new Map();
+    // 2026-09-10: one reply each instead of 1,000-row slices. The stock map is
+    // 18,000+ rows, which was 19 requests one after another (about 12 s of
+    // "Loading" before the first row could show). The *_json functions return
+    // the whole table as one jsonb value, which PostgREST does not cap, and
+    // both are fetched at the same time. The sliced loop stays as a fallback.
     const PAGE = 1000;
-    for (let from = 0; from < 200000; from += PAGE) {
-      const { data, error } = await sb
-        .rpc("sku_order_window_counts")
-        .range(from, from + PAGE - 1);
-      if (error) { console.warn("sku_order_window_counts failed", error); break; }
-      const batch = data || [];
-      for (const r of batch) m.set(wcKey(r.company_name, r.platform, r.sku), r);
-      if (batch.length < PAGE) break;
+    async function sliced(fn) {
+      const out = [];
+      for (let from = 0; from < 200000; from += PAGE) {
+        const { data, error } = await sb.rpc(fn).range(from, from + PAGE - 1);
+        if (error) { console.warn(fn + " failed", error); break; }
+        const batch = data || [];
+        out.push(...batch);
+        if (batch.length < PAGE) break;
+      }
+      return out;
     }
+    async function whole(fn) {
+      const { data, error } = await sb.rpc(fn + "_json");
+      if (!error && Array.isArray(data)) return data;
+      console.warn(fn + "_json failed, falling back to slices", error);
+      return sliced(fn);
+    }
+    const [wc, st] = await Promise.all([whole("sku_order_window_counts"), whole("sku_stock_map")]);
+    const m = new Map();
+    for (const r of wc) m.set(wcKey(r.company_name, r.platform, r.sku), r);
     state.windowCounts = m;
     // Platform stock, off the newest inventory export per company + platform.
     // A SKU missing from an export that exists is Inactive; a company +
     // platform with no export at all shows a dash, not a false Inactive.
     const sm = new Map(), have = new Set();
-    for (let from = 0; from < 200000; from += PAGE) {
-      const { data, error } = await sb.rpc("sku_stock_map").range(from, from + PAGE - 1);
-      if (error) { console.warn("sku_stock_map failed", error); break; }
-      const batch = data || [];
-      for (const r of batch) {
-        sm.set(wcKey(r.company_name, r.platform, r.sku), r);
-        have.add(wcKey(r.company_name, r.platform, ""));
-      }
-      if (batch.length < PAGE) break;
+    for (const r of st) {
+      sm.set(wcKey(r.company_name, r.platform, r.sku), r);
+      have.add(wcKey(r.company_name, r.platform, ""));
     }
     state.stockMap = sm; state.stockHave = have;
   }
@@ -3282,7 +3291,9 @@
     const { data, error } = await sb.from("seller_sku_master")
       .select("updated_at,source_file")
       .eq("user_id", state.uid)
-      .order("updated_at", { ascending: false })
+      // NULLS LAST matches the (user_id, updated_at DESC NULLS LAST) index;
+      // plain DESC could not use it and read all 27,000 rows (4-5 s).
+      .order("updated_at", { ascending: false, nullsFirst: false })
       .limit(1);
     const el = $("#masterFileStamp");
     if (error || !data || data.length === 0) {
