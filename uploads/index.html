@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-10a</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-10b</span></div>
     </div>
   </a>
   </div>
@@ -1976,9 +1976,29 @@
       // in force right now - what was typed on the SKU Wise Data page wins over the
       // last file - so an edited download re-uploads as the latest everywhere.
       const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Final COP","Expected Settlement","Selling Price"];
+      // Expected Settlement is computed on Flipkart / Amazon / Meesho - the same
+      // rule the SKU Wise page and the reprice use: Manual Settlement as typed,
+      // else COP + tax + packaging + Manual Margin, else the smaller of Auto
+      // Margin (50) and COP x Auto % (50%). Amazon Selling Price = that + Add Rs.
+      const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : null; };
+      const expSettle = (rd, ld) => {
+        const ms = numOf(ld["Manual Settlement"]) ?? numOf(rd["Manual Settlement"]);
+        if (ms != null) return Math.round(ms);
+        const cop = numOf(rd["COP"]); if (cop == null || cop <= 0) return "";
+        const tax = numOf(rd["Tax %"]) || 0, pack = numOf(rd["Packaging"]) || 0;
+        const mm = numOf(ld["Manual Margin"]) ?? numOf(rd["Manual Margin"]);
+        const am = numOf(ld["Auto Margin"]) ?? numOf(rd["Auto Margin"]);
+        const ap = numOf(ld["Auto %"]) ?? numOf(rd["Auto %"]);
+        const mg = mm != null ? mm : (am != null && ap != null) ? Math.min(am, cop * ap / 100) : am != null ? am : ap != null ? cop * ap / 100 : Math.min(50, cop * 0.5);
+        return Math.ceil(cop * (1 + tax / 100) + pack + mg);
+      };
       const rows = all.map((r, i) => {
         const rd = r.raw_data || {}, ld = r.listing_data || {};
         const eff = (k) => (ld[k] != null && String(ld[k]).trim() !== "") ? ld[k] : (rd[k] ?? "");
+        const pf = String(r.platform || rd["Platform"] || "").toLowerCase();
+        const exp = ["flipkart", "amazon", "meesho"].includes(pf) ? expSettle(rd, ld) : (rd["Expected Settlement"] ?? "");
+        const addRs = courier.has(String(r.id)) ? courier.get(String(r.id)) : (numOf(eff("Amazon Add Rs")) ?? 50);
+        const sell = pf === "amazon" ? (exp === "" ? "" : Math.round(Number(exp) + Number(addRs))) : (rd["Selling Price"] ?? "");
         return [
           i + 1,
           rd["Date"] ?? "",
@@ -2004,8 +2024,8 @@
           eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
           (courier.has(String(r.id)) ? courier.get(String(r.id)) : eff("Amazon Add Rs")), eff("Max Step %"),
           rd["Final COP"] ?? "",
-          rd["Expected Settlement"] ?? "",
-          rd["Selling Price"] ?? "",
+          exp,
+          sell,
         ];
       });
       const aoa = [HEADERS, ...rows];
