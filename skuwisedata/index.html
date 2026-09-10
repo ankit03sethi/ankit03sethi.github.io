@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10s</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10t</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -696,6 +696,34 @@
     }
     return `<td class="edcell"${tip ? ' title="' + escapeHtml(tip) + '"' : ""}>${ctl}<button type="button" class="edpen" title="Edit">&#9998;</button></td>`;
   }
+  // Expected Settlement and Selling Price are computed from the pricing cells,
+  // so they follow every edit at once - amber while the edit is still unsaved,
+  // normal again once Save (or Discard) has settled it.
+  function liveRow(r) {
+    const ld = Object.assign({}, r.listing_data || {});
+    for (const it of PENDING.values()) if (String(it.id) === String(r.id)) ld[it.col] = it.val;
+    return Object.assign({}, r, { listing_data: ld });
+  }
+  function repaintComputed(id) {
+    const table = document.querySelector("#tableWrap table.data"); if (!table) return;
+    const tr = table.querySelector('tbody tr[data-id="' + id + '"]');
+    const r = state.rowsById.get(String(id)); if (!tr || !r) return;
+    const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
+    const rr = liveRow(r), pf = String(r.platform || "").toLowerCase();
+    let dirty = false; for (const it of PENDING.values()) if (String(it.id) === String(r.id)) { dirty = true; break; }
+    const tone = dirty ? "#b45309" : "#334155";
+    const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price");
+    if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon"].includes(pf)) {
+      const es = expSettleCalc(rr), td = tr.cells[iE];
+      td.textContent = es.val == null ? DASH : String(es.val); td.title = es.why;
+      td.style.color = es.val == null ? "#cbd5e1" : tone; td.style.fontWeight = es.manual ? "600" : "";
+    }
+    if (iS >= 0 && tr.cells[iS] && pf === "amazon") {
+      const es = expSettleCalc(rr), td = tr.cells[iS];
+      if (es.val == null) { td.textContent = DASH; td.title = es.why; td.style.color = "#cbd5e1"; }
+      else { const ad = amazonAddRs(rr); td.textContent = String(Math.round(es.val + ad.val)); td.title = "Expected Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + "). The price the Amazon file gets."; td.style.color = tone; }
+    }
+  }
   const tableWrapEl = document.getElementById("tableWrap");
   tableWrapEl.addEventListener("click", (e) => {
     const pen = e.target.closest("button.edpen"); if (!pen) return;
@@ -728,6 +756,7 @@
     if (val === orig) { PENDING.delete(k); ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!val); }
     else { PENDING.set(k, { id, col, val }); ctl.classList.add("dirty"); }
     updateEditBar();
+    repaintComputed(id);
   });
   document.getElementById("editSaveBtn").addEventListener("click", async () => {
     const items = Array.from(PENDING.values()); if (!items.length) return;
@@ -743,6 +772,7 @@
         PENDING.delete(pendKey(it.id, it.col));
         const ctl = findCtl(it.id, it.col);
         if (ctl) { ctl.dataset.orig = it.val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!it.val); }
+        repaintComputed(it.id);
       } catch (err) {
         console.error(err); failed.push(it.col + ": " + (err.message || err));
       }
@@ -752,12 +782,14 @@
     if (failed.length) alert("Could not save " + failed.length + " change(s):\n" + failed.slice(0, 5).join("\n"));
   });
   document.getElementById("editDiscardBtn").addEventListener("click", () => {
+    const ids = new Set();
     for (const it of PENDING.values()) {
-      const ctl = findCtl(it.id, it.col);
+      const ctl = findCtl(it.id, it.col); ids.add(it.id);
       if (ctl) { ctl.value = ctl.dataset.orig || ""; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!ctl.dataset.orig); }
     }
     PENDING.clear();
     updateEditBar();
+    for (const id of ids) repaintComputed(id);
   });
   window.addEventListener("beforeunload", (e) => {
     if (PENDING.size) { e.preventDefault(); e.returnValue = ""; }
