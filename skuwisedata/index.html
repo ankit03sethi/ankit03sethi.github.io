@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10g</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10h</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -615,6 +615,8 @@
     if (n === "same") return "Same";
     if (n.startsWith("floor ")) return "Floor \u20b9" + n.slice(6);
     if (n === "no seller name") return "No seller name";
+    if (n === "no cop") return "No COP";
+    if (n === "no file") return "No file price";
     return "";
   }
   function suggColor(st) {
@@ -2166,6 +2168,20 @@
         const opts = [""].concat(TAG_COLS[c]).map(o => `<option value="${escapeHtml(o)}"${o === cur ? " selected" : ""}>${escapeHtml(o || "\u2014")}</option>`).join("");
         return `<td><select class="tagsel" data-col="${escapeHtml(c)}" data-id="${r.id}" style="font:inherit;padding:2px 4px;border:1px solid #e2e8f0;border-radius:6px;background:${cur ? "#eff6ff" : "#fff"}">${opts}</select></td>`;
       }
+      // Flipkart: Expected Settlement is computed, not typed - COP + tax +
+      // packaging + the smaller of Auto Margin (50) and COP x Auto % (50%).
+      // The same formula the Suggested Price and the reprice file use.
+      if (c === "Expected Settlement" && String(r.platform || "").toLowerCase() === "flipkart") {
+        const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+        const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
+        const cop = num(rd0["COP"]);
+        if (cop == null || cop <= 0) return '<td title="No COP on the master sheet" style="color:#cbd5e1">' + DASH + "</td>";
+        const tax = num(rd0["Tax %"]) || 0, pack = num(rd0["Packaging"]) || 0;
+        const am = num(ld0["Auto Margin"]) ?? num(rd0["Auto Margin"]) ?? 50;
+        const ap = num(ld0["Auto %"]) ?? num(rd0["Auto %"]) ?? 50;
+        const ev = Math.ceil(cop * (1 + tax / 100) + pack + Math.min(am, cop * ap / 100));
+        return '<td title="COP + tax + packaging + the smaller of Auto Margin and COP x Auto %. Computed, not typed." style="color:#334155">' + ev + "</td>";
+      }
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
         const cur = String(ld[c] != null && ld[c] !== "" ? ld[c] : (rd[c] != null ? rd[c] : "")).trim();
@@ -2729,7 +2745,7 @@
     "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
     "Our Assured": "F Assured when our Platform Seller carries the Assured badge in that list.",
     "File Price": "Your Selling Price in the latest Flipkart listing file for this company.",
-    "Suggested Price": "Flipkart: the Selling Price to put in the file. Someone else has the buy box: his site price - 2. We have it: cheapest F Assured other seller - 2; nobody else on the listing: the master sheet's Selling Price; others but none Assured: Hold. Never above MRP, never below the floor where the settlement would drop under COP (+tax on COP) + packaging + Margin. Green = raise, red = cut.",
+    "Suggested Price": "Flipkart: the Selling Price to put in the file. Someone else has the buy box: his site price - 2, down to the floor (COP + tax + packaging + Floor Margin) but never below it. We have it and an F Assured other seller sits on the listing: his price - 2, same floor. Every other case (alone, page not checked yet, only non-Assured others): the price that lands the Expected Settlement. Never above MRP. Green = raise, red = cut.",
     "Margin": "Floor: the settlement never goes below COP + tax + packaging + this, whether or not a competitor is being priced against. Blank = 10. Type a number; it saves at once.",
     "Auto Margin": "Used only when a listing has no competitor to price against: settlement target = COP + tax + packaging + Auto Margin. Blank = 50. With Auto % also set, the smaller of the two applies.",
     "Auto %": "Auto Margin as a percent of COP. With both set, the smaller of Auto Margin and COP x Auto % applies.",
@@ -2746,7 +2762,7 @@
     "Tax %": "Tax rate you pay on this SKU. You fill this in.",
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
-    "Expected Settlement": "What you expect the platform to pay per unit. You fill this in.",
+    "Expected Settlement": "Flipkart: computed - COP + tax + packaging + the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Other platforms: you fill this in.",
     "Selling Price": "Your listed price from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
