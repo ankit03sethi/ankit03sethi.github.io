@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11a</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11b</span></div>
     </div>
   </a>
   </div>
@@ -1991,9 +1991,9 @@
       // Same shape as the sample, pricing columns included. Those five carry the value
       // in force right now - what was typed on the SKU Wise Data page wins over the
       // last file - so an edited download re-uploads as the latest everywhere.
-      // 2026-09-11: the SKU Wise page's own column order (A-T, X-AG, AH, AI-AK),
-      // plus Non Returnable from the file. 35 columns, same as the sample.
-      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Non Returnable","Return Type","Type","Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Final COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %","Selling Price"];
+      // 2026-09-11: the SKU Wise page's own column order (A-T, X-AG, AI-AK).
+      // 33 columns, same as the sample.
+      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type","Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Final COP","Floor Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Selling Price"];
       // Expected Settlement is computed on Flipkart / Amazon / Meesho - the same
       // rule the SKU Wise page and the reprice use: Manual Settlement as typed,
       // else COP + tax + packaging + Manual Margin, else the smaller of Auto
@@ -2027,7 +2027,6 @@
           x.platform_seller ?? "",
           r.brand || rd["Brand"] || "",
           rd["Vertical"] ?? "",
-          rd["Non Returnable"] ?? "",
           x.return_type ?? "",
           rd["Type"] ?? "",
           r.category || rd["Category"] || "",
@@ -2046,7 +2045,6 @@
           rd["Packaging"] ?? "",
           rd["Final COP"] ?? "",
           eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
-          exp,
           (courier.has(String(r.id)) ? courier.get(String(r.id)) : eff("Amazon Add Rs")), eff("Max Step %"),
           sell,
         ];
@@ -2304,6 +2302,8 @@
         const master = String(r[idx.master] || "").trim();
         if (!master) { skippedNoMaster++; skippedRows.push(r); continue; }
         const raw = r; // full row, empties preserved
+        // The file says "Floor Margin" (the page's label); the database key is "Margin".
+        if (raw["Floor Margin"] !== undefined && raw["Margin"] === undefined) { raw["Margin"] = raw["Floor Margin"]; delete raw["Floor Margin"]; }
         const fields = {
           brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
           category:     idx.fields.category     ? String(r[idx.fields.category]     || "").trim() : "",
