@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10v</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10w</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -713,7 +713,7 @@
     let dirty = false; for (const it of PENDING.values()) if (String(it.id) === String(r.id)) { dirty = true; break; }
     const tone = dirty ? "#b45309" : "#334155";
     const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price");
-    if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon"].includes(pf)) {
+    if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon", "meesho"].includes(pf)) {
       const es = expSettleCalc(rr), td = tr.cells[iE];
       td.textContent = es.val == null ? "—" : String(es.val); td.title = es.why;
       td.style.color = es.val == null ? "#cbd5e1" : tone; td.style.fontWeight = es.manual ? "600" : "";
@@ -2329,7 +2329,7 @@
       // Flipkart: Expected Settlement is computed, not typed - COP + tax +
       // packaging + the smaller of Auto Margin (50) and COP x Auto % (50%).
       // The same formula the Suggested Price and the reprice file use.
-      if (c === "Expected Settlement" && ["flipkart", "amazon"].includes(String(r.platform || "").toLowerCase())) {
+      if (c === "Expected Settlement" && ["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase())) {
         const es = expSettleCalc(r);
         if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
         return '<td title="' + escapeHtml(es.why) + '" style="color:#334155' + (es.manual ? ";font-weight:600" : "") + '">' + es.val + "</td>";
@@ -2948,7 +2948,7 @@
     "Tax %": "Tax rate you pay on this SKU. You fill this in.",
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
-    "Expected Settlement": "Flipkart + Amazon: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
+    "Expected Settlement": "Flipkart + Amazon + Meesho: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
     "Selling Price": "Amazon: Expected Settlement + Amazon Add Rs - the price the Amazon file gets. Flipkart: live price from the last price/inventory file (Flipkart pricing runs on Expected Settlement). Meesho: what the last order sold at (Supplier Discounted Price). Others: from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
