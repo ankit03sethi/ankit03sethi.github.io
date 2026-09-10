@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1288,7 +1288,7 @@
     if (["Total revenue","Settlement","Tax paid","Packaging cost",
          "Product cost","Net profit","Profit % rev","Profit % cost",
          "Rev per unit","Courier per unit","Settled per unit","Settle order","Return per unit","Return order",
-         "Tax per unit","Pack per unit","Profit per unit","Profit order"].includes(c)) return "Cash";
+         "Tax per unit","Pack per unit","Profit per unit"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
     if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
@@ -1583,7 +1583,7 @@
       // The same seven figures per unit, with the last paid order beside them.
       // Each "Last" figure names the order it was read from, right beside it.
       "Rev per unit","Courier per unit","Settled per unit","Settle order","Return per unit","Return order",
-      "Tax per unit","Pack per unit","Profit per unit","Profit order",
+      "Tax per unit","Pack per unit","Profit per unit",
       // The table ends here. Everything that used to follow - the settle-rate
       // estimates (Settle/unit, Margin/unit, Margin % of COP), the older
       // courier averages, and the second Margin / Tax / Profit set - was the
@@ -2065,10 +2065,10 @@
     const DASH = "\u2014";
 
     function renderCell(r, i, c) {
-      // The order id behind the "Last" box next door - Settle order and Profit
-      // order are the same order (the last clean paid one); Return order is the
-      // last order the platform charged a return on.
-      if (c === "Settle order" || c === "Profit order" || c === "Return order") {
+      // The order id behind the "Last" box next door - Settle order is the last
+      // clean paid order (Settled per unit and Profit per unit both read from
+      // it); Return order is the last order the platform charged a return on.
+      if (c === "Settle order" || c === "Return order") {
         const wc0 = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const k = wc0 ? (c === "Return order" ? wc0.lr_key : wc0.ls_key) : null;
         if (!k) return '<td style="color:#cbd5e1">' + DASH + "</td>";
@@ -2795,8 +2795,7 @@
     "Return per unit":    "What one buyer return cost. RTOs excluded - they are mostly billed at nothing. Last is the most recent charged buyer return.",
     "Tax per unit":       "Tax % from the master sheet on the settlement per unit. Blank Tax % reads as 0.",
     "Pack per unit":      "Packaging from the master sheet. Blank reads as 0.",
-    "Settle order":       "The order id behind Settled per unit - Last: the most recent paid order that was never charged a return.",
-    "Profit order":       "Same order as Settle order - Profit per unit - Last is read from it.",
+    "Settle order":       "The order id behind Settled per unit - Last and Profit per unit - Last: the most recent paid order that was never charged a return.",
     "Return order":       "The order id behind Return per unit - Last: the most recent order the platform charged a return on.",
     "Profit per unit":    "What one unit actually left you with. Last is the last clean order - never returned - so no return comes off it. The 30/60/90 figures do carry the return cost, spread over the units. Dash means no COP on the master sheet.",
     "Returns billed":  "How many returns the platform actually charged you for. Red means an RTO was billed, which is money to claim back.",
