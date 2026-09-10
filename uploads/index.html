@@ -1952,7 +1952,7 @@
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await sb.from("seller_sku_master")
-          .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at, raw_data")
+          .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at, raw_data, listing_data")
           .eq("user_id", OWNER_ID)
           .order("master_sku", { ascending: true })
           .range(from, from + PAGE - 1);
@@ -1964,9 +1964,13 @@
       if (all.length === 0) { setStatus("Nothing to download yet — upload a Master SKU file first.", true); return; }
 
       // Round-trip export in the SAME shape as the sample (24 cols)
-      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Final COP","Expected Settlement","Selling Price"];
+      // Same shape as the sample, pricing columns included. Those five carry the value
+      // in force right now - what was typed on the SKU Wise Data page wins over the
+      // last file - so an edited download re-uploads as the latest everywhere.
+      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Brand","Vertical","Non Returnable","Type","Category","Sub Category","Product","Color","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Final COP","Expected Settlement","Selling Price"];
       const rows = all.map((r, i) => {
-        const rd = r.raw_data || {};
+        const rd = r.raw_data || {}, ld = r.listing_data || {};
+        const eff = (k) => (ld[k] != null && String(ld[k]).trim() !== "") ? ld[k] : (rd[k] ?? "");
         return [
           i + 1,
           rd["Date"] ?? "",
@@ -1989,6 +1993,7 @@
           r.hsn || rd["HSN"] || "",
           rd["Tax %"] ?? "",
           rd["Packaging"] ?? "",
+          eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
           rd["Final COP"] ?? "",
           rd["Expected Settlement"] ?? "",
           rd["Selling Price"] ?? "",
