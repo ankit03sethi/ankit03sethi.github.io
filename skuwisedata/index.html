@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1287,7 +1287,7 @@
          "Returns billed","Return cost","Cost per return"].includes(c)) return "Returns";
     if (["Total revenue","Settlement","Tax paid","Packaging cost",
          "Product cost","Net profit","Profit % rev","Profit % cost",
-         "Rev per unit","Courier per unit","Settled per unit","Settle order","Return per unit","Return order",
+         "Rev per unit","Courier per unit","Settled per unit","Last Settled Order","Return per unit","Last Return Order",
          "Tax per unit","Pack per unit","Profit per unit"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
     if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
@@ -1582,7 +1582,7 @@
       "Profit % rev","Profit % cost",
       // The same seven figures per unit, with the last paid order beside them.
       // Each "Last" figure names the order it was read from, right beside it.
-      "Rev per unit","Courier per unit","Settled per unit","Settle order","Return per unit","Return order",
+      "Rev per unit","Courier per unit","Settled per unit","Last Settled Order","Return per unit","Last Return Order",
       "Tax per unit","Pack per unit","Profit per unit",
       // The table ends here. Everything that used to follow - the settle-rate
       // estimates (Settle/unit, Margin/unit, Margin % of COP), the older
@@ -2068,12 +2068,12 @@
       // The order id behind the "Last" box next door - Settle order is the last
       // clean paid order (Settled per unit and Profit per unit both read from
       // it); Return order is the last order the platform charged a return on.
-      if (c === "Settle order" || c === "Return order") {
+      if (c === "Last Settled Order" || c === "Last Return Order") {
         const wc0 = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const k = wc0 ? (c === "Return order" ? wc0.lr_key : wc0.ls_key) : null;
+        const k = wc0 ? (c === "Last Return Order" ? wc0.lr_key : wc0.ls_key) : null;
         if (!k) return '<td style="color:#cbd5e1">' + DASH + "</td>";
-        const when = c === "Return order" ? wc0.lr_on : wc0.settle_last_on;
-        const tip = (c === "Return order" ? "Last return the platform charged" : "Last clean paid order")
+        const when = c === "Last Return Order" ? wc0.lr_on : wc0.settle_last_on;
+        const tip = (c === "Last Return Order" ? "Last return the platform charged" : "Last clean paid order")
                   + (when ? " · paid " + escapeHtml(String(when)) : "");
         return '<td title="' + tip + '" style="font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap">' + escapeHtml(String(k)) + "</td>";
       }
@@ -2795,8 +2795,8 @@
     "Return per unit":    "What one buyer return cost. RTOs excluded - they are mostly billed at nothing. Last is the most recent charged buyer return.",
     "Tax per unit":       "Tax % from the master sheet on the settlement per unit. Blank Tax % reads as 0.",
     "Pack per unit":      "Packaging from the master sheet. Blank reads as 0.",
-    "Settle order":       "The order id behind Settled per unit - Last and Profit per unit - Last: the most recent paid order that was never charged a return.",
-    "Return order":       "The order id behind Return per unit - Last: the most recent order the platform charged a return on.",
+    "Last Settled Order":       "The order id behind Settled per unit - Last and Profit per unit - Last: the most recent paid order that was never charged a return.",
+    "Last Return Order":       "The order id behind Return per unit - Last: the most recent order the platform charged a return on.",
     "Profit per unit":    "What one unit actually left you with. Last is the last clean order - never returned - so no return comes off it. The 30/60/90 figures do carry the return cost, spread over the units. Dash means no COP on the master sheet.",
     "Returns billed":  "How many returns the platform actually charged you for. Red means an RTO was billed, which is money to claim back.",
     "Return cost":     "What the platform actually deducted for those returns, on payment date. A return it has not billed yet is not counted.",
