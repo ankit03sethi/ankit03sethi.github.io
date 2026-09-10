@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10j</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -605,7 +605,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "50" }, "Manual Margin": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "50" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" } };
   // Suggested Price cell text: the price, or why there is none.
   function suggText(st) {
     if (!st) return "";
@@ -1272,7 +1272,7 @@
   // Financial columns need the "Financial data" permission. Prices stay visible
   // (listing work needs them); cost, margin, settlement, revenue and profit do not.
   const FIN_KEEP = new Set(["Selling Price","Site Price","Other Price","Our Price","File Price","Suggested Price"]);
-  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
+  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
   const canFin = () => !window.CA || !CA.access || CA.can("skuwise.financial", "view");
   const finHidden = (c) => !canFin() && !FIN_KEEP.has(c) && (FIN_EXTRA.has(c) || colKind(c) === "value");
   const FIN_RAW = /price|amount|settle|value|profit|cost|revenue|margin|fee|charge|tax|gst|total|payment|payout|commission|\brs\b|₹|mrp|discount|invoice/i;
@@ -1563,7 +1563,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
-      "COP","Margin","Auto Margin","Auto %","Manual Margin","Max Step %","Amazon Add Rs","HSN","Tax %","Packaging","Final COP","Expected Settlement",
+      "COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","HSN","Tax %","Packaging","Final COP","Expected Settlement",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
@@ -2174,6 +2174,9 @@
       if (c === "Expected Settlement" && String(r.platform || "").toLowerCase() === "flipkart") {
         const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
         const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
+        // Manual Settlement typed = that is the Expected Settlement, full stop.
+        const ms = num(ld0["Manual Settlement"]) ?? num(rd0["Manual Settlement"]);
+        if (ms != null) return '<td title="Manual Settlement, as typed" style="color:#334155;font-weight:600">' + Math.round(ms) + "</td>";
         const cop = num(rd0["COP"]);
         if (cop == null || cop <= 0) return '<td title="No COP on the master sheet" style="color:#cbd5e1">' + DASH + "</td>";
         const tax = num(rd0["Tax %"]) || 0, pack = num(rd0["Packaging"]) || 0;
@@ -2758,6 +2761,7 @@
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and half the COP.",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and half the COP.",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
+    "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
     "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Blank = 65.",
     "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
