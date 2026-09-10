@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10q</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10r</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -621,7 +621,37 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "50" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "50" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" } };
+  const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
+  // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
+  // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
+  // Auto Margin (50) and COP x Auto % (50%). Returns { val, why, manual }.
+  function expSettleCalc(r) {
+    const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
+    if (ms != null) return { val: Math.round(ms), why: "Manual Settlement, as typed", manual: true };
+    const cop = numOf(rd0["COP"]);
+    if (cop == null || cop <= 0) return { val: null, why: "No COP on the master sheet" };
+    const tax = numOf(rd0["Tax %"]) || 0, pack = numOf(rd0["Packaging"]) || 0;
+    const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
+    const am = numOf(ld0["Auto Margin"]) ?? numOf(rd0["Auto Margin"]);
+    const ap = numOf(ld0["Auto %"]) ?? numOf(rd0["Auto %"]);
+    const mg = mm != null ? mm
+             : (am != null && ap != null) ? Math.min(am, cop * ap / 100)
+             : am != null ? am
+             : ap != null ? cop * ap / 100
+             : Math.min(50, cop * 0.5);
+    return { val: Math.ceil(cop * (1 + tax / 100) + pack + mg), why: "COP + tax + packaging + " + (mm != null ? "Manual Margin" : "the smaller of Auto Margin and COP x Auto %") + ". Computed, not typed." };
+  }
+  // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
+  function amazonAddRs(r) {
+    const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+    const ld0 = r.listing_data || {}, rd0 = r.raw_data || {};
+    const typed = numOf(ld0["Amazon Add Rs"]) ?? numOf(rd0["Amazon Add Rs"]);
+    if (wc && wc.ls_ship != null) return { val: Number(wc.ls_ship), src: "courier on last order" + (wc.ls_key ? " " + wc.ls_key : "") };
+    if (typed != null) return { val: typed, src: "typed Amazon Add Rs" };
+    return { val: 50, src: "default 50" };
+  }
   // Suggested Price cell text: the price, or why there is none.
   function suggText(st) {
     if (!st) return "";
@@ -1011,8 +1041,8 @@
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
-                   "Last updated": "last_checked_at" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated"]);
+                   "Last updated": "last_checked_at", "Selling Price": "file_price" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -1024,6 +1054,7 @@
       const stt = String(st.last_check_status || "");
       for (const [c, i] of idx) {
         const td = tr.cells[i]; if (!td) continue;
+        if (c === "Selling Price" && String(r.platform || "").toLowerCase() !== "flipkart") continue;
         let v = st[want[c]];
         // Return Type: only overwrite once the page has said something; until
         // then the cell keeps the master sheet's value.
@@ -2264,26 +2295,32 @@
       // packaging + the smaller of Auto Margin (50) and COP x Auto % (50%).
       // The same formula the Suggested Price and the reprice file use.
       if (c === "Expected Settlement" && ["flipkart", "amazon"].includes(String(r.platform || "").toLowerCase())) {
-        const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
-        const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
-        // Manual Settlement typed = that is the Expected Settlement, full stop.
-        const ms = num(ld0["Manual Settlement"]) ?? num(rd0["Manual Settlement"]);
-        if (ms != null) return '<td title="Manual Settlement, as typed" style="color:#334155;font-weight:600">' + Math.round(ms) + "</td>";
-        const cop = num(rd0["COP"]);
-        if (cop == null || cop <= 0) return '<td title="No COP on the master sheet" style="color:#cbd5e1">' + DASH + "</td>";
-        const tax = num(rd0["Tax %"]) || 0, pack = num(rd0["Packaging"]) || 0;
-        // Typed wins: Auto Margin alone, Auto % alone, the smaller when both;
-        // nothing typed = the smaller of 50 and half the COP.
-        const mm = num(ld0["Manual Margin"]) ?? num(rd0["Manual Margin"]);
-        const am = num(ld0["Auto Margin"]) ?? num(rd0["Auto Margin"]);
-        const ap = num(ld0["Auto %"]) ?? num(rd0["Auto %"]);
-        const mg = mm != null ? mm                                   // Manual Margin overrides the auto rule
-                 : (am != null && ap != null) ? Math.min(am, cop * ap / 100)
-                 : am != null ? am
-                 : ap != null ? cop * ap / 100
-                 : Math.min(50, cop * 0.5);
-        const ev = Math.ceil(cop * (1 + tax / 100) + pack + mg);
-        return '<td title="COP + tax + packaging + the smaller of Auto Margin and COP x Auto %. Computed, not typed." style="color:#334155">' + ev + "</td>";
+        const es = expSettleCalc(r);
+        if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
+        return '<td title="' + escapeHtml(es.why) + '" style="color:#334155' + (es.manual ? ";font-weight:600" : "") + '">' + es.val + "</td>";
+      }
+      // Selling Price is never typed on the three big platforms. Amazon: the
+      // price the reprice file gets (Expected Settlement + Add Rs). Flipkart:
+      // the live price from the last price/inventory file (pricing there runs
+      // on Expected Settlement). Meesho: what the last order actually sold at.
+      if (c === "Selling Price") {
+        const pf = String(r.platform || "").toLowerCase();
+        if (pf === "amazon") {
+          const es = expSettleCalc(r);
+          if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
+          const ad = amazonAddRs(r);
+          return '<td title="' + escapeHtml("Expected Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + "). The price the Amazon file gets.") + '" style="color:#334155;font-weight:600">' + Math.round(es.val + ad.val) + "</td>";
+        }
+        if (pf === "flipkart") {
+          const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+          const v = st && st.file_price != null ? String(st.file_price) : "";
+          return '<td title="Live price from the last Flipkart price/inventory file. Pricing runs on Expected Settlement." style="color:#334155">' + escapeHtml(v) + "</td>";
+        }
+        if (pf === "meesho") {
+          const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+          const v = wc && wc.ls_price != null ? String(Math.round(Number(wc.ls_price))) : "";
+          return '<td title="' + escapeHtml("Supplier Discounted Price on the last Meesho order" + (wc && wc.ls_pkey ? " " + wc.ls_pkey : "")) + '" style="color:#334155">' + v + "</td>";
+        }
       }
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
@@ -2295,9 +2332,9 @@
           // every new clean order. The typed number is only the stand-in until
           // a courier line has settled.
           if (wc && wc.ls_ship != null) {
-            return '<td title="' + escapeHtml("Courier charged on the last non-returned order" + (wc.ls_key ? " " + wc.ls_key : "") + ": " + wc.ls_ship + ". Updates with every new order. Typed stand-in: " + (cur || "65")) + '" style="color:#334155;font-weight:600">' + Math.round(Number(wc.ls_ship)) + "</td>";
+            return '<td title="' + escapeHtml("Courier charged on the last non-returned order" + (wc.ls_key ? " " + wc.ls_key : "") + ": " + wc.ls_ship + ". Updates with every new order. Typed stand-in: " + (cur || "50")) + '" style="color:#334155;font-weight:600">' + Math.round(Number(wc.ls_ship)) + "</td>";
           }
-          tip = "No courier line settled on the last order yet - the typed number (or 65) is used until one does.";
+          tip = "No courier line settled on the last order yet - the typed number (or 50) is used until one does.";
         }
         return editCell("tagnum", c, r.id, cur, null, ph, tip);
       }
@@ -2866,7 +2903,7 @@
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
-    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Shows the courier actually charged on this SKU's last non-returned order and moves with every new order. The typed number (file or page) is only the stand-in until a courier line has settled; blank = 65.",
+    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Shows the courier actually charged on this SKU's last non-returned order and moves with every new order. The typed number (file or page) is only the stand-in until a courier line has settled; blank = 50.",
     "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
@@ -2879,7 +2916,7 @@
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
     "Expected Settlement": "Flipkart + Amazon: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (50%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
-    "Selling Price": "Your listed price from the master sheet.",
+    "Selling Price": "Amazon: Expected Settlement + Amazon Add Rs - the price the Amazon file gets. Flipkart: live price from the last price/inventory file (Flipkart pricing runs on Expected Settlement). Meesho: what the last order sold at (Supplier Discounted Price). Others: from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
     "Ratings": "Star rating on the live listing.",
