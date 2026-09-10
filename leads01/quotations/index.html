@@ -347,6 +347,18 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
 
+// 2026-09-10: names and emails are stored in CAPITALS (policy 2026-08-21), but a
+// lead's email arrives in lowercase and the old guard only rejected it - so a
+// quote made from a website lead could never be saved. Now the field is simply
+// converted to capitals in place, at prefill, while typing and on save.
+function upcaseInput(input) {
+  if (!input) return;
+  const v = input.value || "";
+  if (v === "Dear customer" || !/[a-z]/.test(v)) return;
+  const a = input.selectionStart, b = input.selectionEnd;
+  input.value = v.toUpperCase();
+  try { if (a != null) input.setSelectionRange(a, b); } catch {}
+}
 function toast(msg, isErr) {
   const t = document.createElement("div");
   t.className = "toast" + (isErr ? " err" : "");
@@ -749,6 +761,7 @@ async function openContactEditor(quoteId) {
     const saveAllBtn = document.getElementById("qcSaveAll");
     const msg = document.getElementById("qcMsg");
     const recompute = () => {
+      upcaseInput(input);
       const v = (input.value || "").trim();
       const bad = /[a-z]/.test(v);
       if (bad) {
@@ -819,15 +832,9 @@ async function openContactEditor(quoteId) {
 
   const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
+    if (id === "qcName" || id === "qcEmail") upcaseInput(input);
     const raw = (input.value || "").trim();
     if (!raw) return;
-    // Names AND emails must be typed in ALL CAPITAL letters (policy 2026-08-21).
-    if ((id === "qcName" || id === "qcEmail") && /[a-z]/.test(raw)) {
-      const msg = document.getElementById("qcMsg");
-      msg.style.color = "#dc2626";
-      msg.textContent = (id === "qcEmail" ? "Email" : "Name") + " must be in CAPITAL letters. Please retype in ALL CAPS.";
-      return;
-    }
     const nextCustomer = {
       name:  id === "qcName"  ? raw : (q.customer_name  || ""),
       email: id === "qcEmail" ? raw : (q.customer_email || ""), // preserve CAPS as typed
@@ -880,15 +887,13 @@ async function openContactEditor(quoteId) {
   document.getElementById("qcSaveAll").addEventListener("click", async () => {
     const msg = document.getElementById("qcMsg");
     msg.textContent = ""; msg.style.color = "";
+    upcaseInput(document.getElementById("qcNameInput"));
+    upcaseInput(document.getElementById("qcEmailInput"));
     const getVal = (id) => (document.getElementById(id + "Input")?.value || "").trim();
     const nameV = getVal("qcName");
     const emailV = getVal("qcEmail");
     const phoneV = getVal("qcPhone");
     const gstV = getVal("qcGst");
-    const errs = [];
-    if (nameV && /[a-z]/.test(nameV)) errs.push("Name must be in CAPITAL letters.");
-    if (emailV && /[a-z]/.test(emailV)) errs.push("Email must be in CAPITAL letters.");
-    if (errs.length) { msg.style.color = "#dc2626"; msg.textContent = errs.join(" "); return; }
     if (!nameV && !emailV && !phoneV && !gstV) {
       msg.style.color = "#64748b"; msg.textContent = "Nothing to save — type into at least one field."; return;
     }
@@ -1343,7 +1348,7 @@ function openBuilder(quote) {
     $("#qnumBadge").classList.remove("hidden");
     $("#statusHere").innerHTML = `<span class="status-badge st-${quote.status}">${quote.status}</span>`;
     $("#custName").value = quote.customer_name || "Dear customer";
-    $("#custEmail").value = quote.customer_email || "";
+    $("#custEmail").value = (quote.customer_email || "").toUpperCase();
     $("#custPhone").value = quote.customer_phone || "";
     $("#custGst").value = quote.customer_gst || "";
     $("#custAddress").value = quote.customer_address || "";
@@ -1598,18 +1603,8 @@ $("#saveBtn").addEventListener("click", async () => {
   // Names AND emails must be in ALL CAPITAL letters — same rule as the contact
   // editor (policy 2026-08-21). Reject lowercase to keep history consistent
   // regardless of which form the edit came from.
-  const nameRaw = $("#custName").value.trim();
-  if (nameRaw && /[a-z]/.test(nameRaw) && nameRaw !== "Dear customer") {
-    toast("Name must be in CAPITAL letters. Please retype in ALL CAPS.", true);
-    $("#custName").focus();
-    return;
-  }
-  const emailRaw = $("#custEmail").value.trim();
-  if (emailRaw && /[a-z]/.test(emailRaw)) {
-    toast("Email must be in CAPITAL letters. Please retype in ALL CAPS.", true);
-    $("#custEmail").focus();
-    return;
-  }
+  upcaseInput($("#custName"));
+  upcaseInput($("#custEmail"));
   const phoneRaw = $("#custPhone").value.trim();
   const phoneDigits = phoneRaw.replace(/\D/g, "");
   if (phoneRaw && phoneDigits.length !== 10) {
@@ -1910,7 +1905,7 @@ async function tryPrefillFromUrl() {
   // default to "Dear customer" so we never send a blank/awkward salutation.
   // (The lead prefill URL only carries email/mobile/service — no name.)
   $("#custName").value = "Dear customer";
-  $("#custEmail").value = email;
+  $("#custEmail").value = (email || "").toUpperCase();
   $("#custPhone").value = mobile;
   // Remember for backend auto-move
   window._prefill_customer_key = customerKey;
@@ -2170,6 +2165,7 @@ $("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistor
   const guard = (input, label) => {
     if (!input) return;
     const recompute = () => {
+      upcaseInput(input);
       const v = (input.value || "").trim();
       const bad = v && v !== "Dear customer" && /[a-z]/.test(v);
       if (bad) {
