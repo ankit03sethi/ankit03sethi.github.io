@@ -103,6 +103,8 @@
         color:#94a3b8; letter-spacing:0; }
     table.data thead th .wdays > span.wa { color:#1f6feb; }
     table.data thead th .hrow { display:block; white-space:nowrap; }
+    /* Excel-style column letter (A, B ... Z, AA, AB ...) above every header, by position */
+    table.data thead th .colid { display:block; font-size:9.5px; font-weight:700; color:#94a3b8; letter-spacing:.08em; line-height:1; margin-bottom:3px; text-transform:none; }
     table.data thead th .hlab { }
     /* Sort panel: direction and, where a column carries several windows, which
        window the order is taken from. */
@@ -289,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-11b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-11c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2607,7 +2609,7 @@
     headRow.querySelectorAll("th").forEach((th, i) => {
       th.dataset.col = names[i];
       th.classList.add("sortable");
-      th.innerHTML = headerHtml(names[i], t);
+      th.innerHTML = '<span class="colid">' + colLetter(i) + "</span>" + headerHtml(names[i], t);
       attachColNote(th, names[i]);
       bindSortButtons(th, names[i], t, table);
       th.addEventListener("click", () => openSortMenu(th, names[i], t, table));
@@ -2848,6 +2850,8 @@
   }
   window.addEventListener("scroll", hideColNote, true);
 
+  // Column letter by position, the way a spreadsheet names it: A..Z, AA, AB ...
+  function colLetter(i) { let s = ""; i += 1; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; }
   function headerHtml(name, t) {
     const active = t.sort && t.sort.col === name ? t.sort.dir : "";
     // A combined header carries its days on a second line, laid out on the same
@@ -2938,9 +2942,9 @@
 
   function installedRefresh(table) {
     const t = toolsFor(state.view);
-    [...table.querySelectorAll("thead tr:first-child th")].forEach(th => {
+    [...table.querySelectorAll("thead tr:first-child th")].forEach((th, i) => {
       const name = th.dataset.col;
-      th.innerHTML = headerHtml(name, t);
+      th.innerHTML = '<span class="colid">' + colLetter(i) + "</span>" + headerHtml(name, t);
       bindSortButtons(th, name, t, table);
     });
     applyTableTools();
