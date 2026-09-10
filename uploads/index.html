@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-10b</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-10c</span></div>
     </div>
   </a>
   </div>
@@ -1979,7 +1979,7 @@
       // Expected Settlement is computed on Flipkart / Amazon / Meesho - the same
       // rule the SKU Wise page and the reprice use: Manual Settlement as typed,
       // else COP + tax + packaging + Manual Margin, else the smaller of Auto
-      // Margin (50) and COP x Auto % (50%). Amazon Selling Price = that + Add Rs.
+      // Margin (50) and COP x Auto % (100%). Amazon Selling Price = that + Add Rs.
       const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : null; };
       const expSettle = (rd, ld) => {
         const ms = numOf(ld["Manual Settlement"]) ?? numOf(rd["Manual Settlement"]);
@@ -1989,7 +1989,7 @@
         const mm = numOf(ld["Manual Margin"]) ?? numOf(rd["Manual Margin"]);
         const am = numOf(ld["Auto Margin"]) ?? numOf(rd["Auto Margin"]);
         const ap = numOf(ld["Auto %"]) ?? numOf(rd["Auto %"]);
-        const mg = mm != null ? mm : (am != null && ap != null) ? Math.min(am, cop * ap / 100) : am != null ? am : ap != null ? cop * ap / 100 : Math.min(50, cop * 0.5);
+        const mg = mm != null ? mm : (am != null && ap != null) ? Math.min(am, cop * ap / 100) : am != null ? am : ap != null ? cop * ap / 100 : Math.min(50, cop);
         return Math.ceil(cop * (1 + tax / 100) + pack + mg);
       };
       const rows = all.map((r, i) => {
