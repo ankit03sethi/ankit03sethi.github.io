@@ -180,7 +180,7 @@
     .scrape-bar .sep { color:#cbd5e1; }
     .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
     table.data { width:100%; border-collapse:collapse; font-size:14px; }
-    table.data th, table.data td { padding:12px 14px; text-align:left; border-bottom:1px solid #eef2f7; }
+    table.data th, table.data td { padding:12px 14px; text-align:center; border-bottom:1px solid #eef2f7; }
     /* Rows read like data you are meant to act on, not a log dump: a little
        more room and a little more weight. */
     table.data tbody td { font-weight:700; color:#1e293b; }
@@ -289,7 +289,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10n</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-10o</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -318,6 +318,22 @@
   <div class="controls">
     <button class="btn" id="reloadBtn">Reload</button>
     <span id="lastLoadAt" style="font-size:12px; color:#94a3b8;"></span>
+  </div>
+  <style>
+    .edcell { white-space:nowrap; }
+    .edcell .edin { font:inherit; width:64px; padding:2px 4px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:inherit; text-align:center; }
+    .edcell select.edin { width:auto; }
+    .edcell .edin.locked { border-color:transparent; pointer-events:none; }
+    .edcell .edin.set { background:#eff6ff; }
+    .edcell .edin.dirty { background:#fef3c7 !important; border-color:#f59e0b; }
+    .edcell .edin:not(.locked) { border-color:#93c5fd; box-shadow:0 0 0 2px #dbeafe; }
+    .edpen { border:0; background:none; cursor:pointer; color:#94a3b8; padding:0 3px; font-size:13px; line-height:1; vertical-align:middle; }
+    .edpen:hover { color:#1d4ed8; }
+  </style>
+  <div id="editBar" style="display:none; position:fixed; bottom:18px; right:18px; z-index:60; align-items:center; gap:10px; padding:10px 14px; background:#fffbeb; border:1px solid #f59e0b; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.14); font-size:13px; color:#78350f;">
+    <span id="editCount"></span>
+    <button class="btn" id="editSaveBtn" style="background:#1d4ed8; color:#fff; border-color:#1d4ed8; font-weight:600;">Save</button>
+    <button class="btn" id="editDiscardBtn">Discard</button>
   </div>
 
   <div class="platform-row" id="companyRow">
@@ -471,7 +487,7 @@
     if (!CA.access.active) { $("#locker").classList.add("show"); return; }
     if (!CA.anyOn("skuwise")) { alert("You do not have access to SKU Wise Data. Ask the account owner."); location.href = "/analyst/"; return; }
     CA.apply();
-    if (!CA.access.is_owner) { document.body.classList.add("ca-emp"); const st = document.createElement("style"); st.textContent = ".ca-emp .tagsel, .ca-emp .tagnum { pointer-events:none; background:#f8fafc !important; color:#64748b; } .ca-emp #scrapeResetBtn { display:none !important; }"; document.head.appendChild(st); }
+    if (!CA.access.is_owner) { document.body.classList.add("ca-emp"); const st = document.createElement("style"); st.textContent = ".ca-emp .tagsel, .ca-emp .tagnum { pointer-events:none; background:#f8fafc !important; color:#64748b; } .ca-emp #scrapeResetBtn { display:none !important; } .ca-emp .edpen { display:none !important; }"; document.head.appendChild(st); }
     if (!canFin()) { const pt = document.querySelector('.tab[data-view="payments"]'); if (pt) pt.style.display = "none"; }
     // start on the first tab the employee may see
     const firstTab = [...document.querySelectorAll(".tab[data-view]")].find(t => t.style.display !== "none");
@@ -624,20 +640,97 @@
     if (st.file_price == null) return "#0f172a";
     return st.sugg_price > st.file_price ? "#047857" : st.sugg_price < st.file_price ? "#b91c1c" : "#0f172a";
   }
-  document.getElementById("tableWrap").addEventListener("change", async (e) => {
-    const sel = e.target.closest("select.tagsel, input.tagnum"); if (!sel) return;
-    const id = sel.dataset.id, col = sel.dataset.col, val = sel.value;
-    const r = state.rowsById.get(String(id));
-    sel.disabled = true;
-    try {
-      const { data, error } = await sb.rpc("sku_master_set_tag", { p_id: Number(id), p_key: col, p_value: val });
-      if (error) throw error;
-      if (r) r.listing_data = data || {};
-      sel.style.background = val ? "#eff6ff" : "#fff";
-    } catch (err) {
-      console.error(err); alert("Could not save: " + (err.message || err));
-      sel.value = String(((r && r.listing_data) || {})[col] || "");
-    } finally { sel.disabled = false; }
+  // Edits do not save by themselves. A cell is locked until its pencil is
+  // clicked; a changed value turns amber and waits in PENDING until Save is
+  // pressed (Discard puts the old values back). Re-renders keep pending values.
+  const PENDING = new Map();
+  const pendKey = (id, col) => String(id) + "|" + col;
+  function findCtl(id, col) {
+    return document.querySelector('#tableWrap .edin[data-id="' + id + '"][data-col="' + String(col).replace(/"/g, "") + '"]');
+  }
+  function updateEditBar() {
+    const n = PENDING.size, bar = document.getElementById("editBar");
+    bar.style.display = n ? "flex" : "none";
+    document.getElementById("editCount").textContent = n + (n === 1 ? " change" : " changes") + " not saved yet";
+  }
+  function editCell(kind, c, id, cur, opts) {
+    const pk = PENDING.get(pendKey(id, c));
+    const shown = pk ? pk.val : cur;
+    const cls = "edin locked " + kind + (pk ? " dirty" : shown ? " set" : "");
+    let ctl;
+    if (opts) {
+      const o = [""].concat(opts).map(x => `<option value="${escapeHtml(x)}"${x === shown ? " selected" : ""}>${escapeHtml(x || "—")}</option>`).join("");
+      ctl = `<select class="${cls}" data-col="${escapeHtml(c)}" data-id="${id}" data-orig="${escapeHtml(cur)}">${o}</select>`;
+    } else {
+      ctl = `<input class="${cls}" type="text" inputmode="decimal" autocomplete="off" data-col="${escapeHtml(c)}" data-id="${id}" data-orig="${escapeHtml(cur)}" value="${escapeHtml(shown)}" placeholder="${escapeHtml((NUM_COLS[c] || {}).def || "")}">`;
+    }
+    return `<td class="edcell">${ctl}<button type="button" class="edpen" title="Edit">&#9998;</button></td>`;
+  }
+  const tableWrapEl = document.getElementById("tableWrap");
+  tableWrapEl.addEventListener("click", (e) => {
+    const pen = e.target.closest("button.edpen"); if (!pen) return;
+    const ctl = pen.parentElement.querySelector(".edin"); if (!ctl) return;
+    ctl.classList.remove("locked");
+    ctl.focus();
+    if (ctl.tagName === "INPUT") ctl.select();
+    else if (typeof ctl.showPicker === "function") { try { ctl.showPicker(); } catch (_) { /* ignore */ } }
+  });
+  tableWrapEl.addEventListener("focusout", (e) => {
+    const ctl = e.target && e.target.closest ? e.target.closest(".edin") : null;
+    if (ctl) ctl.classList.add("locked");
+  });
+  tableWrapEl.addEventListener("keydown", (e) => {
+    const ctl = e.target && e.target.closest ? e.target.closest("input.edin") : null;
+    if (!ctl) return;
+    if (e.key === "Enter") { e.preventDefault(); ctl.blur(); }
+    if (e.key === "Escape") {
+      const pk = PENDING.get(pendKey(ctl.dataset.id, ctl.dataset.col));
+      ctl.value = pk ? pk.val : (ctl.dataset.orig || "");
+      ctl.blur();
+    }
+  });
+  tableWrapEl.addEventListener("change", (e) => {
+    const ctl = e.target.closest(".edin"); if (!ctl) return;
+    const id = ctl.dataset.id, col = ctl.dataset.col, orig = ctl.dataset.orig || "";
+    let val = String(ctl.value || "").trim();
+    if (ctl.classList.contains("tagnum")) { val = val.replace(/[^\d.-]/g, ""); ctl.value = val; }
+    const k = pendKey(id, col);
+    if (val === orig) { PENDING.delete(k); ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!val); }
+    else { PENDING.set(k, { id, col, val }); ctl.classList.add("dirty"); }
+    updateEditBar();
+  });
+  document.getElementById("editSaveBtn").addEventListener("click", async () => {
+    const items = Array.from(PENDING.values()); if (!items.length) return;
+    const btn = document.getElementById("editSaveBtn");
+    btn.disabled = true; btn.textContent = "Saving…";
+    const failed = [];
+    for (const it of items) {
+      try {
+        const { data, error } = await sb.rpc("sku_master_set_tag", { p_id: Number(it.id), p_key: it.col, p_value: it.val });
+        if (error) throw error;
+        const r = state.rowsById.get(String(it.id));
+        if (r) r.listing_data = data || {};
+        PENDING.delete(pendKey(it.id, it.col));
+        const ctl = findCtl(it.id, it.col);
+        if (ctl) { ctl.dataset.orig = it.val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!it.val); }
+      } catch (err) {
+        console.error(err); failed.push(it.col + ": " + (err.message || err));
+      }
+    }
+    btn.disabled = false; btn.textContent = "Save";
+    updateEditBar();
+    if (failed.length) alert("Could not save " + failed.length + " change(s):\n" + failed.slice(0, 5).join("\n"));
+  });
+  document.getElementById("editDiscardBtn").addEventListener("click", () => {
+    for (const it of PENDING.values()) {
+      const ctl = findCtl(it.id, it.col);
+      if (ctl) { ctl.value = ctl.dataset.orig || ""; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!ctl.dataset.orig); }
+    }
+    PENDING.clear();
+    updateEditBar();
+  });
+  window.addEventListener("beforeunload", (e) => {
+    if (PENDING.size) { e.preventDefault(); e.returnValue = ""; }
   });
   // Clear filters: company, platform, search box, every column filter and the
   // sort go back to default in one click, and the saved copy goes with them.
@@ -1258,7 +1351,7 @@
       }
     });
     let css = (sel.length ? sel.join(",") + "{display:none}" : "")
-      + (num.length ? num.join(",") + "{text-align:right}" : "");
+      + (num.length ? num.join(",") + "{text-align:center}" : "");
     for (const c in tdT) css += tdT[c].join(",") + "{background:" + c + "}";
     for (const c in thT) css += thT[c].join(",") + "{background:" + c + "}";
     el.textContent = css;
@@ -2161,12 +2254,11 @@
         const n = wc ? wc[DAY_COLS[c]] : 0;
         return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}</td>`;
       }
-      // Two hand-picked marks per row, saved to the master row the moment they
-      // change. The options are fixed; a blank first entry clears the mark.
+      // Hand-picked marks per row: locked until the pencil is clicked, saved
+      // only when Save is pressed. A blank first entry clears the mark.
       if (TAG_COLS[c]) {
         const cur = String((r.listing_data || {})[c] || "");
-        const opts = [""].concat(TAG_COLS[c]).map(o => `<option value="${escapeHtml(o)}"${o === cur ? " selected" : ""}>${escapeHtml(o || "\u2014")}</option>`).join("");
-        return `<td><select class="tagsel" data-col="${escapeHtml(c)}" data-id="${r.id}" style="font:inherit;padding:2px 4px;border:1px solid #e2e8f0;border-radius:6px;background:${cur ? "#eff6ff" : "#fff"}">${opts}</select></td>`;
+        return editCell("tagsel", c, r.id, cur, TAG_COLS[c]);
       }
       // Flipkart: Expected Settlement is computed, not typed - COP + tax +
       // packaging + the smaller of Auto Margin (50) and COP x Auto % (50%).
@@ -2196,7 +2288,7 @@
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
         const cur = String(ld[c] != null && ld[c] !== "" ? ld[c] : (rd[c] != null ? rd[c] : "")).trim();
-        return `<td><input class="tagnum" type="number" step="1" data-col="${escapeHtml(c)}" data-id="${r.id}" value="${escapeHtml(cur)}" placeholder="${escapeHtml(NUM_COLS[c].def)}" style="font:inherit;width:64px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:6px;background:${cur ? "#eff6ff" : "#fff"}"></td>`;
+        return editCell("tagnum", c, r.id, cur, null);
       }
       let v = shownVal(r, i, c);
       if (v === DASH) v = "";   // an empty cell is an empty cell, in every column
