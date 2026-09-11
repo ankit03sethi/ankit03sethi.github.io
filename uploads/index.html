@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11b</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11c</span></div>
     </div>
   </a>
   </div>
@@ -1993,7 +1993,7 @@
       // last file - so an edited download re-uploads as the latest everywhere.
       // 2026-09-11: the SKU Wise page's own column order (A-T, X-AG, AI-AK).
       // 33 columns, same as the sample.
-      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type","Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","COP","HSN","Tax %","Packaging","Final COP","Floor Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Selling Price"];
+      const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type","Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","COP","Qty","HSN","Tax %","Packaging","Final COP","Floor Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Selling Price"];
       // Expected Settlement is computed on Flipkart / Amazon / Meesho - the same
       // rule the SKU Wise page and the reprice use: Manual Settlement as typed,
       // else COP + tax + packaging + Manual Margin, else the smaller of Auto
@@ -2040,6 +2040,7 @@
           r.seller_sku || rd["SKU"] || "",
           r.master_sku || rd["Master Sku"] || "",
           rd["COP"] ?? "",
+          (x.wh_qty != null && String(x.wh_qty) !== "" ? x.wh_qty : ""),
           r.hsn || rd["HSN"] || "",
           rd["Tax %"] ?? "",
           rd["Packaging"] ?? "",
@@ -2304,6 +2305,7 @@
         const raw = r; // full row, empties preserved
         // The file says "Floor Margin" (the page's label); the database key is "Margin".
         if (raw["Floor Margin"] !== undefined && raw["Margin"] === undefined) { raw["Margin"] = raw["Floor Margin"]; delete raw["Floor Margin"]; }
+        delete raw["Qty"];  // Qty is warehouse-only; never taken from the file
         const fields = {
           brand:        idx.fields.brand        ? String(r[idx.fields.brand]        || "").trim() : "",
           category:     idx.fields.category     ? String(r[idx.fields.category]     || "").trim() : "",
