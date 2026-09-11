@@ -82,7 +82,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-11b</span></div>
+      <div class="nav-sub">Cursive Analyst &middot; Stock In/Out <span style="opacity:.5;">build 2026-09-11c</span></div>
     </div>
   </a>
   <div style="display:flex; align-items:center; gap:16px;">
@@ -201,7 +201,7 @@
       }).join("");
     } else if (tab === "B" || tab === "C") {
       const list = tab === "B" ? data.made : data.kits;
-      thead.innerHTML = `<tr><th>Code</th><th>${tab === "B" ? "Item" : "Kit / Marketplace SKU"}</th><th class=num>Qty</th><th>Status</th><th>Parts (limiting part in red)</th>${tab === "C" ? "<th class=num>Price</th>" : ""}</tr>`;
+      thead.innerHTML = `<tr><th>Code</th><th>${tab === "B" ? "Item" : "Kit / Marketplace SKU"}</th><th class=num>Qty</th><th>Status</th><th>Parts (limiting part in red)</th><th class=num title="Live cost rolled up from Tab A prices">Cost</th></tr>`;
       rows = list.filter(r => matches(r, q)).filter(r => {
         if (f === "instock") return Number(r.qty) > 0 && !isDel(r); if (f === "zero") return Number(r.qty) <= 0 && !isDel(r); if (f === "other") return false; if (f === "deleted") return isDel(r); if (f === "changed") return false; return true;
       });
@@ -210,7 +210,7 @@
         const parts = (r.items || []).map(it => `<b class="${key(it.code) === key(r.limiting) ? "lim" : ""}">${esc(it.code)}</b>${it.qty && Number(it.qty) !== 1 ? "×" + esc(it.qty) : ""}`).join(", ");
         return `<tr class="${isDel(r) ? "deleted" : ""}"><td class=code>${esc(r.code)}</td><td class=name>${esc(r.name || "")}${r.sku ? " <span class=pill>" + esc(r.sku) + "</span>" : ""}</td>
           <td class=num><span class="stock ${qty < 0 ? "neg" : qty === 0 ? "zero" : ""}">${qty < 0 ? "part missing" : fmt(qty)}</span></td>
-          <td>${isDel(r) ? "<span class='pill miss'>Deleted</span>" : ""}</td><td class=parts>${parts || "<i>no parts listed</i>"}</td>${tab === "C" ? "<td class=num>" + fmt(r.price) + "</td>" : ""}</tr>`;
+          <td>${isDel(r) ? "<span class='pill miss'>Deleted</span>" : ""}</td><td class=parts>${parts || "<i>no parts listed</i>"}</td><td class=num title="${r.cost != null ? "From parts (Tab A prices)" + (tab === "C" && r.price != null ? " · file: " + fmt(r.price) : "") : "A part has no price"}">${r.cost != null ? fmt(r.cost) : (tab === "C" && r.price != null ? fmt(r.price) : "—")}</td></tr>`;
       }).join("");
     } else {
       thead.innerHTML = "<tr><th>Date</th><th>Type</th><th>Code</th><th class=num>Qty</th><th>Note</th><th>In workbook</th></tr>";
