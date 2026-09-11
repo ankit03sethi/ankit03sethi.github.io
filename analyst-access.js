@@ -37,7 +37,7 @@
       { key: "reports.missings", label: "Missings", levels: ["view"] },
     ]},
     { page: "skuwise", label: "SKU-wise data", items: [
-      { key: "skuwise.sku_master", label: "SKU Master (view only — editing is owner-only)", levels: ["view"] },
+      { key: "skuwise.sku_master", label: "SKU Master (view = see page; edit = change cells)", levels: ["view", "edit"] },
       { key: "skuwise.orders",   label: "Orders",   levels: ["view"] },
       { key: "skuwise.returns",  label: "Returns",  levels: ["view"] },
       { key: "skuwise.payments", label: "Payments", levels: ["view"] },
@@ -80,7 +80,7 @@
     if (!access) return false;
     if (access.is_owner) return true;
     // edit must be ticked on the exact item; a page-level setting only grants view (same rule as has_perm in the database)
-    if (level === "edit") return !String(key).startsWith("skuwise") && (access.perms || {})[key] === "edit";   // SKU-wise editing is owner-only
+    if (level === "edit") return (access.perms || {})[key] === "edit";
     const l = levelOf(key);
     return l === "view" || l === "edit";
   }
