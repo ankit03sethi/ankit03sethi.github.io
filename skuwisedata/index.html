@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-11c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-11d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -790,28 +790,81 @@
   }
   tableWrapEl.addEventListener("input", (e) => { const ctl = e.target.closest(".edin"); if (ctl && ctl.tagName === "INPUT") noteEdit(ctl, false); });
   tableWrapEl.addEventListener("change", (e) => { const ctl = e.target.closest(".edin"); if (ctl) noteEdit(ctl, true); });
-  document.getElementById("editSaveBtn").addEventListener("click", async () => {
+  // Save asks the scope first: just this row, or every listing that shares the
+  // product's Master SKU (optionally one platform). The choice writes straight to
+  // the database (so the master file gets it too) and loaded rows update in place.
+  function ensureScopeModal() {
+    if (document.getElementById("scopeModal")) return;
+    const d = document.createElement("div");
+    d.id = "scopeModal";
+    d.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:9999";
+    d.innerHTML =
+      '<div style="background:#fff;border-radius:14px;max-width:440px;width:92%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3)">' +
+      '<h3 style="margin:0 0 6px;font-size:17px">Save changes</h3>' +
+      '<p id="scopeSummary" style="margin:0 0 14px;color:#64748b;font-size:13px"></p>' +
+      '<label style="display:flex;gap:8px;align-items:flex-start;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px;cursor:pointer">' +
+      '<input type="radio" name="scopeR" value="single" checked style="margin-top:2px"><span><b>This row only</b><br><span style="color:#64748b;font-size:12px">Just the listing you edited.</span></span></label>' +
+      '<label style="display:flex;gap:8px;align-items:flex-start;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px;cursor:pointer">' +
+      '<input type="radio" name="scopeR" value="bulk" style="margin-top:2px"><span><b>All listings of this product</b><br><span style="color:#64748b;font-size:12px">Every row with the same Master SKU.</span></span></label>' +
+      '<div id="scopePlatWrap" style="display:none;margin:2px 0 12px;padding-left:6px">' +
+      '<label style="font-size:13px;color:#334155">Platform: <select id="scopePlat" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px">' +
+      '<option value="all">All platforms</option><option value="amazon">Amazon</option><option value="flipkart">Flipkart</option><option value="meesho">Meesho</option><option value="firstcry">Firstcry</option><option value="myntra">Myntra</option>' +
+      '</select></label></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">' +
+      '<button id="scopeCancel" style="background:#f1f5f9;border:1px solid #e5e7eb;padding:8px 14px;border-radius:9px;cursor:pointer">Cancel</button>' +
+      '<button id="scopeApply" style="background:#1f6feb;color:#fff;border:none;padding:8px 16px;border-radius:9px;cursor:pointer">Apply</button></div>' +
+      '</div>';
+    document.body.appendChild(d);
+    d.addEventListener("change", function (e) { if (e.target && e.target.name === "scopeR") document.getElementById("scopePlatWrap").style.display = e.target.value === "bulk" ? "block" : "none"; });
+    d.addEventListener("click", function (e) { if (e.target === d || e.target.id === "scopeCancel") d.style.display = "none"; });
+    document.getElementById("scopeApply").addEventListener("click", runScopedSave);
+  }
+  async function runScopedSave() {
+    const modal = document.getElementById("scopeModal");
+    const picked = modal.querySelector('input[name="scopeR"]:checked');
+    const scope = picked ? picked.value : "single";
+    const plat = scope === "bulk" ? (document.getElementById("scopePlat").value || "all") : "all";
+    modal.style.display = "none";
     const items = Array.from(PENDING.values()); if (!items.length) return;
-    const btn = document.getElementById("editSaveBtn");
-    btn.disabled = true; btn.textContent = "Saving…";
+    const btn = document.getElementById("editSaveBtn"); btn.disabled = true; btn.textContent = "Saving…";
     const failed = [];
     for (const it of items) {
       try {
-        const { data, error } = await sb.rpc("sku_master_set_tag", { p_id: Number(it.id), p_key: it.col, p_value: it.val });
+        const { data, error } = await sb.rpc("sku_master_set_tag_scope", { p_id: Number(it.id), p_key: it.col, p_value: it.val, p_scope: scope, p_platform: plat });
         if (error) throw error;
-        const r = state.rowsById.get(String(it.id));
-        if (r) r.listing_data = data || {};
+        const info = data || {}, msku = String(info.master_sku || "").toUpperCase();
+        const affected = [];
+        if (scope === "bulk") {
+          for (const r of state.rowsById.values()) {
+            if (String(r.master_sku || "").toUpperCase() !== msku) continue;
+            if (plat !== "all" && String(r.platform || "").toLowerCase() !== plat) continue;
+            affected.push(r);
+          }
+        } else {
+          const r = state.rowsById.get(String(it.id)); if (r) affected.push(r);
+        }
+        for (const r of affected) {
+          const ld = Object.assign({}, r.listing_data || {});
+          if (it.val === "") delete ld[it.col]; else ld[it.col] = it.val;
+          r.listing_data = ld;
+          const ctl = findCtl(r.id, it.col);
+          if (ctl) { ctl.value = it.val; ctl.dataset.orig = it.val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!it.val); }
+          repaintComputed(r.id);
+        }
         PENDING.delete(pendKey(it.id, it.col));
-        const ctl = findCtl(it.id, it.col);
-        if (ctl) { ctl.dataset.orig = it.val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!it.val); }
-        repaintComputed(it.id);
-      } catch (err) {
-        console.error(err); failed.push(it.col + ": " + (err.message || err));
-      }
+      } catch (err) { console.error(err); failed.push(it.col + ": " + (err.message || err)); }
     }
-    btn.disabled = false; btn.textContent = "Save";
-    updateEditBar();
+    btn.disabled = false; btn.textContent = "Save"; updateEditBar();
     if (failed.length) alert("Could not save " + failed.length + " change(s):\n" + failed.slice(0, 5).join("\n"));
+  }
+  document.getElementById("editSaveBtn").addEventListener("click", function () {
+    const n = PENDING.size; if (!n) return;
+    ensureScopeModal();
+    document.getElementById("scopeSummary").textContent = n + (n === 1 ? " change" : " changes") + " to save. Bulk applies each edit to every listing that shares its product's Master SKU.";
+    const sm = document.getElementById("scopeModal");
+    sm.querySelector('input[value="single"]').checked = true;
+    document.getElementById("scopePlatWrap").style.display = "none";
+    sm.style.display = "flex";
   });
   document.getElementById("editDiscardBtn").addEventListener("click", () => {
     const ids = new Set();
