@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-13a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-13b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -651,20 +651,23 @@
   // Amazon the promotion is recovered through a higher price, so its cut is 0.
   function expProfitCalc(r) {
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const es = expSettleCalc(r);
+    if (es.val == null) return { val: null, why: es.why };
     const a = autoSettleCalc(r);
-    if (a.val == null) return { val: null, why: a.why };
     const cop = numOf(rd0["COP"]) || 0;
     const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0;
     const pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
-    const rc = a.rc || 0, promo = a.promo || 0;
-    const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
-    const gross = ms != null ? Math.round(ms) : a.sub;
-    const taxAmt = (tax > 0 && tax < 100) ? Math.round(gross * tax / 100) : 0;
-    const profit = Math.round(gross - taxAmt - promo - cop - pack - rc);
-    const src = ms != null ? "Manual Settlement " + gross : "Expected Settlement " + gross;
-    const why = src + " - tax " + taxAmt + " - promotion " + promo + " - COP " + Math.round(cop)
+    const rc = (a && a.rc) || 0;
+    const settle = es.val;
+    // Promotion is already taken out before the settlement lands, so Expected
+    // Settlement IS the post-promotion figure. Profit is what remains once the
+    // real costs come off it: tax (a flat % of the settlement), COP, packaging
+    // and return cost/order. Promotion is NOT deducted again.
+    const taxAmt = (tax > 0 && tax < 100) ? Math.round(settle * tax / 100) : 0;
+    const profit = Math.round(settle - taxAmt - cop - pack - rc);
+    const why = "Expected Settlement " + settle + " - tax " + taxAmt + " - COP " + Math.round(cop)
       + " - packaging " + Math.round(pack) + " - return cost " + rc + " = " + profit
-      + ". Profit after every deduction.";
+      + ". Promotion is already out before the settlement, so it is not deducted again.";
     return { val: profit, why: why };
   }
   // Return cost per order: return charges billed over 90 days (RTO excluded)
@@ -3263,7 +3266,7 @@
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
     "Expected Settlement": "Flipkart + Amazon + Meesho: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (100%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
-    "Expected Profit": "What is left after every deduction: the settlement (Manual Settlement if typed, else the Expected Settlement target) less tax, promotion, COP, packaging and return cost/order. On Amazon the promotion is recovered through a higher selling price, so it does not cut profit here. Red = a loss at target. Computed, not typed.",
+    "Expected Profit": "What is left after the real costs come off the Expected Settlement: tax, COP, packaging and return cost/order. Promotion is already taken out before the settlement lands, so it is NOT deducted again. With no manual settlement this equals your margin. Red = a loss at target. Computed, not typed.",
     "Selling Price": "Amazon: Expected Settlement + Amazon Add Rs - the price the Amazon file gets. Flipkart: live price from the last price/inventory file (Flipkart pricing runs on Expected Settlement). Meesho: what the last order sold at (Supplier Discounted Price). Others: from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
