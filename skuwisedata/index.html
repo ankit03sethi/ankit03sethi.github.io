@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12o</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12p</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -918,7 +918,7 @@
       match = [];
       if (document.getElementById("mAll").checked) {
         match = ["all"];
-        if (!confirm("Change ALL rows (the whole column)" + (plat !== "all" ? " on " + plat : "") + (comp !== "all" ? " for " + comp : "") + "? This can affect a very large number of listings.")) return;
+        if (!confirm("Change ALL rows (the whole column)" + (plat !== "all" ? " on " + plat : "") + (comp !== "all" ? " for " + comp : "") + ? This can affect a very large number of listings. It may take up to a minute for all platforms/companies - please wait after OK.")) return;
       } else {
         if (document.getElementById("mMaster").checked) match.push("master");
         if (document.getElementById("mSub").checked) match.push("subcategory");
