@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2018,7 +2018,7 @@
         case "S.NO":              return String(i + 1);
         case "Date":              return fmtDate(r.created_at || r.updated_at);
         case "Company":           return r.company_name || "—";
-        case "Platform":          return r.platform || "—";
+        case "Platform":          return r.platform ? r.platform.charAt(0).toUpperCase() + r.platform.slice(1) : "—";
         case "Platform Seller":   return state.platformSellers.get(psKey(r.company_name, r.platform)) || "";
         case "Brand":             return r.brand || "—";
         case "Category":          return r.category || "—";
