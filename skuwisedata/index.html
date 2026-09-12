@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12x</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-13a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -644,6 +644,29 @@
     if (a.val == null) return { val: null, why: a.why, manual: false };
     return { val: a.sub, why: "Target before promotion: " + a.sub + ".", manual: false };
   }
+  // Expected Profit: what is left after every deduction comes off the settlement.
+  // The settlement before promotion = Manual Settlement if typed, else the
+  // Expected Settlement target (auto). Off it come tax (a flat % of the
+  // settlement), the promotion cut, COP, packaging and return cost/order. On
+  // Amazon the promotion is recovered through a higher price, so its cut is 0.
+  function expProfitCalc(r) {
+    const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const a = autoSettleCalc(r);
+    if (a.val == null) return { val: null, why: a.why };
+    const cop = numOf(rd0["COP"]) || 0;
+    const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0;
+    const pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
+    const rc = a.rc || 0, promo = a.promo || 0;
+    const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
+    const gross = ms != null ? Math.round(ms) : a.sub;
+    const taxAmt = (tax > 0 && tax < 100) ? Math.round(gross * tax / 100) : 0;
+    const profit = Math.round(gross - taxAmt - promo - cop - pack - rc);
+    const src = ms != null ? "Manual Settlement " + gross : "Expected Settlement " + gross;
+    const why = src + " - tax " + taxAmt + " - promotion " + promo + " - COP " + Math.round(cop)
+      + " - packaging " + Math.round(pack) + " - return cost " + rc + " = " + profit
+      + ". Profit after every deduction.";
+    return { val: profit, why: why };
+  }
   // Return cost per order: return charges billed over 90 days (RTO excluded)
   // over Net sales (units that stayed sold). Same number the Return Cost/Order
   // column shows; Auto Settlement adds it on top. Null when there is no data.
@@ -734,6 +757,32 @@
       + (promoPct > 0 ? "; grossed up for " + promoPct + "% promotion = " + val : "") + ". The price the Amazon file gets.";
     return { val: val, why: why };
   }
+  // Flipkart / Meesho target selling price: convert the Auto Settlement to a
+  // price using this listing's own settlement-to-price ratio (observed
+  // settlement/unit over the observed selling price). Estimate - the real price
+  // comes from the reprice file (slope). Falls back to the observed price.
+  function fmSellPrice(r) {
+    const pf = String(r.platform || "").toLowerCase();
+    const key = wcKey(r.company_name, r.platform, r.seller_sku);
+    const wc = state.windowCounts && state.windowCounts.get(key);
+    const st = state.listingStats && state.listingStats.get(key);
+    const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const su = wc ? Number(wc.settle_unit) : NaN;
+    const obsPrice = pf === "flipkart" ? (st ? Number(st.file_price) : NaN) : (wc ? Number(wc.ls_price) : NaN);
+    const a = autoSettleCalc(r);
+    if (a.val == null) return { val: (obsPrice > 0 ? Math.round(obsPrice) : null), why: a.why };
+    // Gross settlement to aim the price at: Manual Settlement (plus the promotion
+    // cut it must still cover) if typed, else the Auto Settlement. So the price
+    // follows Manual Settlement and Promotion % live, not just the auto figure.
+    const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
+    const target = ms != null ? Math.round(ms) + (a.promo || 0) : a.val;
+    const tgtWhy = ms != null ? ("Manual Settlement " + Math.round(ms) + (a.promo ? " + " + a.promo + " promotion" : "")) : ("Auto Settlement " + a.val);
+    if (su > 0 && obsPrice > 0) {
+      const price = Math.round(target * obsPrice / su);
+      return { val: price, why: "Est. price to net " + tgtWhy + " = " + target + " - this listing keeps about " + Math.round(su / obsPrice * 100) + "% of price as settlement (" + Math.round(su) + " on " + Math.round(obsPrice) + "). Estimate; real price via the reprice file." };
+    }
+    return { val: (obsPrice > 0 ? Math.round(obsPrice) : null), why: obsPrice > 0 ? "Observed price (no settlement rate yet to compute a target price)." : "No price/settlement data yet - need a settled order (rate) and an observed price." };
+  }
   // MOQ = whichever spoke last. The Flipkart page check (its line, or the lack
   // of one) answers until 3 new orders have been placed after that check; then
   // those 3 answer (their smallest quantity, 2 or more = MOQ, a 1 among them =
@@ -821,7 +870,7 @@
     const rr = liveRow(r), pf = String(r.platform || "").toLowerCase();
     let dirty = false; for (const it of PENDING.values()) if (String(it.id) === String(r.id)) { dirty = true; break; }
     const tone = dirty ? "#b45309" : "#334155";
-    const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price");
+    const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price"), iP = heads.indexOf("Expected Profit");
     const iA = heads.indexOf("Auto Settlement");
     if (iA >= 0 && tr.cells[iA]) {
       const a = autoSettleCalc(rr), td = tr.cells[iA];
@@ -833,10 +882,20 @@
       td.textContent = es.val == null ? "—" : String(es.val); td.title = es.why;
       td.style.color = es.val == null ? "#cbd5e1" : tone; td.style.fontWeight = es.manual ? "600" : "";
     }
+    if (iP >= 0 && tr.cells[iP] && ["flipkart", "amazon", "meesho"].includes(pf)) {
+      const ep = expProfitCalc(rr), td = tr.cells[iP];
+      td.textContent = ep.val == null ? "—" : String(ep.val); td.title = ep.why;
+      td.style.color = ep.val == null ? "#cbd5e1" : (ep.val < 0 ? "#b91c1c" : tone); td.style.fontWeight = ep.val == null ? "" : "600";
+    }
     if (iS >= 0 && tr.cells[iS] && pf === "amazon") {
       const asp = amazonSellPrice(rr), td = tr.cells[iS];
       if (asp.val == null) { td.textContent = "—"; td.title = asp.why; td.style.color = "#cbd5e1"; }
       else { td.textContent = String(asp.val); td.title = asp.why; td.style.color = tone; }
+    }
+    if (iS >= 0 && tr.cells[iS] && (pf === "flipkart" || pf === "meesho")) {
+      const fm = fmSellPrice(rr), td = tr.cells[iS];
+      if (fm.val == null) { td.textContent = "—"; td.title = fm.why; td.style.color = "#cbd5e1"; }
+      else { td.textContent = String(fm.val); td.title = fm.why; td.style.color = tone; }
     }
   }
   const tableWrapEl = document.getElementById("tableWrap");
@@ -1650,7 +1709,7 @@
   // Financial columns need the "Financial data" permission. Prices stay visible
   // (listing work needs them); cost, margin, settlement, revenue and profit do not.
   const FIN_KEEP = new Set(["Selling Price","Site Price","Other Price","Our Price","File Price","Suggested Price"]);
-  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
+  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Expected Profit","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
   const canFin = () => !window.CA || !CA.access || CA.can("skuwise.financial", "view");
   const finHidden = (c) => !canFin() && !FIN_KEEP.has(c) && (FIN_EXTRA.has(c) || colKind(c) === "value");
   const FIN_RAW = /price|amount|settle|value|profit|cost|revenue|margin|fee|charge|tax|gst|total|payment|payout|commission|\brs\b|₹|mrp|discount|invoice/i;
@@ -1928,7 +1987,7 @@
   // Units / % / Values switch reaches them too.
   const FLAT_KIND = {
     "COP": "value", "Final COP": "value", "Packaging": "value", "Tax %": "pct",
-    "Expected Settlement": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Promotion %": "pct", "Selling Price": "value", "Site Price": "value",
+    "Expected Settlement": "value", "Expected Profit": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Promotion %": "pct", "Selling Price": "value", "Site Price": "value",
     "Last 3 Settle": "value", "Last Settle": "value", "Settle/unit": "value",
     "Margin/unit": "value", "Margin %COP": "pct",
     "Last Ret Charge": "value", "Last Ret Cost": "value",
@@ -1941,7 +2000,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
-      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
+      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Expected Profit","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
@@ -2574,6 +2633,15 @@
         if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
         return '<td title="' + escapeHtml(es.why) + '" style="color:#334155' + (es.manual ? ";font-weight:600" : "") + '">' + es.val + "</td>";
       }
+      // Expected Profit: settlement less every deduction (tax, promotion, COP,
+      // packaging, return cost). Red when it goes negative - a loss at target.
+      if (c === "Expected Profit") {
+        if (!["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase()))
+          return '<td style="color:#cbd5e1">' + DASH + "</td>";
+        const ep = expProfitCalc(r);
+        if (ep.val == null) return '<td title="' + escapeHtml(ep.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
+        return '<td title="' + escapeHtml(ep.why) + '" style="color:' + (ep.val < 0 ? "#b91c1c" : "#334155") + ';font-weight:600">' + ep.val + "</td>";
+      }
       // Selling Price is never typed on the three big platforms. Amazon: the
       // price the reprice file gets (Expected Settlement + Add Rs). Flipkart:
       // the live price from the last price/inventory file (pricing there runs
@@ -2585,15 +2653,10 @@
           if (asp.val == null) return '<td title="' + escapeHtml(asp.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
           return '<td title="' + escapeHtml(asp.why) + '" style="color:#334155;font-weight:600">' + asp.val + "</td>";
         }
-        if (pf === "flipkart") {
-          const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
-          const v = st && st.file_price != null ? String(st.file_price) : "";
-          return '<td title="Live price from the last Flipkart price/inventory file. Pricing runs on Expected Settlement." style="color:#334155">' + escapeHtml(v) + "</td>";
-        }
-        if (pf === "meesho") {
-          const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-          const v = wc && wc.ls_price != null ? String(Math.round(Number(wc.ls_price))) : "";
-          return '<td title="' + escapeHtml("Supplier Discounted Price on the last Meesho order" + (wc && wc.ls_pkey ? " " + wc.ls_pkey : "")) + '" style="color:#334155">' + v + "</td>";
+        if (pf === "flipkart" || pf === "meesho") {
+          const fm = fmSellPrice(r);
+          if (fm.val == null) return '<td title="' + escapeHtml(fm.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
+          return '<td title="' + escapeHtml(fm.why) + '" style="color:#334155;font-weight:600">' + fm.val + "</td>";
         }
       }
       if (NUM_COLS[c]) {
@@ -3200,6 +3263,7 @@
     "Packaging": "Packing cost per unit from the master sheet.",
     "Final COP": "COP plus packaging - the full cost of one unit.",
     "Expected Settlement": "Flipkart + Amazon + Meesho: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (100%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
+    "Expected Profit": "What is left after every deduction: the settlement (Manual Settlement if typed, else the Expected Settlement target) less tax, promotion, COP, packaging and return cost/order. On Amazon the promotion is recovered through a higher selling price, so it does not cut profit here. Red = a loss at target. Computed, not typed.",
     "Selling Price": "Amazon: Expected Settlement + Amazon Add Rs - the price the Amazon file gets. Flipkart: live price from the last price/inventory file (Flipkart pricing runs on Expected Settlement). Meesho: what the last order sold at (Supplier Discounted Price). Others: from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
@@ -3308,7 +3372,7 @@
     "Category":"category", "Sub Category":"subcategory", "Product":"product",
     "Color":"color", "ASIN":"asin", "SKU":"sku", "Master Sku":"mastersku", "Stock":"stockstatus", "Qty":"stockqty", "HSN":"hsn",
     "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
-    "Expected Settlement":"expectedsettlement", "Tax %":"tax", "Packaging":"packaging",
+    "Expected Settlement":"expectedsettlement", "Expected Profit":"expectedprofit", "Tax %":"tax", "Packaging":"packaging",
     "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
     "Other Seller":"otherseller", "Other Price":"otherprice", "Other Assured":"otherassured",
     "Our Price":"ourprice", "Our Assured":"ourassured",
