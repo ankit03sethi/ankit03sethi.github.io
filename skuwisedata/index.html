@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2349,16 +2349,17 @@
 
     function renderCell(r, i, c) {
       // Return cost per order: the return charges the platform actually billed
-      // over the last 90 days (RTO excluded), spread across the delivered (net)
-      // orders in that window. Read-only, per listing - add it to the settlement.
+      // over the last 90 days (RTO excluded), spread across Net sales (the units
+      // that stayed sold = sold minus returned) - the same 90d Net sales figure
+      // shown on the page. Read-only, per listing - add it to the settlement.
       if (c === "Return Cost/Order") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const po = wc ? Number(wc.po90) : NaN;
+        const net = wc ? (Number(wc.u90) || 0) - (Number(wc.ur90) || 0) : NaN;
         const rl = wc ? Number(wc.rls90) : NaN;
-        if (!(po > 0) || !(rl > 0)) return `<td style="color:#cbd5e1">${DASH}</td>`;
-        const v = Math.round(rl / po);
+        if (!(net > 0) || !(rl > 0)) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        const v = Math.round(rl / net);
         const tip = "Return charges billed over 90 days (" + money(rl) + ", RTO excluded) over "
-          + po + " delivered order" + (po === 1 ? "" : "s") + " = " + money(v) + " per order.";
+          + net.toLocaleString("en-IN") + " Net sales (units that stayed sold) = " + money(v) + " per order.";
         return `<td title="${escapeHtml(tip)}" style="color:#334155">${v}</td>`;
       }
       // The order id behind the "Last" box next door - Settle order is the last
@@ -3078,7 +3079,7 @@
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
-    "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by the delivered (net) orders in that window - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
+    "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by 90d Net sales (units that stayed sold = sold minus returned) - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
     "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Shows the courier actually charged on this SKU's last non-returned order and moves with every new order. The typed number (file or page) is only the stand-in until a courier line has settled; blank = 50.",
