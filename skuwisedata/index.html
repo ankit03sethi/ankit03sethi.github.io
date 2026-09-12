@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12m</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12n</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -692,17 +692,23 @@
                why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
                     + "; grossed up for " + promoPct + "% promotion on settlement (+" + mpromo + ") = " + mval + " so you still net " + sub + " after the Meesho cut. Auto - computed, not typed." };
     }
-    const stp = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
-    const wcp = state.windowCounts && state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-    let sp = null, spSrc = "";
-    if (stp && Number(stp.price) > 0) { sp = Number(stp.price); spSrc = "live price"; }
-    else if (stp && Number(stp.our_price) > 0) { sp = Number(stp.our_price); spSrc = "our price"; }
-    else if (wcp && Number(wcp.ls_price) > 0) { sp = Number(wcp.ls_price); spSrc = "last order"; }
+    const spKey = wcKey(r.company_name, r.platform, r.seller_sku);
+    const stp = state.listingStats && state.listingStats.get(spKey);
+    const wcp = state.windowCounts && state.windowCounts.get(spKey);
+    const stk = state.stockMap && state.stockMap.get(spKey);
+    // Every selling-price source with its date - scrape, last order, and (mainly
+    // Flipkart) the inventory file. The freshest one wins.
+    const cand = [];
+    if (stp && Number(stp.price) > 0) cand.push({ p: Number(stp.price), d: Date.parse(stp.last_checked_at || "") || 0, s: "live price" });
+    if (wcp && Number(wcp.ls_price) > 0) cand.push({ p: Number(wcp.ls_price), d: Date.parse(wcp.settle_last_on || "") || 0, s: "last order" });
+    if (stk && Number(stk.sell_price) > 0) cand.push({ p: Number(stk.sell_price), d: Date.parse(stk.seen_at || "") || 0, s: "inventory file" });
+    let sp = null, spSrc = "", spWhen = "";
+    if (cand.length) { cand.sort((a, b) => b.d - a.d); sp = cand[0].p; spSrc = cand[0].s; spWhen = cand[0].d ? new Date(cand[0].d).toISOString().slice(0, 10) : ""; }
     else { const es = expSettleCalc(r); const add = pf === "amazon" ? amazonAddRs(r).val : 0; sp = (es.val != null ? es.val : sub) + add; spSrc = "estimate"; }
     const promo = Math.round(promoPct / 100 * sp);
     return { val: sub + promo, base: base, rc: rc, sub: sub, promo: promo, promoPct: promoPct, sp: sp,
              why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
-                  + "; + " + promoPct + "% promotion on selling price " + Math.round(sp) + " (" + spSrc + ") = +" + promo
+                  + "; + " + promoPct + "% promotion on selling price " + Math.round(sp) + " (" + spSrc + (spWhen ? ", " + spWhen : "") + ") = +" + promo
                   + ", total " + (sub + promo) + " so the promotion cut still leaves " + sub + ". Auto - computed, not typed." };
   }
   // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
