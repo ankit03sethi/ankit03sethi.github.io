@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -878,8 +878,8 @@
     const sm = document.getElementById("scopeModal");
     sm.querySelector('input[value="single"]').checked = true;
     document.getElementById("scopeBulk").style.display = "none";
-    var comps = [...new Set([...state.rowsById.values()].map(function (r) { return String(r.company_name || "").trim(); }).filter(Boolean))].sort();
-    document.getElementById("scopeCompany").innerHTML = '<option value="all">All companies</option>' + comps.map(function (c) { return '<option value="' + c.replace(/"/g, "&quot;") + '">' + c + '</option>'; }).join("");
+    var comps = (state.companies && state.companies.length) ? state.companies.slice() : [...new Set([...state.rowsById.values()].map(function (r) { return String(r.company_name || "").trim(); }).filter(Boolean))].sort();
+    document.getElementById("scopeCompany").innerHTML = '<option value="all">All companies</option>' + comps.map(function (c) { return '<option value="' + String(c).replace(/"/g, "&quot;") + '">' + String(c) + '</option>'; }).join("");
     var first = Array.from(PENDING.values())[0];
     var r0 = first ? state.rowsById.get(String(first.id)) : null;
     var hint = function (v) { v = String(v == null ? "" : v).trim(); return v ? '(' + (v.length > 22 ? v.slice(0, 22) + "…" : v) + ')' : "(blank)"; };
