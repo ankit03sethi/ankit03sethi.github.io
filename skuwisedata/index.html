@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12l</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12m</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -677,15 +677,20 @@
     const sub = base + rc;
     const pf = String(r.platform || "").toLowerCase();
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
-    // Promotion is a % cut off the SELLING PRICE the buyer sees, borne by us, so
-    // the deduction is promoPct% of the actual selling price. We add it back so
-    // that after the platform cut we still net sub. Meesho promotions are
-    // platform-funded and never touch our settlement, so Meesho is left out.
-    if (!(promoPct > 0) || pf === "meesho") {
+    // Promotion is a % cut the platform makes. Flipkart and Amazon cut it off
+    // the SELLING PRICE (borne by us), so we add promoPct% of the actual selling
+    // price. Meesho cuts it off the SETTLEMENT, so we gross the settlement up.
+    if (!(promoPct > 0)) {
       return { val: sub, base: base, rc: rc, sub: sub, promo: 0, promoPct: promoPct, sp: null,
+               why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub + ". Auto - computed, not typed." };
+    }
+    if (pf === "meesho") {
+      // Meesho takes the promotion off the SETTLEMENT: gross up by 1/(1-promoPct).
+      const mval = (promoPct < 100) ? Math.ceil(sub / (1 - promoPct / 100)) : sub;
+      const mpromo = mval - sub;
+      return { val: mval, base: base, rc: rc, sub: sub, promo: mpromo, promoPct: promoPct, sp: null,
                why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
-                    + (pf === "meesho" && promoPct > 0 ? " (Promotion % ignored on Meesho - platform-funded)" : "")
-                    + ". Auto - computed, not typed." };
+                    + "; grossed up for " + promoPct + "% promotion on settlement (+" + mpromo + ") = " + mval + " so you still net " + sub + " after the Meesho cut. Auto - computed, not typed." };
     }
     const stp = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
     const wcp = state.windowCounts && state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -3146,8 +3151,8 @@
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
-    "Promotion %": "A promotion percentage you type per listing. On Flipkart and Amazon the promotion is a % cut off the SELLING PRICE (borne by you), so Auto Settlement adds Promotion% of the actual selling price (live scrape price, else last order price) on top - after the platform takes its cut you still net the base amount. Meesho promotions are platform-funded, so Promotion % is ignored there. Editable; saved to the master file. Blank = 0.",
-    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order, plus Promotion% of the actual selling price (Flipkart/Amazon only; Meesho excluded) so the promotion cut still leaves the pre-promotion amount. The full number that already covers returns and the promotion. Same auto base as Expected Settlement (ignoring any typed Manual Settlement).",
+    "Promotion %": "A promotion percentage you type per listing. Flipkart/Amazon cut the promotion off the SELLING PRICE, so Auto Settlement adds Promotion% of the actual selling price (live scrape price, else last order price). Meesho cuts it off the SETTLEMENT, so there Auto Settlement is grossed up (settlement / (1 - Promotion%/100)). Either way, after the platform cut you still net the base amount. Editable; saved to the master file. Blank = 0.",
+    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order, plus the promotion the platform takes - on Flipkart/Amazon Promotion% of the selling price, on Meesho grossed up off the settlement - so the promotion cut still leaves the pre-promotion amount. The full number that already covers returns and the promotion. Same auto base as Expected Settlement (ignoring any typed Manual Settlement).",
     "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by 90d Net sales (units that stayed sold = sold minus returned) - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
