@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12j</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -676,11 +676,15 @@
     const rc = returnCostPerOrder(r) || 0;
     const sub = base + rc;
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
-    const promo = Math.round(sub * promoPct / 100);
-    return { val: sub + promo, base: base, rc: rc, promo: promo, promoPct: promoPct,
-             why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ")"
-                  + (promoPct ? " + " + promoPct + "% promotion (" + promo + ")" : "")
-                  + " = " + (sub + promo) + ". Auto - computed, not typed." };
+    // Gross up: the platform takes the promotion as a cut off the FINAL
+    // settlement, so to still net `sub` after a promoPct% cut the settlement
+    // must be sub / (1 - promoPct/100), not sub plus promoPct% of sub.
+    const val = (promoPct > 0 && promoPct < 100) ? Math.ceil(sub / (1 - promoPct / 100)) : sub;
+    const promo = val - sub;
+    return { val: val, base: base, rc: rc, promo: promo, promoPct: promoPct,
+             why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
+                  + (promoPct ? "; grossed up for " + promoPct + "% promotion (+" + promo + ") = " + val + " so you still net " + sub + " after the platform cut" : "")
+                  + ". Auto - computed, not typed." };
   }
   // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
   function amazonAddRs(r) {
@@ -3128,8 +3132,8 @@
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
-    "Promotion %": "A promotion percentage you type per listing. Auto Settlement adds this % of itself (COP + tax + packaging + margin + return cost) on top, so the settlement covers the promotion. Editable; saved to the master file. Blank = 0.",
-    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order, plus Promotion % of that sum. The full number that already covers returns and the promotion. Same auto base as Expected Settlement (ignoring any typed Manual Settlement).",
+    "Promotion %": "A promotion percentage you type per listing. Auto Settlement is grossed up by this % (settlement = base / (1 - Promotion%/100)), so after the platform takes its Promotion% cut off the settlement you still net the base amount. Editable; saved to the master file. Blank = 0.",
+    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order, then grossed up for Promotion % (divided by 1 - Promotion%/100) so the promotion cut off the settlement still leaves the pre-promotion amount. The full number that already covers returns and the promotion. Same auto base as Expected Settlement (ignoring any typed Manual Settlement).",
     "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by 90d Net sales (units that stayed sold = sold minus returned) - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
