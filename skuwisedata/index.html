@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12n</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12o</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -888,6 +888,7 @@
       '<label style="display:block;font-size:13px;margin-bottom:4px"><input type="checkbox" id="mSub"> Sub Category <span id="vSub" style="color:#64748b"></span></label>' +
       '<label style="display:block;font-size:13px;margin-bottom:4px"><input type="checkbox" id="mProd"> Product <span id="vProd" style="color:#64748b"></span></label>' +
       '<label style="display:block;font-size:13px;margin-bottom:8px"><input type="checkbox" id="mColor"> Color <span id="vColor" style="color:#64748b"></span></label>' +
+      '<label style="display:block;font-size:13px;margin-top:2px;padding-top:6px;border-top:1px solid #eef2f7"><input type="checkbox" id="mAll"> All rows <span style="color:#64748b">(whole column - only Platform/Company filter below)</span></label>' +
       '<label style="font-size:13px;color:#334155;display:block;margin-bottom:6px">Platform: <select id="scopePlat" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px"><option value="all">All platforms</option><option value="amazon">Amazon</option><option value="flipkart">Flipkart</option><option value="meesho">Meesho</option><option value="firstcry">Firstcry</option><option value="myntra">Myntra</option></select></label>' +
       '<label style="font-size:13px;color:#334155;display:block">Company: <select id="scopeCompany" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px"><option value="all">All companies</option></select></label>' +
       '</div>' +
@@ -897,7 +898,11 @@
       '<button id="scopeApply" style="background:#1f6feb;color:#fff;border:none;padding:8px 16px;border-radius:9px;cursor:pointer">Apply</button></div>' +
       '</div>';
     document.body.appendChild(d);
-    d.addEventListener("change", function (e) { if (e.target && e.target.name === "scopeR") document.getElementById("scopeBulk").style.display = e.target.value === "bulk" ? "block" : "none"; });
+    d.addEventListener("change", function (e) {
+      if (e.target && e.target.name === "scopeR") document.getElementById("scopeBulk").style.display = e.target.value === "bulk" ? "block" : "none";
+      if (e.target && e.target.id === "mAll" && e.target.checked) ["mMaster","mSub","mProd","mColor"].forEach(function (id) { document.getElementById(id).checked = false; });
+      if (e.target && ["mMaster","mSub","mProd","mColor"].indexOf(e.target.id) >= 0 && e.target.checked) document.getElementById("mAll").checked = false;
+    });
     d.addEventListener("click", function (e) { if (e.target === d || e.target.id === "scopeCancel") d.style.display = "none"; });
     document.getElementById("scopeApply").addEventListener("click", function () { runScopedSave(false); });
     document.getElementById("scopeBlank").addEventListener("click", function () { runScopedSave(true); });
@@ -911,11 +916,16 @@
       plat = document.getElementById("scopePlat").value || "all";
       comp = document.getElementById("scopeCompany").value || "all";
       match = [];
-      if (document.getElementById("mMaster").checked) match.push("master");
-      if (document.getElementById("mSub").checked) match.push("subcategory");
-      if (document.getElementById("mProd").checked) match.push("product");
-      if (document.getElementById("mColor").checked) match.push("color");
-      if (!match.length) { alert("Tick at least one Match-by box (Master SKU, Sub Category, Product or Color)."); return; }
+      if (document.getElementById("mAll").checked) {
+        match = ["all"];
+        if (!confirm("Change ALL rows (the whole column)" + (plat !== "all" ? " on " + plat : "") + (comp !== "all" ? " for " + comp : "") + "? This can affect a very large number of listings.")) return;
+      } else {
+        if (document.getElementById("mMaster").checked) match.push("master");
+        if (document.getElementById("mSub").checked) match.push("subcategory");
+        if (document.getElementById("mProd").checked) match.push("product");
+        if (document.getElementById("mColor").checked) match.push("color");
+        if (!match.length) { alert("Tick at least one Match-by box (Master SKU, Sub Category, Product, Color, or All rows)."); return; }
+      }
     }
     modal.style.display = "none";
     const items = Array.from(PENDING.values()); if (!items.length) return;
@@ -962,6 +972,7 @@
     document.getElementById("mSub").checked = false;
     document.getElementById("mProd").checked = false;
     document.getElementById("mColor").checked = false;
+    document.getElementById("mAll").checked = false;
     sm.style.display = "flex";
   });
   document.getElementById("editDiscardBtn").addEventListener("click", () => {
