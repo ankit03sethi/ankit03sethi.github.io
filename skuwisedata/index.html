@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12u</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12v</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -679,20 +679,12 @@
     // promotion is absorbed by raising the SELLING PRICE - it does NOT change the
     // settlement here. Flipkart: the platform sets the price and the promotion
     // eats our settlement, so we add promoPct% of the actual selling price.
-    // Meesho: the promotion comes off the SETTLEMENT, so we gross the settlement up.
+    // Meesho: same rule as Flipkart - promo% of the actual selling price.
     if (!(promoPct > 0) || pf === "amazon") {
       return { val: sub, base: base, rc: rc, sub: sub, promo: 0, promoPct: promoPct, sp: null,
                why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
                     + (pf === "amazon" && promoPct > 0 ? " (Promotion applied to the Amazon selling price, not the settlement)" : "")
                     + ". Auto - computed, not typed." };
-    }
-    if (pf === "meesho") {
-      // Meesho takes the promotion off the SETTLEMENT: gross up by 1/(1-promoPct).
-      const mval = (promoPct < 100) ? Math.ceil(sub / (1 - promoPct / 100)) : sub;
-      const mpromo = mval - sub;
-      return { val: mval, base: base, rc: rc, sub: sub, promo: mpromo, promoPct: promoPct, sp: null,
-               why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
-                    + "; grossed up for " + promoPct + "% promotion on settlement (+" + mpromo + ") = " + mval + " so you still net " + sub + " after the Meesho cut. Auto - computed, not typed." };
     }
     const spKey = wcKey(r.company_name, r.platform, r.seller_sku);
     const stp = state.listingStats && state.listingStats.get(spKey);
