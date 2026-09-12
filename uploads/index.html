@@ -172,7 +172,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11d</span></div>
+      <div class="nav-sub">Uploads &middot; Cursive Analyst <span style="opacity:.5;" title="Which build of this page you are looking at. If this is older than the change you are testing, the browser is serving a cached copy.">build 2026-09-11e</span></div>
     </div>
   </a>
   </div>
@@ -2003,7 +2003,7 @@
         const ms = numOf(ld["Manual Settlement"]) ?? numOf(rd["Manual Settlement"]);
         if (ms != null) return Math.round(ms);
         const cop = numOf(rd["COP"]); if (cop == null || cop <= 0) return "";
-        const tax = numOf(rd["Tax %"]) || 0, pack = numOf(rd["Packaging"]) || 0;
+        const tax = (numOf(ld["Tax %"]) ?? numOf(rd["Tax %"])) || 0, pack = (numOf(ld["Packaging"]) ?? numOf(rd["Packaging"])) || 0;
         const mm = numOf(ld["Manual Margin"]) ?? numOf(rd["Manual Margin"]);
         const am = numOf(ld["Auto Margin"]) ?? numOf(rd["Auto Margin"]);
         const ap = numOf(ld["Auto %"]) ?? numOf(rd["Auto %"]);
@@ -2042,8 +2042,8 @@
           rd["COP"] ?? "",
           (x.wh_qty != null && String(x.wh_qty) !== "" ? x.wh_qty : ""),
           r.hsn || rd["HSN"] || "",
-          rd["Tax %"] ?? "",
-          rd["Packaging"] ?? "",
+          eff("Tax %"),
+          eff("Packaging"),
           rd["Final COP"] ?? "",
           eff("Margin"), eff("Auto Margin"), eff("Auto %"), eff("Manual Margin"), eff("Manual Settlement"),
           (courier.has(String(r.id)) ? courier.get(String(r.id)) : eff("Amazon Add Rs")), eff("Max Step %"),
