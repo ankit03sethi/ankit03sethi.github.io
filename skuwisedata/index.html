@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12r</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12s</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -633,18 +633,10 @@
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
     const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
     if (ms != null) return { val: Math.round(ms), why: "Manual Settlement, as typed", manual: true };
-    const cop = numOf(rd0["COP"]);
-    if (cop == null || cop <= 0) return { val: null, why: "No COP on the master sheet" };
-    const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0, pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
-    const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
-    const am = numOf(ld0["Auto Margin"]) ?? numOf(rd0["Auto Margin"]);
-    const ap = numOf(ld0["Auto %"]) ?? numOf(rd0["Auto %"]);
-    const mg = mm != null ? mm
-             : (am != null && ap != null) ? Math.min(am, cop * ap / 100)
-             : am != null ? am
-             : ap != null ? cop * ap / 100
-             : Math.min(50, cop);
-    return { val: Math.ceil(cop * (1 + tax / 100) + pack + mg), why: "COP + tax + packaging + " + (mm != null ? "Manual Margin" : "the smaller of Auto Margin and COP x Auto %") + ". Computed, not typed." };
+    // No manual settlement: the final settlement IS the Auto Settlement
+    // (base + return cost + promotion, per platform).
+    const a = autoSettleCalc(r);
+    return { val: a.val, why: a.val == null ? a.why : ("Final = Auto Settlement (no manual). " + a.why), manual: false };
   }
   // Return cost per order: return charges billed over 90 days (RTO excluded)
   // over Net sales (units that stayed sold). Same number the Return Cost/Order
@@ -677,12 +669,16 @@
     const sub = base + rc;
     const pf = String(r.platform || "").toLowerCase();
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
-    // Promotion is a % cut the platform makes. Flipkart and Amazon cut it off
-    // the SELLING PRICE (borne by us), so we add promoPct% of the actual selling
-    // price. Meesho cuts it off the SETTLEMENT, so we gross the settlement up.
-    if (!(promoPct > 0)) {
+    // Promotion is a % cut the platform makes. Amazon: WE set the price, so the
+    // promotion is absorbed by raising the SELLING PRICE - it does NOT change the
+    // settlement here. Flipkart: the platform sets the price and the promotion
+    // eats our settlement, so we add promoPct% of the actual selling price.
+    // Meesho: the promotion comes off the SETTLEMENT, so we gross the settlement up.
+    if (!(promoPct > 0) || pf === "amazon") {
       return { val: sub, base: base, rc: rc, sub: sub, promo: 0, promoPct: promoPct, sp: null,
-               why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub + ". Auto - computed, not typed." };
+               why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
+                    + (pf === "amazon" && promoPct > 0 ? " (Promotion applied to the Amazon selling price, not the settlement)" : "")
+                    + ". Auto - computed, not typed." };
     }
     if (pf === "meesho") {
       // Meesho takes the promotion off the SETTLEMENT: gross up by 1/(1-promoPct).
@@ -704,7 +700,7 @@
     if (stk && Number(stk.sell_price) > 0) cand.push({ p: Number(stk.sell_price), d: Date.parse(stk.seen_at || "") || 0, s: "inventory file" });
     let sp = null, spSrc = "", spWhen = "";
     if (cand.length) { cand.sort((a, b) => b.d - a.d); sp = cand[0].p; spSrc = cand[0].s; spWhen = cand[0].d ? new Date(cand[0].d).toISOString().slice(0, 10) : ""; }
-    else { const es = expSettleCalc(r); const add = pf === "amazon" ? amazonAddRs(r).val : 0; sp = (es.val != null ? es.val : sub) + add; spSrc = "estimate"; }
+    else { const add = pf === "amazon" ? amazonAddRs(r).val : 0; sp = sub + add; spSrc = "estimate"; }
     const promo = Math.round(promoPct / 100 * sp);
     return { val: sub + promo, base: base, rc: rc, sub: sub, promo: promo, promoPct: promoPct, sp: sp,
              why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
@@ -719,6 +715,21 @@
     if (wc && wc.ls_ship != null) return { val: Number(wc.ls_ship), src: "courier on last order" + (wc.ls_key ? " " + wc.ls_key : "") };
     if (typed != null) return { val: typed, src: "typed Amazon Add Rs" };
     return { val: 50, src: "default 50" };
+  }
+  // Amazon selling price = final settlement + Amazon Add Rs, grossed up for
+  // Promotion % (we set the Amazon price, so the promo is absorbed by a higher
+  // price, not by the settlement). Returns { val, why }; val null when no COP.
+  function amazonSellPrice(r) {
+    const es = expSettleCalc(r);
+    if (es.val == null) return { val: null, why: es.why };
+    const ad = amazonAddRs(r);
+    const base = es.val + ad.val;
+    const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
+    const val = (promoPct > 0 && promoPct < 100) ? Math.ceil(base / (1 - promoPct / 100)) : Math.round(base);
+    const why = "Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + ")"
+      + (promoPct > 0 ? "; grossed up for " + promoPct + "% promotion = " + val : "") + ". The price the Amazon file gets.";
+    return { val: val, why: why };
   }
   // MOQ = whichever spoke last. The Flipkart page check (its line, or the lack
   // of one) answers until 3 new orders have been placed after that check; then
@@ -820,9 +831,9 @@
       td.style.color = es.val == null ? "#cbd5e1" : tone; td.style.fontWeight = es.manual ? "600" : "";
     }
     if (iS >= 0 && tr.cells[iS] && pf === "amazon") {
-      const es = expSettleCalc(rr), td = tr.cells[iS];
-      if (es.val == null) { td.textContent = "—"; td.title = es.why; td.style.color = "#cbd5e1"; }
-      else { const ad = amazonAddRs(rr); td.textContent = String(Math.round(es.val + ad.val)); td.title = "Expected Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + "). The price the Amazon file gets."; td.style.color = tone; }
+      const asp = amazonSellPrice(rr), td = tr.cells[iS];
+      if (asp.val == null) { td.textContent = "—"; td.title = asp.why; td.style.color = "#cbd5e1"; }
+      else { td.textContent = String(asp.val); td.title = asp.why; td.style.color = tone; }
     }
   }
   const tableWrapEl = document.getElementById("tableWrap");
@@ -2567,10 +2578,9 @@
       if (c === "Selling Price") {
         const pf = String(r.platform || "").toLowerCase();
         if (pf === "amazon") {
-          const es = expSettleCalc(r);
-          if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
-          const ad = amazonAddRs(r);
-          return '<td title="' + escapeHtml("Expected Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + "). The price the Amazon file gets.") + '" style="color:#334155;font-weight:600">' + Math.round(es.val + ad.val) + "</td>";
+          const asp = amazonSellPrice(r);
+          if (asp.val == null) return '<td title="' + escapeHtml(asp.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
+          return '<td title="' + escapeHtml(asp.why) + '" style="color:#334155;font-weight:600">' + asp.val + "</td>";
         }
         if (pf === "flipkart") {
           const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
