@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-11f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -792,69 +792,77 @@
   }
   tableWrapEl.addEventListener("input", (e) => { const ctl = e.target.closest(".edin"); if (ctl && ctl.tagName === "INPUT") noteEdit(ctl, false); });
   tableWrapEl.addEventListener("change", (e) => { const ctl = e.target.closest(".edin"); if (ctl) noteEdit(ctl, true); });
-  // Save asks the scope first: just this row, or every listing that shares the
-  // product's Master SKU (optionally one platform). The choice writes straight to
-  // the database (so the master file gets it too) and loaded rows update in place.
+  // Save asks the scope first. "This row only" writes just the edited listing.
+  // "Bulk" writes every listing that matches the ticked dimensions (Master SKU,
+  // Sub Category, Product, Color - one or more, taken from the edited row) within
+  // the chosen platform and company. "Make blank" clears the cell(s) instead of
+  // writing the typed value. Everything goes to the database and loaded rows
+  // update in place.
   function ensureScopeModal() {
     if (document.getElementById("scopeModal")) return;
     const d = document.createElement("div");
     d.id = "scopeModal";
     d.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:9999";
     d.innerHTML =
-      '<div style="background:#fff;border-radius:14px;max-width:440px;width:92%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3)">' +
+      '<div style="background:#fff;border-radius:14px;max-width:460px;width:92%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:90vh;overflow:auto">' +
       '<h3 style="margin:0 0 6px;font-size:17px">Save changes</h3>' +
       '<p id="scopeSummary" style="margin:0 0 14px;color:#64748b;font-size:13px"></p>' +
       '<label style="display:flex;gap:8px;align-items:flex-start;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px;cursor:pointer">' +
       '<input type="radio" name="scopeR" value="single" checked style="margin-top:2px"><span><b>This row only</b><br><span style="color:#64748b;font-size:12px">Just the listing you edited.</span></span></label>' +
       '<label style="display:flex;gap:8px;align-items:flex-start;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px;cursor:pointer">' +
-      '<input type="radio" name="scopeR" value="bulk" style="margin-top:2px"><span><b>All listings of this product</b><br><span style="color:#64748b;font-size:12px">Every row with the same Master SKU.</span></span></label>' +
-      '<div id="scopePlatWrap" style="display:none;margin:2px 0 12px;padding-left:6px">' +
-      '<label style="font-size:13px;color:#334155">Platform: <select id="scopePlat" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px">' +
-      '<option value="all">All platforms</option><option value="amazon">Amazon</option><option value="flipkart">Flipkart</option><option value="meesho">Meesho</option><option value="firstcry">Firstcry</option><option value="myntra">Myntra</option>' +
-      '</select></label>' +
-      '<label style="font-size:13px;color:#334155;display:block;margin-top:8px">Company: <select id="scopeCompany" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px"><option value="all">All companies</option></select></label>' +
+      '<input type="radio" name="scopeR" value="bulk" style="margin-top:2px"><span><b>Bulk - many listings at once</b><br><span style="color:#64748b;font-size:12px">Every listing that matches the ticks below.</span></span></label>' +
+      '<div id="scopeBulk" style="display:none;margin:2px 0 4px;padding:10px;border:1px dashed #cbd5e1;border-radius:10px">' +
+      '<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:6px">Match by (tick one or more)</div>' +
+      '<label style="display:block;font-size:13px;margin-bottom:4px"><input type="checkbox" id="mMaster" checked> Master SKU <span id="vMaster" style="color:#64748b"></span></label>' +
+      '<label style="display:block;font-size:13px;margin-bottom:4px"><input type="checkbox" id="mSub"> Sub Category <span id="vSub" style="color:#64748b"></span></label>' +
+      '<label style="display:block;font-size:13px;margin-bottom:4px"><input type="checkbox" id="mProd"> Product <span id="vProd" style="color:#64748b"></span></label>' +
+      '<label style="display:block;font-size:13px;margin-bottom:8px"><input type="checkbox" id="mColor"> Color <span id="vColor" style="color:#64748b"></span></label>' +
+      '<label style="font-size:13px;color:#334155;display:block;margin-bottom:6px">Platform: <select id="scopePlat" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px"><option value="all">All platforms</option><option value="amazon">Amazon</option><option value="flipkart">Flipkart</option><option value="meesho">Meesho</option><option value="firstcry">Firstcry</option><option value="myntra">Myntra</option></select></label>' +
+      '<label style="font-size:13px;color:#334155;display:block">Company: <select id="scopeCompany" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px"><option value="all">All companies</option></select></label>' +
       '</div>' +
-      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">' +
       '<button id="scopeCancel" style="background:#f1f5f9;border:1px solid #e5e7eb;padding:8px 14px;border-radius:9px;cursor:pointer">Cancel</button>' +
+      '<button id="scopeBlank" style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:8px 14px;border-radius:9px;cursor:pointer">Make blank</button>' +
       '<button id="scopeApply" style="background:#1f6feb;color:#fff;border:none;padding:8px 16px;border-radius:9px;cursor:pointer">Apply</button></div>' +
       '</div>';
     document.body.appendChild(d);
-    d.addEventListener("change", function (e) { if (e.target && e.target.name === "scopeR") document.getElementById("scopePlatWrap").style.display = e.target.value === "bulk" ? "block" : "none"; });
+    d.addEventListener("change", function (e) { if (e.target && e.target.name === "scopeR") document.getElementById("scopeBulk").style.display = e.target.value === "bulk" ? "block" : "none"; });
     d.addEventListener("click", function (e) { if (e.target === d || e.target.id === "scopeCancel") d.style.display = "none"; });
-    document.getElementById("scopeApply").addEventListener("click", runScopedSave);
+    document.getElementById("scopeApply").addEventListener("click", function () { runScopedSave(false); });
+    document.getElementById("scopeBlank").addEventListener("click", function () { runScopedSave(true); });
   }
-  async function runScopedSave() {
+  async function runScopedSave(forceClear) {
     const modal = document.getElementById("scopeModal");
     const picked = modal.querySelector('input[name="scopeR"]:checked');
     const scope = picked ? picked.value : "single";
-    const plat = scope === "bulk" ? (document.getElementById("scopePlat").value || "all") : "all";
-    const comp = scope === "bulk" ? (document.getElementById("scopeCompany").value || "all") : "all";
+    let plat = "all", comp = "all", match = ["master"];
+    if (scope === "bulk") {
+      plat = document.getElementById("scopePlat").value || "all";
+      comp = document.getElementById("scopeCompany").value || "all";
+      match = [];
+      if (document.getElementById("mMaster").checked) match.push("master");
+      if (document.getElementById("mSub").checked) match.push("subcategory");
+      if (document.getElementById("mProd").checked) match.push("product");
+      if (document.getElementById("mColor").checked) match.push("color");
+      if (!match.length) { alert("Tick at least one Match-by box (Master SKU, Sub Category, Product or Color)."); return; }
+    }
     modal.style.display = "none";
     const items = Array.from(PENDING.values()); if (!items.length) return;
     const btn = document.getElementById("editSaveBtn"); btn.disabled = true; btn.textContent = "Saving…";
     const failed = [];
     for (const it of items) {
       try {
-        const { data, error } = await sb.rpc("sku_master_set_tag_scope", { p_id: Number(it.id), p_key: it.col, p_value: it.val, p_scope: scope, p_platform: plat, p_company: comp });
+        const val = forceClear ? "" : it.val;
+        const { data, error } = await sb.rpc("sku_master_set_tag_scope", { p_id: Number(it.id), p_key: it.col, p_value: val, p_scope: scope, p_platform: plat, p_company: comp, p_match: match });
         if (error) throw error;
-        const info = data || {}, msku = String(info.master_sku || "").toUpperCase();
-        const affected = [];
-        if (scope === "bulk") {
-          for (const r of state.rowsById.values()) {
-            if (String(r.master_sku || "").toUpperCase() !== msku) continue;
-            if (plat !== "all" && String(r.platform || "").toLowerCase() !== plat) continue;
-            if (comp !== "all" && String(r.company_name || "").trim().toLowerCase() !== comp.toLowerCase()) continue;
-            affected.push(r);
-          }
-        } else {
-          const r = state.rowsById.get(String(it.id)); if (r) affected.push(r);
-        }
-        for (const r of affected) {
+        const info = data || {}, ids = new Set((info.ids || []).map(String));
+        for (const r of state.rowsById.values()) {
+          if (!ids.has(String(r.id))) continue;
           const ld = Object.assign({}, r.listing_data || {});
-          if (it.val === "") delete ld[it.col]; else ld[it.col] = it.val;
+          if (val === "") delete ld[it.col]; else ld[it.col] = val;
           r.listing_data = ld;
           const ctl = findCtl(r.id, it.col);
-          if (ctl) { ctl.value = it.val; ctl.dataset.orig = it.val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!it.val); }
+          if (ctl) { ctl.value = val; ctl.dataset.orig = val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!val); }
           repaintComputed(r.id);
         }
         PENDING.delete(pendKey(it.id, it.col));
@@ -866,12 +874,23 @@
   document.getElementById("editSaveBtn").addEventListener("click", function () {
     const n = PENDING.size; if (!n) return;
     ensureScopeModal();
-    document.getElementById("scopeSummary").textContent = n + (n === 1 ? " change" : " changes") + " to save. Bulk applies each edit to every listing that shares its product's Master SKU.";
+    document.getElementById("scopeSummary").textContent = n + (n === 1 ? " change" : " changes") + " to save.";
     const sm = document.getElementById("scopeModal");
     sm.querySelector('input[value="single"]').checked = true;
-    document.getElementById("scopePlatWrap").style.display = "none";
+    document.getElementById("scopeBulk").style.display = "none";
     var comps = [...new Set([...state.rowsById.values()].map(function (r) { return String(r.company_name || "").trim(); }).filter(Boolean))].sort();
     document.getElementById("scopeCompany").innerHTML = '<option value="all">All companies</option>' + comps.map(function (c) { return '<option value="' + c.replace(/"/g, "&quot;") + '">' + c + '</option>'; }).join("");
+    var first = Array.from(PENDING.values())[0];
+    var r0 = first ? state.rowsById.get(String(first.id)) : null;
+    var hint = function (v) { v = String(v == null ? "" : v).trim(); return v ? '(' + (v.length > 22 ? v.slice(0, 22) + "…" : v) + ')' : "(blank)"; };
+    document.getElementById("vMaster").textContent = r0 ? hint(r0.master_sku) : "";
+    document.getElementById("vSub").textContent = r0 ? hint(r0.sub_category) : "";
+    document.getElementById("vProd").textContent = r0 ? hint(r0.product) : "";
+    document.getElementById("vColor").textContent = r0 ? hint(r0.color) : "";
+    document.getElementById("mMaster").checked = true;
+    document.getElementById("mSub").checked = false;
+    document.getElementById("mProd").checked = false;
+    document.getElementById("mColor").checked = false;
     sm.style.display = "flex";
   });
   document.getElementById("editDiscardBtn").addEventListener("click", () => {
