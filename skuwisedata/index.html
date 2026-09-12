@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12v</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12w</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -672,7 +672,12 @@
     // costs / (1 - tax%). That is the TARGET (Expected Settlement) before promotion.
     const costs = cop + pack + mg + rc;
     const base = Math.round(costs);
-    const sub = (tax > 0 && tax < 100) ? Math.ceil(costs / (1 - tax / 100)) : Math.ceil(costs);
+    const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
+    // Target before promotion = Manual Settlement if typed, else all costs grossed up for the flat tax.
+    const sub = ms != null ? Math.round(ms)
+              : ((tax > 0 && tax < 100) ? Math.ceil(costs / (1 - tax / 100)) : Math.ceil(costs));
+    const subWhy = ms != null ? ("Manual Settlement " + sub)
+                 : ("costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub);
     const pf = String(r.platform || "").toLowerCase();
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
     // Promotion is a % cut the platform makes. Amazon: WE set the price, so the
@@ -682,7 +687,7 @@
     // Meesho: same rule as Flipkart - promo% of the actual selling price.
     if (!(promoPct > 0) || pf === "amazon") {
       return { val: sub, base: base, rc: rc, sub: sub, promo: 0, promoPct: promoPct, sp: null,
-               why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
+               why: subWhy
                     + (pf === "amazon" && promoPct > 0 ? " (Promotion applied to the Amazon selling price, not the settlement)" : "")
                     + ". Auto - computed, not typed." };
     }
@@ -701,7 +706,7 @@
     else { const add = pf === "amazon" ? amazonAddRs(r).val : 0; sp = sub + add; spSrc = "estimate"; }
     const promo = Math.round(promoPct / 100 * sp);
     return { val: sub + promo, base: base, rc: rc, sub: sub, promo: promo, promoPct: promoPct, sp: sp,
-             why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
+             why: subWhy
                   + "; + " + promoPct + "% promotion on selling price " + Math.round(sp) + " (" + spSrc + (spWhen ? ", " + spWhen : "") + ") = +" + promo
                   + ", total " + (sub + promo) + " so the promotion cut still leaves " + sub + ". Auto - computed, not typed." };
   }
