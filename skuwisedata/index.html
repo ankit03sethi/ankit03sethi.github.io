@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -646,6 +646,37 @@
              : Math.min(50, cop);
     return { val: Math.ceil(cop * (1 + tax / 100) + pack + mg), why: "COP + tax + packaging + " + (mm != null ? "Manual Margin" : "the smaller of Auto Margin and COP x Auto %") + ". Computed, not typed." };
   }
+  // Return cost per order: return charges billed over 90 days (RTO excluded)
+  // over Net sales (units that stayed sold). Same number the Return Cost/Order
+  // column shows; Auto Settlement adds it on top. Null when there is no data.
+  function returnCostPerOrder(r) {
+    const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+    const net = wc ? (Number(wc.u90) || 0) - (Number(wc.ur90) || 0) : NaN;
+    const rl = wc ? Number(wc.rls90) : NaN;
+    if (!(net > 0) || !(rl > 0)) return null;
+    return Math.round(rl / net);
+  }
+  // Auto Settlement: the full auto number - COP + tax + packaging + margin (the
+  // same auto base as Expected Settlement, ignoring any typed Manual Settlement)
+  // PLUS the return cost per order. Computed, never typed.
+  function autoSettleCalc(r) {
+    const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const cop = numOf(rd0["COP"]);
+    if (cop == null || cop <= 0) return { val: null, why: "No COP on the master sheet" };
+    const tax = numOf(rd0["Tax %"]) || 0, pack = numOf(rd0["Packaging"]) || 0;
+    const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
+    const am = numOf(ld0["Auto Margin"]) ?? numOf(rd0["Auto Margin"]);
+    const ap = numOf(ld0["Auto %"]) ?? numOf(rd0["Auto %"]);
+    const mg = mm != null ? mm
+             : (am != null && ap != null) ? Math.min(am, cop * ap / 100)
+             : am != null ? am
+             : ap != null ? cop * ap / 100
+             : Math.min(50, cop);
+    const base = Math.ceil(cop * (1 + tax / 100) + pack + mg);
+    const rc = returnCostPerOrder(r) || 0;
+    return { val: base + rc, base: base, rc: rc,
+             why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + (base + rc) + ". Auto - computed, not typed." };
+  }
   // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
   function amazonAddRs(r) {
     const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -743,6 +774,12 @@
     let dirty = false; for (const it of PENDING.values()) if (String(it.id) === String(r.id)) { dirty = true; break; }
     const tone = dirty ? "#b45309" : "#334155";
     const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price");
+    const iA = heads.indexOf("Auto Settlement");
+    if (iA >= 0 && tr.cells[iA]) {
+      const a = autoSettleCalc(rr), td = tr.cells[iA];
+      td.textContent = a.val == null ? "—" : String(a.val); td.title = a.why;
+      td.style.color = a.val == null ? "#cbd5e1" : tone;
+    }
     if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon", "meesho"].includes(pf)) {
       const es = expSettleCalc(rr), td = tr.cells[iE];
       td.textContent = es.val == null ? "—" : String(es.val); td.title = es.why;
@@ -1831,7 +1868,7 @@
   // Units / % / Values switch reaches them too.
   const FLAT_KIND = {
     "COP": "value", "Final COP": "value", "Packaging": "value", "Tax %": "pct",
-    "Expected Settlement": "value", "Selling Price": "value", "Site Price": "value",
+    "Expected Settlement": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Selling Price": "value", "Site Price": "value",
     "Last 3 Settle": "value", "Last Settle": "value", "Settle/unit": "value",
     "Margin/unit": "value", "Margin %COP": "pct",
     "Last Ret Charge": "value", "Last Ret Cost": "value",
@@ -1844,7 +1881,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
-      "COP","HSN","Tax %","Packaging","Final COP","Margin","Auto Margin","Auto %","Manual Margin","Return Cost/Order","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
+      "COP","HSN","Tax %","Packaging","Final COP","Margin","Auto Margin","Auto %","Manual Margin","Return Cost/Order","Auto Settlement","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
@@ -2354,13 +2391,20 @@
       // shown on the page. Read-only, per listing - add it to the settlement.
       if (c === "Return Cost/Order") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const net = wc ? (Number(wc.u90) || 0) - (Number(wc.ur90) || 0) : NaN;
-        const rl = wc ? Number(wc.rls90) : NaN;
-        if (!(net > 0) || !(rl > 0)) return `<td style="color:#cbd5e1">${DASH}</td>`;
-        const v = Math.round(rl / net);
+        const v = returnCostPerOrder(r);
+        if (v == null) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        const net = (Number(wc.u90) || 0) - (Number(wc.ur90) || 0), rl = Number(wc.rls90);
         const tip = "Return charges billed over 90 days (" + money(rl) + ", RTO excluded) over "
           + net.toLocaleString("en-IN") + " Net sales (units that stayed sold) = " + money(v) + " per order.";
         return `<td title="${escapeHtml(tip)}" style="color:#334155">${v}</td>`;
+      }
+      // Auto Settlement: COP + tax + packaging + margin + return cost/order.
+      // The full auto figure, computed - what the settlement should be before
+      // any Manual Settlement override.
+      if (c === "Auto Settlement") {
+        const a = autoSettleCalc(r);
+        if (a.val == null) return '<td title="' + escapeHtml(a.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
+        return '<td title="' + escapeHtml(a.why) + '" style="color:#334155">' + a.val + "</td>";
       }
       // The order id behind the "Last" box next door - Settle order is the last
       // clean paid order (Settled per order and Profit per order both read from
@@ -3079,6 +3123,7 @@
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
+    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order. Same auto base as Expected Settlement (ignoring any typed Manual Settlement) with the per-order return cost added on top. Use it as the settlement that already covers returns.",
     "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by 90d Net sales (units that stayed sold = sold minus returned) - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
