@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12t</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12u</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -666,9 +666,13 @@
              : am != null ? am
              : ap != null ? cop * ap / 100
              : Math.min(50, cop);
-    const base = Math.ceil(cop * (1 + tax / 100) + pack + mg);
     const rc = returnCostPerOrder(r) || 0;
-    const sub = base + rc;
+    // All costs except promotion: COP + margin + packaging + return cost. Tax is
+    // a flat % taken off the settlement, so gross the whole thing up:
+    // costs / (1 - tax%). That is the TARGET (Expected Settlement) before promotion.
+    const costs = cop + pack + mg + rc;
+    const base = Math.round(costs);
+    const sub = (tax > 0 && tax < 100) ? Math.ceil(costs / (1 - tax / 100)) : Math.ceil(costs);
     const pf = String(r.platform || "").toLowerCase();
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
     // Promotion is a % cut the platform makes. Amazon: WE set the price, so the
@@ -678,7 +682,7 @@
     // Meesho: the promotion comes off the SETTLEMENT, so we gross the settlement up.
     if (!(promoPct > 0) || pf === "amazon") {
       return { val: sub, base: base, rc: rc, sub: sub, promo: 0, promoPct: promoPct, sp: null,
-               why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
+               why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
                     + (pf === "amazon" && promoPct > 0 ? " (Promotion applied to the Amazon selling price, not the settlement)" : "")
                     + ". Auto - computed, not typed." };
     }
@@ -687,7 +691,7 @@
       const mval = (promoPct < 100) ? Math.ceil(sub / (1 - promoPct / 100)) : sub;
       const mpromo = mval - sub;
       return { val: mval, base: base, rc: rc, sub: sub, promo: mpromo, promoPct: promoPct, sp: null,
-               why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
+               why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
                     + "; grossed up for " + promoPct + "% promotion on settlement (+" + mpromo + ") = " + mval + " so you still net " + sub + " after the Meesho cut. Auto - computed, not typed." };
     }
     const spKey = wcKey(r.company_name, r.platform, r.seller_sku);
@@ -705,7 +709,7 @@
     else { const add = pf === "amazon" ? amazonAddRs(r).val : 0; sp = sub + add; spSrc = "estimate"; }
     const promo = Math.round(promoPct / 100 * sp);
     return { val: sub + promo, base: base, rc: rc, sub: sub, promo: promo, promoPct: promoPct, sp: sp,
-             why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + sub
+             why: "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub
                   + "; + " + promoPct + "% promotion on selling price " + Math.round(sp) + " (" + spSrc + (spWhen ? ", " + spWhen : "") + ") = +" + promo
                   + ", total " + (sub + promo) + " so the promotion cut still leaves " + sub + ". Auto - computed, not typed." };
   }
