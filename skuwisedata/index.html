@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12s</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12t</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -633,10 +633,12 @@
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
     const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
     if (ms != null) return { val: Math.round(ms), why: "Manual Settlement, as typed", manual: true };
-    // No manual settlement: the final settlement IS the Auto Settlement
-    // (base + return cost + promotion, per platform).
+    // No manual settlement: Expected Settlement is our TARGET before promotion -
+    // base + return cost/order (the amount we want to net). The promotion is
+    // handled separately (Auto Settlement / the selling price), not here.
     const a = autoSettleCalc(r);
-    return { val: a.val, why: a.val == null ? a.why : ("Final = Auto Settlement (no manual). " + a.why), manual: false };
+    if (a.val == null) return { val: null, why: a.why, manual: false };
+    return { val: a.sub, why: "Target before promotion: COP + tax + packaging + margin + return cost/order = " + a.sub + ".", manual: false };
   }
   // Return cost per order: return charges billed over 90 days (RTO excluded)
   // over Net sales (units that stayed sold). Same number the Return Cost/Order
