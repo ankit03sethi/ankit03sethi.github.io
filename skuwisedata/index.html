@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -624,7 +624,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -635,7 +635,7 @@
     if (ms != null) return { val: Math.round(ms), why: "Manual Settlement, as typed", manual: true };
     const cop = numOf(rd0["COP"]);
     if (cop == null || cop <= 0) return { val: null, why: "No COP on the master sheet" };
-    const tax = numOf(rd0["Tax %"]) || 0, pack = numOf(rd0["Packaging"]) || 0;
+    const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0, pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
     const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
     const am = numOf(ld0["Auto Margin"]) ?? numOf(rd0["Auto Margin"]);
     const ap = numOf(ld0["Auto %"]) ?? numOf(rd0["Auto %"]);
@@ -663,7 +663,7 @@
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
     const cop = numOf(rd0["COP"]);
     if (cop == null || cop <= 0) return { val: null, why: "No COP on the master sheet" };
-    const tax = numOf(rd0["Tax %"]) || 0, pack = numOf(rd0["Packaging"]) || 0;
+    const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0, pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
     const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
     const am = numOf(ld0["Auto Margin"]) ?? numOf(rd0["Auto Margin"]);
     const ap = numOf(ld0["Auto %"]) ?? numOf(rd0["Auto %"]);
@@ -1881,7 +1881,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
-      "COP","HSN","Packaging","Margin","Auto Margin","Auto %","Return Cost/Order","Tax %","Auto Settlement","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
+      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Auto Settlement","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
