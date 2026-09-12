@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12q</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12r</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -942,6 +942,7 @@
           const ld = Object.assign({}, r.listing_data || {});
           if (val === "") delete ld[it.col]; else ld[it.col] = val;
           r.listing_data = ld;
+          if (val === "") { const rd = Object.assign({}, r.raw_data || {}); delete rd[it.col]; r.raw_data = rd; }
           const ctl = findCtl(r.id, it.col);
           if (ctl) { ctl.value = val; ctl.dataset.orig = val; ctl.classList.remove("dirty"); ctl.classList.toggle("set", !!val); }
           repaintComputed(r.id);
