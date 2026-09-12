@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12i</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-12j</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -624,7 +624,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -674,8 +674,13 @@
              : Math.min(50, cop);
     const base = Math.ceil(cop * (1 + tax / 100) + pack + mg);
     const rc = returnCostPerOrder(r) || 0;
-    return { val: base + rc, base: base, rc: rc,
-             why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ") = " + (base + rc) + ". Auto - computed, not typed." };
+    const sub = base + rc;
+    const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
+    const promo = Math.round(sub * promoPct / 100);
+    return { val: sub + promo, base: base, rc: rc, promo: promo, promoPct: promoPct,
+             why: "COP + tax + packaging + margin (" + base + ") + return cost/order (" + rc + ")"
+                  + (promoPct ? " + " + promoPct + "% promotion (" + promo + ")" : "")
+                  + " = " + (sub + promo) + ". Auto - computed, not typed." };
   }
   // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
   function amazonAddRs(r) {
@@ -1868,7 +1873,7 @@
   // Units / % / Values switch reaches them too.
   const FLAT_KIND = {
     "COP": "value", "Final COP": "value", "Packaging": "value", "Tax %": "pct",
-    "Expected Settlement": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Selling Price": "value", "Site Price": "value",
+    "Expected Settlement": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Promotion %": "pct", "Selling Price": "value", "Site Price": "value",
     "Last 3 Settle": "value", "Last Settle": "value", "Settle/unit": "value",
     "Margin/unit": "value", "Margin %COP": "pct",
     "Last Ret Charge": "value", "Last Ret Cost": "value",
@@ -1881,7 +1886,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
-      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Auto Settlement","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
+      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
@@ -3123,7 +3128,8 @@
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Manual Margin": "Type a margin here and Expected Settlement = COP + tax + packaging + this, ignoring Auto Margin and Auto %. Blank = the auto rule.",
-    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order. Same auto base as Expected Settlement (ignoring any typed Manual Settlement) with the per-order return cost added on top. Use it as the settlement that already covers returns.",
+    "Promotion %": "A promotion percentage you type per listing. Auto Settlement adds this % of itself (COP + tax + packaging + margin + return cost) on top, so the settlement covers the promotion. Editable; saved to the master file. Blank = 0.",
+    "Auto Settlement": "The full auto settlement, computed not typed: COP + tax + packaging + margin + Return Cost/Order, plus Promotion % of that sum. The full number that already covers returns and the promotion. Same auto base as Expected Settlement (ignoring any typed Manual Settlement).",
     "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by 90d Net sales (units that stayed sold = sold minus returned) - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
