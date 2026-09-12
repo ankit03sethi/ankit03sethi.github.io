@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-13b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-13c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -770,8 +770,17 @@
     const wc = state.windowCounts && state.windowCounts.get(key);
     const st = state.listingStats && state.listingStats.get(key);
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const stk = state.stockMap && state.stockMap.get(key);
     const su = wc ? Number(wc.settle_unit) : NaN;
-    const obsPrice = pf === "flipkart" ? (st ? Number(st.file_price) : NaN) : (wc ? Number(wc.ls_price) : NaN);
+    // Flipkart observed price: the price/inventory-file price. It is in the stock
+    // map (loaded before the table paints) and in listing stats (loaded a few
+    // seconds later); take whichever is present so the price is right on the
+    // first render, not only after the enrichment redraw. Meesho uses the last
+    // order's Supplier Discounted Price, which loads with the main counts.
+    const obsPrice = pf === "flipkart"
+      ? (st && Number(st.file_price) > 0 ? Number(st.file_price)
+         : (stk && Number(stk.sell_price) > 0 ? Number(stk.sell_price) : NaN))
+      : (wc ? Number(wc.ls_price) : NaN);
     const a = autoSettleCalc(r);
     if (a.val == null) return { val: (obsPrice > 0 ? Math.round(obsPrice) : null), why: a.why };
     // Gross settlement to aim the price at: Manual Settlement (plus the promotion
