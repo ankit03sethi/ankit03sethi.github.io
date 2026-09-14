@@ -94,7 +94,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-01d</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-14a</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -128,9 +128,27 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
     <div class="section-head"><h2>Missings</h2><div class="rule"></div><span class="cnt" id="cntMissings"></span></div>
     <div id="wrapMissings"></div>
   </section>
+
+  <section class="section" id="secPricing" style="display:none">
+    <div class="section-head"><h2>Pricing</h2><div class="rule"></div><span class="cnt" id="cntPricing"></span></div>
+    <div class="card">
+      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Sirf woh SKUs jinka target price current live price se alag hai. Platform aur Company chuno, phir upload-format Excel download karo &mdash; seedha Meesho panel pe upload kar do.</p></div></div>
+      <div class="body open" style="display:block">
+        <div class="controls">
+          <label>Platform</label><select id="prPlat"><option value="meesho">Meesho</option></select>
+          <label>Company</label><select id="prCo"></select>
+          <button class="ghost" id="prPreview">Preview</button>
+          <button class="primary" id="prDownload">Download .xlsx</button>
+          <span id="prStatus" class="muted" style="font-size:12px"></span>
+        </div>
+        <div id="prWrap"></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <script src="/analyst-access.js?v=10"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -376,6 +394,7 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   $("#refresh").addEventListener("click", () => load(true));
   $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
   await load(false);
+  try { initPricing(); } catch (e) { console.error("pricing", e); }
 })();
 
 async function load(force) {
@@ -748,6 +767,57 @@ function renderAll() {
 }
 
 /* ---------- csv -------------------------------------------------------- */
+function initPricing() {
+  const sec = document.querySelector("#secPricing");
+  if (sec) sec.style.display = "block";
+  const coSel = document.querySelector("#prCo");
+  if (!coSel) return;
+  const cos = [...new Set([...(state.check||[]),...(state.profit||[]),...(state.nocost||[]),...(state.orders||[])].map((r)=>r.company_name).filter(Boolean))].sort();
+  coSel.innerHTML = cos.map((c)=>'<option value="'+esc(c)+'">'+esc(titleCase(c))+'</option>').join("");
+  const sk = cos.find((c)=>String(c).toLowerCase().replace(/\s+/g,"")==="shopperskart");
+  if (sk) coSel.value = sk;
+  const stEl = document.querySelector("#prStatus");
+  const wrap = document.querySelector("#prWrap");
+  const cnt = document.querySelector("#cntPricing");
+  let rows = [];
+  async function fetchRows() {
+    const co = coSel.value, plat = document.querySelector("#prPlat").value;
+    if (plat !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai."; return null; }
+    stEl.innerHTML = '<span class="spin"></span> computing&hellip;';
+    const { data, error } = await sb.rpc("meesho_price_export", { p_company: co });
+    if (error) { stEl.textContent = "Error: " + error.message; return null; }
+    rows = data || [];
+    return rows;
+  }
+  function preview() {
+    const sup = rows.length ? rows[0].supplier_id : "";
+    if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
+    stEl.textContent = rows.length + " SKUs need a price change" + (rows.length && !sup ? " - no Supplier ID set for this company" : "");
+    if (!rows.length) { wrap.innerHTML = '<div class="note">Is company mein koi price change nahi (ya inventory/settlement data nahi mila).</div>'; return; }
+    let h = '<div class="scroll"><table><thead><tr><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th class="num">Live now</th></tr></thead><tbody>';
+    for (const r of rows.slice(0,50)) h += "<tr><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td class="num muted">'+(r.live_price==null?"-":r.live_price)+"</td></tr>";
+    h += "</tbody></table></div>";
+    if (rows.length>50) h += '<div class="note">Showing first 50 of '+rows.length+' - download gives all.</div>';
+    wrap.innerHTML = h;
+  }
+  document.querySelector("#prPreview").addEventListener("click", async ()=>{ const d = await fetchRows(); if (d) preview(); });
+  document.querySelector("#prDownload").addEventListener("click", async ()=>{
+    const d = await fetchRows(); if (!d) return; preview();
+    if (!rows.length) return;
+    if (!window.XLSX) { stEl.textContent = "Excel library load nahi hui - page refresh karke try karo."; return; }
+    const header = ["Product ID","Supplier ID","Variation ID","Variation Name","New MSP","WDRP","MRP","REMARKS"];
+    const aoa = [header];
+    const N = (v)=>/^\d+$/.test(String(v))?Number(v):v;
+    for (const r of rows) aoa.push([ N(r.product_id), N(r.supplier_id), N(r.variation_id), r.variation_name, r.new_msp, r.wdrp, r.mrp, "" ]);
+    const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const nm = "Meesho_Price_" + titleCase(coSel.value).replace(/\s+/g,"") + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
+    window.XLSX.writeFile(wb, nm);
+    stEl.textContent = "Downloaded " + rows.length + " rows -> " + nm;
+  });
+}
+
 function csv(r, rows) {
   const q = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const lines = [r.cols.map((c) => q(c.l)).join(",")];
