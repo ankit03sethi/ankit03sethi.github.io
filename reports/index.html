@@ -815,9 +815,16 @@ function initPricing() {
     const pf = String(state.plat || "").toLowerCase();
     if (pf && pf !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai — upar Platform chip Meesho ya All karo."; rows = []; return null; }
     stEl.innerHTML = '<span class="spin"></span> computing&hellip;';
-    const { data, error } = await sb.rpc("meesho_price_export", { p_company: state.co || "" });
-    if (error) { stEl.textContent = "Error: " + error.message; return null; }
-    rows = data || [];
+    rows = [];
+    const PAGE = 1000; let from = 0;
+    for (;;) {
+      const { data, error } = await sb.rpc("meesho_price_export", { p_company: state.co || "" }).range(from, from + PAGE - 1);
+      if (error) { stEl.textContent = "Error: " + error.message; return null; }
+      const batch = data || [];
+      rows = rows.concat(batch);
+      if (batch.length < PAGE) break;
+      from += PAGE; if (from > 200000) break;
+    }
     return rows;
   }
   function preview() {
