@@ -423,7 +423,9 @@ async function load(force) {
 function buildChips() {
   const all = [...(state.check || []), ...(state.profit || []), ...(state.nocost || []), ...(state.orders || [])];
   const plats = [...new Set(all.map((r) => r.platform).filter(Boolean))].sort();
-  const cos = [...new Set(all.map((r) => r.company_name).filter(Boolean))].sort();
+  const coMap = new Map();
+  for (const r of all) { const c = r.company_name; if (!c) continue; const k = String(c).toLowerCase().replace(/\s+/g, ""); const cur = coMap.get(k); if (!cur || (/\s/.test(c) && !/\s/.test(cur))) coMap.set(k, c); }
+  const cos = [...coMap.values()].sort();
   const draw = (host, list, key, allLabel) => {
     host.innerHTML = "";
     const mk = (val, label) => {
@@ -495,7 +497,7 @@ function rowsFor(r, skipCol) {
   let out = src.filter(r.pick);
   if (r.filt) out = out.filter((row) => r.filt(row, num(u.thr)));
   if (state.plat) out = out.filter((row) => row.platform === state.plat);
-  if (state.co) out = out.filter((row) => row.company_name === state.co);
+  if (state.co) { const ck = String(state.co).toLowerCase().replace(/\s+/g, ""); out = out.filter((row) => String(row.company_name || "").toLowerCase().replace(/\s+/g, "") === ck); }
   if (state.q) {
     const q = state.q;
     out = out.filter((row) =>
@@ -772,7 +774,9 @@ function initPricing() {
   if (sec) sec.style.display = "block";
   const coSel = document.querySelector("#prCo");
   if (!coSel) return;
-  const cos = [...new Set([...(state.check||[]),...(state.profit||[]),...(state.nocost||[]),...(state.orders||[])].map((r)=>r.company_name).filter(Boolean))].sort();
+  const coMap = new Map();
+  for (const r of [...(state.check||[]),...(state.profit||[]),...(state.nocost||[]),...(state.orders||[])]) { const c = r.company_name; if (!c) continue; const k = String(c).toLowerCase().replace(/\s+/g, ""); const cur = coMap.get(k); if (!cur || (/\s/.test(c) && !/\s/.test(cur))) coMap.set(k, c); }
+  const cos = [...coMap.values()].sort();
   coSel.innerHTML = cos.map((c)=>'<option value="'+esc(c)+'">'+esc(titleCase(c))+'</option>').join("");
   const sk = cos.find((c)=>String(c).toLowerCase().replace(/\s+/g,"")==="shopperskart");
   if (sk) coSel.value = sk;
