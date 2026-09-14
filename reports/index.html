@@ -798,10 +798,9 @@ function initPricing() {
     if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
     stEl.textContent = rows.length + " SKUs need a price change" + (rows.length && !sup ? " - no Supplier ID set for this company" : "");
     if (!rows.length) { wrap.innerHTML = '<div class="note">Is company mein koi price change nahi (ya inventory/settlement data nahi mila).</div>'; return; }
-    let h = '<div class="scroll"><table><thead><tr><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th class="num">Live now</th></tr></thead><tbody>';
-    for (const r of rows.slice(0,50)) h += "<tr><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td class="num muted">'+(r.live_price==null?"-":r.live_price)+"</td></tr>";
+    let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th class="num">Live Meesho</th><th class="num">Difference</th></tr></thead><tbody>';
+    for (const r of rows) { const lp = r.live_price; const diff = (lp==null) ? null : (r.new_msp - lp); const dc = diff==null ? " muted" : (diff<0 ? " neg" : ""); const ds = diff==null ? "-" : ((diff>0?"+":"")+diff); h += "<tr><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td class="num muted">'+(lp==null?"-":lp)+'</td><td class="num'+dc+'">'+ds+"</td></tr>"; }
     h += "</tbody></table></div>";
-    if (rows.length>50) h += '<div class="note">Showing first 50 of '+rows.length+' - download gives all.</div>';
     wrap.innerHTML = h;
   }
   document.querySelector("#prPreview").addEventListener("click", async ()=>{ const d = await fetchRows(); if (d) preview(); });
