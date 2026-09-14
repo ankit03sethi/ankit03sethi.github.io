@@ -107,7 +107,8 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
     <span id="status" class="muted" style="font-size:12px"></span>
   </div>
   <div class="chips" id="platChips"></div>
-  <div class="chips" id="coChips" style="margin-bottom:16px"></div>
+  <div class="chips" id="coChips" style="margin-bottom:10px"></div>
+  <div class="chips" id="repTabs" style="margin-bottom:18px;font-weight:800;font-size:13px"></div>
 
   <section class="section" id="secOrders" data-perm="reports.orders">
     <div class="section-head"><h2>Orders</h2><div class="rule"></div><span class="cnt" id="cntOrders"></span></div>
@@ -390,6 +391,7 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   if (!CA.anyOn("reports")) { $("#status").textContent = "You do not have access to Reports. Ask the account owner."; document.querySelectorAll("main .section").forEach(s => s.style.display = "none"); return; }
   CA.apply();
   buildCards();
+  buildTabs();
   $("#gc").style.display = "flex";
   $("#refresh").addEventListener("click", () => load(true));
   $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
@@ -769,9 +771,39 @@ function renderAll() {
 }
 
 /* ---------- csv -------------------------------------------------------- */
-function initPricing() {
-  const sec = document.querySelector("#secPricing");
+const REPORT_TABS = [
+  { id: "secOrders", label: "Orders", perm: "reports.orders" },
+  { id: "secPayments", label: "Payments", perm: "reports.payments" },
+  { id: "secReturns", label: "Returns", perm: "reports.returns" },
+  { id: "secMissings", label: "Missings", perm: "reports.missings" },
+  { id: "secPricing", label: "Pricing", perm: null }
+];
+function showTab(id) {
+  document.querySelectorAll("main > section.section").forEach((el) => { el.style.display = "none"; });
+  const sec = document.getElementById(id);
   if (sec) sec.style.display = "block";
+  const host = document.querySelector("#repTabs");
+  if (host) [...host.children].forEach((c) => c.classList.toggle("active", c.dataset.sec === id));
+  try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
+}
+function buildTabs() {
+  const host = document.querySelector("#repTabs");
+  if (!host) return;
+  const avail = REPORT_TABS.filter((t) => document.getElementById(t.id) && (!t.perm || (window.CA && CA.can(t.perm, "view"))));
+  host.innerHTML = "";
+  avail.forEach((t, i) => {
+    const c = document.createElement("span");
+    c.className = "chip" + (i === 0 ? " active" : "");
+    c.dataset.sec = t.id;
+    c.textContent = t.label;
+    c.addEventListener("click", () => showTab(t.id));
+    host.appendChild(c);
+  });
+  REPORT_TABS.forEach((t) => { const el = document.getElementById(t.id); if (el) el.style.display = "none"; });
+  if (avail.length) showTab(avail[0].id);
+}
+
+function initPricing() {
   const coSel = document.querySelector("#prCo");
   if (!coSel) return;
   const coMap = new Map();
