@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-14c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-14d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3590,6 +3590,24 @@
     if (_softTimer) clearInterval(_softTimer);
     _softTimer = setInterval(softRefreshListing, 60000);
   }
+
+  // Auto-refresh when the tab comes back into focus: the upload-time stamp is
+  // updated right away (cheap), and if the page has been in the background for
+  // more than 15s the current view is reloaded so a file upload or edit made
+  // elsewhere shows without a manual refresh. Quick tab flicks are ignored.
+  let _hiddenAt = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { _hiddenAt = Date.now(); return; }
+    try { if (typeof refreshMasterStamp === "function") refreshMasterStamp(); } catch (_) {}
+    try { if (typeof refreshScrapeBar === "function") refreshScrapeBar(); } catch (_) {}
+    const away = _hiddenAt ? Date.now() - _hiddenAt : 0;
+    _hiddenAt = 0;
+    const hasPending = (typeof PENDING !== "undefined" && PENDING.size > 0);
+    if (away > 15000 && !state.loadingMore && !hasPending) {
+      if (state.view === "sku_master") { softRefreshListing(); refresh(); }
+      else refresh();
+    }
+  });
 
   function startScrapeBar() {
     if (_scrapeTimer) clearInterval(_scrapeTimer);
