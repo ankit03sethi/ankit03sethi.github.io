@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-14b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-14c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1424,6 +1424,7 @@
     let q = sb.from(table).select("*")
       .eq("user_id", state.uid)
       .order(dateCol, { ascending: false, nullsFirst: false })
+      .order("id", { ascending: false })
       .range(from, from + state.pageSize - 1);
     // These apply to the SKU Master view too — the chips at the top of the page
     // used to be ignored there, so picking "Amazon" changed nothing.
