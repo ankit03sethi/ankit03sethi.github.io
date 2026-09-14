@@ -133,13 +133,12 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
   <section class="section" id="secPricing" style="display:none">
     <div class="section-head"><h2>Pricing</h2><div class="rule"></div><span class="cnt" id="cntPricing"></span></div>
     <div class="card">
-      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Sirf woh SKUs jinka target price current live price se alag hai. Platform aur Company chuno, phir upload-format Excel download karo &mdash; seedha Meesho panel pe upload kar do.</p></div></div>
+      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Upar ke Company aur Platform chips se select karo (All = sabka data). Sirf woh SKUs aayenge jinka target price current live price se alag hai. Phir upload-format Excel download karo &mdash; seedha Meesho panel pe upload kar do.</p></div></div>
       <div class="body open" style="display:block">
         <div class="controls">
-          <label>Platform</label><select id="prPlat"><option value="meesho">Meesho</option></select>
-          <label>Company</label><select id="prCo"></select>
           <button class="ghost" id="prPreview">Preview</button>
           <button class="primary" id="prDownload">Download .xlsx</button>
+          <span id="prSel" class="muted" style="font-size:12px;font-weight:700"></span>
           <span id="prStatus" class="muted" style="font-size:12px"></span>
         </div>
         <div id="prWrap"></div>
@@ -434,7 +433,7 @@ function buildChips() {
       const c = document.createElement("span");
       c.className = "chip" + (state[key] === val ? " active" : "");
       c.textContent = label;
-      c.addEventListener("click", () => { state[key] = val; buildChips(); renderAll(); });
+      c.addEventListener("click", () => { state[key] = val; buildChips(); renderAll(); if (window.__prSel) window.__prSel(); });
       host.appendChild(c);
     };
     mk("", allLabel);
@@ -804,37 +803,34 @@ function buildTabs() {
 }
 
 function initPricing() {
-  const coSel = document.querySelector("#prCo");
-  if (!coSel) return;
-  const coMap = new Map();
-  for (const r of [...(state.check||[]),...(state.profit||[]),...(state.nocost||[]),...(state.orders||[])]) { const c = r.company_name; if (!c) continue; const k = String(c).toLowerCase().replace(/\s+/g, ""); const cur = coMap.get(k); if (!cur || (/\s/.test(c) && !/\s/.test(cur))) coMap.set(k, c); }
-  const cos = [...coMap.values()].sort();
-  coSel.innerHTML = cos.map((c)=>'<option value="'+esc(c)+'">'+esc(titleCase(c))+'</option>').join("");
-  const sk = cos.find((c)=>String(c).toLowerCase().replace(/\s+/g,"")==="shopperskart");
-  if (sk) coSel.value = sk;
   const stEl = document.querySelector("#prStatus");
   const wrap = document.querySelector("#prWrap");
   const cnt = document.querySelector("#cntPricing");
+  const selEl = document.querySelector("#prSel");
   let rows = [];
+  function selNote() { const co = state.co || "All companies"; const pf = state.plat || "All platforms"; if (selEl) selEl.textContent = "Selected: " + titleCase(co) + " / " + titleCase(pf) + "  (upar ke chips se badlo)"; }
+  window.__prSel = selNote;
   async function fetchRows() {
-    const co = coSel.value, plat = document.querySelector("#prPlat").value;
-    if (plat !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai."; return null; }
+    selNote();
+    const pf = String(state.plat || "").toLowerCase();
+    if (pf && pf !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai — upar Platform chip Meesho ya All karo."; rows = []; return null; }
     stEl.innerHTML = '<span class="spin"></span> computing&hellip;';
-    const { data, error } = await sb.rpc("meesho_price_export", { p_company: co });
+    const { data, error } = await sb.rpc("meesho_price_export", { p_company: state.co || "" });
     if (error) { stEl.textContent = "Error: " + error.message; return null; }
     rows = data || [];
     return rows;
   }
   function preview() {
-    const sup = rows.length ? rows[0].supplier_id : "";
+    const missSup = rows.some((r) => !r.supplier_id);
     if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
-    stEl.textContent = rows.length + " SKUs need a price change" + (rows.length && !sup ? " - no Supplier ID set for this company" : "");
-    if (!rows.length) { wrap.innerHTML = '<div class="note">Is company mein koi price change nahi (ya inventory/settlement data nahi mila).</div>'; return; }
-    let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th class="num">Live Meesho</th><th class="num">Difference</th></tr></thead><tbody>';
-    for (const r of rows) { const lp = r.live_price; const diff = (lp==null) ? null : (r.new_msp - lp); const dc = diff==null ? " muted" : (diff<0 ? " neg" : ""); const ds = diff==null ? "-" : ((diff>0?"+":"")+diff); h += "<tr><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td class="num muted">'+(lp==null?"-":lp)+'</td><td class="num'+dc+'">'+ds+"</td></tr>"; }
+    stEl.textContent = rows.length + " SKUs need a price change" + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
+    if (!rows.length) { wrap.innerHTML = '<div class="note">Koi price change nahi (ya inventory/settlement data nahi mila). Upar Company/Platform chip badal ke dekho.</div>'; return; }
+    let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th class="num">Live Meesho</th><th class="num">Difference</th><th>Open</th></tr></thead><tbody>';
+    for (const r of rows) { const lp = r.live_price; const diff = (lp==null) ? null : (r.new_msp - lp); const dc = diff==null ? " muted" : (diff<0 ? " neg" : ""); const ds = diff==null ? "-" : ((diff>0?"+":"")+diff); h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td class="num muted">'+(lp==null?"-":lp)+'</td><td class="num'+dc+'">'+ds+'</td><td><a href="'+esc(r.product_url)+'" target="_blank" rel="noopener">Open</a></td></tr>'; }
     h += "</tbody></table></div>";
     wrap.innerHTML = h;
   }
+  selNote();
   document.querySelector("#prPreview").addEventListener("click", async ()=>{ const d = await fetchRows(); if (d) preview(); });
   document.querySelector("#prDownload").addEventListener("click", async ()=>{
     const d = await fetchRows(); if (!d) return; preview();
@@ -847,7 +843,8 @@ function initPricing() {
     const ws = window.XLSX.utils.aoa_to_sheet(aoa);
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    const nm = "Meesho_Price_" + titleCase(coSel.value).replace(/\s+/g,"") + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
+    const tag = state.co ? titleCase(state.co).replace(/\s+/g,"") : "AllCompanies";
+    const nm = "Meesho_Price_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
     window.XLSX.writeFile(wb, nm);
     stEl.textContent = "Downloaded " + rows.length + " rows -> " + nm;
   });
