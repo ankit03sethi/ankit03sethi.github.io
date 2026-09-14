@@ -291,7 +291,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-13c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-14a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -781,17 +781,17 @@
       ? (st && Number(st.file_price) > 0 ? Number(st.file_price)
          : (stk && Number(stk.sell_price) > 0 ? Number(stk.sell_price) : NaN))
       : (wc ? Number(wc.ls_price) : NaN);
-    const a = autoSettleCalc(r);
-    if (a.val == null) return { val: (obsPrice > 0 ? Math.round(obsPrice) : null), why: a.why };
-    // Gross settlement to aim the price at: Manual Settlement (plus the promotion
-    // cut it must still cover) if typed, else the Auto Settlement. So the price
-    // follows Manual Settlement and Promotion % live, not just the auto figure.
-    const ms = numOf(ld0["Manual Settlement"]) ?? numOf(rd0["Manual Settlement"]);
-    const target = ms != null ? Math.round(ms) + (a.promo || 0) : a.val;
-    const tgtWhy = ms != null ? ("Manual Settlement " + Math.round(ms) + (a.promo ? " + " + a.promo + " promotion" : "")) : ("Auto Settlement " + a.val);
+    const es = expSettleCalc(r);
+    if (es.val == null) return { val: (obsPrice > 0 ? Math.round(obsPrice) : null), why: es.why };
+    // Aim the price at the Expected Settlement - the net we want to receive. The
+    // observed keep-rate (settlement / price) already has the promotion and
+    // commission baked in, so promotion is NOT added again here (that inflated
+    // the price). Follows Manual Settlement and Promotion % live via Expected
+    // Settlement.
+    const target = es.val;
     if (su > 0 && obsPrice > 0) {
       const price = Math.round(target * obsPrice / su);
-      return { val: price, why: "Est. price to net " + tgtWhy + " = " + target + " - this listing keeps about " + Math.round(su / obsPrice * 100) + "% of price as settlement (" + Math.round(su) + " on " + Math.round(obsPrice) + "). Estimate; real price via the reprice file." };
+      return { val: price, why: "Est. price to net Expected Settlement " + target + " - this listing keeps about " + Math.round(su / obsPrice * 100) + "% of price as settlement (" + Math.round(su) + " on " + Math.round(obsPrice) + "). Estimate; real price via the reprice file." };
     }
     return { val: (obsPrice > 0 ? Math.round(obsPrice) : null), why: obsPrice > 0 ? "Observed price (no settlement rate yet to compute a target price)." : "No price/settlement data yet - need a settled order (rate) and an observed price." };
   }
