@@ -381,7 +381,7 @@
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
     $("#expNote").textContent = rows.length ? (rows.length+" pending scan") : "Sab scan ho gaye.";
     const show = rows.slice(0,1000);
-    $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
+    $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
 
