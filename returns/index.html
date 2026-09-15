@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Returns Scanner — Cursive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --primary:#1f6feb; --primary-dark:#1858bd; --accent:#f59e0b; --green:#10b981;
+      --red:#ef4444; --amber:#f59e0b; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+    }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin:0; color:var(--text); background:#f1f5f9; }
+    a { color:var(--primary); }
+    header { background:#fff; border-bottom:1px solid var(--border); padding:12px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .brand { font-family:"Dancing Script",cursive; font-size:26px; color:var(--primary); font-weight:700; }
+    .htitle { font-weight:800; font-size:16px; }
+    .spacer { flex:1; }
+    .chip { font-size:12px; color:var(--muted); background:#f1f5f9; border:1px solid var(--border); border-radius:999px; padding:4px 10px; }
+    .navlink { font-size:13px; font-weight:600; text-decoration:none; color:var(--muted); padding:6px 10px; border-radius:8px; }
+    .navlink:hover { background:#f1f5f9; color:var(--primary); }
+    main { max-width:1000px; margin:0 auto; padding:18px 16px 60px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 4px 12px rgba(15,23,42,.06); padding:16px; margin-bottom:16px; }
+    .scanwrap label { display:block; font-weight:700; margin-bottom:6px; }
+    #awb { width:100%; font-size:22px; letter-spacing:.5px; padding:14px 16px; border:2px solid var(--primary); border-radius:10px; outline:none; font-family:ui-monospace,Menlo,Consolas,monospace; }
+    #awb:focus { box-shadow:0 0 0 4px rgba(31,111,235,.15); }
+    .hint { color:var(--muted); font-size:13px; margin-top:8px; }
+    .conds { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    .cond { border:2px solid var(--border); background:#fff; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; }
+    .cond[aria-pressed="true"].good { border-color:var(--green); background:#ecfdf5; color:#047857; }
+    .cond[aria-pressed="true"].damaged { border-color:var(--red); background:#fef2f2; color:#b91c1c; }
+    .cond[aria-pressed="true"].wrong { border-color:var(--amber); background:#fffbeb; color:#b45309; }
+    .result { border-radius:12px; padding:18px; margin-bottom:16px; display:none; }
+    .result.ok { background:#ecfdf5; border:2px solid var(--green); }
+    .result.bad { background:#fef2f2; border:2px solid var(--red); }
+    .result .big { font-size:26px; font-weight:900; display:flex; align-items:center; gap:10px; }
+    .result.ok .big { color:#047857; }
+    .result.bad .big { color:#b91c1c; }
+    .kv { margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; }
+    .kv .k { color:var(--muted); font-weight:600; }
+    .kv .v { font-weight:600; word-break:break-word; }
+    .counts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+    .stat { flex:1; min-width:120px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px 14px; text-align:center; }
+    .stat .n { font-size:24px; font-weight:900; }
+    .stat .l { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+    .stat.ok .n { color:var(--green); } .stat.bad .n { color:var(--red); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #eef2f7; vertical-align:top; }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
+    td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .badge { font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
+    .badge.ok { background:#d1fae5; color:#047857; } .badge.bad { background:#fee2e2; color:#b91c1c; }
+    .cbadge { font-size:11px; font-weight:700; padding:2px 7px; border-radius:6px; }
+    .cbadge.Good { background:#ecfdf5; color:#047857; } .cbadge.Damaged { background:#fef2f2; color:#b91c1c; } .cbadge.Wrong { background:#fffbeb; color:#b45309; }
+    .mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
+    .scroll { overflow-x:auto; border:1px solid #eef2f7; border-radius:10px; }
+    .muted { color:var(--muted); }
+    @media (max-width:560px){ #awb{font-size:18px;} .htitle{display:none;} }
+  </style>
+</head>
+<body>
+<header>
+  <span class="brand">cursive</span>
+  <span class="htitle">Returns Scanner</span>
+  <a class="navlink" href="/analyst/">All tools</a>
+  <a class="navlink" href="/skuwisedata/">SKU Wise Data</a>
+  <a class="navlink" href="/reports/">Reports</a>
+  <span class="spacer"></span>
+  <span class="chip" id="whoChip"></span>
+</header>
+
+<main>
+  <div class="card scanwrap">
+    <label for="awb">Scan / type AWB (tracking number)</label>
+    <input id="awb" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Scan the return label's AWB and press Enter" />
+    <div class="conds">
+      <span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span>
+      <button class="cond good" data-c="Good" aria-pressed="true">Good</button>
+      <button class="cond damaged" data-c="Damaged" aria-pressed="false">Damaged</button>
+      <button class="cond wrong" data-c="Wrong" aria-pressed="false">Wrong item</button>
+    </div>
+    <div class="hint">Har scan turant save hota hai — jo condition select hai wahi lagti hai. AWB returns data se match hui to <b>OK</b>, warna <b>NOT FOUND</b>.</div>
+  </div>
+
+  <div class="result" id="result"></div>
+
+  <div class="counts">
+    <div class="stat"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
+    <div class="stat ok"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
+    <div class="stat bad"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <b>Scans</b><span class="muted" id="listNote"></span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Time</th><th>AWB</th><th>Status</th><th>SKU</th><th>Product</th><th>Platform</th><th>Reason</th><th>Condition</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="8" class="muted" style="padding:16px">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="/analyst-access.js?v=12"></script>
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
+  const SB_KEY = "sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ";
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageKey: "pd_tracker_auth" } });
+  const $ = (s) => document.querySelector(s);
+  const esc = (x) => String(x==null?"":x).replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  let condition = "Good";
+  let counts = { total:0, ok:0, bad:0 };
+
+  function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
+  function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; }
+
+  function rowHtml(r){
+    const ok = r.status === "OK";
+    return "<tr><td class='muted'>"+fmtTime(r.scanned_at)+"</td>"+
+      "<td class='mono'>"+esc(r.awb)+"</td>"+
+      "<td><span class='badge "+(ok?"ok":"bad")+"'>"+(ok?"OK":"NOT FOUND")+"</span></td>"+
+      "<td class='mono'>"+esc(r.sku||"—")+"</td>"+
+      "<td>"+esc((r.product||"").slice(0,60))+"</td>"+
+      "<td>"+esc(r.platform||"—")+"</td>"+
+      "<td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td>"+
+      "<td>"+(r.condition?("<span class='cbadge "+esc(r.condition)+"'>"+esc(r.condition)+"</span>"):"—")+"</td></tr>";
+  }
+
+  function showResult(r){
+    const el = $("#result");
+    const ok = r.status === "OK";
+    el.className = "result " + (ok ? "ok" : "bad");
+    el.style.display = "block";
+    let h = "<div class='big'>"+(ok?"✓ OK — return matched":"✕ NOT FOUND in returns")+"</div>";
+    h += "<div class='kv'>";
+    h += "<div class='k'>AWB</div><div class='v mono'>"+esc(r.awb)+"</div>";
+    if (ok) {
+      h += "<div class='k'>SKU</div><div class='v mono'>"+esc(r.sku||"—")+"</div>";
+      h += "<div class='k'>Product</div><div class='v'>"+esc(r.product||"—")+"</div>";
+      h += "<div class='k'>Platform</div><div class='v'>"+esc(r.platform||"—")+(r.company_name?(" · "+esc(r.company_name)):"")+"</div>";
+      h += "<div class='k'>Order</div><div class='v mono'>"+esc(r.order_id||"—")+"</div>";
+      h += "<div class='k'>Reason</div><div class='v'>"+esc(r.return_reason||"—")+"</div>";
+      if (r.r_qty!=null) h += "<div class='k'>Qty</div><div class='v'>"+esc(r.r_qty)+"</div>";
+    } else {
+      h += "<div class='k'>Note</div><div class='v'>Yeh AWB returns data mein nahi mila. Galat AWB, ya return abhi tak file mein nahi aaya.</div>";
+    }
+    h += "<div class='k'>Condition</div><div class='v'>"+esc(r.condition||condition)+"</div>";
+    h += "</div>";
+    el.innerHTML = h;
+  }
+
+  let busy = false;
+  async function doScan(awb){
+    awb = (awb||"").trim();
+    if (!awb || busy) return;
+    busy = true;
+    const inp = $("#awb");
+    inp.disabled = true;
+    try {
+      const { data, error } = await sb.rpc("return_scan_save", { p_awb: awb, p_condition: condition, p_by: (window.CA && CA.who && CA.who()) || null });
+      if (error) { showResult({ awb, status:"BAD", return_reason:error.message }); }
+      else {
+        const r = (data && data[0]) || { awb, status:"NOT_FOUND" };
+        showResult(r);
+        await loadList();
+      }
+    } catch (e) { showResult({ awb, status:"BAD", return_reason:String(e.message||e) }); }
+    inp.value = ""; inp.disabled = false; inp.focus(); busy = false;
+  }
+
+  async function loadList(){
+    const { data, error } = await sb.rpc("return_scan_list", { p_limit: 300 });
+    const rows = error ? [] : (data || []);
+    counts.total = rows.length;
+    counts.ok = rows.filter(r=>r.status==="OK").length;
+    counts.bad = rows.length - counts.ok;
+    setCounts();
+    $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("") : "<tr><td colspan='8' class='muted' style='padding:16px'>Abhi tak koi scan nahi. Upar AWB scan karo.</td></tr>";
+    $("#listNote").textContent = rows.length ? ("("+rows.length+" total)") : "";
+  }
+
+  document.querySelectorAll(".cond").forEach(b => b.addEventListener("click", () => {
+    condition = b.dataset.c;
+    document.querySelectorAll(".cond").forEach(x => x.setAttribute("aria-pressed", x===b ? "true":"false"));
+    $("#awb").focus();
+  }));
+  $("#awb").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doScan($("#awb").value); } });
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "/home/?return=%2Freturns%2F"; return; }
+    try { await CA.load(sb); } catch (e) { }
+    $("#whoChip").textContent = (window.CA && CA.who && CA.who()) || "";
+    await loadList();
+    $("#awb").focus();
+  })();
+</script>
+</body>
+</html>
