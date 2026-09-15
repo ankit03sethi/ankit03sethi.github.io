@@ -52,6 +52,11 @@
     .stat .l { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
     .stat.ok .n { color:var(--green); } .stat.bad .n { color:var(--red); } .stat.fault .n { color:#b91c1c; }
     .stat.fault { border-color:#fecaca; background:#fff5f5; }
+    .datebar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    .datebar .dlbl { font-size:13px; font-weight:700; color:var(--muted); }
+    .dchip { border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 13px; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
+    .dchip[aria-pressed="true"] { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .dpick { border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px; font-weight:600; color:var(--text); }
     .tabbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
     .tab { border:1px solid var(--border); background:#fff; border-radius:999px; padding:7px 14px; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
     .tab[aria-selected="true"] { background:var(--primary); color:#fff; border-color:var(--primary); }
@@ -93,6 +98,15 @@
 
   <div class="result" id="result"></div>
 
+  <div class="datebar">
+    <span class="dlbl">Dates:</span>
+    <button class="dchip" data-d="today" aria-pressed="true">Today</button>
+    <button class="dchip" data-d="yesterday" aria-pressed="false">Yesterday</button>
+    <button class="dchip" data-d="7d" aria-pressed="false">7 days</button>
+    <button class="dchip" data-d="all" aria-pressed="false">All</button>
+    <input type="date" id="dpick" class="dpick" title="Kisi khaas din ke scans" />
+  </div>
+
   <div class="counts">
     <div class="stat"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
     <div class="stat ok"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
@@ -127,7 +141,20 @@
   let counts = { total:0, ok:0, bad:0, fault:0 };
   let allRows = [];
   let tab = "all";
+  let dateFilter = "today";
   let last = null;
+
+  function startOfDay(x){ const y=new Date(x); y.setHours(0,0,0,0); return y; }
+  function inDate(ts){
+    if (dateFilter === "all") return true;
+    const d = new Date(ts); if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    if (dateFilter === "today") return startOfDay(d).getTime() === startOfDay(now).getTime();
+    if (dateFilter === "yesterday") { const yd = new Date(now); yd.setDate(now.getDate()-1); return startOfDay(d).getTime() === startOfDay(yd).getTime(); }
+    if (dateFilter === "7d") { const from = new Date(now); from.setDate(now.getDate()-6); return d.getTime() >= startOfDay(from).getTime(); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) { const p=dateFilter.split("-").map(Number); return startOfDay(d).getTime() === new Date(p[0],p[1]-1,p[2]).getTime(); }
+    return true;
+  }
 
   function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
   function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; $("#cFault").textContent=counts.fault; $("#tabFaultN").textContent=counts.fault; }
@@ -201,25 +228,39 @@
   }
 
   function render(){
-    counts.total = allRows.length;
-    counts.ok = allRows.filter(r=>r.status==="OK").length;
-    counts.bad = allRows.length - counts.ok;
-    counts.fault = allRows.filter(isFault).length;
+    const base = allRows.filter(r => inDate(r.scanned_at));
+    counts.total = base.length;
+    counts.ok = base.filter(r=>r.status==="OK").length;
+    counts.bad = base.length - counts.ok;
+    counts.fault = base.filter(isFault).length;
     setCounts();
-    const rows = tab==="fault" ? allRows.filter(isFault) : allRows;
+    const rows = tab==="fault" ? base.filter(isFault) : base;
     $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>"+(tab==="fault"?"Koi our-fault return nahi.":"Abhi tak koi scan nahi. Upar AWB scan karo.")+"</td></tr>";
     $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => changeCondition(sel.dataset.awb, sel.value)));
   }
 
   async function loadList(){
-    const { data, error } = await sb.rpc("return_scan_list", { p_limit: 300 });
+    const { data, error } = await sb.rpc("return_scan_list", { p_limit: 1000 });
     allRows = error ? [] : (data || []);
     render();
   }
 
   $("#tabAll").addEventListener("click", () => { tab="all"; $("#tabAll").setAttribute("aria-selected","true"); $("#tabFault").setAttribute("aria-selected","false"); render(); });
   $("#tabFault").addEventListener("click", () => { tab="fault"; $("#tabFault").setAttribute("aria-selected","true"); $("#tabAll").setAttribute("aria-selected","false"); render(); });
+
+  document.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
+    dateFilter = b.dataset.d;
+    document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed", x===b ? "true":"false"));
+    $("#dpick").value = "";
+    render(); $("#awb").focus();
+  }));
+  $("#dpick").addEventListener("change", () => {
+    if (!$("#dpick").value) return;
+    dateFilter = $("#dpick").value;
+    document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed","false"));
+    render();
+  });
 
   const inp = $("#awb");
   let idleTimer = null, lastKey = 0, maxGap = 0;
