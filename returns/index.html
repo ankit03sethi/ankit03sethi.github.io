@@ -11,10 +11,7 @@
   <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <style>
     * { box-sizing: border-box; }
-    :root {
-      --primary:#1f6feb; --green:#10b981; --red:#ef4444; --amber:#f59e0b;
-      --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
-    }
+    :root { --primary:#1f6feb; --green:#10b981; --red:#ef4444; --amber:#f59e0b; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; }
     body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin:0; color:var(--text); background:#f1f5f9; }
     a { color:var(--primary); }
     header { background:#fff; border-bottom:1px solid var(--border); padding:12px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
@@ -34,33 +31,34 @@
     .result.ok { background:#ecfdf5; border:2px solid var(--green); }
     .result.bad { background:#fef2f2; border:2px solid var(--red); }
     .result .big { font-size:26px; font-weight:900; display:flex; align-items:center; gap:10px; }
-    .result.ok .big { color:#047857; }
-    .result.bad .big { color:#b91c1c; }
-    .warn { margin-top:12px; background:#b91c1c; color:#fff; border-radius:10px; padding:14px 16px; font-size:20px; font-weight:900; letter-spacing:.3px; display:flex; align-items:center; gap:10px; }
+    .result.ok .big { color:#047857; } .result.bad .big { color:#b91c1c; }
+    .warn { margin-top:12px; background:#b91c1c; color:#fff; border-radius:10px; padding:14px 16px; font-size:20px; font-weight:900; display:flex; align-items:center; gap:10px; }
     .kv { margin-top:12px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; }
-    .kv .k { color:var(--muted); font-weight:600; }
-    .kv .v { font-weight:600; word-break:break-word; }
+    .kv .k { color:var(--muted); font-weight:600; } .kv .v { font-weight:600; word-break:break-word; }
     .cbtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center; }
     .cbtns .lbl { font-size:13px; font-weight:700; color:var(--muted); align-self:center; }
     .cbtn { border:2px solid var(--border); background:#fff; border-radius:9px; padding:8px 14px; font-weight:700; cursor:pointer; font-size:14px; }
     .cbtn.good[aria-pressed="true"] { border-color:var(--green); background:#ecfdf5; color:#047857; }
     .cbtn.damaged[aria-pressed="true"] { border-color:var(--red); background:#fef2f2; color:#b91c1c; }
     .cbtn.wrong[aria-pressed="true"] { border-color:var(--amber); background:#fffbeb; color:#b45309; }
-    .counts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
-    .stat { flex:1; min-width:110px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px 14px; text-align:center; }
-    .stat .n { font-size:24px; font-weight:900; }
-    .stat .l { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
-    .stat.ok .n { color:var(--green); } .stat.bad .n { color:var(--red); } .stat.fault .n { color:#b91c1c; }
-    .stat.fault { border-color:#fecaca; background:#fff5f5; }
+    .lockmsg { margin-top:10px; font-size:13px; color:var(--muted); font-weight:600; }
     .datebar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
     .datebar .dlbl { font-size:13px; font-weight:700; color:var(--muted); }
     .dchip { border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 13px; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
     .dchip[aria-pressed="true"] { background:var(--primary); color:#fff; border-color:var(--primary); }
     .dpick { border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px; font-weight:600; color:var(--text); }
-    .tabbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-    .tab { border:1px solid var(--border); background:#fff; border-radius:999px; padding:7px 14px; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
-    .tab[aria-selected="true"] { background:var(--primary); color:#fff; border-color:var(--primary); }
-    .tab.faulttab[aria-selected="true"] { background:#b91c1c; border-color:#b91c1c; }
+    .tabbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center; }
+    .ctab { border:1px solid var(--border); background:#fff; border-radius:999px; padding:6px 14px; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
+    .ctab[aria-selected="true"] { background:#0f172a; color:#fff; border-color:#0f172a; }
+    .counts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+    .stat { flex:1; min-width:110px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px 14px; text-align:center; cursor:pointer; transition:transform .1s, box-shadow .1s; }
+    .stat:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(15,23,42,.1); }
+    .stat[aria-selected="true"] { outline:3px solid var(--primary); }
+    .stat .n { font-size:24px; font-weight:900; }
+    .stat .l { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+    .stat.ok .n { color:var(--green); } .stat.bad .n { color:var(--red); } .stat.fault .n { color:#b91c1c; }
+    .stat.fault { border-color:#fecaca; background:#fff5f5; }
+    .stat.fault[aria-selected="true"] { outline-color:#b91c1c; }
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #eef2f7; vertical-align:top; }
     th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
@@ -72,9 +70,24 @@
     .condsel.Good { border-color:var(--green); color:#047857; background:#ecfdf5; }
     .condsel.Damaged { border-color:var(--red); color:#b91c1c; background:#fef2f2; }
     .condsel.Wrong { border-color:var(--amber); color:#b45309; background:#fffbeb; }
+    .cstatic { font-size:12px; font-weight:800; padding:2px 8px; border-radius:7px; }
+    .cstatic.Good { color:#047857; background:#ecfdf5; } .cstatic.Damaged { color:#b91c1c; background:#fef2f2; } .cstatic.Wrong { color:#b45309; background:#fffbeb; }
+    .dmg { display:block; font-size:11px; color:#b91c1c; margin-top:3px; }
     .mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
     .scroll { overflow-x:auto; border:1px solid #eef2f7; border-radius:10px; }
     .muted { color:var(--muted); }
+    .modal { position:fixed; inset:0; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; padding:16px; z-index:50; }
+    .modalcard { background:#fff; border-radius:14px; width:100%; max-width:520px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+    .modalhd { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .modalbody { padding:8px 16px; overflow:auto; }
+    .modalft { padding:14px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+    .xbtn { border:none; background:none; font-size:24px; cursor:pointer; color:var(--muted); line-height:1; }
+    .savebtn { background:#b91c1c; color:#fff; border:none; border-radius:9px; padding:10px 18px; font-weight:800; cursor:pointer; font-size:14px; }
+    .ghostbtn { background:#fff; color:var(--muted); border:1px solid var(--border); border-radius:9px; padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; }
+    .itemrow { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid #eef2f7; }
+    .itemrow input[type=checkbox] { width:20px; height:20px; }
+    .itemrow .nm { flex:1; font-weight:600; font-size:14px; }
+    .itemrow .qin { width:70px; padding:6px 8px; border:1px solid var(--border); border-radius:7px; font-size:14px; }
     @media (max-width:560px){ #awb{font-size:18px;} .htitle{display:none;} }
   </style>
 </head>
@@ -91,9 +104,9 @@
 
 <main>
   <div class="card scanwrap">
-    <label for="awb">Scan AWB (tracking number)</label>
-    <input id="awb" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Bas scan karo - apne aap save ho jayega (Enter zaroori nahi)" />
-    <div class="hint">Har scan <b>apne aap Good</b> mein save hota hai (Enter zaroori nahi). Damaged / Wrong karna ho to niche list ke <b>Condition</b> dropdown se ya upar result card ke buttons se badal do. Return ki galti <b>hamari</b> hui to bada laal <b>attention</b> aayega.</div>
+    <label for="awb">Scan AWB number or enter Order ID</label>
+    <input id="awb" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AWB scan karo ya Order ID type karo - apne aap match ho jayega" />
+    <div class="hint">Har scan <b>apne aap Good</b> mein save hota hai (Enter zaroori nahi). Condition <b>ek hi baar</b> badal sakte ho. Damaged chunne pe items ki list aayegi - jo kharab hai wo qty ke saath choose karo. Hamari galti hui to bada laal <b>attention</b> aayega.</div>
   </div>
 
   <div class="result" id="result"></div>
@@ -108,17 +121,14 @@
   </div>
 
   <div class="counts">
-    <div class="stat"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
-    <div class="stat ok"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
-    <div class="stat bad"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
-    <div class="stat fault"><div class="n" id="cFault">0</div><div class="l">Our fault</div></div>
+    <div class="stat" id="fAll" data-f="all" aria-selected="true"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
+    <div class="stat ok" id="fOk" data-f="ok" aria-selected="false"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
+    <div class="stat bad" id="fBad" data-f="notfound" aria-selected="false"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
   </div>
 
   <div class="card">
-    <div class="tabbar">
-      <button class="tab" id="tabAll" aria-selected="true">All scans</button>
-      <button class="tab faulttab" id="tabFault" aria-selected="false">&#9888; Our fault (<span id="tabFaultN">0</span>)</button>
-    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span></div>
+    <div class="tabbar"><span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span><button class="ctab" data-c="Good" aria-selected="false">Good</button><button class="ctab" data-c="Damaged" aria-selected="false">Damaged</button><button class="ctab" data-c="Wrong" aria-selected="false">Wrong</button><button class="ctab" data-c="" aria-selected="false">Clear</button></div>
     <div class="scroll">
       <table>
         <thead><tr><th>Time</th><th>AWB</th><th>Status</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Condition</th></tr></thead>
@@ -127,6 +137,14 @@
     </div>
   </div>
 </main>
+
+<div class="modal" id="pickWrap" hidden>
+  <div class="modalcard">
+    <div class="modalhd"><b>Damaged items chuno</b><button class="xbtn" id="pickClose">&times;</button></div>
+    <div class="modalbody" id="pickBody"></div>
+    <div class="modalft"><button class="ghostbtn" id="pickCancel">Cancel</button><button class="savebtn" id="pickSave">Save damaged</button></div>
+  </div>
+</div>
 
 <script src="/analyst-access.js?v=12"></script>
 <script type="module">
@@ -137,12 +155,13 @@
   const $ = (s) => document.querySelector(s);
   const esc = (x) => String(x==null?"":x).replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const CONDS = ["Good","Damaged","Wrong"];
-  const isFault = (r) => !!(r && (r.our_fault || r.condition==="Damaged" || r.condition==="Wrong"));
+  const isFault = (r) => !!(r && r.our_fault);
   let counts = { total:0, ok:0, bad:0, fault:0 };
   let allRows = [];
-  let tab = "all";
   let dateFilter = "today";
+  let statusFilter = "all";
   let last = null;
+  let pickerOpen = false;
 
   function startOfDay(x){ const y=new Date(x); y.setHours(0,0,0,0); return y; }
   function inDate(ts){
@@ -155,23 +174,39 @@
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) { const p=dateFilter.split("-").map(Number); return startOfDay(d).getTime() === new Date(p[0],p[1]-1,p[2]).getTime(); }
     return true;
   }
-
+  function statusMatch(r){
+    if (statusFilter.indexOf("cond:")===0) return (r.condition||"Good")===statusFilter.slice(5);
+    if (statusFilter==="ok") return r.status==="OK";
+    if (statusFilter==="notfound") return r.status!=="OK";
+    if (statusFilter==="fault") return isFault(r);
+    return true;
+  }
+  function dmgText(r){ if(!r.damaged_items||!r.damaged_items.length) return ""; return r.damaged_items.map(d=>esc(d.name||d.code)+" x"+esc(d.qty)).join(", "); }
   function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
-  function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; $("#cFault").textContent=counts.fault; $("#tabFaultN").textContent=counts.fault; }
+  function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; }
+
+  function condCell(r){
+    const cur = r.condition || "Good";
+    if (r.cond_locked) {
+      let h = "<span class='cstatic "+esc(cur)+"'>"+esc(cur)+"</span>";
+      if (cur==="Damaged") { const t=dmgText(r); if(t) h += "<span class='dmg'>"+t+"</span>"; }
+      return h;
+    }
+    const opts = CONDS.map(c => "<option value='"+c+"'"+(c===cur?" selected":"")+">"+c+"</option>").join("");
+    return "<select class='condsel "+esc(cur)+"' data-awb='"+esc(r.awb)+"' data-sku='"+esc(r.sku||"")+"'>"+opts+"</select>";
+  }
 
   function rowHtml(r){
     const ok = r.status === "OK";
-    const cur = r.condition || "Good";
     const fault = isFault(r);
-    const opts = CONDS.map(c => "<option value='"+c+"'"+(c===cur?" selected":"")+">"+c+"</option>").join("");
     return "<tr class='"+(fault?"fault":"")+"'><td class='muted'>"+fmtTime(r.scanned_at)+"</td>"+
-      "<td class='mono'>"+esc(r.awb)+(fault?"<span class='fbadge'>OUR FAULT</span>":"")+"</td>"+
+      "<td class='mono'>"+esc(r.awb)+"</td>"+
       "<td><span class='badge "+(ok?"ok":"bad")+"'>"+(ok?"OK":"NOT FOUND")+"</span></td>"+
       "<td class='mono'>"+esc(r.sku||"-")+"</td>"+
       "<td>"+esc(r.platform||"-")+"</td>"+
       "<td>"+esc(r.company_name||"-")+"</td>"+
       "<td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td>"+
-      "<td><select class='condsel "+esc(cur)+"' data-awb='"+esc(r.awb)+"'>"+opts+"</select></td></tr>";
+      "<td>"+condCell(r)+"</td></tr>";
   }
 
   function showResult(r){
@@ -182,7 +217,7 @@
     el.className = "result " + (ok ? "ok" : "bad");
     el.style.display = "block";
     let h = "<div class='big'>"+(ok?"OK - return matched":"NOT FOUND in returns")+"</div>";
-    if (fault) h += "<div class='warn'>&#9888; HAMARI GALTI &mdash; "+esc(r.return_reason || (r.condition==="Wrong"?"Wrong item":"Damaged"))+"</div>";
+    if (fault) h += "<div class='warn'>&#9888; HAMARI GALTI &mdash; "+esc(r.return_reason || (cur==="Wrong"?"Wrong item":"Damaged"))+"</div>";
     h += "<div class='kv'>";
     h += "<div class='k'>AWB</div><div class='v mono'>"+esc(r.awb)+"</div>";
     if (ok) {
@@ -190,42 +225,82 @@
       h += "<div class='k'>Platform</div><div class='v'>"+esc(r.platform||"-")+(r.company_name?(" / "+esc(r.company_name)):"")+"</div>";
       h += "<div class='k'>Order</div><div class='v mono'>"+esc(r.order_id||"-")+"</div>";
       h += "<div class='k'>Reason</div><div class='v'>"+esc(r.return_reason||"-")+"</div>";
-      if (r.r_qty!=null) h += "<div class='k'>Qty</div><div class='v'>"+esc(r.r_qty)+"</div>";
     } else {
-      h += "<div class='k'>Note</div><div class='v'>Yeh AWB returns data mein nahi mila. Galat AWB, ya return abhi tak file mein nahi aaya.</div>";
+      h += "<div class='k'>Note</div><div class='v'>Yeh AWB returns data mein nahi mila.</div>";
     }
+    if (cur==="Damaged" && dmgText(r)) h += "<div class='k'>Damaged</div><div class='v'>"+dmgText(r)+"</div>";
     h += "</div>";
-    h += "<div class='cbtns'><span class='lbl'>Condition:</span>"+
-      CONDS.map(c => "<button class='cbtn "+c.toLowerCase()+"' data-c='"+c+"' aria-pressed='"+(c===cur?"true":"false")+"'>"+(c==="Wrong"?"Wrong item":c)+"</button>").join("")+"</div>";
+    if (r.cond_locked) {
+      h += "<div class='lockmsg'>Condition set: <b>"+esc(cur)+"</b> (locked - ab badla nahi ja sakta)</div>";
+    } else {
+      h += "<div class='cbtns'><span class='lbl'>Condition:</span>"+
+        CONDS.map(c => "<button class='cbtn "+c.toLowerCase()+"' data-c='"+c+"' aria-pressed='"+(c===cur?"true":"false")+"'>"+(c==="Wrong"?"Wrong item":c)+"</button>").join("")+"</div>";
+    }
     el.innerHTML = h;
-    el.querySelectorAll(".cbtn").forEach(b => b.addEventListener("click", () => changeCondition(r.awb, b.dataset.c)));
+    if (!r.cond_locked) el.querySelectorAll(".cbtn").forEach(b => b.addEventListener("click", () => onPick(r.awb, r.sku, b.dataset.c)));
+  }
+
+  function onPick(awb, sku, cond){
+    if (cond === "Damaged") openPicker(awb, sku);
+    else changeCondition(awb, cond, null);
   }
 
   let busy = false;
   async function doScan(awb){
     awb = (awb||"").trim();
-    if (!awb || busy) return;
+    if (!awb || busy || pickerOpen) return;
     busy = true;
     const inp = $("#awb");
     try {
       const { data, error } = await sb.rpc("return_scan_save", { p_awb: awb, p_condition: "Good", p_by: (window.CA && CA.who && CA.who()) || null });
       if (error) { last = { awb, status:"BAD", return_reason:error.message }; showResult(last); }
-      else {
-        last = (data && data[0]) || { awb, status:"NOT_FOUND", condition:"Good" };
-        showResult(last);
-        await loadList();
-      }
+      else { last = (data && data[0]) || { awb, status:"NOT_FOUND", condition:"Good" }; showResult(last); await loadList(); }
     } catch (e) { last = { awb, status:"BAD", return_reason:String(e.message||e) }; showResult(last); }
     inp.value = ""; inp.focus(); busy = false;
   }
 
-  async function changeCondition(awb, cond){
-    try { await sb.rpc("return_scan_set_condition", { p_awb: awb, p_condition: cond }); } catch(e){ }
-    const row = allRows.find(x => x.awb === awb); if (row) row.condition = cond;
-    if (last && last.awb === awb) { last.condition = cond; showResult(last); }
-    render();
+  async function changeCondition(awb, cond, damaged){
+    try { await sb.rpc("return_scan_set_condition", { p_awb: awb, p_condition: cond, p_damaged: damaged }); } catch(e){ }
+    await loadList();
+    const row = allRows.find(x => x.awb === awb);
+    if (last && last.awb === awb && row) { last = row; showResult(last); }
     $("#awb").focus();
   }
+
+  let pickAwb = null;
+  async function openPicker(awb, sku){
+    pickAwb = awb; pickerOpen = true;
+    $("#pickBody").innerHTML = "<div class='muted' style='padding:12px'>Loading items&hellip;</div>";
+    $("#pickWrap").hidden = false;
+    let items = [];
+    try { const { data } = await sb.rpc("return_sku_components", { p_sku: sku || "" }); items = data || []; } catch(e){ items = []; }
+    if (!items.length) {
+      const row = allRows.find(x=>x.awb===awb);
+      items = [{ code: (row&&row.sku)||sku||"item", name: (row&&(row.product||row.sku))||sku||"Item", qty: (row&&row.r_qty)||1 }];
+    }
+    $("#pickBody").innerHTML = items.map((it,i) =>
+      "<div class='itemrow'><input type='checkbox' data-i='"+i+"' /><span class='nm'>"+esc(it.name||it.code)+" <span class='muted'>(qty "+esc(it.qty)+")</span></span>"+
+      "<input type='number' class='qin' data-i='"+i+"' min='1' step='1' value='1' /></div>"
+    ).join("");
+    $("#pickBody").__items = items;
+    $("#awb").blur();
+  }
+  function closePicker(){ pickerOpen = false; $("#pickWrap").hidden = true; pickAwb = null; $("#awb").focus(); }
+  $("#pickClose").addEventListener("click", closePicker);
+  $("#pickCancel").addEventListener("click", closePicker);
+  $("#pickSave").addEventListener("click", async () => {
+    const items = $("#pickBody").__items || [];
+    const chosen = [];
+    $("#pickBody").querySelectorAll(".itemrow").forEach((rowEl, i) => {
+      const cb = rowEl.querySelector("input[type=checkbox]");
+      const q = Number(rowEl.querySelector(".qin").value) || 0;
+      if (cb.checked && q > 0) chosen.push({ code: items[i].code, name: items[i].name, qty: q });
+    });
+    if (!chosen.length) { alert("Kam se kam ek item choose karo (qty > 0)."); return; }
+    const awb = pickAwb;
+    closePicker();
+    await changeCondition(awb, "Damaged", chosen);
+  });
 
   function render(){
     const base = allRows.filter(r => inDate(r.scanned_at));
@@ -234,10 +309,11 @@
     counts.bad = base.length - counts.ok;
     counts.fault = base.filter(isFault).length;
     setCounts();
-    const rows = tab==="fault" ? base.filter(isFault) : base;
+    const rows = base.filter(statusMatch);
     $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("")
-      : "<tr><td colspan='8' class='muted' style='padding:16px'>"+(tab==="fault"?"Koi our-fault return nahi.":"Abhi tak koi scan nahi. Upar AWB scan karo.")+"</td></tr>";
-    $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => changeCondition(sel.dataset.awb, sel.value)));
+      : "<tr><td colspan='8' class='muted' style='padding:16px'>Is filter mein koi scan nahi.</td></tr>";
+    $("#listNote").textContent = rows.length ? ("("+rows.length+" dikha rahe)") : "";
+    $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => onPick(sel.dataset.awb, sel.dataset.sku, sel.value)));
   }
 
   async function loadList(){
@@ -246,14 +322,24 @@
     render();
   }
 
-  $("#tabAll").addEventListener("click", () => { tab="all"; $("#tabAll").setAttribute("aria-selected","true"); $("#tabFault").setAttribute("aria-selected","false"); render(); });
-  $("#tabFault").addEventListener("click", () => { tab="fault"; $("#tabFault").setAttribute("aria-selected","true"); $("#tabAll").setAttribute("aria-selected","false"); render(); });
-
+  document.querySelectorAll(".stat").forEach(c => c.addEventListener("click", () => {
+    statusFilter = c.dataset.f;
+    document.querySelectorAll(".stat").forEach(x => x.setAttribute("aria-selected", x===c ? "true":"false"));
+    document.querySelectorAll(".ctab").forEach(x => x.setAttribute("aria-selected","false"));
+    render();
+  }));
+  document.querySelectorAll(".ctab").forEach(b => b.addEventListener("click", () => {
+    const c = b.dataset.c;
+    if (!c) { statusFilter = "all"; document.querySelectorAll(".stat").forEach(x=>x.setAttribute("aria-selected", x.dataset.f==="all"?"true":"false")); document.querySelectorAll(".ctab").forEach(x=>x.setAttribute("aria-selected","false")); render(); return; }
+    statusFilter = "cond:"+c;
+    document.querySelectorAll(".stat").forEach(x=>x.setAttribute("aria-selected","false"));
+    document.querySelectorAll(".ctab").forEach(x=>x.setAttribute("aria-selected", x===b?"true":"false"));
+    render();
+  }));
   document.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
     dateFilter = b.dataset.d;
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed", x===b ? "true":"false"));
-    $("#dpick").value = "";
-    render(); $("#awb").focus();
+    $("#dpick").value = ""; render(); $("#awb").focus();
   }));
   $("#dpick").addEventListener("change", () => {
     if (!$("#dpick").value) return;
@@ -269,10 +355,7 @@
     if (inp.value.length <= 1) { maxGap = 0; } else if (lastKey) { maxGap = Math.max(maxGap, now - lastKey); }
     lastKey = now;
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      const v = inp.value.trim();
-      if (v.length >= 6 && maxGap < 80) doScan(v);
-    }, 200);
+    idleTimer = setTimeout(() => { const v = inp.value.trim(); if (v.length >= 6 && maxGap < 80) doScan(v); }, 200);
   });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (idleTimer) clearTimeout(idleTimer); doScan(inp.value); } });
 
