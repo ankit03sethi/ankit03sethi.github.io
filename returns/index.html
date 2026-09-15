@@ -129,7 +129,7 @@
 
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span></div>
-    <div class="tabbar"><span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span><button class="ctab" data-c="Good" aria-selected="false">Good</button><button class="ctab" data-c="Damaged" aria-selected="false">Damaged</button><button class="ctab" data-c="Wrong" aria-selected="false">Wrong</button><button class="ctab" data-c="" aria-selected="false">Clear</button></div>
+    <div class="tabbar"><span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span><button class="ctab" data-c="Good" aria-selected="false">Good</button><button class="ctab" data-c="Damaged" aria-selected="false">Damaged</button><button class="ctab" data-c="Wrong" aria-selected="false">Wrong</button><button class="ctab" data-c="fault" aria-selected="false">Our Fault</button></div>
     <div class="scroll">
       <table>
         <thead><tr><th>Time</th><th>AWB</th><th>Status</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Condition</th></tr></thead>
@@ -160,7 +160,8 @@
   let counts = { total:0, ok:0, bad:0, fault:0 };
   let allRows = [];
   let dateFilter = "today";
-  let statusFilter = "all";
+  let cardFilter = "all";
+  let condFilter = "all";
   let last = null;
   let pickerOpen = false;
 
@@ -175,13 +176,9 @@
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) { const p=dateFilter.split("-").map(Number); return startOfDay(d).getTime() === new Date(p[0],p[1]-1,p[2]).getTime(); }
     return true;
   }
-  function statusMatch(r){
-    if (statusFilter.indexOf("cond:")===0) return (r.condition||"Good")===statusFilter.slice(5);
-    if (statusFilter==="ok") return r.status==="OK";
-    if (statusFilter==="notfound") return r.status!=="OK";
-    if (statusFilter==="fault") return isFault(r);
-    return true;
-  }
+  function matchCard(r){ if(cardFilter==="ok") return r.status==="OK"; if(cardFilter==="notfound") return r.status!=="OK"; return true; }
+  function matchCond(r){ if(condFilter==="all") return true; if(condFilter==="fault") return isFault(r); return (r.condition||"Good")===condFilter; }
+  function statusMatch(r){ return matchCard(r) && matchCond(r); }
   function dmgText(r){ if(!r.damaged_items||!r.damaged_items.length) return ""; return r.damaged_items.map(d=>esc(d.name||d.code)+" x"+esc(d.qty)).join(", "); }
   function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
   function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; }
@@ -245,10 +242,11 @@
     if (cond !== "Damaged") { changeCondition(awb, cond, null); return; }
     let items = [];
     try { const { data } = await sb.rpc("return_sku_components", { p_sku: sku || "" }); items = data || []; } catch(e){ items = []; }
-    if (items.length > 1) { openPicker(awb, items); return; }
-    const row = allRows.find(x=>x.awb===awb);
-    const one = items[0] || { code: (row&&row.sku)||sku||"item", name: (row&&(row.product||row.sku))||sku||"Item", qty: (row&&row.r_qty)||1 };
-    changeCondition(awb, "Damaged", [{ code: one.code, name: one.name, qty: Number(one.qty)||1 }]);
+    if (!items.length) {
+      const row = allRows.find(x=>x.awb===awb);
+      items = [{ code: (row&&row.sku)||sku||"item", name: (row&&(row.product||row.sku))||sku||"Item", qty: (row&&row.r_qty)||1 }];
+    }
+    openPicker(awb, items);
   }
 
   let busy = false;
@@ -284,7 +282,7 @@
     $("#pickWrap").hidden = false;
     $("#awb").blur();
   }
-  function closePicker(){ pickerOpen = false; $("#pickWrap").hidden = true; pickAwb = null; $("#awb").focus(); }
+  function closePicker(){ pickerOpen = false; $("#pickWrap").hidden = true; pickAwb = null; render(); $("#awb").focus(); }
   $("#pickClose").addEventListener("click", closePicker);
   $("#pickCancel").addEventListener("click", closePicker);
   $("#pickWrap").addEventListener("click", (e) => { if (e.target === $("#pickWrap")) closePicker(); });
@@ -323,17 +321,15 @@
   }
 
   document.querySelectorAll(".stat").forEach(c => c.addEventListener("click", () => {
-    statusFilter = c.dataset.f;
-    document.querySelectorAll(".stat").forEach(x => x.setAttribute("aria-selected", x===c ? "true":"false"));
-    document.querySelectorAll(".ctab").forEach(x => x.setAttribute("aria-selected","false"));
+    const f = c.dataset.f;
+    cardFilter = (cardFilter===f && f!=="all") ? "all" : f;
+    document.querySelectorAll(".stat").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter) ? "true":"false"));
     render();
   }));
   document.querySelectorAll(".ctab").forEach(b => b.addEventListener("click", () => {
     const c = b.dataset.c;
-    if (!c) { statusFilter = "all"; document.querySelectorAll(".stat").forEach(x=>x.setAttribute("aria-selected", x.dataset.f==="all"?"true":"false")); document.querySelectorAll(".ctab").forEach(x=>x.setAttribute("aria-selected","false")); render(); return; }
-    statusFilter = "cond:"+c;
-    document.querySelectorAll(".stat").forEach(x=>x.setAttribute("aria-selected","false"));
-    document.querySelectorAll(".ctab").forEach(x=>x.setAttribute("aria-selected", x===b?"true":"false"));
+    condFilter = (condFilter===c) ? "all" : c;
+    document.querySelectorAll(".ctab").forEach(x => x.setAttribute("aria-selected", (x.dataset.c===condFilter) ? "true":"false"));
     render();
   }));
   document.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
