@@ -128,28 +128,26 @@
     <input type="date" id="dpick" class="dpick" title="Kisi khaas din ke scans" />
   </div>
 
-  <div class="card" id="expCard">
-    <div class="wlhead">
-      <button class="wltab" id="wlUnd" data-w="undelivered" aria-selected="false">Undelivered<span class="wln">0</span></button>
-      <button class="wltab" id="wlDel" data-w="delivered" aria-selected="false">Delivered<span class="wln">0</span></button>
-      <span class="muted" id="expNote" style="margin-left:auto"></span>
-    </div>
-    <div id="wlFilters" hidden style="margin-top:10px"></div>
-    <div class="scroll" id="expScrollWrap" hidden>
-      <table>
-        <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Courier</th><th>Reason</th><th>Delivered Date</th></tr></thead>
-        <tbody id="expRows"></tbody>
-      </table>
-    </div>
-  </div>
-
   <div class="counts">
+    <div class="stat wl" id="wlUnd" data-w="undelivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Undelivered</div></div>
+    <div class="stat wl" id="wlDel" data-w="delivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Delivered</div></div>
     <div class="stat" id="fAll" data-f="all" aria-selected="true"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
     <div class="stat ok" id="fOk" data-f="ok" aria-selected="false"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
     <div class="stat bad" id="fBad" data-f="notfound" aria-selected="false"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
   </div>
 
 
+
+  <div class="card" id="expCard" hidden>
+    <div style="margin-bottom:8px"><b id="wlTitle">Aane wale returns</b> <span class="muted" id="expNote"></span></div>
+    <div id="wlFilters"></div>
+    <div class="scroll" id="expScrollWrap" style="margin-top:8px">
+      <table>
+        <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Courier</th><th>Reason</th><th>Delivered Date</th></tr></thead>
+        <tbody id="expRows"></tbody>
+      </table>
+    </div>
+  </div>
 
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span></div>
@@ -364,21 +362,23 @@
     $("#wlDel").querySelector(".wln").textContent = delP.length;
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
-    const filt = $("#wlFilters"), wrap = $("#expScrollWrap");
-    if (!wlMode){ if(wrap) wrap.hidden=true; if(filt) filt.hidden=true; $("#expNote").textContent=""; return; }
+    const card = $("#expCard");
+    if (!wlMode){ if(card) card.hidden=true; return; }
+    if (card) card.hidden=false;
     const all = (wlMode==="delivered"?delP:undP);
-    const byCo={}, byCr={};
-    all.forEach(r=>{ const co=r.company_name||"-", cr=r.courier||"-"; byCo[co]=(byCo[co]||0)+1; byCr[cr]=(byCr[cr]||0)+1; });
-    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+(((t==="co"?wlCompany:wlCourier)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n+")")+"</button>";
-    const coChips=[chip("co","all",all.length)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
+    $("#wlTitle").textContent = (wlMode==="delivered"?"Delivered returns":"Undelivered returns");
+    const byCr={}; all.forEach(r=>{ const cr=r.courier||"-"; byCr[cr]=(byCr[cr]||0)+1; });
+    let crRows = (wlCourier==="all") ? all : all.filter(r=>(r.courier||"-")===wlCourier);
+    const byCo={}; crRows.forEach(r=>{ const co=r.company_name||"-"; byCo[co]=(byCo[co]||0)+1; });
+    if (wlCompany!=="all" && !(wlCompany in byCo)) wlCompany="all";
+    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+(((t==="cr"?wlCourier:wlCompany)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n+")")+"</button>";
     const crChips=[chip("cr","all",all.length)].concat(Object.keys(byCr).sort().map(k=>chip("cr",k,byCr[k]))).join("");
-    filt.hidden=false;
-    filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div><div><b class='muted' style='margin-right:6px'>Courier:</b>"+crChips+"</div>";
-    filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.t==="co") wlCompany=b.dataset.v; else wlCourier=b.dataset.v; renderExpected(); }));
-    let rows=all;
+    const coChips=[chip("co","all",crRows.length)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
+    const filt=$("#wlFilters");
+    filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Courier:</b>"+crChips+"</div><div><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div>";
+    filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.t==="cr"){ wlCourier=b.dataset.v; wlCompany="all"; } else wlCompany=b.dataset.v; renderExpected(); }));
+    let rows=crRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
-    if(wlCourier!=="all") rows=rows.filter(r=>(r.courier||"-")===wlCourier);
-    if(wrap) wrap.hidden=false;
     $("#expNote").textContent = rows.length ? (rows.length+" pending scan") : "Sab scan ho gaye.";
     const show = rows.slice(0,1000);
     $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
@@ -393,9 +393,10 @@
   }
 
   document.querySelectorAll(".stat").forEach(c => c.addEventListener("click", () => {
+    if (c.dataset.w) return;
     const f = c.dataset.f;
     cardFilter = (cardFilter===f && f!=="all") ? "all" : f;
-    document.querySelectorAll(".stat").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter) ? "true":"false"));
+    document.querySelectorAll(".stat[data-f]").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter) ? "true":"false"));
     render();
   }));
   document.querySelectorAll(".ctab").forEach(b => b.addEventListener("click", () => {
