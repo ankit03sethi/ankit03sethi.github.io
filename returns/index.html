@@ -97,7 +97,7 @@
     </div>
     <div class="scroll">
       <table>
-        <thead><tr><th>Time</th><th>AWB</th><th>Status</th><th>SKU</th><th>Product</th><th>Platform</th><th>Reason</th><th>Condition</th></tr></thead>
+        <thead><tr><th>Time</th><th>AWB</th><th>Status</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Condition</th></tr></thead>
         <tbody id="rows"><tr><td colspan="8" class="muted" style="padding:16px">Loading...</td></tr></tbody>
       </table>
     </div>
@@ -127,8 +127,8 @@
       "<td class='mono'>"+esc(r.awb)+"</td>"+
       "<td><span class='badge "+(ok?"ok":"bad")+"'>"+(ok?"OK":"NOT FOUND")+"</span></td>"+
       "<td class='mono'>"+esc(r.sku||"-")+"</td>"+
-      "<td>"+esc((r.product||"").slice(0,60))+"</td>"+
       "<td>"+esc(r.platform||"-")+"</td>"+
+      "<td>"+esc(r.company_name||"-")+"</td>"+
       "<td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td>"+
       "<td><select class='condsel "+esc(cur)+"' data-awb='"+esc(r.awb)+"'>"+opts+"</select></td></tr>";
   }
@@ -144,7 +144,6 @@
     h += "<div class='k'>AWB</div><div class='v mono'>"+esc(r.awb)+"</div>";
     if (ok) {
       h += "<div class='k'>SKU</div><div class='v mono'>"+esc(r.sku||"-")+"</div>";
-      h += "<div class='k'>Product</div><div class='v'>"+esc(r.product||"-")+"</div>";
       h += "<div class='k'>Platform</div><div class='v'>"+esc(r.platform||"-")+(r.company_name?(" / "+esc(r.company_name)):"")+"</div>";
       h += "<div class='k'>Order</div><div class='v mono'>"+esc(r.order_id||"-")+"</div>";
       h += "<div class='k'>Reason</div><div class='v'>"+esc(r.return_reason||"-")+"</div>";
