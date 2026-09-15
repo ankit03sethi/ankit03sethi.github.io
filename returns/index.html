@@ -12,8 +12,8 @@
   <style>
     * { box-sizing: border-box; }
     :root {
-      --primary:#1f6feb; --primary-dark:#1858bd; --accent:#f59e0b; --green:#10b981;
-      --red:#ef4444; --amber:#f59e0b; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+      --primary:#1f6feb; --green:#10b981; --red:#ef4444; --amber:#f59e0b;
+      --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
     }
     body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin:0; color:var(--text); background:#f1f5f9; }
     a { color:var(--primary); }
@@ -36,7 +36,8 @@
     .result .big { font-size:26px; font-weight:900; display:flex; align-items:center; gap:10px; }
     .result.ok .big { color:#047857; }
     .result.bad .big { color:#b91c1c; }
-    .kv { margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; }
+    .warn { margin-top:12px; background:#b91c1c; color:#fff; border-radius:10px; padding:14px 16px; font-size:20px; font-weight:900; letter-spacing:.3px; display:flex; align-items:center; gap:10px; }
+    .kv { margin-top:12px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; }
     .kv .k { color:var(--muted); font-weight:600; }
     .kv .v { font-weight:600; word-break:break-word; }
     .cbtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center; }
@@ -46,15 +47,22 @@
     .cbtn.damaged[aria-pressed="true"] { border-color:var(--red); background:#fef2f2; color:#b91c1c; }
     .cbtn.wrong[aria-pressed="true"] { border-color:var(--amber); background:#fffbeb; color:#b45309; }
     .counts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
-    .stat { flex:1; min-width:120px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px 14px; text-align:center; }
+    .stat { flex:1; min-width:110px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px 14px; text-align:center; }
     .stat .n { font-size:24px; font-weight:900; }
     .stat .l { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
-    .stat.ok .n { color:var(--green); } .stat.bad .n { color:var(--red); }
+    .stat.ok .n { color:var(--green); } .stat.bad .n { color:var(--red); } .stat.fault .n { color:#b91c1c; }
+    .stat.fault { border-color:#fecaca; background:#fff5f5; }
+    .tabbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+    .tab { border:1px solid var(--border); background:#fff; border-radius:999px; padding:7px 14px; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
+    .tab[aria-selected="true"] { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .tab.faulttab[aria-selected="true"] { background:#b91c1c; border-color:#b91c1c; }
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #eef2f7; vertical-align:top; }
     th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
+    tr.fault td { background:#fff5f5; }
     .badge { font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
     .badge.ok { background:#d1fae5; color:#047857; } .badge.bad { background:#fee2e2; color:#b91c1c; }
+    .fbadge { font-size:10px; font-weight:900; color:#fff; background:#b91c1c; padding:2px 6px; border-radius:6px; margin-left:6px; }
     .condsel { font-size:12px; font-weight:700; padding:3px 6px; border-radius:7px; border:1px solid var(--border); background:#fff; cursor:pointer; }
     .condsel.Good { border-color:var(--green); color:#047857; background:#ecfdf5; }
     .condsel.Damaged { border-color:var(--red); color:#b91c1c; background:#fef2f2; }
@@ -80,7 +88,7 @@
   <div class="card scanwrap">
     <label for="awb">Scan AWB (tracking number)</label>
     <input id="awb" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Bas scan karo - apne aap save ho jayega (Enter zaroori nahi)" />
-    <div class="hint">Har scan <b>apne aap save</b> hota hai <b>Good</b> mein (Enter dabana zaroori nahi). Damaged / Wrong karna ho to niche list ya upar ke result card mein condition badal do.</div>
+    <div class="hint">Har scan <b>apne aap Good</b> mein save hota hai (Enter zaroori nahi). Damaged / Wrong karna ho to niche list ke <b>Condition</b> dropdown se ya upar result card ke buttons se badal do. Return ki galti <b>hamari</b> hui to bada laal <b>attention</b> aayega.</div>
   </div>
 
   <div class="result" id="result"></div>
@@ -89,11 +97,13 @@
     <div class="stat"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
     <div class="stat ok"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
     <div class="stat bad"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
+    <div class="stat fault"><div class="n" id="cFault">0</div><div class="l">Our fault</div></div>
   </div>
 
   <div class="card">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <b>Scans</b><span class="muted" id="listNote"></span>
+    <div class="tabbar">
+      <button class="tab" id="tabAll" aria-selected="true">All scans</button>
+      <button class="tab faulttab" id="tabFault" aria-selected="false">&#9888; Our fault (<span id="tabFaultN">0</span>)</button>
     </div>
     <div class="scroll">
       <table>
@@ -113,18 +123,22 @@
   const $ = (s) => document.querySelector(s);
   const esc = (x) => String(x==null?"":x).replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const CONDS = ["Good","Damaged","Wrong"];
-  let counts = { total:0, ok:0, bad:0 };
+  const isFault = (r) => !!(r && (r.our_fault || r.condition==="Damaged" || r.condition==="Wrong"));
+  let counts = { total:0, ok:0, bad:0, fault:0 };
+  let allRows = [];
+  let tab = "all";
   let last = null;
 
   function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
-  function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; }
+  function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; $("#cFault").textContent=counts.fault; $("#tabFaultN").textContent=counts.fault; }
 
   function rowHtml(r){
     const ok = r.status === "OK";
     const cur = r.condition || "Good";
+    const fault = isFault(r);
     const opts = CONDS.map(c => "<option value='"+c+"'"+(c===cur?" selected":"")+">"+c+"</option>").join("");
-    return "<tr><td class='muted'>"+fmtTime(r.scanned_at)+"</td>"+
-      "<td class='mono'>"+esc(r.awb)+"</td>"+
+    return "<tr class='"+(fault?"fault":"")+"'><td class='muted'>"+fmtTime(r.scanned_at)+"</td>"+
+      "<td class='mono'>"+esc(r.awb)+(fault?"<span class='fbadge'>OUR FAULT</span>":"")+"</td>"+
       "<td><span class='badge "+(ok?"ok":"bad")+"'>"+(ok?"OK":"NOT FOUND")+"</span></td>"+
       "<td class='mono'>"+esc(r.sku||"-")+"</td>"+
       "<td>"+esc(r.platform||"-")+"</td>"+
@@ -137,9 +151,11 @@
     const el = $("#result");
     const ok = r.status === "OK";
     const cur = r.condition || "Good";
+    const fault = isFault(r);
     el.className = "result " + (ok ? "ok" : "bad");
     el.style.display = "block";
     let h = "<div class='big'>"+(ok?"OK - return matched":"NOT FOUND in returns")+"</div>";
+    if (fault) h += "<div class='warn'>&#9888; HAMARI GALTI &mdash; "+esc(r.return_reason || (r.condition==="Wrong"?"Wrong item":"Damaged"))+"</div>";
     h += "<div class='kv'>";
     h += "<div class='k'>AWB</div><div class='v mono'>"+esc(r.awb)+"</div>";
     if (ok) {
@@ -178,22 +194,32 @@
 
   async function changeCondition(awb, cond){
     try { await sb.rpc("return_scan_set_condition", { p_awb: awb, p_condition: cond }); } catch(e){ }
+    const row = allRows.find(x => x.awb === awb); if (row) row.condition = cond;
     if (last && last.awb === awb) { last.condition = cond; showResult(last); }
-    await loadList();
+    render();
     $("#awb").focus();
+  }
+
+  function render(){
+    counts.total = allRows.length;
+    counts.ok = allRows.filter(r=>r.status==="OK").length;
+    counts.bad = allRows.length - counts.ok;
+    counts.fault = allRows.filter(isFault).length;
+    setCounts();
+    const rows = tab==="fault" ? allRows.filter(isFault) : allRows;
+    $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("")
+      : "<tr><td colspan='8' class='muted' style='padding:16px'>"+(tab==="fault"?"Koi our-fault return nahi.":"Abhi tak koi scan nahi. Upar AWB scan karo.")+"</td></tr>";
+    $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => changeCondition(sel.dataset.awb, sel.value)));
   }
 
   async function loadList(){
     const { data, error } = await sb.rpc("return_scan_list", { p_limit: 300 });
-    const rows = error ? [] : (data || []);
-    counts.total = rows.length;
-    counts.ok = rows.filter(r=>r.status==="OK").length;
-    counts.bad = rows.length - counts.ok;
-    setCounts();
-    $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("") : "<tr><td colspan='8' class='muted' style='padding:16px'>Abhi tak koi scan nahi. Upar AWB scan karo.</td></tr>";
-    $("#listNote").textContent = rows.length ? ("("+rows.length+" total)") : "";
-    $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => changeCondition(sel.dataset.awb, sel.value)));
+    allRows = error ? [] : (data || []);
+    render();
   }
+
+  $("#tabAll").addEventListener("click", () => { tab="all"; $("#tabAll").setAttribute("aria-selected","true"); $("#tabFault").setAttribute("aria-selected","false"); render(); });
+  $("#tabFault").addEventListener("click", () => { tab="fault"; $("#tabFault").setAttribute("aria-selected","true"); $("#tabAll").setAttribute("aria-selected","false"); render(); });
 
   const inp = $("#awb");
   let idleTimer = null, lastKey = 0, maxGap = 0;
