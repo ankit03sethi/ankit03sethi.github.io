@@ -240,9 +240,14 @@
     if (!r.cond_locked) el.querySelectorAll(".cbtn").forEach(b => b.addEventListener("click", () => onPick(r.awb, r.sku, b.dataset.c)));
   }
 
-  function onPick(awb, sku, cond){
-    if (cond === "Damaged") openPicker(awb, sku);
-    else changeCondition(awb, cond, null);
+  async function onPick(awb, sku, cond){
+    if (cond !== "Damaged") { changeCondition(awb, cond, null); return; }
+    let items = [];
+    try { const { data } = await sb.rpc("return_sku_components", { p_sku: sku || "" }); items = data || []; } catch(e){ items = []; }
+    if (items.length > 1) { openPicker(awb, items); return; }
+    const row = allRows.find(x=>x.awb===awb);
+    const one = items[0] || { code: (row&&row.sku)||sku||"item", name: (row&&(row.product||row.sku))||sku||"Item", qty: (row&&row.r_qty)||1 };
+    changeCondition(awb, "Damaged", [{ code: one.code, name: one.name, qty: Number(one.qty)||1 }]);
   }
 
   let busy = false;
@@ -268,26 +273,20 @@
   }
 
   let pickAwb = null;
-  async function openPicker(awb, sku){
+  function openPicker(awb, items){
     pickAwb = awb; pickerOpen = true;
-    $("#pickBody").innerHTML = "<div class='muted' style='padding:12px'>Loading items&hellip;</div>";
-    $("#pickWrap").hidden = false;
-    let items = [];
-    try { const { data } = await sb.rpc("return_sku_components", { p_sku: sku || "" }); items = data || []; } catch(e){ items = []; }
-    if (!items.length) {
-      const row = allRows.find(x=>x.awb===awb);
-      items = [{ code: (row&&row.sku)||sku||"item", name: (row&&(row.product||row.sku))||sku||"Item", qty: (row&&row.r_qty)||1 }];
-    }
     $("#pickBody").innerHTML = items.map((it,i) =>
-      "<div class='itemrow'><input type='checkbox' data-i='"+i+"' /><span class='nm'>"+esc(it.name||it.code)+" <span class='muted'>(qty "+esc(it.qty)+")</span></span>"+
-      "<input type='number' class='qin' data-i='"+i+"' min='1' step='1' value='1' /></div>"
+      "<div class='itemrow'><input type='checkbox' data-i='"+i+"' checked /><span class='nm'>"+esc(it.name||it.code)+" <span class='muted'>(qty "+esc(it.qty)+")</span></span>"+
+      "<input type='number' class='qin' data-i='"+i+"' min='1' step='1' value='"+(Number(it.qty)||1)+"' /></div>"
     ).join("");
     $("#pickBody").__items = items;
+    $("#pickWrap").hidden = false;
     $("#awb").blur();
   }
   function closePicker(){ pickerOpen = false; $("#pickWrap").hidden = true; pickAwb = null; $("#awb").focus(); }
   $("#pickClose").addEventListener("click", closePicker);
   $("#pickCancel").addEventListener("click", closePicker);
+  $("#pickWrap").addEventListener("click", (e) => { if (e.target === $("#pickWrap")) closePicker(); });
   $("#pickSave").addEventListener("click", async () => {
     const items = $("#pickBody").__items || [];
     const chosen = [];
