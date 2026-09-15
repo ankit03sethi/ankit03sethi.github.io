@@ -183,6 +183,7 @@
   let allRows = [];
   let dateFilter = "today";
   let cardFilter = "all";
+  let cardTouched = false;
   let condFilter = "all";
   let last = null;
   let pickerOpen = false;
@@ -250,6 +251,9 @@
     }
     if (cur==="Damaged" && dmgText(r)) h += "<div class='k'>Damaged</div><div class='v'>"+dmgText(r)+"</div>";
     h += "</div>";
+    if (!ok) {
+      h += "<div style='margin-top:10px;padding-top:10px;border-top:1px solid #eef2f7'><div class='muted' style='margin-bottom:6px'>Match nahi hua &mdash; Order ID / doosri ID daal ke Save karo:</div><input id='rmId1' placeholder='Order ID' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><input id='rmId2' placeholder='Doosri ID (optional)' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><button class='savebtn' id='rmSave'>Save &amp; match</button></div>";
+    }
     if (r.cond_locked) {
       h += "<div class='lockmsg'>Condition set: <b>"+esc(cur)+"</b> (locked - ab badla nahi ja sakta)</div>";
     } else {
@@ -258,8 +262,17 @@
     }
     el.innerHTML = h;
     if (!r.cond_locked) el.querySelectorAll(".cbtn").forEach(b => b.addEventListener("click", () => onPick(r.awb, r.sku, b.dataset.c)));
+    const rmBtn = el.querySelector("#rmSave");
+    if (rmBtn) { rmBtn.addEventListener("click", () => doRematch(r.awb)); [el.querySelector("#rmId1"), el.querySelector("#rmId2")].forEach(x => { if (x) x.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doRematch(r.awb); } }); }); }
   }
 
+  async function doRematch(awb){
+    const i1 = $("#rmId1"), i2 = $("#rmId2");
+    const id1 = i1 ? i1.value.trim() : "", id2 = i2 ? i2.value.trim() : "";
+    if (!id1 && !id2) { if (i1) i1.focus(); return; }
+    try { const { data } = await sb.rpc("return_scan_rematch", { p_awb: awb, p_id1: id1, p_id2: id2 }); if (data && data[0]) { last = data[0]; showResult(last); } } catch(e){}
+    await loadList();
+  }
   async function onPick(awb, sku, cond){
     if (cond !== "Damaged") { changeCondition(awb, cond, null); return; }
     let items = [];
@@ -396,7 +409,9 @@
     if (c.dataset.w) return;
     const f = c.dataset.f;
     cardFilter = (cardFilter===f && f!=="all") ? "all" : f;
-    document.querySelectorAll(".stat[data-f]").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter && cardFilter!=="all") ? "true":"false"));
+    cardTouched = true;
+    document.querySelectorAll(".stat[data-f]").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter && (cardFilter!=="all" || cardTouched)) ? "true":"false"));
+    wlMode = null; renderExpected();
     render();
   }));
   document.querySelectorAll(".ctab").forEach(b => b.addEventListener("click", () => {
