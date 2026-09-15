@@ -78,6 +78,13 @@
     .muted { color:var(--muted); }
     .modal { position:fixed; inset:0; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; padding:16px; z-index:50; }
     .modal[hidden] { display:none !important; }
+    .wlhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .wltab{font-size:18px;font-weight:800;padding:14px 22px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;cursor:pointer;display:flex;gap:10px;align-items:center}
+    .wltab .wln{background:#eef2f7;border-radius:999px;padding:2px 10px;font-size:15px}
+    .wltab[aria-selected=true]{border-color:#2563eb;background:#eff6ff;color:#1d4ed8}
+    .wltab[aria-selected=true] .wln{background:#2563eb;color:#fff}
+    .wlchip{padding:5px 12px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;font-size:13px;margin:3px}
+    .wlchip[aria-selected=true]{border-color:#2563eb;background:#eff6ff;color:#1d4ed8;font-weight:700}
     .modalcard { background:#fff; border-radius:14px; width:100%; max-width:520px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.3); }
     .modalhd { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
     .modalbody { padding:8px 16px; overflow:auto; }
@@ -104,6 +111,21 @@
 </header>
 
 <main>
+  <div class="card" id="expCard">
+    <div class="wlhead">
+      <button class="wltab" id="wlUnd" data-w="undelivered" aria-selected="false">Undelivered<span class="wln">0</span></button>
+      <button class="wltab" id="wlDel" data-w="delivered" aria-selected="false">Delivered<span class="wln">0</span></button>
+      <span class="muted" id="expNote" style="margin-left:auto"></span>
+    </div>
+    <div id="wlFilters" hidden style="margin-top:10px"></div>
+    <div class="scroll" id="expScrollWrap" hidden>
+      <table>
+        <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Courier</th><th>Reason</th><th>Delivered Date</th></tr></thead>
+        <tbody id="expRows"></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="card scanwrap">
     <label for="awb">Scan AWB number or enter Order ID</label>
     <input id="awb" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AWB scan karo ya Order ID type karo - apne aap match ho jayega" />
@@ -127,15 +149,7 @@
     <div class="stat bad" id="fBad" data-f="notfound" aria-selected="false"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
   </div>
 
-  <div class="card" id="expCard">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><b>Aane wale returns (is date ke)</b><button class="ctab" id="wlUnd" data-w="undelivered" aria-selected="false">Undelivered (0)</button><button class="ctab" id="wlDel" data-w="delivered" aria-selected="false">Delivered (0)</button><span class="muted" id="expNote" style="margin-left:auto"></span></div>
-    <div class="scroll" id="expScrollWrap" hidden>
-      <table>
-        <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Date</th></tr></thead>
-        <tbody id="expRows"></tbody>
-      </table>
-    </div>
-  </div>
+
 
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span></div>
@@ -333,7 +347,7 @@
     if(dateFilter==="7d"){const f=new Date(now);f.setDate(now.getDate()-6);return{from:fmtDateY(f),to:fmtDateY(now)};}
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) return {from:dateFilter,to:dateFilter};
     return {from:"2000-01-01",to:"2999-12-31"}; }
-  let wlDel = [], wlUnd = [], wlMode = null;
+  let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all";
   async function loadExpected(){
     const {from,to}=dateRange();
     const [d,u] = await Promise.all([
@@ -346,18 +360,29 @@
   function renderExpected(){
     if (!$("#wlUnd")) return;
     const undP = wlUnd.filter(r=>!r.scanned); const delP = wlDel.filter(r=>!r.scanned);
-    $("#wlUnd").textContent = "Undelivered ("+undP.length+")";
-    $("#wlDel").textContent = "Delivered ("+delP.length+")";
+    $("#wlUnd").querySelector(".wln").textContent = undP.length;
+    $("#wlDel").querySelector(".wln").textContent = delP.length;
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
-    const wrap = $("#expScrollWrap");
-    if (!wlMode){ if(wrap) wrap.hidden=true; $("#expNote").textContent=""; return; }
-    if (wrap) wrap.hidden=false;
-    const rows = (wlMode==="delivered"?delP:undP);
+    const filt = $("#wlFilters"), wrap = $("#expScrollWrap");
+    if (!wlMode){ if(wrap) wrap.hidden=true; if(filt) filt.hidden=true; $("#expNote").textContent=""; return; }
+    const all = (wlMode==="delivered"?delP:undP);
+    const byCo={}, byCr={};
+    all.forEach(r=>{ const co=r.company_name||"-", cr=r.courier||"-"; byCo[co]=(byCo[co]||0)+1; byCr[cr]=(byCr[cr]||0)+1; });
+    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+(((t==="co"?wlCompany:wlCourier)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n+")")+"</button>";
+    const coChips=[chip("co","all",all.length)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
+    const crChips=[chip("cr","all",all.length)].concat(Object.keys(byCr).sort().map(k=>chip("cr",k,byCr[k]))).join("");
+    filt.hidden=false;
+    filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div><div><b class='muted' style='margin-right:6px'>Courier:</b>"+crChips+"</div>";
+    filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.t==="co") wlCompany=b.dataset.v; else wlCourier=b.dataset.v; renderExpected(); }));
+    let rows=all;
+    if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
+    if(wlCourier!=="all") rows=rows.filter(r=>(r.courier||"-")===wlCourier);
+    if(wrap) wrap.hidden=false;
     $("#expNote").textContent = rows.length ? (rows.length+" pending scan") : "Sab scan ho gaye.";
     const show = rows.slice(0,1000);
-    $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
-      : "<tr><td colspan='7' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
+    $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
+      : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
 
   async function loadList(){
@@ -390,8 +415,8 @@
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed","false"));
     render(); loadExpected();
   });
-  $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; renderExpected(); });
-  $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; renderExpected(); });
+  $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; renderExpected(); });
+  $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; wlCompany="all"; wlCourier="all"; renderExpected(); });
 
   const inp = $("#awb");
   let idleTimer = null, firstKey = 0, scanSpan = 0;
