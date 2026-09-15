@@ -129,6 +129,7 @@
   </div>
 
   <div class="counts">
+    <div class="stat wl" id="wlAll" data-w="all" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Total returns</div></div>
     <div class="stat wl" id="wlUnd" data-w="undelivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Undelivered</div></div>
     <div class="stat wl" id="wlDel" data-w="delivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Delivered</div></div>
     <div class="stat" id="fAll" data-f="all" aria-selected="false"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
@@ -252,11 +253,11 @@
     if (cur==="Damaged" && dmgText(r)) h += "<div class='k'>Damaged</div><div class='v'>"+dmgText(r)+"</div>";
     h += "</div>";
     if (!ok) {
-      h += "<div style='margin-top:10px;padding-top:10px;border-top:1px solid #eef2f7'><div class='muted' style='margin-bottom:6px'>Match nahi hua &mdash; Order ID / doosri ID daal ke Save karo:</div><input id='rmId1' placeholder='Order ID' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><input id='rmId2' placeholder='Doosri ID (optional)' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><button class='savebtn' id='rmSave'>Save &amp; match</button></div>";
+      h += "<div style='margin-top:10px;padding-top:10px;border-top:1px solid #eef2f7'><div class='muted' style='margin-bottom:6px'>Match nahi hua &mdash; Order ID / doosri ID daal ke Save karo:</div><input id='rmId1' placeholder='Order ID' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><input id='rmId2' placeholder='Doosri ID (optional)' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><button class='savebtn' id='rmSave'>Save &amp; match</button> <button class='ghostbtn' id='rmCancel'>Cancel</button></div>";
     }
     if (r.cond_locked) {
       h += "<div class='lockmsg'>Condition set: <b>"+esc(cur)+"</b> (locked - ab badla nahi ja sakta)</div>";
-    } else {
+    } else if (!r.pending) {
       h += "<div class='cbtns'><span class='lbl'>Condition:</span>"+
         CONDS.map(c => "<button class='cbtn "+c.toLowerCase()+"' data-c='"+c+"' aria-pressed='"+(c===cur?"true":"false")+"'>"+(c==="Wrong"?"Wrong item":c)+"</button>").join("")+"</div>";
     }
@@ -264,14 +265,20 @@
     if (!r.cond_locked) el.querySelectorAll(".cbtn").forEach(b => b.addEventListener("click", () => onPick(r.awb, r.sku, b.dataset.c)));
     const rmBtn = el.querySelector("#rmSave");
     if (rmBtn) { rmBtn.addEventListener("click", () => doRematch(r.awb)); [el.querySelector("#rmId1"), el.querySelector("#rmId2")].forEach(x => { if (x) x.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doRematch(r.awb); } }); }); }
+    const cxBtn = el.querySelector("#rmCancel");
+    if (cxBtn) cxBtn.addEventListener("click", () => doCancel(r.awb));
   }
 
+  async function doCancel(awb){
+    try { await sb.rpc("return_scan_delete", { p_awb: awb }); } catch(e){}
+    last = null; const el = $("#result"); if (el) { el.style.display = "none"; el.innerHTML = ""; }
+    await loadList(); $("#awb").focus();
+  }
   async function doRematch(awb){
     const i1 = $("#rmId1"), i2 = $("#rmId2");
     const id1 = i1 ? i1.value.trim() : "", id2 = i2 ? i2.value.trim() : "";
     if (!id1 && !id2) { if (i1) i1.focus(); return; }
-    try { const { data } = await sb.rpc("return_scan_rematch", { p_awb: awb, p_id1: id1, p_id2: id2 }); if (data && data[0]) { last = data[0]; showResult(last); } } catch(e){}
-    await loadList();
+    try { const { data } = await sb.rpc("return_scan_rematch", { p_awb: awb, p_id1: id1, p_id2: id2 }); if (data && data[0]) { last = data[0]; showResult(last); await loadList(); } else { alert("Abhi bhi match nahi hua. Doosri ID try karo ya Cancel."); } } catch(e){}
   }
   async function onPick(awb, sku, cond){
     if (cond !== "Damaged") { changeCondition(awb, cond, null); return; }
@@ -291,9 +298,13 @@
     busy = true;
     const inp = $("#awb");
     try {
-      const { data, error } = await sb.rpc("return_scan_save", { p_awb: awb, p_condition: "Good", p_by: (window.CA && CA.who && CA.who()) || null });
-      if (error) { last = { awb, status:"BAD", return_reason:error.message }; showResult(last); }
-      else { last = (data && data[0]) || { awb, status:"NOT_FOUND", condition:"Good" }; showResult(last); await loadList(); }
+      const { data: lk } = await sb.rpc("return_scan_lookup", { p_awb: awb });
+      if (lk && lk.length) {
+        const { data } = await sb.rpc("return_scan_save", { p_awb: awb, p_condition: "Good", p_by: (window.CA && CA.who && CA.who()) || null });
+        last = (data && data[0]) || { awb, status:"OK" }; showResult(last); await loadList();
+      } else {
+        last = { awb, status:"NOT_FOUND", pending:true }; showResult(last);
+      }
     } catch (e) { last = { awb, status:"BAD", return_reason:String(e.message||e) }; showResult(last); }
     inp.value = ""; inp.focus(); busy = false;
   }
@@ -373,13 +384,15 @@
     const undP = wlUnd.filter(r=>!r.scanned); const delP = wlDel.filter(r=>!r.scanned);
     $("#wlUnd").querySelector(".wln").textContent = undP.length;
     $("#wlDel").querySelector(".wln").textContent = delP.length;
+    if ($("#wlAll")) $("#wlAll").querySelector(".wln").textContent = (wlUnd.length + wlDel.length);
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
+    if ($("#wlAll")) $("#wlAll").setAttribute("aria-selected", wlMode==="all"?"true":"false");
     const card = $("#expCard");
     if (!wlMode){ if(card) card.hidden=true; return; }
     if (card) card.hidden=false;
-    const all = (wlMode==="delivered"?delP:undP);
-    $("#wlTitle").textContent = (wlMode==="delivered"?"Delivered returns":"Undelivered returns");
+    const all = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?delP:undP);
+    $("#wlTitle").textContent = (wlMode==="all"?"All returns":(wlMode==="delivered"?"Delivered returns":"Undelivered returns"));
     const byCr={}; all.forEach(r=>{ const cr=r.courier||"-"; byCr[cr]=(byCr[cr]||0)+1; });
     let crRows = (wlCourier==="all") ? all : all.filter(r=>(r.courier||"-")===wlCourier);
     const byCo={}; crRows.forEach(r=>{ const co=r.company_name||"-"; byCo[co]=(byCo[co]||0)+1; });
@@ -392,9 +405,9 @@
     filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.t==="cr"){ wlCourier=b.dataset.v; wlCompany="all"; } else wlCompany=b.dataset.v; renderExpected(); }));
     let rows=crRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
-    $("#expNote").textContent = rows.length ? (rows.length+" pending scan") : "Sab scan ho gaye.";
+    $("#expNote").textContent = rows.length ? (rows.length + (wlMode==="all" ? " returns" : " pending scan")) : "Kuch nahi.";
     const show = rows.slice(0,1000);
-    $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
+    $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
 
@@ -433,6 +446,7 @@
   });
   $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; renderExpected(); });
   $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; wlCompany="all"; wlCourier="all"; renderExpected(); });
+  if ($("#wlAll")) $("#wlAll").addEventListener("click", () => { wlMode = (wlMode==="all")?null:"all"; wlCompany="all"; wlCourier="all"; renderExpected(); });
 
   const inp = $("#awb");
   let idleTimer = null, firstKey = 0, scanSpan = 0;
