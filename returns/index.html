@@ -128,11 +128,11 @@
   </div>
 
   <div class="card" id="expCard">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b>Aane wale returns (is date ke)</b><span class="muted" id="expNote"></span><button class="ghostbtn" id="expToggle" style="margin-left:auto">Chhupao</button></div>
-    <div class="scroll" id="expScrollWrap">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><b>Aane wale returns (is date ke)</b><button class="ctab" id="wlUnd" data-w="undelivered" aria-selected="false">Undelivered (0)</button><button class="ctab" id="wlDel" data-w="delivered" aria-selected="false">Delivered (0)</button><span class="muted" id="expNote" style="margin-left:auto"></span></div>
+    <div class="scroll" id="expScrollWrap" hidden>
       <table>
         <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Date</th></tr></thead>
-        <tbody id="expRows"><tr><td colspan="7" class="muted" style="padding:16px">Loading...</td></tr></tbody>
+        <tbody id="expRows"></tbody>
       </table>
     </div>
   </div>
@@ -333,16 +333,31 @@
     if(dateFilter==="7d"){const f=new Date(now);f.setDate(now.getDate()-6);return{from:fmtDateY(f),to:fmtDateY(now)};}
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) return {from:dateFilter,to:dateFilter};
     return {from:"2000-01-01",to:"2999-12-31"}; }
-  let expRows2 = [], expHidden = false;
-  async function loadExpected(){ const {from,to}=dateRange(); const {data,error}=await sb.rpc("return_expected",{p_from:from,p_to:to}); expRows2 = error?[]:(data||[]); renderExpected(); }
+  let wlDel = [], wlUnd = [], wlMode = null;
+  async function loadExpected(){
+    const {from,to}=dateRange();
+    const [d,u] = await Promise.all([
+      sb.rpc("return_worklist",{p_mode:"delivered",p_from:from,p_to:to}),
+      sb.rpc("return_worklist",{p_mode:"undelivered",p_from:from,p_to:to})
+    ]);
+    wlDel = d.error?[]:(d.data||[]); wlUnd = u.error?[]:(u.data||[]);
+    renderExpected();
+  }
   function renderExpected(){
-    if (!$("#expNote")) return;
-    const pending = expRows2.filter(r=>!r.scanned).length; const done = expRows2.length - pending;
-    $("#expNote").textContent = expRows2.length ? (pending+" pending / "+done+" scan ho gaye  ("+expRows2.length+" total)") : "Is date pe koi return expected nahi.";
-    const wrap = $("#expScrollWrap"); if (wrap) wrap.hidden = expHidden;
-    const show = expRows2.slice(0,1000);
-    $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td><td class='muted'>"+esc(r.return_date||"-")+"</td></tr>").join("")
-      : "<tr><td colspan='7' class='muted' style='padding:16px'>Is date pe koi return expected nahi.</td></tr>";
+    if (!$("#wlUnd")) return;
+    const undP = wlUnd.filter(r=>!r.scanned); const delP = wlDel.filter(r=>!r.scanned);
+    $("#wlUnd").textContent = "Undelivered ("+undP.length+")";
+    $("#wlDel").textContent = "Delivered ("+delP.length+")";
+    $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
+    $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
+    const wrap = $("#expScrollWrap");
+    if (!wlMode){ if(wrap) wrap.hidden=true; $("#expNote").textContent=""; return; }
+    if (wrap) wrap.hidden=false;
+    const rows = (wlMode==="delivered"?delP:undP);
+    $("#expNote").textContent = rows.length ? (rows.length+" pending scan") : "Sab scan ho gaye.";
+    const show = rows.slice(0,1000);
+    $("#expRows").innerHTML = show.length ? show.map(r => "<tr style='background:#fff7ed'><td><span class='badge bad'>PENDING</span></td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
+      : "<tr><td colspan='7' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
 
   async function loadList(){
@@ -375,7 +390,8 @@
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed","false"));
     render(); loadExpected();
   });
-  $("#expToggle").addEventListener("click", () => { expHidden=!expHidden; $("#expToggle").textContent=expHidden?"Dikhao":"Chhupao"; renderExpected(); });
+  $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; renderExpected(); });
+  $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; renderExpected(); });
 
   const inp = $("#awb");
   let idleTimer = null, firstKey = 0, scanSpan = 0;
