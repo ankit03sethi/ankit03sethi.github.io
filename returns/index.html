@@ -264,6 +264,8 @@
   }
 
   async function changeCondition(awb, cond, damaged){
+    const row0 = allRows.find(x => x.awb === awb);
+    if (row0) { row0.condition = cond; row0.cond_locked = true; row0.damaged_items = (cond==="Damaged" ? damaged : null); render(); if (last && last.awb === awb) { last = row0; showResult(last); } }
     try { await sb.rpc("return_scan_set_condition", { p_awb: awb, p_condition: cond, p_damaged: damaged }); } catch(e){ }
     await loadList();
     const row = allRows.find(x => x.awb === awb);
@@ -345,13 +347,12 @@
   });
 
   const inp = $("#awb");
-  let idleTimer = null, lastKey = 0, maxGap = 0;
+  let idleTimer = null, firstKey = 0, scanSpan = 0;
   inp.addEventListener("input", () => {
     const now = Date.now();
-    if (inp.value.length <= 1) { maxGap = 0; } else if (lastKey) { maxGap = Math.max(maxGap, now - lastKey); }
-    lastKey = now;
+    if (inp.value.length <= 1) { firstKey = now; scanSpan = 0; } else { scanSpan = now - firstKey; }
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { const v = inp.value.trim(); if (v.length >= 6 && maxGap < 80) doScan(v); }, 200);
+    idleTimer = setTimeout(() => { const v = inp.value.trim(); if (v.length >= 6 && scanSpan < 600) doScan(v); }, 200);
   });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (idleTimer) clearTimeout(idleTimer); doScan(inp.value); } });
 
