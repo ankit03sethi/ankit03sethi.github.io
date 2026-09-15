@@ -111,21 +111,6 @@
 </header>
 
 <main>
-  <div class="card" id="expCard">
-    <div class="wlhead">
-      <button class="wltab" id="wlUnd" data-w="undelivered" aria-selected="false">Undelivered<span class="wln">0</span></button>
-      <button class="wltab" id="wlDel" data-w="delivered" aria-selected="false">Delivered<span class="wln">0</span></button>
-      <span class="muted" id="expNote" style="margin-left:auto"></span>
-    </div>
-    <div id="wlFilters" hidden style="margin-top:10px"></div>
-    <div class="scroll" id="expScrollWrap" hidden>
-      <table>
-        <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Courier</th><th>Reason</th><th>Delivered Date</th></tr></thead>
-        <tbody id="expRows"></tbody>
-      </table>
-    </div>
-  </div>
-
   <div class="card scanwrap">
     <label for="awb">Scan AWB number or enter Order ID</label>
     <input id="awb" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AWB scan karo ya Order ID type karo - apne aap match ho jayega" />
@@ -141,6 +126,21 @@
     <button class="dchip" data-d="7d" aria-pressed="false">7 days</button>
     <button class="dchip" data-d="all" aria-pressed="false">All</button>
     <input type="date" id="dpick" class="dpick" title="Kisi khaas din ke scans" />
+  </div>
+
+  <div class="card" id="expCard">
+    <div class="wlhead">
+      <button class="wltab" id="wlUnd" data-w="undelivered" aria-selected="false">Undelivered<span class="wln">0</span></button>
+      <button class="wltab" id="wlDel" data-w="delivered" aria-selected="false">Delivered<span class="wln">0</span></button>
+      <span class="muted" id="expNote" style="margin-left:auto"></span>
+    </div>
+    <div id="wlFilters" hidden style="margin-top:10px"></div>
+    <div class="scroll" id="expScrollWrap" hidden>
+      <table>
+        <thead><tr><th>Status</th><th>AWB / Order</th><th>SKU</th><th>Platform</th><th>Company</th><th>Courier</th><th>Reason</th><th>Delivered Date</th></tr></thead>
+        <tbody id="expRows"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="counts">
