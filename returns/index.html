@@ -370,7 +370,8 @@
     if(dateFilter==="7d"){const f=new Date(now);f.setDate(now.getDate()-6);return{from:fmtDateY(f),to:fmtDateY(now)};}
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) return {from:dateFilter,to:dateFilter};
     return {from:"2000-01-01",to:"2999-12-31"}; }
-  let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all";
+  function normCourier(c){ const s=String(c==null?"-":c).trim(); const k=s.toLowerCase().replace(/[^a-z0-9]/g,""); const map={xpressbees:"XpressBees",expressbees:"XpressBees",delhivery:"Delhivery",eke2e:"Ekart",ekart:"Ekart",flipkartlogistics:"Ekart",shadowfax:"Shadowfax",valmo:"Valmo",pocketship:"PocketShip",ats:"ATS",firstcry:"Firstcry",flipkart:"Flipkart",amazon:"Amazon",meesho:"Meesho",myntra:"Myntra"}; return map[k]||s||"-"; }
+  let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all", wlPlatform = "all";
   async function loadExpected(){
     const {from,to}=dateRange();
     const [d,u] = await Promise.all([
@@ -394,21 +395,26 @@
     if (card) card.hidden=false;
     const all = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?delP:undP);
     $("#wlTitle").textContent = (wlMode==="all"?"All returns":(wlMode==="delivered"?"Delivered returns":"Undelivered returns"));
-    const byCr={}; all.forEach(r=>{ const cr=r.courier||"-"; byCr[cr]=(byCr[cr]||0)+1; });
-    let crRows = (wlCourier==="all") ? all : all.filter(r=>(r.courier||"-")===wlCourier);
-    const byCo={}; crRows.forEach(r=>{ const co=r.company_name||"-"; byCo[co]=(byCo[co]||0)+1; });
+    const byCr={}; all.forEach(r=>{ const cr=normCourier(r.courier); byCr[cr]=(byCr[cr]||0)+1; });
+    let crRows = (wlCourier==="all") ? all : all.filter(r=>normCourier(r.courier)===wlCourier);
+    const byPf={}; crRows.forEach(r=>{ const pf=r.platform||"-"; byPf[pf]=(byPf[pf]||0)+1; });
+    if (wlPlatform!=="all" && !(wlPlatform in byPf)) wlPlatform="all";
+    let pfRows = (wlPlatform==="all") ? crRows : crRows.filter(r=>(r.platform||"-")===wlPlatform);
+    const byCo={}; pfRows.forEach(r=>{ const co=r.company_name||"-"; byCo[co]=(byCo[co]||0)+1; });
     if (wlCompany!=="all" && !(wlCompany in byCo)) wlCompany="all";
-    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+(((t==="cr"?wlCourier:wlCompany)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n+")")+"</button>";
+    const sel=(t)=> t==="cr"?wlCourier : (t==="pf"?wlPlatform : wlCompany);
+    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+((sel(t)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n+")")+"</button>";
     const crChips=[chip("cr","all",all.length)].concat(Object.keys(byCr).sort().map(k=>chip("cr",k,byCr[k]))).join("");
-    const coChips=[chip("co","all",crRows.length)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
+    const pfChips=[chip("pf","all",crRows.length)].concat(Object.keys(byPf).sort().map(k=>chip("pf",k,byPf[k]))).join("");
+    const coChips=[chip("co","all",pfRows.length)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
     const filt=$("#wlFilters");
-    filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Courier:</b>"+crChips+"</div><div><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div>";
-    filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.t==="cr"){ wlCourier=b.dataset.v; wlCompany="all"; } else wlCompany=b.dataset.v; renderExpected(); }));
-    let rows=crRows;
+    filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Courier:</b>"+crChips+"</div><div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Platform:</b>"+pfChips+"</div><div><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div>";
+    filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.t,v=b.dataset.v; if(t==="cr"){ wlCourier=v; wlPlatform="all"; wlCompany="all"; } else if(t==="pf"){ wlPlatform=v; wlCompany="all"; } else wlCompany=v; renderExpected(); }));
+    let rows=pfRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
     $("#expNote").textContent = rows.length ? (rows.length + (wlMode==="all" ? " returns" : " pending scan")) : "Kuch nahi.";
     const show = rows.slice(0,1000);
-    $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(r.courier||"-")+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
+    $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(normCourier(r.courier))+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
 
@@ -445,9 +451,9 @@
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed","false"));
     render(); loadExpected();
   });
-  $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; renderExpected(); });
-  $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; wlCompany="all"; wlCourier="all"; renderExpected(); });
-  if ($("#wlAll")) $("#wlAll").addEventListener("click", () => { wlMode = (wlMode==="all")?null:"all"; wlCompany="all"; wlCourier="all"; renderExpected(); });
+  $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
+  $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
+  if ($("#wlAll")) $("#wlAll").addEventListener("click", () => { wlMode = (wlMode==="all")?null:"all"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
 
   const inp = $("#awb");
   let idleTimer = null, firstKey = 0, scanSpan = 0;
