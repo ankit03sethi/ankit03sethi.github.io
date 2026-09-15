@@ -131,7 +131,7 @@
   <div class="counts">
     <div class="stat wl" id="wlUnd" data-w="undelivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Undelivered</div></div>
     <div class="stat wl" id="wlDel" data-w="delivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Delivered</div></div>
-    <div class="stat" id="fAll" data-f="all" aria-selected="true"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
+    <div class="stat" id="fAll" data-f="all" aria-selected="false"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
     <div class="stat ok" id="fOk" data-f="ok" aria-selected="false"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
     <div class="stat bad" id="fBad" data-f="notfound" aria-selected="false"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
   </div>
@@ -396,7 +396,7 @@
     if (c.dataset.w) return;
     const f = c.dataset.f;
     cardFilter = (cardFilter===f && f!=="all") ? "all" : f;
-    document.querySelectorAll(".stat[data-f]").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter) ? "true":"false"));
+    document.querySelectorAll(".stat[data-f]").forEach(x => x.setAttribute("aria-selected", (x.dataset.f===cardFilter && cardFilter!=="all") ? "true":"false"));
     render();
   }));
   document.querySelectorAll(".ctab").forEach(b => b.addEventListener("click", () => {
