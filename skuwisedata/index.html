@@ -471,6 +471,7 @@
     loaded: 0,
     total: 0,
     loadingMore: false,
+    loadingAll: false,         // a filter/search is pulling every remaining page in the background
     hasMore: false,            // a sorted page cannot report a total, so track this instead
     grandTotal: 0,             // the real row count, for the label and the KPI
     genericCols: null,         // raw_data columns chosen on the first page, reused by later pages
@@ -1276,7 +1277,7 @@
     }
     // "Is there another page" cannot come from the total when the total is
     // unknown: a full page back means keep going, a short one means the end.
-    state.hasMore = (state.view === "sku_master" && ss)
+    state.hasMore = (state.view === "sku_master" && (ss || state.search))
       ? (data || []).length >= 1000
       : state.loaded < state.total;
     // The day counts, the platform ids and the scraped listing values are NOT
@@ -1324,6 +1325,9 @@
     syncHScrollPosition();
     installInfiniteScroll();
     if (state.view === "sku_master") loadEnrichments(data);
+    // A search or an active column filter wants the WHOLE matching set, not just
+    // the first page - pull the rest in the background.
+    loadAllForFilter();
   }
 
   // Three independent lookups, run together rather than in a chain, once the
@@ -1496,7 +1500,6 @@
 
   async function loadMoreRows() {
     if (state.loadingMore || state.view === "uploads") return;
-    if (state.search) return;               // a search already returned all its matches
     if (!state.hasMore) return;
     const table = KIND_TABLE[state.view];
     const dateCol = DATE_COL[state.view];
@@ -1505,10 +1508,13 @@
     $("#rowCount").textContent = "Loading more\u2026";
     try {
       const ss2 = serverSort();
+      // A search pages through sku_master_page too (it takes p_offset), so a
+      // 10,000-match search is no longer clipped to its first 1,000 rows.
+      const paged = state.view === "sku_master" && (ss2 || state.search);
       let data, error;
-      if (ss2) {
+      if (paged) {
         const res = await sb.rpc("sku_master_page", {
-          p_sort: ss2.key, p_dir: ss2.dir,
+          p_sort: ss2 ? ss2.key : null, p_dir: ss2 ? ss2.dir : "desc",
           p_company: state.company || null, p_platform: state.platform || null,
           p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
         });
@@ -1528,12 +1534,44 @@
       const tbody = $("#tableWrap").querySelector("table.data tbody");
       if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
       state.loaded += rows.length;
-      if (!ss2) state.hasMore = state.loaded < state.total;
+      if (!paged) state.hasMore = state.loaded < state.total;
       // Re-apply whatever filter and sort the user has set, now including the
       // rows that just arrived.
       applyTableTools();
     } finally {
       state.loadingMore = false;
+      $("#rowCount").textContent = rowCountLabel();
+    }
+  }
+
+  // Is any column filter switched on in the current view?
+  function filtersActive() {
+    const t = toolsFor(state.view);
+    const p = (t && t.picks) || {};
+    return Object.keys(p).some(k => p[k] && p[k].size);
+  }
+
+  // When a search or a column filter is active, the user wants the WHOLE matching
+  // set, not the first page. Column filters only see rows already in the table,
+  // and a filter that hides most rows leaves it too short to trigger infinite
+  // scroll - so pull every remaining page in the background, keeping the filter
+  // applied as rows arrive, until the full set is loaded.
+  async function loadAllForFilter() {
+    if (state.view === "uploads") return;
+    if (!state.search && !filtersActive()) return;
+    if (state.loadingAll) return;
+    state.loadingAll = true;
+    try {
+      let guard = 0;
+      while (state.hasMore && guard++ < 300) {
+        const before = state.loaded;
+        await loadMoreRows();
+        if (state.loaded === before) break;   // no progress - stop
+        $("#rowCount").textContent = "Loading all matches\u2026 " +
+          state.loaded.toLocaleString("en-IN");
+      }
+    } finally {
+      state.loadingAll = false;
       $("#rowCount").textContent = rowCountLabel();
     }
   }
@@ -2992,6 +3030,9 @@
       if (chosen.size) picks[name] = new Set(chosen); else delete picks[name];
       paintFilterButton(btn, t);
       applyTableTools();
+      // A newly applied filter must see every matching row, not just the page
+      // that happens to be loaded - fetch the rest in the background.
+      loadAllForFilter();
     }
 
     list.addEventListener("change", e => {
