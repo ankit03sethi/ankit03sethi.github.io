@@ -1325,9 +1325,10 @@
     syncHScrollPosition();
     installInfiniteScroll();
     if (state.view === "sku_master") loadEnrichments(data);
-    // A search or an active column filter wants the WHOLE matching set, not just
-    // the first page - pull the rest in the background.
-    loadAllForFilter();
+    // A search's remaining pages load as you scroll (smooth); an active column
+    // filter pulls its full set only when you actually change it, not on every
+    // reload - so returning to the page never re-streams the whole table.
+    if (state.search) loadAllForFilter();
   }
 
   // Three independent lookups, run together rather than in a chain, once the
@@ -1602,10 +1603,18 @@
     const wrap = $("#tableWrap");
     if (!wrap || wrap.dataset.infinite === "1") return;
     wrap.dataset.infinite = "1";
+    // Throttle to one check per animation frame so dragging the scrollbar or
+    // spinning the wheel does not fire this handler dozens of times a second.
+    let _scrollTick = false;
     wrap.addEventListener("scroll", () => {
-      syncHScrollPosition();
-      if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) loadMoreRows();
-    });
+      if (_scrollTick) return;
+      _scrollTick = true;
+      requestAnimationFrame(() => {
+        _scrollTick = false;
+        syncHScrollPosition();
+        if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) loadMoreRows();
+      });
+    }, { passive: true });
   }
 
   // ---- The horizontal scrollbar above the header ----------------------------
@@ -3684,9 +3693,12 @@
     const away = _hiddenAt ? Date.now() - _hiddenAt : 0;
     _hiddenAt = 0;
     const hasPending = (typeof PENDING !== "undefined" && PENDING.size > 0);
+    // Coming back to the tab no longer reloads the whole table (that read as an
+    // unwanted "auto refresh" and reset your scroll). On the SKU view we only
+    // refresh the live listing values in place - the rows stay put. Use the
+    // Reload button for a full refresh.
     if (away > 15000 && !state.loadingMore && !hasPending) {
-      if (state.view === "sku_master") { softRefreshListing(); refresh(); }
-      else refresh();
+      if (state.view === "sku_master") softRefreshListing();
     }
   });
 
