@@ -179,12 +179,16 @@
       thead.innerHTML = "<tr><th>Code</th><th>Item</th><th>Subcategory</th><th class=num>Price</th><th>Stock</th><th>Deleted</th><th class=num>Used by</th></tr>";
       rows = data.loose.filter(r => matches(r, q)).filter(r => {
         const v = eff(r);
-        const dl = v.status.toLowerCase() === "deleted";
-        if (f === "instock") return !dl && v.opening === 200;
-        if (f === "zero") return !dl && v.opening === 0;
-        if (f === "other") return !dl && v.opening !== 0 && v.opening !== 200;
-        if (f === "deleted") return v.status.toLowerCase() === "deleted";
         if (f === "changed") return v.dirty;
+        // A row you are editing stays visible even if its new value no longer
+        // matches the filter (otherwise it vanishes the moment you change it).
+        if (v.dirty) return true;
+        const dl = isDel(r);
+        const op = Number(r.opening_qty || 0);
+        if (f === "instock") return !dl && op === 200;
+        if (f === "zero") return !dl && op === 0;
+        if (f === "other") return !dl && op !== 0 && op !== 200;
+        if (f === "deleted") return dl;
         return true;
       });
       tbody.innerHTML = rows.map(r => {
