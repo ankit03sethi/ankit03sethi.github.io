@@ -3800,7 +3800,7 @@
         const { data, error } = await sb.from("seller_sku_master")
           .select("platform, seller_sku, master_sku, brand, category, sub_category, color, product, hsn, updated_at")
           .eq("user_id", state.uid)
-          .order("master_sku", { ascending: true })
+          .order("master_sku", { ascending: true }).order("id", { ascending: true })
           .range(from, from + PAGE - 1);
         if (error) { setStatus("Download error: " + error.message, true); return; }
         if (!data || data.length === 0) break;
