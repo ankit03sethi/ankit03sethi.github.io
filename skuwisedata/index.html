@@ -2683,34 +2683,32 @@
         const col = pct >= 20 ? "#0f172a" : "#475569";
         return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${Math.round(pct)}</td>`;
       }
-      // W Qty: warehouse stock for this Master SKU (from the Warehouse Stock
-      // workbook / warehouse_calc). qty > 0 = In stock, 0 or less = Out of stock,
-      // Master SKU not in the warehouse file = dash.
+      // W Qty: warehouse stock for this Master SKU (Warehouse Stock workbook /
+      // warehouse_calc). Deleted (qty < 0), In stock (qty > 0), Out of stock
+      // (qty 0, or Master SKU not in the warehouse file). No dash.
       if (c === "W Qty") {
         const dot = (bg) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${bg};margin-right:5px;vertical-align:middle"></span>`;
+        if (!state.whQty) return `<td style="color:#cbd5e1">${DASH}</td>`;   // warehouse data still loading
         const key = String(r.master_sku || "").replace(/\s+/g, "").toLowerCase();
-        const wq = (key && state.whQty) ? state.whQty.get(key) : undefined;
-        if (wq == null || Number.isNaN(wq)) return `<td style="color:#cbd5e1" title="Not in the warehouse file">${DASH}</td>`;
-        return wq > 0
-          ? `<td title="Warehouse qty: ${wq}">${dot("#16a34a")}In stock</td>`
-          : `<td title="Warehouse qty: ${wq}">${dot("#dc2626")}Out of stock</td>`;
+        const wq = key ? state.whQty.get(key) : undefined;
+        if (wq != null && !Number.isNaN(wq) && wq < 0) return `<td title="Deleted in the warehouse file">${dot("#9ca3af")}Deleted</td>`;
+        if (wq != null && !Number.isNaN(wq) && wq > 0) return `<td title="Warehouse qty: ${wq}">${dot("#16a34a")}In stock</td>`;
+        return `<td title="Warehouse qty: ${(wq == null || Number.isNaN(wq)) ? 0 : wq}">${dot("#dc2626")}Out of stock</td>`;
       }
-      // P Qty: platform stock, from the newest inventory export (company+platform,
-      // matched on the platform's seller SKU). Qty is the number from that export.
+      // P Qty: in the newest inventory export (company+platform, matched on the
+      // platform's seller SKU) = Active (any qty, including 0); not in the file =
+      // Inactive. No dash. Qty is the raw number from that export.
       if (c === "P Qty" || c === "Qty") {
         const st = state.stockMap.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const has = state.stockHave.has(wcKey(r.company_name, r.platform, ""));
-        if (!has) return `<td style="color:#cbd5e1">${DASH}</td>`;
-        const inactive = !st || String(st.listing_status || "").toUpperCase() === "INACTIVE";
-        const qty = st ? Number(st.qty) : NaN;
         if (c === "Qty") {
-          if (inactive) return `<td style="color:#cbd5e1">${DASH}</td>`;
-          return `<td>${Number.isFinite(qty) ? qty.toLocaleString("en-IN") : 0}</td>`;
+          if (!st) return `<td style="color:#cbd5e1">${DASH}</td>`;
+          const qn = Number(st.qty);
+          return `<td>${Number.isFinite(qn) ? qn.toLocaleString("en-IN") : 0}</td>`;
         }
         const dot = (bg) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${bg};margin-right:5px;vertical-align:middle"></span>`;
-        if (inactive) return `<td title="Not in the latest inventory export${st ? ' (listing INACTIVE)' : ''}">${dot("#9ca3af")}Inactive</td>`;
-        if (qty > 0)  return `<td title="${escapeHtml(st.source_file || "")}">${dot("#16a34a")}Active</td>`;
-        return `<td>${dot("#dc2626")}Out of stock</td>`;
+        return st
+          ? `<td title="${escapeHtml(st.source_file || "")}">${dot("#16a34a")}Active</td>`
+          : `<td>${dot("#9ca3af")}Inactive</td>`;
       }
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -3374,8 +3372,8 @@
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
     "Other Assured": "F Assured when that seller carries the Assured badge.",
-    "W Qty": "Warehouse stock for this Master SKU, from the Warehouse Stock workbook: In stock (qty > 0), Out of stock (0). Dash = this Master SKU is not in the warehouse file.",
-    "P Qty": "Platform stock, from the newest inventory export for this company + platform: Active (qty > 0), Out of stock (0 or blank), Inactive (not in the export, or listing INACTIVE). Dash = no export uploaded yet.",
+    "W Qty": "Warehouse stock for this Master SKU (Warehouse Stock workbook): In stock (qty > 0), Out of stock (qty 0 or not in the warehouse file), Deleted (qty < 0).",
+    "P Qty": "From the inventory export: Active (SKU is in the file, any qty including 0), Inactive (SKU not in the file).",
     "Qty": "Stock on the platform, from the same export.",
     "COP": "What one unit costs you to buy. You fill this in.",
     "HSN": "Tax code from the master sheet.",
