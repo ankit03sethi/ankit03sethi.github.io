@@ -567,7 +567,9 @@
     try {
       const { data: kq } = await sb.rpc("sku_kit_qty");
       state.kitQty = new Map((kq || []).map(x => [String(x.k_code || ""), x]));
-      const { data: wq } = await sb.rpc("sku_wh_qty");
+      // _json variant returns all rows in one blob - the plain RPC is capped at
+      // 1000 rows by PostgREST, which left most Master SKUs looking Out of stock.
+      const { data: wq } = await sb.rpc("sku_wh_qty_json");
       state.whQty = new Map((wq || []).map(x => [String(x.code || "").replace(/\s+/g, "").toLowerCase(), Number(x.qty)]));
       const { data: ps } = await sb.rpc("sku_platform_seller_names");
       state.platformSellers = new Map((ps || []).map(x => [psKey(x.company_name, x.platform), x.seller_name]));
