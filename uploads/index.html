@@ -1390,6 +1390,20 @@
       if (stageKind === "inventory" || stageKind === "myntra_style") {
         stageKind = classifyStockRows(Object.keys(rows[0]), platform) || stageKind;
       }
+      // Flipkart ships two listing exports. The INACTIVE one has a "Listing
+      // Status" column where every row is INACTIVE (qty 0). Saving it replaces
+      // the real inventory with 10k dead rows, and every live SKU then reads as
+      // "not in inventory". Refuse it here so the previous active file stays.
+      if (stageKind === "inventory" && String(platform || "").toLowerCase() === "flipkart") {
+        const stCol = Object.keys(rows[0]).find(k => String(k).toLowerCase().replace(/[^a-z0-9]/g, "") === "listingstatus");
+        if (stCol) {
+          const active = rows.filter(r => String(r[stCol] || "").trim().toUpperCase() === "ACTIVE").length;
+          if (active === 0) {
+            setStatus(`❌ ${f.name} rejected — this is Flipkart's INACTIVE listings report (0 ACTIVE rows out of ${rows.length}). Upload the Active listings report instead. Previous inventory was kept.`, true);
+            return;
+          }
+        }
+      }
       // Snapshot the modal's date choice now (so it locks with this file)
       let overrideDate = null, dateFrom = null, dateTo = null;
       if (dateMode === "single") {
