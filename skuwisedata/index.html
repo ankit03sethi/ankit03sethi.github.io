@@ -567,6 +567,8 @@
     try {
       const { data: kq } = await sb.rpc("sku_kit_qty");
       state.kitQty = new Map((kq || []).map(x => [String(x.k_code || ""), x]));
+      const { data: wq } = await sb.rpc("sku_wh_qty");
+      state.whQty = new Map((wq || []).map(x => [String(x.code || "").replace(/\s+/g, "").toLowerCase(), Number(x.qty)]));
       const { data: ps } = await sb.rpc("sku_platform_seller_names");
       state.platformSellers = new Map((ps || []).map(x => [psKey(x.company_name, x.platform), x.seller_name]));
     } catch (e) { console.warn("platform seller names:", e); }
@@ -2081,7 +2083,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","Stock","Qty","Kit Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Expected Profit","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -2681,7 +2683,21 @@
         const col = pct >= 20 ? "#0f172a" : "#475569";
         return `<td style="color:${col};font-weight:${pct >= 20 ? 700 : 400}">${Math.round(pct)}</td>`;
       }
-      if (c === "Stock" || c === "Qty") {
+      // W Qty: warehouse stock for this Master SKU (from the Warehouse Stock
+      // workbook / warehouse_calc). qty > 0 = In stock, 0 or less = Out of stock,
+      // Master SKU not in the warehouse file = dash.
+      if (c === "W Qty") {
+        const dot = (bg) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${bg};margin-right:5px;vertical-align:middle"></span>`;
+        const key = String(r.master_sku || "").replace(/\s+/g, "").toLowerCase();
+        const wq = (key && state.whQty) ? state.whQty.get(key) : undefined;
+        if (wq == null || Number.isNaN(wq)) return `<td style="color:#cbd5e1" title="Not in the warehouse file">${DASH}</td>`;
+        return wq > 0
+          ? `<td title="Warehouse qty: ${wq}">${dot("#16a34a")}In stock</td>`
+          : `<td title="Warehouse qty: ${wq}">${dot("#dc2626")}Out of stock</td>`;
+      }
+      // P Qty: platform stock, from the newest inventory export (company+platform,
+      // matched on the platform's seller SKU). Qty is the number from that export.
+      if (c === "P Qty" || c === "Qty") {
         const st = state.stockMap.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const has = state.stockHave.has(wcKey(r.company_name, r.platform, ""));
         if (!has) return `<td style="color:#cbd5e1">${DASH}</td>`;
@@ -2693,7 +2709,7 @@
         }
         const dot = (bg) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${bg};margin-right:5px;vertical-align:middle"></span>`;
         if (inactive) return `<td title="Not in the latest inventory export${st ? ' (listing INACTIVE)' : ''}">${dot("#9ca3af")}Inactive</td>`;
-        if (qty > 0)  return `<td title="${escapeHtml(st.source_file || "")}">${dot("#16a34a")}In stock</td>`;
+        if (qty > 0)  return `<td title="${escapeHtml(st.source_file || "")}">${dot("#16a34a")}Active</td>`;
         return `<td>${dot("#dc2626")}Out of stock</td>`;
       }
       if (DAY_COLS[c]) {
@@ -3358,7 +3374,8 @@
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
     "Other Assured": "F Assured when that seller carries the Assured badge.",
-    "Stock": "From the newest inventory export for this company + platform: In stock (qty > 0), Out of stock (0 or blank), Inactive (not in the export, or listing INACTIVE). Dash = no export uploaded yet.",
+    "W Qty": "Warehouse stock for this Master SKU, from the Warehouse Stock workbook: In stock (qty > 0), Out of stock (0). Dash = this Master SKU is not in the warehouse file.",
+    "P Qty": "Platform stock, from the newest inventory export for this company + platform: Active (qty > 0), Out of stock (0 or blank), Inactive (not in the export, or listing INACTIVE). Dash = no export uploaded yet.",
     "Qty": "Stock on the platform, from the same export.",
     "COP": "What one unit costs you to buy. You fill this in.",
     "HSN": "Tax code from the master sheet.",
@@ -3473,7 +3490,7 @@
   const SORT_KEYS = {
     "Date":"date", "Company":"company", "Platform":"platform", "Brand":"brand",
     "Category":"category", "Sub Category":"subcategory", "Product":"product",
-    "Color":"color", "ASIN":"asin", "SKU":"sku", "Master Sku":"mastersku", "Stock":"stockstatus", "Qty":"stockqty", "HSN":"hsn",
+    "Color":"color", "ASIN":"asin", "SKU":"sku", "Master Sku":"mastersku", "P Qty":"stockstatus", "Qty":"stockqty", "HSN":"hsn",
     "COP":"cop", "Final COP":"finalcop", "Selling Price":"sellingprice",
     "Expected Settlement":"expectedsettlement", "Expected Profit":"expectedprofit", "Tax %":"tax", "Packaging":"packaging",
     "Site Price":"siteprice", "Ratings":"ratings", "Count":"count", "Seller":"seller",
