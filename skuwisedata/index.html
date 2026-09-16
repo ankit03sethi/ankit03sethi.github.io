@@ -1447,6 +1447,26 @@
   }
 
   function rowCountLabel() {
+    // Search: show the REAL number of matching rows (once fully loaded), not the
+    // account total. While the rest is still streaming in, show a "+ loading".
+    if (state.search) {
+      if (state.loaded === 0) return 'No match for "' + state.search + '"';
+      const nn = state.loaded.toLocaleString("en-IN");
+      return state.hasMore
+        ? nn + '+ matches for "' + state.search + '" - loading more...'
+        : nn + (state.loaded === 1 ? ' match' : ' matches') + ' for "' + state.search + '"';
+    }
+    // Column filter (no search): show how many rows pass the filter.
+    if (filtersActive()) {
+      const tbl = document.querySelector('#tableWrap table.data');
+      if (tbl && tbl.tBodies[0]) {
+        let shown = 0;
+        for (const tr of tbl.tBodies[0].rows) if (tr.style.display !== 'none') shown++;
+        const tot = (state.grandTotal || state.total).toLocaleString("en-IN");
+        return shown.toLocaleString("en-IN") + ' of ' + tot + ' rows' +
+          (state.hasMore ? ' - loading more...' : ' match the filter');
+      }
+    }
     const t = (state.grandTotal || state.total).toLocaleString("en-IN");
     if (state.search) {
       return state.loaded === 0
@@ -1535,9 +1555,10 @@
       if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
       state.loaded += rows.length;
       if (!paged) state.hasMore = state.loaded < state.total;
-      // Re-apply whatever filter and sort the user has set, now including the
-      // rows that just arrived.
-      applyTableTools();
+      // Re-apply the filter as rows stream in. During a bulk "load all" we only
+      // hide/show non-matches (no re-sort) so the table does not jump on every
+      // page; the single final sort runs once when loading finishes.
+      if (state.loadingAll) applyFilterOnly(); else applyTableTools();
     } finally {
       state.loadingMore = false;
       $("#rowCount").textContent = rowCountLabel();
@@ -1570,6 +1591,7 @@
         $("#rowCount").textContent = "Loading all matches\u2026 " +
           state.loaded.toLocaleString("en-IN");
       }
+      applyTableTools();   // one final sort + renumber over the whole set
     } finally {
       state.loadingAll = false;
       $("#rowCount").textContent = rowCountLabel();
@@ -2838,6 +2860,24 @@
       document.querySelectorAll("#companyRow .plat-chip").forEach(x => x.classList.toggle("active", (x.dataset.c || "") === state.company));
       document.querySelectorAll("#platformRow .plat-chip").forEach(x => x.classList.toggle("active", (x.dataset.p || "") === state.platform));
     } catch (e) { /* ignore */ }
+  }
+
+  // Filter only: hide/show rows to match the active column filters, without any
+  // sorting or reordering. Used while a bulk "load all" is streaming rows in, so
+  // the table does not visibly reshuffle on every page.
+  function applyFilterOnly() {
+    const table = $("#tableWrap").querySelector("table.data");
+    if (!table) return;
+    const t = toolsFor(state.view);
+    const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
+    const body = table.querySelector("tbody");
+    if (!body) return;
+    const picks = picksFor(t);
+    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size);
+    for (const tr of body.rows) {
+      const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i])));
+      tr.style.display = ok ? "" : "none";
+    }
   }
 
   function applyTableTools() {
