@@ -221,6 +221,11 @@
     .fpanel { position:fixed; z-index:120; width:262px; background:#fff; border:1px solid #cbd5e1;
               border-radius:10px; box-shadow:0 12px 32px rgba(15,23,42,.18); font-size:13px; overflow:hidden; }
     .fpanel .fhead { padding:8px; border-bottom:1px solid #eef2f7; }
+    .fpanel .fsort { display:flex; gap:6px; padding:8px 8px 0; }
+    .fpanel .fsort button { flex:1; font:inherit; font-size:12px; font-weight:700; padding:6px 8px; border:1px solid #cbd5e1;
+                            border-radius:7px; background:#f8fafc; color:#0f172a; cursor:pointer; }
+    .fpanel .fsort button:hover { border-color:#1f6feb; color:#1f6feb; }
+    .fpanel .fsort button.on { background:#1f6feb; border-color:#1f6feb; color:#fff; }
     .fpanel .fhead input { width:100%; font:inherit; font-size:13px; padding:6px 9px;
                            border:1px solid #e5e7eb; border-radius:7px; }
     .fpanel .fhead input:focus { outline:none; border-color:#1f6feb; }
@@ -3071,6 +3076,25 @@
         `<span class="cnt"></span></div>` +
       `<div class="flist"></div>` +
       `<div class="ffoot"><button type="button">Done</button></div>`;
+    // Numeric / % columns get High-to-low and Low-to-high on top, before the values.
+    const nonBlank = values.filter(o => String(o.v).trim() !== "");
+    const isNum = nonBlank.length > 0 && nonBlank.filter(o => /^[₹$]?\s*-?[\d,]*\.?\d+\s*%?$/.test(String(o.v).trim())).length >= nonBlank.length * 0.6;
+    if (isNum) {
+      const cur = t.sort && t.sort.col === name ? t.sort.dir : "";
+      const fs = document.createElement("div");
+      fs.className = "fsort";
+      fs.innerHTML = '<button type="button" data-dir="desc"' + (cur === "desc" ? ' class="on"' : "") + '>&#8595; High to low</button>'
+                   + '<button type="button" data-dir="asc"'  + (cur === "asc"  ? ' class="on"' : "") + '>&#8593; Low to high</button>';
+      panel.insertBefore(fs, panel.firstChild);
+      fs.querySelectorAll("[data-dir]").forEach(b => b.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const win = COMBO[name] ? sortWin(t, name) : null;
+        t.sort = { col: name, dir: b.dataset.dir, win: win };
+        closeFilterPanel();
+        if (sortKey(name, win) && state.view === "sku_master") refresh();
+        else installedRefresh(table);
+      }));
+    }
     document.body.appendChild(panel);
     openPanel = panel;
 
