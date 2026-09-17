@@ -150,7 +150,13 @@
              box-shadow:0 4px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04); }
     .panel-head { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700;
                   display:flex; align-items:center; justify-content:space-between; background:#fff; }
-    .panel-body { max-height:calc(100vh - 300px); min-height:420px; overflow:auto; }
+    .panel-body { max-height:calc(100vh - 300px); min-height:320px; overflow:auto; }
+    /* Panel head + top scrollbar ride along under the top bar, so even a page
+       scroll never hides where you are in the table. */
+    #latestPanel .panel-head { position:sticky; top:69px; z-index:12; }
+    #hscrollTop { position:sticky; top:114px; z-index:12; }
+    table.data thead th { z-index:5; }
+    table.data thead tr.filter-row th { z-index:5; }
     /* A second horizontal scrollbar pinned above the header row. The table is
        wider than the screen and the real one sits at the very bottom of a very
        long list, which is nowhere near where you are looking. */
@@ -359,7 +365,7 @@
 
   <div class="kpi-grid" id="kpis"></div>
 
-  <div class="panel">
+  <div class="panel" id="latestPanel">
     <div class="panel-head">
       <span id="tableTitle">Latest rows</span>
       <span class="allsearch" id="allSearchWrap">
@@ -1650,6 +1656,23 @@
     _hSyncing = true; bar.scrollLeft = wrap.scrollLeft; _hSyncing = false;
   }
   window.addEventListener("resize", syncHScroll);
+
+  // Keep the header row on screen. The table scrolls inside #tableWrap, whose
+  // sticky headers only hold while THAT box is the thing scrolling. So the box
+  // is sized to end exactly at the bottom of the window: once the page has
+  // scrolled the panel head up under the top bar there is nothing further to
+  // page-scroll, every wheel turn goes to the table, and the headers stay put.
+  function fitTableWrap() {
+    const wrap = $("#tableWrap"); if (!wrap) return;
+    const top = wrap.getBoundingClientRect().top;
+    const h = Math.max(320, window.innerHeight - top - 8);
+    wrap.style.maxHeight = h + "px";
+    wrap.style.height = h + "px";
+  }
+  window.addEventListener("resize", fitTableWrap);
+  window.addEventListener("scroll", fitTableWrap, { passive: true });
+  document.addEventListener("DOMContentLoaded", fitTableWrap);
+  setTimeout(fitTableWrap, 300); setTimeout(fitTableWrap, 1500);
 
   // Forward courier across every SKU currently in the window cache, over the
   // last 30 days on payment date. Only platforms that print the charge are in
