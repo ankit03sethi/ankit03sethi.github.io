@@ -1660,25 +1660,6 @@
   }
   window.addEventListener("resize", syncHScroll);
 
-  // Keep the header row on screen. The table scrolls inside #tableWrap, whose
-  // sticky headers only hold while THAT box is the thing scrolling. So the box
-  // is sized to end exactly at the bottom of the window: once the page has
-  // scrolled the panel head up under the top bar there is nothing further to
-  // page-scroll, every wheel turn goes to the table, and the headers stay put.
-  // The table no longer scrolls inside its own box: the PAGE scrolls, and the
-  // header rows (letters, names, filters) are pushed down with a transform so
-  // they always sit right under the top bar + top scrollbar. A CSS sticky
-  // cannot do this because the wrap must stay a horizontal scroller.
-  function fitTableWrap() {
-    const wrap = $("#tableWrap"); if (!wrap) return;
-    // The wrap is the vertical scroller and ends at the bottom of the window, so
-    // it keeps its own up/down scrollbar on the right and the page only scrolls
-    // until the table reaches the top bar.
-    const bar = document.querySelector(".topbar"); const barH = bar ? bar.offsetHeight : 69;
-    const h = Math.max(320, window.innerHeight - barH - 14 - 6);
-    wrap.style.maxHeight = h + "px"; wrap.style.height = h + "px";
-    stickHead();
-  }
   // Native sticky: the wrap (#tableWrap) is the one vertical scroller and ends at
   // the bottom of the window. Inside it, a left/right strip (.hstrip) sticks to the
   // top, the header row sticks right under it and the filter row under that. No
