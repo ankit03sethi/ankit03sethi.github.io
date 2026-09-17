@@ -150,8 +150,7 @@
              box-shadow:0 4px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04); }
     .panel-head { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700;
                   display:flex; align-items:center; justify-content:space-between; background:#fff; }
-    .panel-body { max-height:none; min-height:320px; overflow-x:auto; overflow-y:hidden; }
-    #hscrollTop { position:sticky; top:69px; z-index:12; }
+    .panel-body { max-height:none; min-height:320px; overflow:auto; }
     #headClone table.data thead th { position:static; }
     /* Panel head + top scrollbar ride along under the top bar, so even a page
        scroll never hides where you are in the table. */
@@ -1670,7 +1669,12 @@
   // cannot do this because the wrap must stay a horizontal scroller.
   function fitTableWrap() {
     const wrap = $("#tableWrap"); if (!wrap) return;
-    wrap.style.maxHeight = "none"; wrap.style.height = "auto";
+    // The wrap is the vertical scroller and ends at the bottom of the window, so
+    // it keeps its own up/down scrollbar on the right and the page only scrolls
+    // until the table reaches the top bar.
+    const bar = document.querySelector(".topbar"); const barH = bar ? bar.offsetHeight : 69;
+    const h = Math.max(320, window.innerHeight - barH - 14 - 6);
+    wrap.style.maxHeight = h + "px"; wrap.style.height = h + "px";
     stickHead();
   }
   // A fixed copy of the header rows sits under the top bar whenever the real
@@ -1701,11 +1705,10 @@
     if (!thead) { hc.style.display = "none"; return; }
     const bar = document.querySelector(".topbar"); const hs = $("#hscrollTop");
     const barH = bar ? bar.offsetHeight : 69;
-    if (hs) hs.style.top = barH + "px";
-    const topLine = barH + (hs && !hs.classList.contains("hidden") ? hs.offsetHeight : 0);
+    const topLine = barH + 14;
     const r = wrap.getBoundingClientRect();
-    const headBottom = thead.getBoundingClientRect().bottom;
-    const show = r.top < topLine && (r.bottom - thead.offsetHeight) > topLine;
+    const tr = thead.getBoundingClientRect();
+    const show = tr.top < topLine && r.bottom > topLine + thead.offsetHeight + 14;
     if (!show) { hc.style.display = "none"; return; }
     // Rebuild the copy when the real header changed (sort caret, filter state, column set).
     const sig = thead.innerHTML.length + ":" + table.offsetWidth + ":" + thead.offsetHeight;
@@ -1716,11 +1719,17 @@
       const src = thead.rows[0] ? thead.rows[0].cells : []; const dst = th2.rows[0] ? th2.rows[0].cells : [];
       for (let i = 0; i < src.length && i < dst.length; i++) { const w = src[i].getBoundingClientRect().width; dst[i].style.width = w + "px"; dst[i].style.minWidth = w + "px"; dst[i].style.maxWidth = w + "px"; }
       th2.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
-      t2.appendChild(th2); hc.innerHTML = ""; hc.appendChild(t2);
+      // Left/right scrollbar strip on top of the pinned header, tied to the table.
+      const strip = document.createElement("div");
+      strip.className = "hcs"; strip.style.cssText = "overflow-x:auto; overflow-y:hidden; height:14px; background:#f8fafc; border-bottom:1px solid #e5e7eb;";
+      const sin = document.createElement("div"); sin.style.cssText = "height:1px; width:" + table.offsetWidth + "px;"; strip.appendChild(sin);
+      strip.addEventListener("scroll", () => { if (_hSyncing) return; _hSyncing = true; wrap.scrollLeft = strip.scrollLeft; _hSyncing = false; const tt = hc.querySelector("table"); if (tt) tt.style.transform = "translateX(" + (-wrap.scrollLeft) + "px)"; });
+      hc.innerHTML = ""; hc.appendChild(strip); t2.appendChild(th2); hc.appendChild(t2);
     }
     hc.style.display = "block";
-    hc.style.top = topLine + "px"; hc.style.left = r.left + "px"; hc.style.width = r.width + "px"; hc.style.height = thead.offsetHeight + "px";
-    const t2 = hc.firstChild; if (t2) t2.style.transform = "translateX(" + (-wrap.scrollLeft) + "px)";
+    hc.style.top = barH + "px"; hc.style.left = r.left + "px"; hc.style.width = r.width + "px"; hc.style.height = (thead.offsetHeight + 14) + "px";
+    const t2 = hc.querySelector("table"); if (t2) t2.style.transform = "translateX(" + (-wrap.scrollLeft) + "px)";
+    const st = hc.querySelector(".hcs"); if (st && Math.abs(st.scrollLeft - wrap.scrollLeft) > 1) { _hSyncing = true; st.scrollLeft = wrap.scrollLeft; _hSyncing = false; }
   }
   window.addEventListener("resize", fitTableWrap);
   window.addEventListener("scroll", stickHead, { passive: true });
