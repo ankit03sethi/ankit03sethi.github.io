@@ -151,7 +151,8 @@
     .panel-head { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700;
                   display:flex; align-items:center; justify-content:space-between; background:#fff; }
     .panel-body { max-height:none; min-height:320px; overflow:auto; }
-    #headClone table.data thead th { position:static; }
+    .hstrip { position:sticky; top:0; left:0; z-index:8; overflow-x:auto; overflow-y:hidden; height:14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; }
+    .hstrip > div { height:1px; }
     /* Panel head + top scrollbar ride along under the top bar, so even a page
        scroll never hides where you are in the table. */
     table.data thead th { z-index:5; }
@@ -196,7 +197,7 @@
        merged-window figures - so nothing looks louder than the rest. */
     table.data tbody td, table.data tbody .wv { font-weight:700 !important; color:#0f172a !important; }
     table.data thead th { background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase;
-                          font-size:11px; letter-spacing:.5px; position:sticky; top:0;
+                          font-size:11px; letter-spacing:.5px; position:sticky; top:14px;
                           border-bottom:1px solid #e2e8f0; }
     table.data tbody tr { transition:background .12s; }
     table.data tbody tr:hover { background:#eff6ff; }
@@ -210,7 +211,7 @@
     table.data thead th .sorthint { display:inline-block; margin-left:6px; font-size:9.5px;
         font-weight:700; color:#1f6feb; letter-spacing:0; text-transform:none; }
     table.data thead th .hrow.sorted .hlab { color:#1f6feb; }
-    table.data thead tr.filter-row th { position:sticky; top:33px; background:#fff; padding:5px 8px; border-bottom:1px solid #e5e7eb; }
+    table.data thead tr.filter-row th { position:sticky; top:var(--hdr-h, 76px); background:#fff; padding:5px 8px; border-bottom:1px solid #e5e7eb; }
     .col-filter { font:inherit; font-size:12px; width:100%; min-width:70px; padding:3px 6px; border:1px solid #e5e7eb; border-radius:5px; }
     .col-filter:focus { outline:none; border-color:#1f6feb; }
     .col-filter.on { border-color:#1f6feb; background:#eff6ff; }
@@ -1338,7 +1339,7 @@
     syncHScroll();
     syncHScrollPosition();
     installInfiniteScroll();
-    fitTableWrap();
+    installHStrip();
     if (state.view === "sku_master") loadEnrichments(data);
     // A search's remaining pages load as you scroll (smooth); an active column
     // filter pulls its full set only when you actually change it, not on every
@@ -1639,7 +1640,7 @@
     if (!wrap || !bar) return;
     const inner = bar.firstElementChild;
     const needed = wrap.scrollWidth > wrap.clientWidth + 2;
-    bar.classList.toggle("hidden", !needed);
+    bar.classList.toggle("hidden", !needed || !!wrap.querySelector(".hstrip"));
     if (!needed) return;
     inner.style.width = wrap.scrollWidth + "px";
     bar.scrollLeft = wrap.scrollLeft;
@@ -1653,8 +1654,9 @@
   function syncHScrollPosition() {
     const wrap = $("#tableWrap"), bar = $("#hscrollTop");
     if (!wrap || !bar || _hSyncing) return;
-    _hSyncing = true; bar.scrollLeft = wrap.scrollLeft; _hSyncing = false;
-    try { stickHead(); } catch (e) {}
+    _hSyncing = true; bar.scrollLeft = wrap.scrollLeft;
+    const s = wrap.querySelector(".hstrip"); if (s && Math.abs(s.scrollLeft - wrap.scrollLeft) > 1) s.scrollLeft = wrap.scrollLeft;
+    _hSyncing = false;
   }
   window.addEventListener("resize", syncHScroll);
 
@@ -1677,70 +1679,36 @@
     wrap.style.maxHeight = h + "px"; wrap.style.height = h + "px";
     stickHead();
   }
-  // A fixed copy of the header rows sits under the top bar whenever the real
-  // header has scrolled off. Fixed = no lag while scrolling, and rows can never
-  // show through above it. Clicks on the copy are forwarded to the real header.
-  let _hc = null;
-  function headClone() {
-    if (_hc) return _hc;
-    _hc = document.createElement("div");
-    _hc.id = "headClone";
-    _hc.style.cssText = "position:fixed; overflow:hidden; z-index:11; background:#f8fafc; display:none; border-bottom:1px solid #e2e8f0; box-shadow:0 4px 10px rgba(15,23,42,.06);";
-    document.body.appendChild(_hc);
-    _hc.addEventListener("click", e => {
-      const wrap = $("#tableWrap"); const real = wrap && wrap.querySelector("table.data thead"); if (!real) return;
-      const ct = _hc.querySelector("thead"); if (!ct) return;
-      // Same path of child indexes inside the copy → same element in the real header.
-      const path = []; let n = e.target;
-      while (n && n !== ct) { const p = n.parentNode; if (!p) break; path.unshift(Array.prototype.indexOf.call(p.childNodes, n)); n = p; }
-      let t = real; for (const i of path) { t = t && t.childNodes[i]; }
-      if (t && t.click) { e.preventDefault(); e.stopPropagation(); t.click(); }
-    }, true);
-    return _hc;
-  }
-  function stickHead() {
+  // Native sticky: the wrap (#tableWrap) is the one vertical scroller and ends at
+  // the bottom of the window. Inside it, a left/right strip (.hstrip) sticks to the
+  // top, the header row sticks right under it and the filter row under that. No
+  // JavaScript runs while scrolling apart from keeping the strip's scrollLeft in
+  // step with the table, so nothing lags or hangs.
+  function fitTableWrap() {
     const wrap = $("#tableWrap"); if (!wrap) return;
-    const table = wrap.querySelector("table.data"); const thead = table && table.querySelector("thead");
-    const hc = headClone();
-    if (!thead) { hc.style.display = "none"; return; }
-    const bar = document.querySelector(".topbar"); const hs = $("#hscrollTop");
-    const barH = bar ? bar.offsetHeight : 69;
-    const topLine = barH + 14;
-    const r = wrap.getBoundingClientRect();
-    const tr = thead.getBoundingClientRect();
-    const show = tr.top < topLine && r.bottom > topLine + thead.offsetHeight + 14;
-    if (!show) { hc.style.display = "none"; return; }
-    // Rebuild the copy when the real header changed (sort caret, filter state, column set).
-    const sig = thead.innerHTML.length + ":" + table.offsetWidth + ":" + thead.offsetHeight;
-    if (hc.dataset.sig !== sig) {
-      hc.dataset.sig = sig;
-      const t2 = document.createElement("table"); t2.className = table.className; t2.style.cssText = "width:" + table.offsetWidth + "px; table-layout:fixed; border-collapse:collapse;";
-      const th2 = thead.cloneNode(true);
-      const src = thead.rows[0] ? thead.rows[0].cells : []; const dst = th2.rows[0] ? th2.rows[0].cells : [];
-      for (let i = 0; i < src.length && i < dst.length; i++) { const w = src[i].getBoundingClientRect().width; dst[i].style.width = w + "px"; dst[i].style.minWidth = w + "px"; dst[i].style.maxWidth = w + "px"; }
-      th2.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
-      // Left/right scrollbar strip on top of the pinned header, tied to the table.
-      const strip = document.createElement("div");
-      strip.className = "hcs"; strip.style.cssText = "overflow-x:auto; overflow-y:hidden; height:14px; background:#f8fafc; border-bottom:1px solid #e5e7eb;";
-      const sin = document.createElement("div"); sin.style.cssText = "height:1px; width:" + table.offsetWidth + "px;"; strip.appendChild(sin);
-      strip.addEventListener("scroll", () => { if (_hSyncing) return; _hSyncing = true; wrap.scrollLeft = strip.scrollLeft; _hSyncing = false; const tt = hc.querySelector("table"); if (tt) tt.style.transform = "translateX(" + (-wrap.scrollLeft) + "px)"; });
-      hc.innerHTML = ""; hc.appendChild(strip); t2.appendChild(th2); hc.appendChild(t2);
-    }
-    hc.style.display = "block";
-    hc.style.top = barH + "px"; hc.style.left = r.left + "px"; hc.style.width = r.width + "px"; hc.style.height = (thead.offsetHeight + 14) + "px";
-    const t2 = hc.querySelector("table"); if (t2) t2.style.transform = "translateX(" + (-wrap.scrollLeft) + "px)";
-    const st = hc.querySelector(".hcs"); if (st && Math.abs(st.scrollLeft - wrap.scrollLeft) > 1) { _hSyncing = true; st.scrollLeft = wrap.scrollLeft; _hSyncing = false; }
+    const bar = document.querySelector(".topbar"); const barH = bar ? bar.offsetHeight : 69;
+    const h = Math.max(320, window.innerHeight - barH - 6);
+    wrap.style.maxHeight = h + "px"; wrap.style.height = h + "px";
+    const hr = wrap.querySelector("table.data thead tr");
+    if (hr) wrap.style.setProperty("--hdr-h", (14 + hr.offsetHeight) + "px");
   }
-  window.addEventListener("resize", fitTableWrap);
-  window.addEventListener("scroll", stickHead, { passive: true });
-  // Infinite scroll now watches the page, since the wrap itself never scrolls vertically.
-  let _pageTick = false;
-  window.addEventListener("scroll", () => {
-    if (_pageTick) return; _pageTick = true;
-    requestAnimationFrame(() => { _pageTick = false;
-      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 600) { try { loadMoreRows(); } catch (e) {} }
-    });
-  }, { passive: true });
+  function installHStrip() {
+    const wrap = $("#tableWrap"); if (!wrap) return;
+    const table = wrap.querySelector("table.data"); if (!table) return;
+    let strip = wrap.querySelector(".hstrip");
+    if (!strip) {
+      strip = document.createElement("div"); strip.className = "hstrip";
+      strip.innerHTML = "<div></div>";
+      wrap.insertBefore(strip, wrap.firstChild);
+      strip.addEventListener("scroll", () => { if (_hSyncing) return; _hSyncing = true; wrap.scrollLeft = strip.scrollLeft; _hSyncing = false; }, { passive: true });
+    }
+    strip.firstElementChild.style.width = table.offsetWidth + "px";
+    strip.style.width = wrap.clientWidth + "px";
+    const old = $("#hscrollTop"); if (old) old.classList.add("hidden");
+    fitTableWrap();
+  }
+  function stickHead() {}
+  window.addEventListener("resize", () => { fitTableWrap(); const w = $("#tableWrap"); const s = w && w.querySelector(".hstrip"); if (s) s.style.width = w.clientWidth + "px"; });
   document.addEventListener("DOMContentLoaded", fitTableWrap);
   setTimeout(fitTableWrap, 300); setTimeout(fitTableWrap, 1500);
 
