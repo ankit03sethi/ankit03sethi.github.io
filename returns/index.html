@@ -401,8 +401,9 @@
     // Totals as the marketplace file states them: Delivered = company says it reached
     // the seller; Undelivered = company says not completed. Scan status is shown per row.
     // Big number = still to scan (a matched scan drops off at once); small = total the file states.
-    $("#wlUnd").querySelector(".wln").innerHTML = undP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + wlUnd.length + "</small>";
-    $("#wlDel").querySelector(".wln").innerHTML = delP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + wlDel.length + "</small>";
+    // pending / scanned — e.g. 5/78: 5 still to scan, 78 already scanned
+    $("#wlUnd").querySelector(".wln").innerHTML = undP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + (wlUnd.length-undP.length) + "</small>";
+    $("#wlDel").querySelector(".wln").innerHTML = delP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + (wlDel.length-delP.length) + "</small>";
     if ($("#wlAll")) $("#wlAll").querySelector(".wln").textContent = (wlUnd.length + wlDel.length);
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
@@ -414,18 +415,21 @@
     const all = (wlMode==="all") ? pool : pool.filter(r => wlView==="scanned" ? r.scanned : !r.scanned);
     if ($("#wlPend")) { $("#wlPend").setAttribute("aria-selected", wlView==="pending"?"true":"false"); $("#wlScan").setAttribute("aria-selected", wlView==="scanned"?"true":"false"); }
     $("#wlTitle").textContent = (wlMode==="all"?"All returns":(wlMode==="delivered"?"Delivered returns":"Undelivered returns"));
-    const byCr={}; all.forEach(r=>{ const cr=normCourier(r.courier); byCr[cr]=(byCr[cr]||0)+1; });
+    const cnt=(m,k,r)=>{ const c=m[k]||(m[k]={p:0,s:0}); if(r.scanned) c.s++; else c.p++; };
+    const byCr={}; pool.forEach(r=>cnt(byCr, normCourier(r.courier), r));
     let crRows = (wlCourier==="all") ? all : all.filter(r=>normCourier(r.courier)===wlCourier);
-    const byPf={}; crRows.forEach(r=>{ const pf=r.platform||"-"; byPf[pf]=(byPf[pf]||0)+1; });
+    const crPool = (wlCourier==="all") ? pool : pool.filter(r=>normCourier(r.courier)===wlCourier);
+    const byPf={}; crPool.forEach(r=>cnt(byPf, r.platform||"-", r));
     if (wlPlatform!=="all" && !(wlPlatform in byPf)) wlPlatform="all";
     let pfRows = (wlPlatform==="all") ? crRows : crRows.filter(r=>(r.platform||"-")===wlPlatform);
-    const byCo={}; pfRows.forEach(r=>{ const co=r.company_name||"-"; byCo[co]=(byCo[co]||0)+1; });
+    const pfPool = (wlPlatform==="all") ? crPool : crPool.filter(r=>(r.platform||"-")===wlPlatform);
+    const byCo={}; pfPool.forEach(r=>cnt(byCo, r.company_name||"-", r));
     if (wlCompany!=="all" && !(wlCompany in byCo)) wlCompany="all";
     const sel=(t)=> t==="cr"?wlCourier : (t==="pf"?wlPlatform : wlCompany);
-    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+((sel(t)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n+")")+"</button>";
-    const crChips=[chip("cr","all",all.length)].concat(Object.keys(byCr).sort().map(k=>chip("cr",k,byCr[k]))).join("");
-    const pfChips=[chip("pf","all",crRows.length)].concat(Object.keys(byPf).sort().map(k=>chip("pf",k,byPf[k]))).join("");
-    const coChips=[chip("co","all",pfRows.length)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
+    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+((sel(t)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n.p+"/"+n.s+")")+"</button>";
+    const crChips=[chip("cr","all",0)].concat(Object.keys(byCr).sort().map(k=>chip("cr",k,byCr[k]))).join("");
+    const pfChips=[chip("pf","all",0)].concat(Object.keys(byPf).sort().map(k=>chip("pf",k,byPf[k]))).join("");
+    const coChips=[chip("co","all",0)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
     const filt=$("#wlFilters");
     filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Courier:</b>"+crChips+"</div><div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Platform:</b>"+pfChips+"</div><div><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div>";
     filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.t,v=b.dataset.v; if(t==="cr"){ wlCourier=v; wlPlatform="all"; wlCompany="all"; } else if(t==="pf"){ wlPlatform=v; wlCompany="all"; } else wlCompany=v; renderExpected(); }));
