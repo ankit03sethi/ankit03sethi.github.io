@@ -443,8 +443,15 @@
   }
 
   async function loadList(){
-    const { data, error } = await sb.rpc("return_scan_list", { p_limit: 1000 });
-    allRows = error ? [] : (data || []);
+    // API caps a call at 1000 rows — page through so every scan is loaded, no 1000 lock.
+    const PAGE = 1000; const acc = [];
+    for (let i = 0; ; i += PAGE) {
+      const { data, error } = await sb.rpc("return_scan_list", { p_limit: 100000 }).range(i, i + PAGE - 1);
+      if (error || !data || !data.length) break;
+      acc.push(...data);
+      if (data.length < PAGE) break;
+    }
+    allRows = acc;
     render();
     loadExpected();
   }
