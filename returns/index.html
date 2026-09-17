@@ -381,15 +381,10 @@
   async function loadExpected(){
     const {from,to}=dateRange();
     // The API returns at most 1000 rows per call, so page through until a short page.
+    // One call returns the whole list as JSON (no 1000-row cap, no repeated round trips).
     async function fetchAll(mode){
-      const out = []; const PAGE = 1000;
-      for (let i = 0; ; i += PAGE) {
-        const { data, error } = await sb.rpc("return_worklist",{p_mode:mode,p_from:from,p_to:to}).range(i, i + PAGE - 1);
-        if (error || !data || !data.length) break;
-        out.push(...data);
-        if (data.length < PAGE) break;
-      }
-      return out;
+      const { data, error } = await sb.rpc("return_worklist_json",{p_mode:mode,p_from:from,p_to:to});
+      return (error || !Array.isArray(data)) ? [] : data;
     }
     const [d,u] = await Promise.all([fetchAll("delivered"), fetchAll("undelivered")]);
     wlDel = d; wlUnd = u;
@@ -444,14 +439,8 @@
 
   async function loadList(){
     // API caps a call at 1000 rows — page through so every scan is loaded, no 1000 lock.
-    const PAGE = 1000; const acc = [];
-    for (let i = 0; ; i += PAGE) {
-      const { data, error } = await sb.rpc("return_scan_list", { p_limit: 100000 }).range(i, i + PAGE - 1);
-      if (error || !data || !data.length) break;
-      acc.push(...data);
-      if (data.length < PAGE) break;
-    }
-    allRows = acc;
+    const { data, error } = await sb.rpc("return_scan_list_json");
+    allRows = (error || !Array.isArray(data)) ? [] : data;
     render();
     loadExpected();
   }
