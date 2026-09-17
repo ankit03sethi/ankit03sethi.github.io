@@ -152,7 +152,7 @@
                   display:flex; align-items:center; justify-content:space-between; background:#fff; }
     .panel-body { max-height:none; min-height:320px; overflow-x:auto; overflow-y:hidden; }
     #hscrollTop { position:sticky; top:69px; z-index:12; }
-    table.data thead { position:relative; z-index:6; }
+    #headClone table.data thead th { position:static; }
     /* Panel head + top scrollbar ride along under the top bar, so even a page
        scroll never hides where you are in the table. */
     table.data thead th { z-index:5; }
@@ -1655,6 +1655,7 @@
     const wrap = $("#tableWrap"), bar = $("#hscrollTop");
     if (!wrap || !bar || _hSyncing) return;
     _hSyncing = true; bar.scrollLeft = wrap.scrollLeft; _hSyncing = false;
+    try { stickHead(); } catch (e) {}
   }
   window.addEventListener("resize", syncHScroll);
 
@@ -1672,16 +1673,54 @@
     wrap.style.maxHeight = "none"; wrap.style.height = "auto";
     stickHead();
   }
+  // A fixed copy of the header rows sits under the top bar whenever the real
+  // header has scrolled off. Fixed = no lag while scrolling, and rows can never
+  // show through above it. Clicks on the copy are forwarded to the real header.
+  let _hc = null;
+  function headClone() {
+    if (_hc) return _hc;
+    _hc = document.createElement("div");
+    _hc.id = "headClone";
+    _hc.style.cssText = "position:fixed; overflow:hidden; z-index:11; background:#f8fafc; display:none; border-bottom:1px solid #e2e8f0; box-shadow:0 4px 10px rgba(15,23,42,.06);";
+    document.body.appendChild(_hc);
+    _hc.addEventListener("click", e => {
+      const wrap = $("#tableWrap"); const real = wrap && wrap.querySelector("table.data thead"); if (!real) return;
+      const ct = _hc.querySelector("thead"); if (!ct) return;
+      // Same path of child indexes inside the copy → same element in the real header.
+      const path = []; let n = e.target;
+      while (n && n !== ct) { const p = n.parentNode; if (!p) break; path.unshift(Array.prototype.indexOf.call(p.childNodes, n)); n = p; }
+      let t = real; for (const i of path) { t = t && t.childNodes[i]; }
+      if (t && t.click) { e.preventDefault(); e.stopPropagation(); t.click(); }
+    }, true);
+    return _hc;
+  }
   function stickHead() {
     const wrap = $("#tableWrap"); if (!wrap) return;
-    const thead = wrap.querySelector("table.data thead"); if (!thead) return;
+    const table = wrap.querySelector("table.data"); const thead = table && table.querySelector("thead");
+    const hc = headClone();
+    if (!thead) { hc.style.display = "none"; return; }
     const bar = document.querySelector(".topbar"); const hs = $("#hscrollTop");
-    const topLine = (bar ? bar.offsetHeight : 69) + (hs && !hs.classList.contains("hidden") ? hs.offsetHeight : 0);
-    const wrapTop = wrap.getBoundingClientRect().top;
-    let off = topLine - wrapTop;
-    const maxOff = wrap.offsetHeight - thead.offsetHeight;
-    if (off < 0) off = 0; if (off > maxOff) off = maxOff;
-    thead.style.transform = off ? "translateY(" + off + "px)" : "";
+    const barH = bar ? bar.offsetHeight : 69;
+    if (hs) hs.style.top = barH + "px";
+    const topLine = barH + (hs && !hs.classList.contains("hidden") ? hs.offsetHeight : 0);
+    const r = wrap.getBoundingClientRect();
+    const headBottom = thead.getBoundingClientRect().bottom;
+    const show = r.top < topLine && (r.bottom - thead.offsetHeight) > topLine;
+    if (!show) { hc.style.display = "none"; return; }
+    // Rebuild the copy when the real header changed (sort caret, filter state, column set).
+    const sig = thead.innerHTML.length + ":" + table.offsetWidth + ":" + thead.offsetHeight;
+    if (hc.dataset.sig !== sig) {
+      hc.dataset.sig = sig;
+      const t2 = document.createElement("table"); t2.className = table.className; t2.style.cssText = "width:" + table.offsetWidth + "px; table-layout:fixed; border-collapse:collapse;";
+      const th2 = thead.cloneNode(true);
+      const src = thead.rows[0] ? thead.rows[0].cells : []; const dst = th2.rows[0] ? th2.rows[0].cells : [];
+      for (let i = 0; i < src.length && i < dst.length; i++) { const w = src[i].getBoundingClientRect().width; dst[i].style.width = w + "px"; dst[i].style.minWidth = w + "px"; dst[i].style.maxWidth = w + "px"; }
+      th2.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
+      t2.appendChild(th2); hc.innerHTML = ""; hc.appendChild(t2);
+    }
+    hc.style.display = "block";
+    hc.style.top = topLine + "px"; hc.style.left = r.left + "px"; hc.style.width = r.width + "px"; hc.style.height = thead.offsetHeight + "px";
+    const t2 = hc.firstChild; if (t2) t2.style.transform = "translateX(" + (-wrap.scrollLeft) + "px)";
   }
   window.addEventListener("resize", fitTableWrap);
   window.addEventListener("scroll", stickHead, { passive: true });
