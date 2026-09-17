@@ -153,8 +153,6 @@
     .panel-body { max-height:calc(100vh - 300px); min-height:320px; overflow:auto; }
     /* Panel head + top scrollbar ride along under the top bar, so even a page
        scroll never hides where you are in the table. */
-    #latestPanel .panel-head { position:sticky; top:69px; z-index:12; }
-    #hscrollTop { position:sticky; top:114px; z-index:12; }
     table.data thead th { z-index:5; }
     table.data thead tr.filter-row th { z-index:5; }
     /* A second horizontal scrollbar pinned above the header row. The table is
@@ -1664,13 +1662,16 @@
   // page-scroll, every wheel turn goes to the table, and the headers stay put.
   function fitTableWrap() {
     const wrap = $("#tableWrap"); if (!wrap) return;
-    const top = wrap.getBoundingClientRect().top;
-    const h = Math.max(320, window.innerHeight - top - 8);
+    // Constant height: window minus the top bar, the panel head and the top
+    // scrollbar. The page can then scroll only until the panel head sits right
+    // under the top bar - after that every wheel turn scrolls the table.
+    const bar = document.querySelector(".topbar"); const head = document.querySelector("#latestPanel .panel-head"); const hs = $("#hscrollTop");
+    const used = (bar ? bar.offsetHeight : 69) + (head ? head.offsetHeight : 46) + (hs && !hs.classList.contains("hidden") ? hs.offsetHeight : 0) + 12;
+    const h = Math.max(320, window.innerHeight - used);
     wrap.style.maxHeight = h + "px";
     wrap.style.height = h + "px";
   }
   window.addEventListener("resize", fitTableWrap);
-  window.addEventListener("scroll", fitTableWrap, { passive: true });
   document.addEventListener("DOMContentLoaded", fitTableWrap);
   setTimeout(fitTableWrap, 300); setTimeout(fitTableWrap, 1500);
 
