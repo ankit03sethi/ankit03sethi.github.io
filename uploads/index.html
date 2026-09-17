@@ -2316,7 +2316,8 @@
       // Preserve every cell as-is (empty ones kept) — the original file structure is stored intact
       for (const r of rows) {
         const master = String(r[idx.master] || "").trim();
-        if (!master) { skippedNoMaster++; skippedRows.push(r); continue; }
+        // A blank Master SKU no longer drops the row: archived / unmapped listings
+        // are kept (master_sku empty) so the file and the database stay equal.
         const raw = r; // full row, empties preserved
         // The file says "Floor Margin" (the page's label); the database key is "Margin".
         if (raw["Floor Margin"] !== undefined && raw["Margin"] === undefined) { raw["Margin"] = raw["Floor Margin"]; delete raw["Floor Margin"]; }
