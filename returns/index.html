@@ -140,7 +140,7 @@
 
 
   <div class="card" id="expCard" hidden>
-    <div style="margin-bottom:8px"><b id="wlTitle">Aane wale returns</b> <span class="muted" id="expNote"></span></div>
+    <div style="margin-bottom:8px"><b id="wlTitle">Aane wale returns</b> <span class="muted" id="expNote"></span> <span style="float:right"><button class="wlchip" id="wlPend" aria-selected="true">Pending</button> <button class="wlchip" id="wlScan" aria-selected="false">Scanned</button></span></div>
     <div id="wlFilters"></div>
     <div class="scroll" id="expScrollWrap" style="margin-top:8px">
       <table>
@@ -377,7 +377,7 @@
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) return {from:dateFilter,to:dateFilter};
     return {from:"2000-01-01",to:"2999-12-31"}; }
   function normCourier(c){ const s=String(c==null?"-":c).trim(); const k=s.toLowerCase().replace(/[^a-z0-9]/g,""); const map={xpressbees:"XpressBees",expressbees:"XpressBees",delhivery:"Delhivery",eke2e:"Ekart",ekart:"Ekart",flipkartlogistics:"Ekart",shadowfax:"Shadowfax",valmo:"Valmo",pocketship:"PocketShip",ats:"ATS",firstcry:"Firstcry",flipkart:"Flipkart",amazon:"Amazon",meesho:"Meesho",myntra:"Myntra"}; return map[k]||s||"-"; }
-  let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all", wlPlatform = "all";
+  let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all", wlPlatform = "all", wlView = "pending";
   async function loadExpected(){
     const {from,to}=dateRange();
     // The API returns at most 1000 rows per call, so page through until a short page.
@@ -410,7 +410,9 @@
     const card = $("#expCard");
     if (!wlMode){ if(card) card.hidden=true; return; }
     if (card) card.hidden=false;
-    const all = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?delP:undP);
+    const pool = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?wlDel:wlUnd);
+    const all = (wlMode==="all") ? pool : pool.filter(r => wlView==="scanned" ? r.scanned : !r.scanned);
+    if ($("#wlPend")) { $("#wlPend").setAttribute("aria-selected", wlView==="pending"?"true":"false"); $("#wlScan").setAttribute("aria-selected", wlView==="scanned"?"true":"false"); }
     $("#wlTitle").textContent = (wlMode==="all"?"All returns":(wlMode==="delivered"?"Delivered returns":"Undelivered returns"));
     const byCr={}; all.forEach(r=>{ const cr=normCourier(r.courier); byCr[cr]=(byCr[cr]||0)+1; });
     let crRows = (wlCourier==="all") ? all : all.filter(r=>normCourier(r.courier)===wlCourier);
@@ -429,7 +431,7 @@
     filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.t,v=b.dataset.v; if(t==="cr"){ wlCourier=v; wlPlatform="all"; wlCompany="all"; } else if(t==="pf"){ wlPlatform=v; wlCompany="all"; } else wlCompany=v; renderExpected(); }));
     let rows=pfRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
-    $("#expNote").textContent = rows.length ? (rows.length + (wlMode==="all" ? " returns" : " pending scan")) : "Sab scan ho gaye.";
+    $("#expNote").textContent = rows.length ? (rows.length + (wlMode==="all" ? " returns" : (wlView==="scanned" ? " scanned" : " pending scan"))) : (wlView==="scanned" ? "Abhi koi scan nahi." : "Sab scan ho gaye.");
     const show = rows;
     $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(normCourier(r.courier))+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
@@ -468,6 +470,7 @@
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed","false"));
     render(); loadExpected();
   });
+  if ($("#wlPend")) { $("#wlPend").addEventListener("click", () => { wlView="pending"; renderExpected(); }); $("#wlScan").addEventListener("click", () => { wlView="scanned"; renderExpected(); }); }
   $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
   $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
   if ($("#wlAll")) $("#wlAll").addEventListener("click", () => { wlMode = (wlMode==="all")?null:"all"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
