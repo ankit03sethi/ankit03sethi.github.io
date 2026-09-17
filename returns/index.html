@@ -400,8 +400,9 @@
     const undP = wlUnd.filter(r=>!r.scanned); const delP = wlDel.filter(r=>!r.scanned);
     // Totals as the marketplace file states them: Delivered = company says it reached
     // the seller; Undelivered = company says not completed. Scan status is shown per row.
-    $("#wlUnd").querySelector(".wln").textContent = wlUnd.length;
-    $("#wlDel").querySelector(".wln").textContent = wlDel.length;
+    // Big number = still to scan (a matched scan drops off at once); small = total the file states.
+    $("#wlUnd").querySelector(".wln").innerHTML = undP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + wlUnd.length + "</small>";
+    $("#wlDel").querySelector(".wln").innerHTML = delP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + wlDel.length + "</small>";
     if ($("#wlAll")) $("#wlAll").querySelector(".wln").textContent = (wlUnd.length + wlDel.length);
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
@@ -409,7 +410,7 @@
     const card = $("#expCard");
     if (!wlMode){ if(card) card.hidden=true; return; }
     if (card) card.hidden=false;
-    const all = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?wlDel:wlUnd);
+    const all = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?delP:undP);
     $("#wlTitle").textContent = (wlMode==="all"?"All returns":(wlMode==="delivered"?"Delivered returns":"Undelivered returns"));
     const byCr={}; all.forEach(r=>{ const cr=normCourier(r.courier); byCr[cr]=(byCr[cr]||0)+1; });
     let crRows = (wlCourier==="all") ? all : all.filter(r=>normCourier(r.courier)===wlCourier);
@@ -428,7 +429,7 @@
     filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.t,v=b.dataset.v; if(t==="cr"){ wlCourier=v; wlPlatform="all"; wlCompany="all"; } else if(t==="pf"){ wlPlatform=v; wlCompany="all"; } else wlCompany=v; renderExpected(); }));
     let rows=pfRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
-    $("#expNote").textContent = rows.length ? (rows.length + " returns · " + rows.filter(r=>!r.scanned).length + " pending scan") : "Kuch nahi.";
+    $("#expNote").textContent = rows.length ? (rows.length + (wlMode==="all" ? " returns" : " pending scan")) : "Sab scan ho gaye.";
     const show = rows;
     $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(normCourier(r.courier))+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
