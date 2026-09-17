@@ -402,8 +402,9 @@
     // the seller; Undelivered = company says not completed. Scan status is shown per row.
     // Big number = still to scan (a matched scan drops off at once); small = total the file states.
     // pending / scanned — e.g. 5/78: 5 still to scan, 78 already scanned
-    $("#wlUnd").querySelector(".wln").innerHTML = undP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + (wlUnd.length-undP.length) + "</small>";
-    $("#wlDel").querySelector(".wln").innerHTML = delP.length + " <small style='font-size:12px;color:#64748b;font-weight:500'>/ " + (wlDel.length-delP.length) + "</small>";
+    const ps = (p,s) => "<span style='color:#dc2626'>" + p + "</span> <small style='font-size:12px;font-weight:600;color:#94a3b8'>/</small> <small style='font-size:14px;font-weight:700;color:#16a34a'>" + s + "</small>";
+    $("#wlUnd").querySelector(".wln").innerHTML = ps(undP.length, wlUnd.length-undP.length);
+    $("#wlDel").querySelector(".wln").innerHTML = ps(delP.length, wlDel.length-delP.length);
     if ($("#wlAll")) $("#wlAll").querySelector(".wln").textContent = (wlUnd.length + wlDel.length);
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
@@ -426,7 +427,7 @@
     const byCo={}; pfPool.forEach(r=>cnt(byCo, r.company_name||"-", r));
     if (wlCompany!=="all" && !(wlCompany in byCo)) wlCompany="all";
     const sel=(t)=> t==="cr"?wlCourier : (t==="pf"?wlPlatform : wlCompany);
-    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+((sel(t)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" ("+n.p+"/"+n.s+")")+"</button>";
+    const chip=(t,k,n)=>"<button class='wlchip' data-t='"+t+"' data-v='"+esc(k)+"' aria-selected='"+((sel(t)===k)?"true":"false")+"'>"+(k==="all"?"All":esc(k))+(k==="all"?"":" (<span style='color:#dc2626;font-weight:700'>"+n.p+"</span>/<span style='color:#16a34a;font-weight:700'>"+n.s+"</span>)")+"</button>";
     const crChips=[chip("cr","all",0)].concat(Object.keys(byCr).sort().map(k=>chip("cr",k,byCr[k]))).join("");
     const pfChips=[chip("pf","all",0)].concat(Object.keys(byPf).sort().map(k=>chip("pf",k,byPf[k]))).join("");
     const coChips=[chip("co","all",0)].concat(Object.keys(byCo).sort().map(k=>chip("co",k,byCo[k]))).join("");
