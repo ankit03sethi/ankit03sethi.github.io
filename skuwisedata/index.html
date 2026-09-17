@@ -150,7 +150,9 @@
              box-shadow:0 4px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04); }
     .panel-head { padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700;
                   display:flex; align-items:center; justify-content:space-between; background:#fff; }
-    .panel-body { max-height:calc(100vh - 300px); min-height:320px; overflow:auto; }
+    .panel-body { max-height:none; min-height:320px; overflow-x:auto; overflow-y:hidden; }
+    #hscrollTop { position:sticky; top:69px; z-index:12; }
+    table.data thead { position:relative; z-index:6; }
     /* Panel head + top scrollbar ride along under the top bar, so even a page
        scroll never hides where you are in the table. */
     table.data thead th { z-index:5; }
@@ -1337,6 +1339,7 @@
     syncHScroll();
     syncHScrollPosition();
     installInfiniteScroll();
+    fitTableWrap();
     if (state.view === "sku_master") loadEnrichments(data);
     // A search's remaining pages load as you scroll (smooth); an active column
     // filter pulls its full set only when you actually change it, not on every
@@ -1660,18 +1663,36 @@
   // is sized to end exactly at the bottom of the window: once the page has
   // scrolled the panel head up under the top bar there is nothing further to
   // page-scroll, every wheel turn goes to the table, and the headers stay put.
+  // The table no longer scrolls inside its own box: the PAGE scrolls, and the
+  // header rows (letters, names, filters) are pushed down with a transform so
+  // they always sit right under the top bar + top scrollbar. A CSS sticky
+  // cannot do this because the wrap must stay a horizontal scroller.
   function fitTableWrap() {
     const wrap = $("#tableWrap"); if (!wrap) return;
-    // Constant height: window minus the top bar, the panel head and the top
-    // scrollbar. The page can then scroll only until the panel head sits right
-    // under the top bar - after that every wheel turn scrolls the table.
-    const bar = document.querySelector(".topbar"); const head = document.querySelector("#latestPanel .panel-head"); const hs = $("#hscrollTop");
-    const used = (bar ? bar.offsetHeight : 69) + (head ? head.offsetHeight : 46) + (hs && !hs.classList.contains("hidden") ? hs.offsetHeight : 0) + 12;
-    const h = Math.max(320, window.innerHeight - used);
-    wrap.style.maxHeight = h + "px";
-    wrap.style.height = h + "px";
+    wrap.style.maxHeight = "none"; wrap.style.height = "auto";
+    stickHead();
+  }
+  function stickHead() {
+    const wrap = $("#tableWrap"); if (!wrap) return;
+    const thead = wrap.querySelector("table.data thead"); if (!thead) return;
+    const bar = document.querySelector(".topbar"); const hs = $("#hscrollTop");
+    const topLine = (bar ? bar.offsetHeight : 69) + (hs && !hs.classList.contains("hidden") ? hs.offsetHeight : 0);
+    const wrapTop = wrap.getBoundingClientRect().top;
+    let off = topLine - wrapTop;
+    const maxOff = wrap.offsetHeight - thead.offsetHeight;
+    if (off < 0) off = 0; if (off > maxOff) off = maxOff;
+    thead.style.transform = off ? "translateY(" + off + "px)" : "";
   }
   window.addEventListener("resize", fitTableWrap);
+  window.addEventListener("scroll", stickHead, { passive: true });
+  // Infinite scroll now watches the page, since the wrap itself never scrolls vertically.
+  let _pageTick = false;
+  window.addEventListener("scroll", () => {
+    if (_pageTick) return; _pageTick = true;
+    requestAnimationFrame(() => { _pageTick = false;
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 600) { try { loadMoreRows(); } catch (e) {} }
+    });
+  }, { passive: true });
   document.addEventListener("DOMContentLoaded", fitTableWrap);
   setTimeout(fitTableWrap, 300); setTimeout(fitTableWrap, 1500);
 
