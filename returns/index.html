@@ -380,11 +380,19 @@
   let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all", wlPlatform = "all";
   async function loadExpected(){
     const {from,to}=dateRange();
-    const [d,u] = await Promise.all([
-      sb.rpc("return_worklist",{p_mode:"delivered",p_from:from,p_to:to}),
-      sb.rpc("return_worklist",{p_mode:"undelivered",p_from:from,p_to:to})
-    ]);
-    wlDel = d.error?[]:(d.data||[]); wlUnd = u.error?[]:(u.data||[]);
+    // The API returns at most 1000 rows per call, so page through until a short page.
+    async function fetchAll(mode){
+      const out = []; const PAGE = 1000;
+      for (let i = 0; ; i += PAGE) {
+        const { data, error } = await sb.rpc("return_worklist",{p_mode:mode,p_from:from,p_to:to}).range(i, i + PAGE - 1);
+        if (error || !data || !data.length) break;
+        out.push(...data);
+        if (data.length < PAGE) break;
+      }
+      return out;
+    }
+    const [d,u] = await Promise.all([fetchAll("delivered"), fetchAll("undelivered")]);
+    wlDel = d; wlUnd = u;
     renderExpected();
   }
   function renderExpected(){
@@ -421,7 +429,7 @@
     let rows=pfRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
     $("#expNote").textContent = rows.length ? (rows.length + " returns · " + rows.filter(r=>!r.scanned).length + " pending scan") : "Kuch nahi.";
-    const show = rows.slice(0,1000);
+    const show = rows;
     $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(normCourier(r.courier))+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
