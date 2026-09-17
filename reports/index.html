@@ -203,7 +203,7 @@ const REPORTS = [
   {
     id: "allorders", sec: "Orders", lazy: "orders", rpc: "seller_all_orders",
     title: "All orders",
-    desc: "Every order line and what finally happened to it. Status is the outcome, not the raw word in the order file. Money the platform has only scheduled is shown in amber and marked Scheduled \u2014 it has not reached you, and on a return in progress it may never.",
+    desc: "Every order line and what finally happened to it. Status is the outcome, not the raw word in the order file. Money the platform has only scheduled is shown in amber and marked Scheduled — it has not reached you, and on a return in progress it may never.",
     src: "orders", pick: () => true,
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.qty, COL.fstat,
            COL.famt, COL.mstate, COL.amton, COL.age, COL.ostat, COL.val],
@@ -344,7 +344,7 @@ const REPORTS = [
   {
     id: "skunocop", sec: "Missings",
     title: "Selling with no cost price",
-    desc: "SKUs that sold in the last 90 days but have no cost price behind them, so every profit and margin figure for them is blank. Sorted by what is moving now \u2014 this is the order to fix the master sheet in.",
+    desc: "SKUs that sold in the last 90 days but have no cost price behind them, so every profit and margin figure for them is blank. Sorted by what is moving now — this is the order to fix the master sheet in.",
     src: "nocost", pick: () => true,
     cols: [COL.plat, COL.co, COL.sku, COL.u30, COL.u90, COL.r90, COL.spu, COL.s90, COL.rsn],
     sort: { k: "units_30d", dir: -1 }, unit: "SKU",
@@ -469,11 +469,11 @@ function buildCards() {
         // "waiting for data" is what an unopened card says; once you have
         // clicked it, it is reading, and it should not look dead while it does.
         const pl = $("#pill_" + r.id);
-        if (pl) { pl.className = "pill hit"; pl.textContent = "reading\u2026"; }
+        if (pl) { pl.className = "pill hit"; pl.textContent = "reading…"; }
         $("#card_" + r.id).classList.remove("locked");
-        b.innerHTML = r.note ? '<div class="note"><span class="spin"></span> ' + esc(r.note) + '</div>' : '<div class="note"><span class="spin"></span> reading every order\u2026 this one walks all 27,000 lines, so it takes a few seconds.</div>';
+        b.innerHTML = r.note ? '<div class="note"><span class="spin"></span> ' + esc(r.note) + '</div>' : '<div class="note"><span class="spin"></span> reading every order… this one walks all 27,000 lines, so it takes a few seconds.</div>';
         const { data, error } = await sb.rpc(r.rpc);
-        if (error) { console.error("all orders", error); b.innerHTML = '<div class="note">Could not read orders \u2014 ' + esc(error.message) + "</div>"; state.ui[r.id].loading = false; return; }
+        if (error) { console.error("all orders", error); b.innerHTML = '<div class="note">Could not read orders — ' + esc(error.message) + "</div>"; state.ui[r.id].loading = false; return; }
         state[r.lazy] = data || [];
         state.ui[r.id].loading = false;
         buildChips();
@@ -545,7 +545,7 @@ function cell(row, c) {
     // Blank, not zero, when no money has moved yet - the files do not say what
     // an unpaid order will settle at, so nothing is put in its place.
     case "fmoney": {
-      if (v == null) return '<td class="num muted">\u2014</td>';
+      if (v == null) return '<td class="num muted">—</td>';
       // Money the platform has only scheduled is drawn in amber. It has not
       // reached you, and on a return in progress it may never.
       const sched = String(row.money_state || "").indexOf("Sched") === 0
@@ -556,7 +556,7 @@ function cell(row, c) {
     }
     case "mstate": {
       const t = String(v || "");
-      if (!t) return '<td><span class="muted">\u2014</span></td>';
+      if (!t) return '<td><span class="muted">—</span></td>';
       const cls = t === "Settled" ? " paid" : " warn";
       return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
     }
@@ -651,7 +651,7 @@ function installColumnFilters(r, body) {
   fr.className = "filter-row";
   fr.innerHTML = r.cols.map((c) =>
     '<th><button type="button" class="fbtn" data-k="' + c.k + '">' +
-    '<span class="cap"></span><span class="car">\u25bc</span></button></th>').join("");
+    '<span class="cap"></span><span class="car">▼</span></button></th>').join("");
   table.tHead.appendChild(fr);
   fr.querySelectorAll(".fbtn").forEach((btn) => {
     paintFBtn(btn, u);
@@ -720,7 +720,7 @@ function openFPanel(r, btn) {
       '<label><input type="checkbox" ' + (chosen.has(o.v) ? "checked" : "") +
       ' value="' + esc(o.v) + '"><span class="v">' +
       (o.v === "" ? "<i>(blank)</i>" : esc(o.v)) + '</span><span class="c">' + o.n + "</span></label>"
-    ).join("") + (rows.length > 600 ? '<div class="none">Showing the first 600 \u2014 type to narrow.</div>' : "");
+    ).join("") + (rows.length > 600 ? '<div class="none">Showing the first 600 — type to narrow.</div>' : "");
   }
   function commit() {
     if (chosen.size) u.picks[key] = new Set(chosen); else delete u.picks[key];
@@ -808,29 +808,35 @@ function initPricing() {
   const cnt = document.querySelector("#cntPricing");
   const selEl = document.querySelector("#prSel");
   let rows = [];
+  const ck = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  let lastKey = null;
   function selNote() { const co = state.co || "All companies"; const pf = state.plat || "All platforms"; if (selEl) selEl.textContent = "Selected: " + titleCase(co) + " / " + titleCase(pf) + "  (upar ke chips se badlo)"; }
-  window.__prSel = selNote;
+  window.__prSel = function () {
+    selNote();
+    // Chips badle aur table pehle se dikh rahi hai -> turant dobara load karo
+    if (lastKey !== null && lastKey !== (state.co || "") + "|" + String(state.plat || "").toLowerCase()) { fetchRows().then((d) => { if (d) preview(); }); }
+  };
   async function fetchRows() {
     selNote();
     const pf = String(state.plat || "").toLowerCase();
-    if (pf && pf !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai — upar Platform chip Meesho ya All karo."; rows = []; return null; }
+    if (pf && pf !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai — upar Platform chip Meesho ya All karo."; rows = []; wrap.innerHTML = ""; if (cnt) cnt.textContent = ""; return null; }
     stEl.innerHTML = '<span class="spin"></span> computing&hellip;';
     rows = [];
-    const PAGE = 1000; let from = 0;
-    for (;;) {
-      const { data, error } = await sb.rpc("meesho_price_export", { p_company: state.co || "" }).range(from, from + PAGE - 1);
-      if (error) { stEl.textContent = "Error: " + error.message; return null; }
-      const batch = data || [];
-      rows = rows.concat(batch);
-      if (batch.length < PAGE) break;
-      from += PAGE; if (from > 200000) break;
-    }
+    const co = state.co || "";
+    const { data, error } = await sb.rpc("meesho_price_export_json", { p_company: co });
+    if (error) { stEl.textContent = "Error: " + error.message; return null; }
+    let list = Array.isArray(data) ? data : [];
+    // Safety: chip ke company ke alawa kuch bhi table me na aaye
+    if (co) list = list.filter((r) => ck(r.company) === ck(co));
+    rows = list;
+    lastKey = co + "|" + pf;
     return rows;
   }
   function preview() {
     const missSup = rows.some((r) => !r.supplier_id);
     if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
-    stEl.textContent = rows.length + " SKUs (latest inventory)" + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
+    const cos = [...new Set(rows.map((r) => titleCase(r.company)))];
+    stEl.textContent = rows.length + " SKUs (latest inventory) · " + (cos.length ? cos.join(", ") : "-") + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
     if (!rows.length) { wrap.innerHTML = '<div class="note">Is company ki inventory / settlement data nahi mila. Upar Company/Platform chip badal ke dekho.</div>'; return; }
     let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th>Open</th></tr></thead><tbody>';
     for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td><a href="'+esc(r.product_url)+'" target="_blank" rel="noopener">Open</a></td></tr>'; }
