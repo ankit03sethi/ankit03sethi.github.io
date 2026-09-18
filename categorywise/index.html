@@ -90,12 +90,12 @@
         <tr>
           <th>Category / Sub / Master / SKU / Order</th>
           <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>Upcoming</th><th>Return Qty</th>
-          <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th>
+          <th>Revenue ₹</th><th>Return ₹</th><th>Courier ₹</th><th>Settlement ₹</th>
           <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>Margin %</th>
         </tr>
         <tr class="qtyrow" id="qtyA"></tr>
       </thead>
-      <tbody id="tbodyA"><tr><td colspan="14" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+      <tbody id="tbodyA"><tr><td colspan="15" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
     </table></div>
 
     <h3 class="ttl">2 · Projected @ Expected <span class="sub">— poora gross, upcoming ko target rate se</span></h3>
@@ -104,12 +104,12 @@
         <tr>
           <th>Category / Sub / Master / SKU</th>
           <th>SKUs</th><th>Gross Units</th>
-          <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th>
+          <th>Revenue ₹</th><th>Return ₹</th><th>Courier ₹</th><th>Settlement ₹</th>
           <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>Margin %</th>
         </tr>
         <tr class="qtyrow" id="qtyE"></tr>
       </thead>
-      <tbody id="tbodyE"><tr><td colspan="11" class="empty">…</td></tr></tbody>
+      <tbody id="tbodyE"><tr><td colspan="12" class="empty">…</td></tr></tbody>
     </table></div>
 
     <h3 class="ttl">3 · Projected @ Actual <span class="sub">— poora gross, upcoming ko abhi ke actual rate se</span></h3>
@@ -118,12 +118,12 @@
         <tr>
           <th>Category / Sub / Master / SKU</th>
           <th>SKUs</th><th>Gross Units</th>
-          <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th>
+          <th>Revenue ₹</th><th>Return ₹</th><th>Courier ₹</th><th>Settlement ₹</th>
           <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>Margin %</th>
         </tr>
         <tr class="qtyrow" id="qtyAc"></tr>
       </thead>
-      <tbody id="tbodyAc"><tr><td colspan="11" class="empty">…</td></tr></tbody>
+      <tbody id="tbodyAc"><tr><td colspan="12" class="empty">…</td></tr></tbody>
     </table></div>
 
   </div>
@@ -135,7 +135,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS_A=14, NCOLS_E=11, NCOLS_AC=11;
+  const NCOLS_A=15, NCOLS_E=12, NCOLS_AC=12;
   const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
@@ -185,7 +185,7 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","gross_orders","units","upcoming","return_units","settled_orders","ship_orders","revenue","retfees","settled","cop","packaging","tax","profit","e_rev","e_ret","e_settle","g_cop","g_pack","e_tax","e_profit","a_rev","a_ret","a_settle","a_tax","a_profit"];
+  const F=["gross_units","gross_orders","units","upcoming","return_units","settled_orders","ship_orders","revenue","retfees","courier","settled","cop","packaging","tax","profit","e_rev","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_rev","a_ret","a_cour","a_settle","a_tax","a_profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -195,17 +195,17 @@
   // ---- three column layouts ----
   function cellsActual(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)+'<td>'+IN(a.return_units)+'</td>'
-      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td>'
+      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+cst(a.courier)+'<td>'+IN(a.settled)+'</td>'
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+mcell(a.profit,a.settled);
   }
   function cellsExp(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td>'
-      +'<td>'+IN(a.e_rev)+'</td>'+cst(a.e_ret)+'<td>'+IN(a.e_settle)+'</td>'
+      +'<td>'+IN(a.e_rev)+'</td>'+cst(a.e_ret)+cst(a.e_cour)+'<td>'+IN(a.e_settle)+'</td>'
       +cst(a.g_cop)+cst(a.g_pack)+cst(a.e_tax)+prof(a.e_profit)+mcell(a.e_profit,a.e_settle);
   }
   function cellsAct(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td>'
-      +'<td>'+IN(a.a_rev)+'</td>'+cst(a.a_ret)+'<td>'+IN(a.a_settle)+'</td>'
+      +'<td>'+IN(a.a_rev)+'</td>'+cst(a.a_ret)+cst(a.a_cour)+'<td>'+IN(a.a_settle)+'</td>'
       +cst(a.g_cop)+cst(a.g_pack)+cst(a.a_tax)+prof(a.a_profit)+mcell(a.a_profit,a.a_settle);
   }
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
@@ -280,9 +280,9 @@
     cats.sort((x,y)=>y.a.profit-x.a.profit);
 
     // qty / base sub-headers
-    $("#qtyA").innerHTML=qtyRow(['','','','','','',U(tot.units),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'']);
-    $("#qtyE").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'']);
-    $("#qtyAc").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.gross_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'']);
+    $("#qtyA").innerHTML=qtyRow(['','','','','','',U(tot.units),U(tot.return_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'']);
+    $("#qtyE").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.return_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'']);
+    $("#qtyAc").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'']);
 
     $("#tbodyA").innerHTML=buildBody(cats,tot,cellsActual,true,NCOLS_A);
     $("#tbodyE").innerHTML=buildBody(cats,tot,cellsExp,false,NCOLS_E);
@@ -299,7 +299,7 @@
       const tag=o.paid?'':' <span class="up" title="settlement pending">upcoming</span>';
       h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+tag+'</td>'
         +'<td>—</td><td>'+IN(o.qty)+'</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td><td>—</td>'
-        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'
+        +'<td>—</td><td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'
         +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
     }
     return h;
