@@ -50,6 +50,9 @@
   .prof.pos{color:#15803d}
   .cost{color:#7c2d12}
   .up{color:#b45309}
+  .proj{background:#eff6ff;font-weight:700}
+  td.proj.neg{color:#b91c1c}
+  td.proj.pos{color:#0369a1}
   .muted{color:#94a3b8}
   .pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;background:#e2e8f0;color:#475569}
   .cnt{display:inline-block;background:#dbe3ff;color:#3730a3;font-size:10px;font-weight:800;border-radius:999px;padding:1px 7px;margin-left:8px}
@@ -79,8 +82,8 @@
     <thead><tr>
       <th>Category / Sub / Master / SKU / Order</th>
       <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>Upcoming</th><th>Return Qty</th>
-      <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th><th>Expected ₹</th>
-      <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Margin %</th>
+      <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th><th>Expected ₹</th><th>Proj. Settle ₹</th>
+      <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Proj. Profit ₹</th><th>Margin %</th>
     </tr></thead>
     <tbody id="tbody"><tr><td colspan="16" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
   </table></div>
@@ -92,7 +95,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS=16;
+  const NCOLS=18;
   const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
@@ -142,17 +145,19 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","units","upcoming","return_units","revenue","retfees","settled","cop","packaging","tax","expected","exp_profit","profit"];
+  const F=["gross_units","units","upcoming","return_units","revenue","retfees","settled","cop","packaging","tax","expected","exp_profit","profit","proj_settle","proj_profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
   const upc=v=>'<td class="up">'+(v?IN(v):'0')+'</td>';
+  const pjs=v=>'<td class="proj">'+IN(v)+'</td>';
+  const pjp=v=>'<td class="proj '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
   function cells(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)+'<td>'+IN(a.return_units)+'</td>'
-      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'
-      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+mcell(a);
+      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'+pjs(a.proj_settle)
+      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+pjp(a.proj_profit)+mcell(a);
   }
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
 
@@ -173,6 +178,7 @@
     $("#kpis").innerHTML=kpi("Gross Units",IN(tot.gross_units))+kpi("Settled",IN(tot.units))+kpi("Upcoming",IN(tot.upcoming))+
       kpi("Settlement","₹"+IN(tot.settled))+
       '<div class="kpi"><div class="lbl">Profit</div><div class="val '+(tot.profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.profit)+'</div></div>'+
+      '<div class="kpi"><div class="lbl">Proj. Profit</div><div class="val '+(tot.proj_profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.proj_profit)+'</div></div>'+
       kpi("Margin",(marg(tot)==null?'—':marg(tot)+'%'));
     if(!rows.length){$("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">No orders in this window.</td></tr>';return;}
 
@@ -224,8 +230,8 @@
       const tag=o.paid?'':' <span class="up" title="settlement pending">upcoming</span>';
       h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+tag+'</td>'
         +'<td>—</td><td>'+IN(o.qty)+'</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td><td>—</td>'
-        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td><td>—</td>'
-        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
+        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td><td>—</td><td>—</td>'
+        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
     }
     return h;
   }
