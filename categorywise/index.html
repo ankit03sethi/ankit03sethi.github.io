@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Category Wise Data — Cursive</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+<style>
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;background:#f8fafc;color:#0f172a}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:#fff;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:20}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand h1{font-size:17px;margin:0;font-weight:800}
+  .brand .sub{font-size:11px;color:#64748b}
+  .back-link{color:#1f6feb;text-decoration:none;font-size:14px;font-weight:700}
+  main{padding:16px 22px 60px}
+  .controls{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;user-select:none}
+  .chip.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0 14px}
+  .kpi{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px 16px;min-width:130px}
+  .kpi .lbl{font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .kpi .val{font-size:20px;font-weight:800;margin-top:3px}
+  .status{font-size:12px;color:#64748b;margin:2px 0 8px}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid #cbd5e1;border-top-color:#1f6feb;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .wrap{border:1px solid #e5e7eb;border-radius:14px;overflow:auto;background:#fff;max-height:calc(100vh - 240px)}
+  table.data{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.data thead th{position:sticky;top:0;z-index:5;background:#f1f5f9;color:#475569;font-weight:800;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px;padding:11px 12px;text-align:right;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+  table.data thead th:first-child{text-align:left}
+  table.data td{padding:9px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.data td:first-child{text-align:left}
+  tr.cat>td{background:#eef2ff;font-weight:800;font-size:14px;cursor:pointer}
+  tr.cat:hover>td{background:#e0e7ff}
+  tr.sub>td{background:#f8fafc;font-weight:700;cursor:pointer}
+  tr.sub:hover>td{background:#eff6ff}
+  tr.sku>td{color:#334155}
+  tr.sku>td:first-child{padding-left:52px;color:#475569;font-weight:600}
+  tr.sub>td:first-child{padding-left:30px}
+  .tw{display:inline-block;width:14px;color:#64748b;font-weight:800;transition:transform .12s}
+  .prof{font-weight:800}
+  .prof.neg{color:#b91c1c}
+  .prof.pos{color:#15803d}
+  .muted{color:#94a3b8}
+  .cnt{display:inline-block;background:#e2e8f0;color:#475569;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;margin-left:8px}
+  .empty{padding:40px;text-align:center;color:#94a3b8}
+  @media(max-width:640px){main{padding:12px}.wrap{max-height:calc(100vh - 300px)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div style="width:34px;height:34px;background:#1f6feb;border-radius:9px;display:flex;align-items:center;justify-content:center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
+    </div>
+    <div><h1>Category Wise Data</h1><div class="sub">Profit &amp; loss summary by category — last <span id="dLbl">90</span> days</div></div>
+  </div>
+  <a href="/analyst/" class="back-link">&larr; Back</a>
+</header>
+
+<main>
+  <div class="controls">
+    <div class="chips" id="platChips"></div>
+    <div class="chips" id="coChips"></div>
+    <div class="chips" id="dayChips"></div>
+  </div>
+  <div class="cards" id="kpis"></div>
+  <div class="status" id="status"></div>
+  <div class="wrap"><table class="data">
+    <thead><tr>
+      <th>Category / Sub-category / SKU</th>
+      <th>SKUs</th><th>Units</th><th>Settlement ₹</th><th>COP ₹</th><th>Profit ₹</th><th>Margin %</th>
+    </tr></thead>
+    <tbody id="tbody"><tr><td colspan="7" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+  </table></div>
+</main>
+
+<script src="/analyst-access.js?v=10"></script>
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
+  const $=s=>document.querySelector(s);
+  const IN=n=>Number(n||0).toLocaleString("en-IN");
+  const state={rows:[],plat:"",co:"",days:90,open:new Set()};
+
+  (async function boot(){
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){location.href="/home/?return=%2Fcategorywise%2F";return;}
+    try{await CA.load(sb);}catch(e){$("#status").textContent="Access check failed: "+(e.message||e);return;}
+    if(!CA.access||!CA.access.active){$("#status").textContent="Cursive Analyst subscription required.";return;}
+    if(!(CA.access.is_owner||CA.can("skuwise.financial","view"))){
+      $("#status").textContent="You do not have access to financial data. Ask the account owner.";
+      $("#tbody").innerHTML='<tr><td colspan="7" class="empty">No access</td></tr>';return;
+    }
+    buildDayChips();
+    await load();
+  })();
+
+  function buildDayChips(){
+    const host=$("#dayChips");host.innerHTML="";
+    [30,60,90].forEach(d=>{
+      const c=document.createElement("span");
+      c.className="chip"+(state.days===d?" active":"");c.textContent="Last "+d+" days";
+      c.onclick=()=>{if(state.days===d)return;state.days=d;$("#dLbl").textContent=d;load();};
+      host.appendChild(c);
+    });
+  }
+
+  async function load(){
+    $("#status").innerHTML='<span class="spin"></span> reading orders &amp; payments…';
+    $("#tbody").innerHTML='<tr><td colspan="7" class="empty"><span class="spin"></span> loading…</td></tr>';
+    const t0=Date.now();
+    const {data,error}=await sb.rpc("category_pnl_json",{p_days:state.days});
+    if(error){$("#status").textContent="Error: "+error.message;$("#tbody").innerHTML='<tr><td colspan="7" class="empty">Could not load</td></tr>';return;}
+    state.rows=Array.isArray(data)?data:[];
+    $("#status").textContent=state.rows.length.toLocaleString("en-IN")+" SKUs · loaded in "+((Date.now()-t0)/1000).toFixed(1)+"s";
+    buildChips();render();
+  }
+
+  function buildChips(){
+    const plats=[...new Set(state.rows.map(r=>r.platform).filter(Boolean))].sort();
+    const cos=[...new Set(state.rows.map(r=>r.company).filter(Boolean))].sort();
+    draw($("#platChips"),plats,"plat","All platforms");
+    draw($("#coChips"),cos,"co","All companies");
+  }
+  function draw(host,list,key,allLbl){
+    host.innerHTML="";
+    const mk=(v,l)=>{const c=document.createElement("span");c.className="chip"+(state[key]===v?" active":"");c.textContent=l;c.onclick=()=>{state[key]=v;buildChips();render();};host.appendChild(c);};
+    mk("",allLbl);for(const v of list)mk(v,v);
+  }
+
+  function filtered(){
+    return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));
+  }
+  function agg(rows){
+    let u=0,s=0,c=0,p=0;const sk=new Set();
+    for(const r of rows){u+=+r.units||0;s+=+r.received||0;c+=+r.cop||0;p+=+r.profit||0;sk.add(r.master_sku);}
+    return{units:u,recv:s,cop:c,profit:p,skus:sk.size};
+  }
+  const marg=a=>a.recv>0?Math.round(1000*a.profit/a.recv)/10:null;
+  const profCell=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
+  const margCell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
+
+  function render(){
+    const rows=filtered();
+    const tot=agg(rows);
+    $("#kpis").innerHTML=
+      kpi("Units",IN(tot.units))+kpi("Settlement","₹"+IN(tot.recv))+kpi("COP","₹"+IN(tot.cop))+
+      '<div class="kpi"><div class="lbl">Profit</div><div class="val '+(tot.profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.profit)+'</div></div>'+
+      kpi("Margin",(marg(tot)==null?'—':marg(tot)+'%'));
+
+    const cats=new Map();
+    for(const r of rows){
+      const cat=r.category||"(Uncategorized)",sub=r.sub_category||"(Other)";
+      if(!cats.has(cat))cats.set(cat,new Map());
+      const sm=cats.get(cat);if(!sm.has(sub))sm.set(sub,[]);sm.get(sub).push(r);
+    }
+    const catArr=[...cats.entries()].map(([cat,sm])=>{
+      const subs=[...sm.entries()].map(([sub,list])=>({sub,list,a:agg(list)}));
+      subs.sort((x,y)=>y.a.profit-x.a.profit);
+      const all=[].concat(...subs.map(s=>s.list));
+      return{cat,subs,a:agg(all)};
+    });
+    catArr.sort((x,y)=>y.a.profit-x.a.profit);
+
+    let h="";
+    if(!catArr.length){$("#tbody").innerHTML='<tr><td colspan="7" class="empty">No paid orders in this window.</td></tr>';return;}
+    for(const C of catArr){
+      const ck="c:"+C.cat,co=state.open.has(ck);
+      h+='<tr class="cat" data-k="'+esc(ck)+'"><td><span class="tw">'+(co?'▾':'▸')+'</span> '+esc(C.cat)+'<span class="cnt">'+C.a.skus+' SKU</span></td>'
+        +'<td>'+IN(C.a.skus)+'</td><td>'+IN(C.a.units)+'</td><td>'+IN(C.a.recv)+'</td><td>'+IN(C.a.cop)+'</td>'+profCell(C.a.profit)+margCell(C.a)+'</tr>';
+      if(!co)continue;
+      for(const S of C.subs){
+        const sk="s:"+C.cat+"|"+S.sub,so=state.open.has(sk);
+        h+='<tr class="sub" data-k="'+esc(sk)+'"><td><span class="tw">'+(so?'▾':'▸')+'</span> '+esc(S.sub)+'<span class="cnt">'+S.a.skus+'</span></td>'
+          +'<td>'+IN(S.a.skus)+'</td><td>'+IN(S.a.units)+'</td><td>'+IN(S.a.recv)+'</td><td>'+IN(S.a.cop)+'</td>'+profCell(S.a.profit)+margCell(S.a)+'</tr>';
+        if(!so)continue;
+        const skus=S.list.slice().sort((x,y)=>(+y.profit)-(+x.profit));
+        for(const r of skus){
+          h+='<tr class="sku"><td>'+esc(r.master_sku)+(r.cop_known?'':' <span class="muted" title="COP missing — profit may be off">⚠</span>')+'</td>'
+            +'<td class="muted">—</td><td>'+IN(r.units)+'</td><td>'+IN(r.received)+'</td><td>'+IN(r.cop)+'</td>'+profCell(r.profit)+margCell({recv:+r.received,profit:+r.profit})+'</tr>';
+        }
+      }
+    }
+    $("#tbody").innerHTML=h;
+  }
+
+  function kpi(l,v){return '<div class="kpi"><div class="lbl">'+l+'</div><div class="val">'+v+'</div></div>';}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+  $("#tbody").addEventListener("click",e=>{
+    const tr=e.target.closest("tr.cat,tr.sub");if(!tr)return;
+    const k=tr.dataset.k;if(!k)return;
+    if(state.open.has(k))state.open.delete(k);else state.open.add(k);
+    render();
+  });
+</script>
+</body>
+</html>
