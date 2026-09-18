@@ -78,11 +78,11 @@
   <div class="wrap"><table class="data">
     <thead><tr>
       <th>Category / Sub / Master / SKU / Order</th>
-      <th>Gross Units</th><th>SKUs</th><th>Settled</th><th>Upcoming</th>
+      <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>Upcoming</th><th>Return Qty</th>
       <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th><th>Expected ₹</th>
       <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Margin %</th>
     </tr></thead>
-    <tbody id="tbody"><tr><td colspan="15" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+    <tbody id="tbody"><tr><td colspan="16" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
   </table></div>
 </main>
 
@@ -92,7 +92,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS=15;
+  const NCOLS=16;
   const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
@@ -142,7 +142,7 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","units","upcoming","revenue","retfees","settled","cop","packaging","tax","expected","exp_profit","profit"];
+  const F=["gross_units","units","upcoming","return_units","revenue","retfees","settled","cop","packaging","tax","expected","exp_profit","profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -150,7 +150,7 @@
   const upc=v=>'<td class="up">'+(v?IN(v):'0')+'</td>';
   const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
   function cells(a,skusTxt){
-    return '<td>'+IN(a.gross_units)+'</td><td>'+skusTxt+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)
+    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)+'<td>'+IN(a.return_units)+'</td>'
       +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+mcell(a);
   }
@@ -223,9 +223,9 @@
       const st=o.status?' <span class="pill">'+esc(o.status)+'</span>':'';
       const tag=o.paid?'':' <span class="up" title="settlement pending">upcoming</span>';
       h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+tag+'</td>'
-        +'<td>'+IN(o.qty)+'</td><td>—</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td>'
-        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'
-        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
+        +'<td>—</td><td>'+IN(o.qty)+'</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td><td>—</td>'
+        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td><td>—</td>'
+        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
     }
     return h;
   }
