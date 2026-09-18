@@ -61,7 +61,7 @@
     <div style="width:34px;height:34px;background:#1f6feb;border-radius:9px;display:flex;align-items:center;justify-content:center">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
     </div>
-    <div><h1>Category Wise Data</h1><div class="sub">Category → Sub → Master SKU → SKU → Orders · same numbers as SKU-wise · last <span id="dLbl">90</span> days</div></div>
+    <div><h1>Category Wise Data</h1><div class="sub">Category → Sub → Master SKU → SKU → Orders · same numbers as SKU-wise · last <span id="dLbl">30</span> days</div></div>
   </div>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -77,8 +77,8 @@
   <div class="wrap"><table class="data">
     <thead><tr>
       <th>Category / Sub / Master / SKU / Order</th>
-      <th>SKUs</th><th>Units</th><th>Returns</th><th>Revenue ₹</th><th>Courier ₹</th><th>Settlement ₹</th>
-      <th>Expected ₹</th><th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Return fees ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Margin %</th>
+      <th>SKUs</th><th>Units</th><th>Returns</th><th>Revenue ₹</th><th>Courier ₹</th><th>Return fees ₹</th><th>Settlement ₹</th>
+      <th>Expected ₹</th><th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Margin %</th>
     </tr></thead>
     <tbody id="tbody"><tr><td colspan="15" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
   </table></div>
@@ -91,7 +91,7 @@
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
   const NCOLS=15;
-  const state={rows:[],plat:"",co:"",days:90,open:new Set(),orders:{}};
+  const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
     const {data:{session}}=await sb.auth.getSession();
@@ -110,7 +110,7 @@
     [30,60,90].forEach(d=>{
       const c=document.createElement("span");
       c.className="chip"+(state.days===d?" active":"");c.textContent="Last "+d+" days";
-      c.onclick=()=>{if(state.days===d)return;state.days=d;state.orders={};$("#dLbl").textContent=d;load();};
+      c.onclick=()=>{if(state.days===d)return;state.days=d;state.orders={};$("#dLbl").textContent=d;buildDayChips();load();};
       host.appendChild(c);
     });
   }
@@ -147,7 +147,7 @@
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
   const cur=v=>'<td style="color:#94a3b8" title="Already deducted inside settlement (platform ne pehle hi kaat liya) - info only, profit me dobara minus nahi hota">'+(v?IN(v):'0')+'</td>';
   const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
-  function cells(a,skusTxt){return '<td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.revenue)+'</td>'+cur(a.courier)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+cst(a.retfees)+prof(a.exp_profit)+prof(a.profit)+mcell(a);}
+  function cells(a,skusTxt){return '<td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.courier)+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+mcell(a);}
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
 
   // group rows into cat -> sub -> master -> [sku rows]
@@ -218,8 +218,8 @@
       const paid=o.paid?'':' <span class="muted" title="settlement pending">pending</span>';
       h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+paid+'</td>'
         +'<td>—</td><td>'+IN(o.qty)+'</td><td>—</td>'  /* SKUs,Units,Returns */
-        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'  /* Revenue,Courier,Settlement */
-        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';  /* Expected,COP,Pack,Tax,Retfees,ExpProfit,Profit,Margin */
+        +'<td>—</td><td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'  /* Revenue,Courier,Return,Settlement */
+        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';  /* Expected,COP,Pack,Tax,ExpProfit,Profit,Margin */  /* Expected,COP,Pack,Tax,Retfees,ExpProfit,Profit,Margin */
     }
     return h;
   }
