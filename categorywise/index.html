@@ -32,6 +32,8 @@
   table.data thead th:first-child{text-align:left}
   table.data td{padding:8px 11px;text-align:right;border-bottom:1px solid #f1f5f9;font-variant-numeric:tabular-nums;white-space:nowrap}
   table.data td:first-child{text-align:left}
+  tr.totrow>td{background:#fef9c3;font-weight:800;font-size:13.5px;border-bottom:2px solid #eab308}
+  tr.totrow>td:first-child{color:#713f12}
   tr.lvl-cat>td{background:#e0e7ff;font-weight:800;font-size:13.5px;cursor:pointer}
   tr.lvl-sub>td{background:#eef2ff;font-weight:800;cursor:pointer}
   tr.lvl-mas>td{background:#f1f5f9;font-weight:700;cursor:pointer}
@@ -47,12 +49,11 @@
   .prof.neg{color:#b91c1c}
   .prof.pos{color:#15803d}
   .cost{color:#7c2d12}
+  .up{color:#b45309}
   .muted{color:#94a3b8}
   .pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;background:#e2e8f0;color:#475569}
   .cnt{display:inline-block;background:#dbe3ff;color:#3730a3;font-size:10px;font-weight:800;border-radius:999px;padding:1px 7px;margin-left:8px}
   .empty{padding:40px;text-align:center;color:#94a3b8}
-  tr.totrow>td{background:#fef9c3;font-weight:800;font-size:13.5px;border-bottom:2px solid #eab308}
-  tr.totrow>td:first-child{color:#713f12}
 </style>
 </head>
 <body>
@@ -61,7 +62,7 @@
     <div style="width:34px;height:34px;background:#1f6feb;border-radius:9px;display:flex;align-items:center;justify-content:center">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
     </div>
-    <div><h1>Category Wise Data</h1><div class="sub">Category → Sub → Master SKU → SKU → Orders · same numbers as SKU-wise · last <span id="dLbl">30</span> days</div></div>
+    <div><h1>Category Wise Data</h1><div class="sub">Orders-file based (order date) · Gross = Settled + Upcoming · last <span id="dLbl">30</span> days</div></div>
   </div>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -77,10 +78,11 @@
   <div class="wrap"><table class="data">
     <thead><tr>
       <th>Category / Sub / Master / SKU / Order</th>
-      <th>Gross Units</th><th>SKUs</th><th>Settled Units</th><th>Returns</th><th>Revenue ₹</th><th>Courier ₹</th><th>Return fees ₹</th><th>Settlement ₹</th>
-      <th>Expected ₹</th><th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Margin %</th>
+      <th>Gross Units</th><th>SKUs</th><th>Settled</th><th>Upcoming</th>
+      <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th><th>Expected ₹</th>
+      <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Margin %</th>
     </tr></thead>
-    <tbody id="tbody"><tr><td colspan="16" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+    <tbody id="tbody"><tr><td colspan="15" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
   </table></div>
 </main>
 
@@ -90,7 +92,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS=16;
+  const NCOLS=15;
   const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
@@ -116,7 +118,7 @@
   }
 
   async function load(){
-    $("#status").innerHTML='<span class="spin"></span> reading…';
+    $("#status").innerHTML='<span class="spin"></span> reading orders…';
     $("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     const t0=Date.now();
     const {data,error}=await sb.rpc("category_pnl_json",{p_days:state.days});
@@ -140,17 +142,20 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","units","returns_u","revenue","settled","cop","packaging","tax","retfees","courier","expected","exp_profit","profit"];
+  const F=["gross_units","units","upcoming","revenue","retfees","settled","cop","packaging","tax","expected","exp_profit","profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
-  const cur=v=>'<td style="color:#94a3b8" title="Already deducted inside settlement (platform ne pehle hi kaat liya) - info only, profit me dobara minus nahi hota">'+(v?IN(v):'0')+'</td>';
+  const upc=v=>'<td class="up">'+(v?IN(v):'0')+'</td>';
   const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
-  function cells(a,skusTxt){return '<td>'+IN(a.gross_units)+'</td><td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.courier)+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+mcell(a);}
+  function cells(a,skusTxt){
+    return '<td>'+IN(a.gross_units)+'</td><td>'+skusTxt+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)
+      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'
+      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+mcell(a);
+  }
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
 
-  // group rows into cat -> sub -> master -> [sku rows]
   function tree(rows){
     const C=new Map();
     for(const r of rows){
@@ -165,7 +170,8 @@
   function render(){
     const rows=filtered();
     const tot=agg(rows);
-    $("#kpis").innerHTML=kpi("Units",IN(tot.units))+kpi("Settlement","₹"+IN(tot.settled))+kpi("COP","₹"+IN(tot.cop))+
+    $("#kpis").innerHTML=kpi("Gross Units",IN(tot.gross_units))+kpi("Settled",IN(tot.units))+kpi("Upcoming",IN(tot.upcoming))+
+      kpi("Settlement","₹"+IN(tot.settled))+
       '<div class="kpi"><div class="lbl">Profit</div><div class="val '+(tot.profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.profit)+'</div></div>'+
       kpi("Margin",(marg(tot)==null?'—':marg(tot)+'%'));
     if(!rows.length){$("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">No orders in this window.</td></tr>';return;}
@@ -197,7 +203,7 @@
           if(!mo)continue;
           for(const r of M.list.slice().sort((x,y)=>(+y.profit)-(+x.profit))){
             const okey="k:"+r.k_co+"|"+r.k_pf+"|"+r.k_sku, kop=state.open.has(okey);
-            const a={gross_units:+r.gross_units,units:+r.units,returns_u:+r.returns_u,revenue:+r.revenue,settled:+r.settled,cop:+r.cop,packaging:+r.packaging,tax:+r.tax,retfees:+r.retfees,courier:+r.courier,expected:+r.expected,exp_profit:+r.exp_profit,profit:+r.profit,nskus:1};
+            const a={};for(const f of F)a[f]=+r[f]||0;a.nskus=1;
             const label=esc(r.seller_sku)+' <span class="pill">'+esc(r.platform)+' · '+esc(r.company)+'</span>'+(r.cop_known?'':' <span class="muted" title="COP missing">⚠</span>');
             h+='<tr class="lvl-sku clk" data-ord="'+esc(okey)+'" data-co="'+esc(r.company)+'" data-pf="'+esc(r.platform)+'" data-sku="'+esc(r.seller_sku)+'"><td>'+tw(kop)+label+'</td>'+cells(a,'—')+'</tr>';
             if(kop) h+=ordersHtml(okey);
@@ -215,11 +221,11 @@
     let h="";
     for(const o of od){
       const st=o.status?' <span class="pill">'+esc(o.status)+'</span>':'';
-      const paid=o.paid?'':' <span class="muted" title="settlement pending">pending</span>';
-      h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+paid+'</td>'
-        +'<td>'+IN(o.qty)+'</td><td>—</td><td>—</td><td>—</td>'  /* Gross,SKUs,Units,Returns */
-        +'<td>—</td><td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'  /* Rev,Cour,Ret,Settle */
-        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';  /* Exp,COP,Pack,Tax,ExpProfit,Profit,Margin */  /* Expected,COP,Pack,Tax,ExpProfit,Profit,Margin */  /* Expected,COP,Pack,Tax,Retfees,ExpProfit,Profit,Margin */
+      const tag=o.paid?'':' <span class="up" title="settlement pending">upcoming</span>';
+      h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+tag+'</td>'
+        +'<td>'+IN(o.qty)+'</td><td>—</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td>'
+        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'
+        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
     }
     return h;
   }
