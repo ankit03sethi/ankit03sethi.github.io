@@ -145,7 +145,7 @@
   const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
-  const cur=v=>'<td style="color:#0f172a;font-weight:700">'+(v?'−'+IN(v):'0')+'</td>';
+  const cur=v=>'<td style="color:#94a3b8" title="Already deducted inside settlement (platform ne pehle hi kaat liya) - info only, profit me dobara minus nahi hota">'+(v?IN(v):'0')+'</td>';
   const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
   function cells(a,skusTxt){return '<td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.settled)+'</td>'+cur(a.courier)+'<td>'+IN(a.expected)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+cst(a.retfees)+prof(a.exp_profit)+prof(a.profit)+mcell(a);}
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
