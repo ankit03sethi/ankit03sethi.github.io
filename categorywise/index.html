@@ -50,10 +50,14 @@
   .prof.pos{color:#15803d}
   .cost{color:#7c2d12}
   .up{color:#b45309}
-  .proj{background:#eff6ff;font-weight:700}
-  td.proj.neg{color:#b91c1c}
-  td.proj.pos{color:#0369a1}
   .muted{color:#94a3b8}
+  .ttl{margin:22px 0 6px;font-size:15px;font-weight:800;color:#0f172a}
+  .ttl .sub{font-weight:500;color:#64748b;font-size:12px}
+  #tE .ttl,#tAc .ttl{}
+  #tE thead tr:first-child th,#tE tbody tr:not(.lvl-ord){background:#f8fbff}
+  #tAc thead tr:first-child th,#tAc tbody .totrow{}
+  tr.qtyrow th{font-weight:600;font-size:10px;color:#2563eb;background:#f1f5f9;padding:2px 8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap}
+  tr.qtyrow th:first-child{text-align:left}
   .pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;background:#e2e8f0;color:#475569}
   .cnt{display:inline-block;background:#dbe3ff;color:#3730a3;font-size:10px;font-weight:800;border-radius:999px;padding:1px 7px;margin-left:8px}
   .empty{padding:40px;text-align:center;color:#94a3b8}
@@ -78,15 +82,51 @@
   </div>
   <div class="cards" id="kpis"></div>
   <div class="status" id="status"></div>
-  <div class="wrap"><table class="data">
-    <thead><tr>
-      <th>Category / Sub / Master / SKU / Order</th>
-      <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>Upcoming</th><th>Return Qty</th>
-      <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th><th>Expected ₹</th><th>Proj. Settle ₹</th>
-      <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Exp. Profit ₹</th><th>Profit ₹</th><th>Proj. Profit ₹</th><th>Margin %</th>
-    </tr></thead>
-    <tbody id="tbody"><tr><td colspan="16" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
-  </table></div>
+  <div id="tblwrap">
+
+    <h3 class="ttl">1 · Actual <span class="sub">— jo aa chuka (settled)</span></h3>
+    <div class="wrap"><table class="data" id="tA">
+      <thead>
+        <tr>
+          <th>Category / Sub / Master / SKU / Order</th>
+          <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>Upcoming</th><th>Return Qty</th>
+          <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th>
+          <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>Margin %</th>
+        </tr>
+        <tr class="qtyrow" id="qtyA"></tr>
+      </thead>
+      <tbody id="tbodyA"><tr><td colspan="14" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+    </table></div>
+
+    <h3 class="ttl">2 · Projected @ Expected <span class="sub">— poora gross, upcoming ko target rate se</span></h3>
+    <div class="wrap"><table class="data" id="tE">
+      <thead>
+        <tr>
+          <th>Category / Sub / Master / SKU</th>
+          <th>SKUs</th><th>Gross Units</th>
+          <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th>
+          <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>Margin %</th>
+        </tr>
+        <tr class="qtyrow" id="qtyE"></tr>
+      </thead>
+      <tbody id="tbodyE"><tr><td colspan="11" class="empty">…</td></tr></tbody>
+    </table></div>
+
+    <h3 class="ttl">3 · Projected @ Actual <span class="sub">— poora gross, upcoming ko abhi ke actual rate se</span></h3>
+    <div class="wrap"><table class="data" id="tAc">
+      <thead>
+        <tr>
+          <th>Category / Sub / Master / SKU</th>
+          <th>SKUs</th><th>Gross Units</th>
+          <th>Revenue ₹</th><th>Return ₹</th><th>Settlement ₹</th>
+          <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>Margin %</th>
+        </tr>
+        <tr class="qtyrow" id="qtyAc"></tr>
+      </thead>
+      <tbody id="tbodyAc"><tr><td colspan="11" class="empty">…</td></tr></tbody>
+    </table></div>
+
+  </div>
 </main>
 
 <script src="/analyst-access.js?v=10"></script>
@@ -95,7 +135,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS=18;
+  const NCOLS_A=14, NCOLS_E=11, NCOLS_AC=11;
   const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
@@ -105,7 +145,7 @@
     if(!CA.access||!CA.access.active){$("#status").textContent="Cursive Analyst subscription required.";return;}
     if(!(CA.access.is_owner||CA.can("skuwise.financial","view"))){
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
-      $("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">No access</td></tr>';return;
+      $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">No access</td></tr>';return;
     }
     buildDayChips(); await load();
   })();
@@ -122,10 +162,10 @@
 
   async function load(){
     $("#status").innerHTML='<span class="spin"></span> reading orders…';
-    $("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty"><span class="spin"></span> loading…</td></tr>';
+    $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     const t0=Date.now();
     const {data,error}=await sb.rpc("category_pnl_json",{p_days:state.days});
-    if(error){$("#status").textContent="Error: "+error.message;$("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">Could not load</td></tr>';return;}
+    if(error){$("#status").textContent="Error: "+error.message;$("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">Could not load</td></tr>';return;}
     state.rows=Array.isArray(data)?data:[];
     $("#status").textContent=state.rows.length.toLocaleString("en-IN")+" SKUs · loaded in "+((Date.now()-t0)/1000).toFixed(1)+"s";
     buildChips();render();
@@ -145,19 +185,28 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","units","upcoming","return_units","revenue","retfees","settled","cop","packaging","tax","expected","exp_profit","profit","proj_settle","proj_profit"];
+  const F=["gross_units","gross_orders","units","upcoming","return_units","settled_orders","ship_orders","revenue","retfees","settled","cop","packaging","tax","profit","e_rev","e_ret","e_settle","g_cop","g_pack","e_tax","e_profit","a_rev","a_ret","a_settle","a_tax","a_profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
-  const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
+  const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
   const upc=v=>'<td class="up">'+(v?IN(v):'0')+'</td>';
-  const pjs=v=>'<td class="proj">'+IN(v)+'</td>';
-  const pjp=v=>'<td class="proj '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
-  const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
-  function cells(a,skusTxt){
+  const mcell=(p,s)=>{const m=margPS(p,s);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
+  // ---- three column layouts ----
+  function cellsActual(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)+'<td>'+IN(a.return_units)+'</td>'
-      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td><td>'+IN(a.expected)+'</td>'+pjs(a.proj_settle)
-      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.exp_profit)+prof(a.profit)+pjp(a.proj_profit)+mcell(a);
+      +'<td>'+IN(a.revenue)+'</td>'+cst(a.retfees)+'<td>'+IN(a.settled)+'</td>'
+      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+mcell(a.profit,a.settled);
+  }
+  function cellsExp(a,skusTxt){
+    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td>'
+      +'<td>'+IN(a.e_rev)+'</td>'+cst(a.e_ret)+'<td>'+IN(a.e_settle)+'</td>'
+      +cst(a.g_cop)+cst(a.g_pack)+cst(a.e_tax)+prof(a.e_profit)+mcell(a.e_profit,a.e_settle);
+  }
+  function cellsAct(a,skusTxt){
+    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td>'
+      +'<td>'+IN(a.a_rev)+'</td>'+cst(a.a_ret)+'<td>'+IN(a.a_settle)+'</td>'
+      +cst(a.g_cop)+cst(a.g_pack)+cst(a.a_tax)+prof(a.a_profit)+mcell(a.a_profit,a.a_settle);
   }
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
 
@@ -172,15 +221,51 @@
     return C;
   }
 
+  // build one tbody's HTML from the shared tree, using a per-table cells fn.
+  function buildBody(cats,tot,cellsFn,withOrders,ncols){
+    let h='<tr class="totrow"><td>Σ TOTAL (all shown)</td>'+cellsFn(tot,IN(tot.nskus))+'</tr>';
+    for(const C1 of cats){
+      const ck="c:"+C1.cat,co=state.open.has(ck);
+      h+='<tr class="lvl-cat clk" data-k="'+esc(ck)+'"><td>'+tw(co)+esc(C1.cat)+'<span class="cnt">'+C1.a.nskus+' SKU</span></td>'+cellsFn(C1.a,IN(C1.a.nskus))+'</tr>';
+      if(!co)continue;
+      for(const S of C1.subs){
+        const sk="s:"+C1.cat+"|"+S.sub,so=state.open.has(sk);
+        h+='<tr class="lvl-sub clk" data-k="'+esc(sk)+'"><td>'+tw(so)+esc(S.sub)+'<span class="cnt">'+S.a.nskus+'</span></td>'+cellsFn(S.a,IN(S.a.nskus))+'</tr>';
+        if(!so)continue;
+        for(const M of S.mss){
+          const mk="m:"+C1.cat+"|"+S.sub+"|"+M.mas,mo=state.open.has(mk);
+          h+='<tr class="lvl-mas clk" data-k="'+esc(mk)+'"><td>'+tw(mo)+esc(M.mas)+'<span class="cnt">'+M.a.nskus+'</span></td>'+cellsFn(M.a,IN(M.a.nskus))+'</tr>';
+          if(!mo)continue;
+          for(const r of M.list.slice().sort((x,y)=>(+y.profit)-(+x.profit))){
+            const okey="k:"+r.k_co+"|"+r.k_pf+"|"+r.k_sku, kop=withOrders&&state.open.has(okey);
+            const a={};for(const f of F)a[f]=+r[f]||0;a.nskus=1;
+            const label=esc(r.seller_sku)+' <span class="pill">'+esc(r.platform)+' · '+esc(r.company)+'</span>'+(r.cop_known?'':' <span class="muted" title="COP missing">⚠</span>');
+            const attr=withOrders?' clk" data-ord="'+esc(okey)+'" data-co="'+esc(r.company)+'" data-pf="'+esc(r.platform)+'" data-sku="'+esc(r.seller_sku)+'"':'"';
+            h+='<tr class="lvl-sku'+attr+'><td>'+(withOrders?tw(kop):'')+label+'</td>'+cellsFn(a,'—')+'</tr>';
+            if(kop) h+=ordersHtml(okey,ncols);
+          }
+        }
+      }
+    }
+    return h;
+  }
+
+  function qtyRow(tds){return tds.map((t,i)=>'<th>'+(i===0?'':t)+'</th>').join('');}
+  const U=n=>IN(n)+' u', ORD=n=>IN(n)+' ord';
+
   function render(){
     const rows=filtered();
     const tot=agg(rows);
     $("#kpis").innerHTML=kpi("Gross Units",IN(tot.gross_units))+kpi("Settled",IN(tot.units))+kpi("Upcoming",IN(tot.upcoming))+
       kpi("Settlement","₹"+IN(tot.settled))+
       '<div class="kpi"><div class="lbl">Profit</div><div class="val '+(tot.profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.profit)+'</div></div>'+
-      '<div class="kpi"><div class="lbl">Proj. Profit</div><div class="val '+(tot.proj_profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.proj_profit)+'</div></div>'+
-      kpi("Margin",(marg(tot)==null?'—':marg(tot)+'%'));
-    if(!rows.length){$("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">No orders in this window.</td></tr>';return;}
+      kpi("Margin",(margPS(tot.profit,tot.settled)==null?'—':margPS(tot.profit,tot.settled)+'%'));
+    if(!rows.length){
+      $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">No orders in this window.</td></tr>';
+      $("#tbodyE").innerHTML='<tr><td colspan="'+NCOLS_E+'" class="empty">—</td></tr>';
+      $("#tbodyAc").innerHTML='<tr><td colspan="'+NCOLS_AC+'" class="empty">—</td></tr>';
+      return;
+    }
 
     const C=tree(rows);
     const cats=[...C.entries()].map(([cat,S])=>{
@@ -194,44 +279,28 @@
     });
     cats.sort((x,y)=>y.a.profit-x.a.profit);
 
-    let h='<tr class="totrow"><td>Σ TOTAL (all shown)</td>'+cells(tot,IN(tot.nskus))+'</tr>';
-    for(const C1 of cats){
-      const ck="c:"+C1.cat,co=state.open.has(ck);
-      h+='<tr class="lvl-cat clk" data-k="'+esc(ck)+'"><td>'+tw(co)+esc(C1.cat)+'<span class="cnt">'+C1.a.nskus+' SKU</span></td>'+cells(C1.a,IN(C1.a.nskus))+'</tr>';
-      if(!co)continue;
-      for(const S of C1.subs){
-        const sk="s:"+C1.cat+"|"+S.sub,so=state.open.has(sk);
-        h+='<tr class="lvl-sub clk" data-k="'+esc(sk)+'"><td>'+tw(so)+esc(S.sub)+'<span class="cnt">'+S.a.nskus+'</span></td>'+cells(S.a,IN(S.a.nskus))+'</tr>';
-        if(!so)continue;
-        for(const M of S.mss){
-          const mk="m:"+C1.cat+"|"+S.sub+"|"+M.mas,mo=state.open.has(mk);
-          h+='<tr class="lvl-mas clk" data-k="'+esc(mk)+'"><td>'+tw(mo)+esc(M.mas)+'<span class="cnt">'+M.a.nskus+'</span></td>'+cells(M.a,IN(M.a.nskus))+'</tr>';
-          if(!mo)continue;
-          for(const r of M.list.slice().sort((x,y)=>(+y.profit)-(+x.profit))){
-            const okey="k:"+r.k_co+"|"+r.k_pf+"|"+r.k_sku, kop=state.open.has(okey);
-            const a={};for(const f of F)a[f]=+r[f]||0;a.nskus=1;
-            const label=esc(r.seller_sku)+' <span class="pill">'+esc(r.platform)+' · '+esc(r.company)+'</span>'+(r.cop_known?'':' <span class="muted" title="COP missing">⚠</span>');
-            h+='<tr class="lvl-sku clk" data-ord="'+esc(okey)+'" data-co="'+esc(r.company)+'" data-pf="'+esc(r.platform)+'" data-sku="'+esc(r.seller_sku)+'"><td>'+tw(kop)+label+'</td>'+cells(a,'—')+'</tr>';
-            if(kop) h+=ordersHtml(okey);
-          }
-        }
-      }
-    }
-    $("#tbody").innerHTML=h;
+    // qty / base sub-headers
+    $("#qtyA").innerHTML=qtyRow(['','','','','','',U(tot.units),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'']);
+    $("#qtyE").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'']);
+    $("#qtyAc").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.gross_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'']);
+
+    $("#tbodyA").innerHTML=buildBody(cats,tot,cellsActual,true,NCOLS_A);
+    $("#tbodyE").innerHTML=buildBody(cats,tot,cellsExp,false,NCOLS_E);
+    $("#tbodyAc").innerHTML=buildBody(cats,tot,cellsAct,false,NCOLS_AC);
   }
 
-  function ordersHtml(okey){
+  function ordersHtml(okey,ncols){
     const od=state.orders[okey];
-    if(od==="loading") return '<tr class="lvl-ord"><td colspan="'+NCOLS+'"><span class="spin"></span> loading orders…</td></tr>';
-    if(!od||!od.length) return '<tr class="lvl-ord"><td colspan="'+NCOLS+'" class="muted">No orders in this window.</td></tr>';
+    if(od==="loading") return '<tr class="lvl-ord"><td colspan="'+ncols+'"><span class="spin"></span> loading orders…</td></tr>';
+    if(!od||!od.length) return '<tr class="lvl-ord"><td colspan="'+ncols+'" class="muted">No orders in this window.</td></tr>';
     let h="";
     for(const o of od){
       const st=o.status?' <span class="pill">'+esc(o.status)+'</span>':'';
       const tag=o.paid?'':' <span class="up" title="settlement pending">upcoming</span>';
       h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+tag+'</td>'
         +'<td>—</td><td>'+IN(o.qty)+'</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td><td>—</td>'
-        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td><td>—</td><td>—</td>'
-        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
+        +'<td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'
+        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
     }
     return h;
   }
@@ -248,7 +317,7 @@
   function kpi(l,v){return '<div class="kpi"><div class="lbl">'+l+'</div><div class="val">'+v+'</div></div>';}
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
-  $("#tbody").addEventListener("click",e=>{
+  $("#tblwrap").addEventListener("click",e=>{
     const tr=e.target.closest("tr.clk");if(!tr)return;
     if(tr.classList.contains("lvl-sku")){
       const okey=tr.dataset.ord;
