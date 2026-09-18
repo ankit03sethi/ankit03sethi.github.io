@@ -20,33 +20,37 @@
   .chip{font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;user-select:none}
   .chip.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
   .cards{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0 14px}
-  .kpi{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px 16px;min-width:130px}
+  .kpi{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px 16px;min-width:120px}
   .kpi .lbl{font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .kpi .val{font-size:20px;font-weight:800;margin-top:3px}
   .status{font-size:12px;color:#64748b;margin:2px 0 8px}
   .spin{display:inline-block;width:12px;height:12px;border:2px solid #cbd5e1;border-top-color:#1f6feb;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .wrap{border:1px solid #e5e7eb;border-radius:14px;overflow:auto;background:#fff;max-height:calc(100vh - 240px)}
-  table.data{width:100%;border-collapse:collapse;font-size:13.5px}
-  table.data thead th{position:sticky;top:0;z-index:5;background:#f1f5f9;color:#475569;font-weight:800;text-transform:uppercase;font-size:10.5px;letter-spacing:.4px;padding:11px 12px;text-align:right;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+  .wrap{border:1px solid #e5e7eb;border-radius:14px;overflow:auto;background:#fff;max-height:calc(100vh - 250px)}
+  table.data{width:100%;border-collapse:collapse;font-size:13px}
+  table.data thead th{position:sticky;top:0;z-index:5;background:#f1f5f9;color:#475569;font-weight:800;text-transform:uppercase;font-size:10px;letter-spacing:.3px;padding:10px 11px;text-align:right;border-bottom:1px solid #e2e8f0;white-space:nowrap}
   table.data thead th:first-child{text-align:left}
-  table.data td{padding:9px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.data td{padding:8px 11px;text-align:right;border-bottom:1px solid #f1f5f9;font-variant-numeric:tabular-nums;white-space:nowrap}
   table.data td:first-child{text-align:left}
-  tr.cat>td{background:#eef2ff;font-weight:800;font-size:14px;cursor:pointer}
-  tr.cat:hover>td{background:#e0e7ff}
-  tr.sub>td{background:#f8fafc;font-weight:700;cursor:pointer}
-  tr.sub:hover>td{background:#eff6ff}
-  tr.sku>td{color:#334155}
-  tr.sku>td:first-child{padding-left:52px;color:#475569;font-weight:600}
-  tr.sub>td:first-child{padding-left:30px}
-  .tw{display:inline-block;width:14px;color:#64748b;font-weight:800;transition:transform .12s}
+  tr.lvl-cat>td{background:#e0e7ff;font-weight:800;font-size:13.5px;cursor:pointer}
+  tr.lvl-sub>td{background:#eef2ff;font-weight:800;cursor:pointer}
+  tr.lvl-mas>td{background:#f1f5f9;font-weight:700;cursor:pointer}
+  tr.lvl-sku>td{background:#fff;font-weight:600;cursor:pointer}
+  tr.lvl-ord>td{background:#fcfcfd;color:#475569;font-weight:500}
+  tr.clk:hover>td{filter:brightness(0.97)}
+  tr.lvl-sub>td:first-child{padding-left:28px}
+  tr.lvl-mas>td:first-child{padding-left:48px}
+  tr.lvl-sku>td:first-child{padding-left:70px}
+  tr.lvl-ord>td:first-child{padding-left:96px;color:#64748b}
+  .tw{display:inline-block;width:14px;color:#64748b;font-weight:800}
   .prof{font-weight:800}
   .prof.neg{color:#b91c1c}
   .prof.pos{color:#15803d}
+  .cost{color:#7c2d12}
   .muted{color:#94a3b8}
-  .cnt{display:inline-block;background:#e2e8f0;color:#475569;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;margin-left:8px}
+  .pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;background:#e2e8f0;color:#475569}
+  .cnt{display:inline-block;background:#dbe3ff;color:#3730a3;font-size:10px;font-weight:800;border-radius:999px;padding:1px 7px;margin-left:8px}
   .empty{padding:40px;text-align:center;color:#94a3b8}
-  @media(max-width:640px){main{padding:12px}.wrap{max-height:calc(100vh - 300px)}}
 </style>
 </head>
 <body>
@@ -55,7 +59,7 @@
     <div style="width:34px;height:34px;background:#1f6feb;border-radius:9px;display:flex;align-items:center;justify-content:center">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
     </div>
-    <div><h1>Category Wise Data</h1><div class="sub">Units = ordered (order date) · Profit = on settled · last <span id="dLbl">90</span> days</div></div>
+    <div><h1>Category Wise Data</h1><div class="sub">Category → Sub → Master SKU → SKU → Orders · same numbers as SKU-wise · last <span id="dLbl">90</span> days</div></div>
   </div>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -70,10 +74,11 @@
   <div class="status" id="status"></div>
   <div class="wrap"><table class="data">
     <thead><tr>
-      <th>Category / Sub-category / SKU</th>
-      <th>SKUs</th><th>Units</th><th>Settled</th><th>Settlement ₹</th><th>COP ₹</th><th>Profit ₹</th><th>Margin %</th>
+      <th>Category / Sub / Master / SKU / Order</th>
+      <th>SKUs</th><th>Units</th><th>Returns</th><th>Settlement ₹</th><th>COP ₹</th>
+      <th>Packaging ₹</th><th>Tax ₹</th><th>Return fees ₹</th><th>Courier ₹</th><th>Expected ₹</th><th>Profit ₹</th><th>Margin %</th>
     </tr></thead>
-    <tbody id="tbody"><tr><td colspan="8" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+    <tbody id="tbody"><tr><td colspan="13" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
   </table></div>
 </main>
 
@@ -83,7 +88,8 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const state={rows:[],plat:"",co:"",days:90,open:new Set()};
+  const NCOLS=13;
+  const state={rows:[],plat:"",co:"",days:90,open:new Set(),orders:{}};
 
   (async function boot(){
     const {data:{session}}=await sb.auth.getSession();
@@ -92,10 +98,9 @@
     if(!CA.access||!CA.access.active){$("#status").textContent="Cursive Analyst subscription required.";return;}
     if(!(CA.access.is_owner||CA.can("skuwise.financial","view"))){
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
-      $("#tbody").innerHTML='<tr><td colspan="8" class="empty">No access</td></tr>';return;
+      $("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">No access</td></tr>';return;
     }
-    buildDayChips();
-    await load();
+    buildDayChips(); await load();
   })();
 
   function buildDayChips(){
@@ -103,17 +108,17 @@
     [30,60,90].forEach(d=>{
       const c=document.createElement("span");
       c.className="chip"+(state.days===d?" active":"");c.textContent="Last "+d+" days";
-      c.onclick=()=>{if(state.days===d)return;state.days=d;$("#dLbl").textContent=d;load();};
+      c.onclick=()=>{if(state.days===d)return;state.days=d;state.orders={};$("#dLbl").textContent=d;load();};
       host.appendChild(c);
     });
   }
 
   async function load(){
-    $("#status").innerHTML='<span class="spin"></span> reading orders &amp; payments…';
-    $("#tbody").innerHTML='<tr><td colspan="8" class="empty"><span class="spin"></span> loading…</td></tr>';
+    $("#status").innerHTML='<span class="spin"></span> reading…';
+    $("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     const t0=Date.now();
     const {data,error}=await sb.rpc("category_pnl_json",{p_days:state.days});
-    if(error){$("#status").textContent="Error: "+error.message;$("#tbody").innerHTML='<tr><td colspan="8" class="empty">Could not load</td></tr>';return;}
+    if(error){$("#status").textContent="Error: "+error.message;$("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">Could not load</td></tr>';return;}
     state.rows=Array.isArray(data)?data:[];
     $("#status").textContent=state.rows.length.toLocaleString("en-IN")+" SKUs · loaded in "+((Date.now()-t0)/1000).toFixed(1)+"s";
     buildChips();render();
@@ -131,68 +136,110 @@
     mk("",allLbl);for(const v of list)mk(v,v);
   }
 
-  function filtered(){
-    return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));
+  function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
+
+  const F=["units","returns_u","settled","cop","packaging","tax","retfees","courier","expected","profit"];
+  function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
+  const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
+  const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
+  const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
+  const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
+  function cells(a,skusTxt){return '<td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.settled)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+cst(a.retfees)+cst(a.courier)+'<td>'+IN(a.expected)+'</td>'+prof(a.profit)+mcell(a);}
+  const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
+
+  // group rows into cat -> sub -> master -> [sku rows]
+  function tree(rows){
+    const C=new Map();
+    for(const r of rows){
+      const cat=r.category||"Others",sub=r.sub_category||"Others",mas=r.master_sku||"Others";
+      if(!C.has(cat))C.set(cat,new Map());const S=C.get(cat);
+      if(!S.has(sub))S.set(sub,new Map());const M=S.get(sub);
+      if(!M.has(mas))M.set(mas,[]);M.get(mas).push(r);
+    }
+    return C;
   }
-  function agg(rows){
-    let u=0,su=0,s=0,c=0,p=0;const sk=new Set();
-    for(const r of rows){u+=+r.units||0;su+=+r.sunits||0;s+=+r.received||0;c+=+r.cop||0;p+=+r.profit||0;sk.add(r.master_sku);}
-    return{units:u,sunits:su,recv:s,cop:c,profit:p,skus:sk.size};
-  }
-  const marg=a=>a.recv>0?Math.round(1000*a.profit/a.recv)/10:null;
-  const profCell=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
-  const margCell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
 
   function render(){
     const rows=filtered();
     const tot=agg(rows);
-    $("#kpis").innerHTML=
-      kpi("Units",IN(tot.units))+kpi("Settlement","₹"+IN(tot.recv))+kpi("COP","₹"+IN(tot.cop))+
+    $("#kpis").innerHTML=kpi("Units",IN(tot.units))+kpi("Settlement","₹"+IN(tot.settled))+kpi("COP","₹"+IN(tot.cop))+
       '<div class="kpi"><div class="lbl">Profit</div><div class="val '+(tot.profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.profit)+'</div></div>'+
       kpi("Margin",(marg(tot)==null?'—':marg(tot)+'%'));
+    if(!rows.length){$("#tbody").innerHTML='<tr><td colspan="'+NCOLS+'" class="empty">No orders in this window.</td></tr>';return;}
 
-    // group Category -> Sub -> SKU
-    const cats=new Map();
-    for(const r of rows){
-      const cat=r.category||"(Uncategorized)",sub=r.sub_category||"(Other)";
-      if(!cats.has(cat))cats.set(cat,new Map());
-      const sm=cats.get(cat);if(!sm.has(sub))sm.set(sub,[]);sm.get(sub).push(r);
-    }
-    const catArr=[...cats.entries()].map(([cat,sm])=>{
-      const subs=[...sm.entries()].map(([sub,list])=>({sub,list,a:agg(list)}));
+    const C=tree(rows);
+    const cats=[...C.entries()].map(([cat,S])=>{
+      const subs=[...S.entries()].map(([sub,M])=>{
+        const mss=[...M.entries()].map(([mas,list])=>({mas,list,a:agg(list)}));
+        mss.sort((x,y)=>y.a.profit-x.a.profit);
+        return{sub,mss,a:agg([].concat(...mss.map(m=>m.list)))};
+      });
       subs.sort((x,y)=>y.a.profit-x.a.profit);
-      const all=[].concat(...subs.map(s=>s.list));
-      return{cat,subs,a:agg(all)};
+      return{cat,subs,a:agg([].concat(...subs.flatMap(s=>s.mss.map(m=>m.list))))};
     });
-    catArr.sort((x,y)=>y.a.profit-x.a.profit);
+    cats.sort((x,y)=>y.a.profit-x.a.profit);
 
     let h="";
-    if(!catArr.length){$("#tbody").innerHTML='<tr><td colspan="8" class="empty">No orders in this window.</td></tr>';return;}
-    for(const C of catArr){
-      const ck="c:"+C.cat,co=state.open.has(ck);
-      h+='<tr class="cat" data-k="'+esc(ck)+'"><td><span class="tw">'+(co?'▾':'▸')+'</span> '+esc(C.cat)+'<span class="cnt">'+C.a.skus+' SKU</span></td>'
-        +'<td>'+IN(C.a.skus)+'</td><td>'+IN(C.a.units)+'</td><td>'+IN(C.a.sunits)+'</td><td>'+IN(C.a.recv)+'</td><td>'+IN(C.a.cop)+'</td>'+profCell(C.a.profit)+margCell(C.a)+'</tr>';
+    for(const C1 of cats){
+      const ck="c:"+C1.cat,co=state.open.has(ck);
+      h+='<tr class="lvl-cat clk" data-k="'+esc(ck)+'"><td>'+tw(co)+esc(C1.cat)+'<span class="cnt">'+C1.a.nskus+' SKU</span></td>'+cells(C1.a,IN(C1.a.nskus))+'</tr>';
       if(!co)continue;
-      for(const S of C.subs){
-        const sk="s:"+C.cat+"|"+S.sub,so=state.open.has(sk);
-        h+='<tr class="sub" data-k="'+esc(sk)+'"><td><span class="tw">'+(so?'▾':'▸')+'</span> '+esc(S.sub)+'<span class="cnt">'+S.a.skus+'</span></td>'
-          +'<td>'+IN(S.a.skus)+'</td><td>'+IN(S.a.units)+'</td><td>'+IN(S.a.sunits)+'</td><td>'+IN(S.a.recv)+'</td><td>'+IN(S.a.cop)+'</td>'+profCell(S.a.profit)+margCell(S.a)+'</tr>';
+      for(const S of C1.subs){
+        const sk="s:"+C1.cat+"|"+S.sub,so=state.open.has(sk);
+        h+='<tr class="lvl-sub clk" data-k="'+esc(sk)+'"><td>'+tw(so)+esc(S.sub)+'<span class="cnt">'+S.a.nskus+'</span></td>'+cells(S.a,IN(S.a.nskus))+'</tr>';
         if(!so)continue;
-        const skus=S.list.slice().sort((x,y)=>(+y.profit)-(+x.profit));
-        for(const r of skus){
-          h+='<tr class="sku"><td>'+esc(r.master_sku)+(r.cop_known?'':' <span class="muted" title="COP missing — profit may be off">⚠</span>')+'</td>'
-            +'<td class="muted">—</td><td>'+IN(r.units)+'</td><td>'+IN(r.sunits)+'</td><td>'+IN(r.received)+'</td><td>'+IN(r.cop)+'</td>'+profCell(r.profit)+margCell({recv:+r.received,profit:+r.profit})+'</tr>';
+        for(const M of S.mss){
+          const mk="m:"+C1.cat+"|"+S.sub+"|"+M.mas,mo=state.open.has(mk);
+          h+='<tr class="lvl-mas clk" data-k="'+esc(mk)+'"><td>'+tw(mo)+esc(M.mas)+'<span class="cnt">'+M.a.nskus+'</span></td>'+cells(M.a,IN(M.a.nskus))+'</tr>';
+          if(!mo)continue;
+          for(const r of M.list.slice().sort((x,y)=>(+y.profit)-(+x.profit))){
+            const okey="k:"+r.k_co+"|"+r.k_pf+"|"+r.k_sku, kop=state.open.has(okey);
+            const a={units:+r.units,returns_u:+r.returns_u,settled:+r.settled,cop:+r.cop,packaging:+r.packaging,tax:+r.tax,retfees:+r.retfees,courier:+r.courier,expected:+r.expected,profit:+r.profit,nskus:1};
+            const label=esc(r.seller_sku)+' <span class="pill">'+esc(r.platform)+' · '+esc(r.company)+'</span>'+(r.cop_known?'':' <span class="muted" title="COP missing">⚠</span>');
+            h+='<tr class="lvl-sku clk" data-ord="'+esc(okey)+'" data-co="'+esc(r.company)+'" data-pf="'+esc(r.platform)+'" data-sku="'+esc(r.seller_sku)+'"><td>'+tw(kop)+label+'</td>'+cells(a,'—')+'</tr>';
+            if(kop) h+=ordersHtml(okey);
+          }
         }
       }
     }
     $("#tbody").innerHTML=h;
   }
 
+  function ordersHtml(okey){
+    const od=state.orders[okey];
+    if(od==="loading") return '<tr class="lvl-ord"><td colspan="'+NCOLS+'"><span class="spin"></span> loading orders…</td></tr>';
+    if(!od||!od.length) return '<tr class="lvl-ord"><td colspan="'+NCOLS+'" class="muted">No orders in this window.</td></tr>';
+    let h="";
+    for(const o of od){
+      const st=o.status?' <span class="pill">'+esc(o.status)+'</span>':'';
+      const paid=o.paid?'':' <span class="muted" title="settlement pending">pending</span>';
+      h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+paid+'</td>'
+        +'<td>—</td><td>'+IN(o.qty)+'</td><td>—</td><td>'+IN(o.settled)+'</td>'
+        +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
+    }
+    return h;
+  }
+
+  async function loadOrders(okey,co,pf,sku){
+    state.orders[okey]="loading";render();
+    try{
+      const {data,error}=await sb.rpc("category_sku_orders_json",{p_co:co,p_pf:pf,p_sku:sku,p_days:state.days});
+      state.orders[okey]=error?[]:(Array.isArray(data)?data:[]);
+    }catch(e){state.orders[okey]=[];}
+    render();
+  }
+
   function kpi(l,v){return '<div class="kpi"><div class="lbl">'+l+'</div><div class="val">'+v+'</div></div>';}
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
   $("#tbody").addEventListener("click",e=>{
-    const tr=e.target.closest("tr.cat,tr.sub");if(!tr)return;
+    const tr=e.target.closest("tr.clk");if(!tr)return;
+    if(tr.classList.contains("lvl-sku")){
+      const okey=tr.dataset.ord;
+      if(state.open.has(okey)){state.open.delete(okey);render();}
+      else{state.open.add(okey); if(state.orders[okey]===undefined){loadOrders(okey,tr.dataset.co,tr.dataset.pf,tr.dataset.sku);} else render();}
+      return;
+    }
     const k=tr.dataset.k;if(!k)return;
     if(state.open.has(k))state.open.delete(k);else state.open.add(k);
     render();
