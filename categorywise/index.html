@@ -51,6 +51,8 @@
   .pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;background:#e2e8f0;color:#475569}
   .cnt{display:inline-block;background:#dbe3ff;color:#3730a3;font-size:10px;font-weight:800;border-radius:999px;padding:1px 7px;margin-left:8px}
   .empty{padding:40px;text-align:center;color:#94a3b8}
+  tr.totrow>td{background:#fef9c3;font-weight:800;font-size:13.5px;border-bottom:2px solid #eab308}
+  tr.totrow>td:first-child{color:#713f12}
 </style>
 </head>
 <body>
@@ -143,8 +145,9 @@
   const marg=a=>a.settled>0?Math.round(1000*a.profit/a.settled)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
+  const cur=v=>'<td style="color:#0f172a;font-weight:700">'+(v?'−'+IN(v):'0')+'</td>';
   const mcell=a=>{const m=marg(a);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
-  function cells(a,skusTxt){return '<td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.settled)+'</td>'+cst(a.courier)+'<td>'+IN(a.expected)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+cst(a.retfees)+prof(a.exp_profit)+prof(a.profit)+mcell(a);}
+  function cells(a,skusTxt){return '<td>'+skusTxt+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.returns_u)+'</td><td>'+IN(a.settled)+'</td>'+cur(a.courier)+'<td>'+IN(a.expected)+'</td>'+cst(a.cop)+cst(a.packaging)+cst(a.tax)+cst(a.retfees)+prof(a.exp_profit)+prof(a.profit)+mcell(a);}
   const tw=o=>'<span class="tw">'+(o?'▾':'▸')+'</span> ';
 
   // group rows into cat -> sub -> master -> [sku rows]
@@ -179,7 +182,7 @@
     });
     cats.sort((x,y)=>y.a.profit-x.a.profit);
 
-    let h="";
+    let h='<tr class="totrow"><td>Σ TOTAL (all shown)</td>'+cells(tot,IN(tot.nskus))+'</tr>';
     for(const C1 of cats){
       const ck="c:"+C1.cat,co=state.open.has(ck);
       h+='<tr class="lvl-cat clk" data-k="'+esc(ck)+'"><td>'+tw(co)+esc(C1.cat)+'<span class="cnt">'+C1.a.nskus+' SKU</span></td>'+cells(C1.a,IN(C1.a.nskus))+'</tr>';
