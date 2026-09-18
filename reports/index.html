@@ -838,8 +838,8 @@ function initPricing() {
     const cos = [...new Set(rows.map((r) => titleCase(r.company)))];
     stEl.textContent = rows.length + " SKUs (latest inventory) · " + (cos.length ? cos.join(", ") : "-") + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
     if (!rows.length) { wrap.innerHTML = '<div class="note">Is company ki inventory / settlement data nahi mila. Upar Company/Platform chip badal ke dekho.</div>'; return; }
-    let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Product ID</th><th>Supplier ID</th><th>Var ID</th><th>Variation</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th>Open</th></tr></thead><tbody>';
-    for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(r.product_id)+"</td><td>"+esc(r.supplier_id)+"</td><td>"+esc(r.variation_id)+"</td><td>"+esc(r.variation_name)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td><a href="'+esc(r.product_url)+'" target="_blank" rel="noopener">Open</a></td></tr>'; }
+    let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Catalog ID</th><th>Product ID</th><th>Variation</th><th>Var ID</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th>Open</th></tr></thead><tbody>';
+    for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(r.catalog_id)+"</td><td>"+esc(r.product_id)+"</td><td>"+esc(r.variation_name)+"</td><td>"+esc(r.variation_id)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td><a href="'+esc(r.product_url)+'" target="_blank" rel="noopener">Open</a></td></tr>'; }
     h += "</tbody></table></div>";
     wrap.innerHTML = h;
   }
@@ -849,10 +849,10 @@ function initPricing() {
     const d = await fetchRows(); if (!d) return; preview();
     if (!rows.length) return;
     if (!window.XLSX) { stEl.textContent = "Excel library load nahi hui - page refresh karke try karo."; return; }
-    const header = ["Product ID","Supplier ID","Variation ID","Variation Name","New MSP","WDRP","MRP","REMARKS"];
+    const header = ["Catalog ID","Product ID","Variation Name","Variation ID","New Meesho Selling Price (MSP)","Wrong/Defective Return Price (WDRP) (if catalog is part of WDRP)","New Maximum Retail Price (MRP) (Optional)"];
     const aoa = [header];
     const N = (v)=>/^\d+$/.test(String(v))?Number(v):v;
-    for (const r of rows) aoa.push([ N(r.product_id), N(r.supplier_id), N(r.variation_id), r.variation_name, r.new_msp, r.wdrp, r.mrp, "" ]);
+    for (const r of rows) aoa.push([ N(r.catalog_id), N(r.product_id), r.variation_name, N(r.variation_id), r.new_msp, r.wdrp, r.mrp ]);
     const ws = window.XLSX.utils.aoa_to_sheet(aoa);
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
