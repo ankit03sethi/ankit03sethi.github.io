@@ -108,7 +108,7 @@
     [30,60,90].forEach(d=>{
       const c=document.createElement("span");
       c.className="chip"+(state.days===d?" active":"");c.textContent="Last "+d+" days";
-      c.onclick=()=>{if(state.days===d)return;state.days=d;state.orders={};$("#dLbl").textContent=d;load();};
+      c.onclick=()=>{if(state.days===d)return;state.days=d;state.orders={};$("#dLbl").textContent=d;buildDayChips();load();};
       host.appendChild(c);
     });
   }
