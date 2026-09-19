@@ -83,6 +83,8 @@
   </div>
   <div class="cards" id="kpis"></div>
   <div class="status" id="status"></div>
+  <div class="cards" id="extraCards"></div>
+  <div id="extraDetail"></div>
   <div id="tblwrap">
 
     <h3 class="ttl">0 · Payment File <span class="sub">— payment file ke saare orders (order file mein ho ya na ho) · saara payment data</span></h3>
@@ -151,7 +153,7 @@
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
   const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=19;
-  const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{},payRows:[]};
+  const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{},payRows:[],extras:{transfers:[],ads:[]},extraOpen:null};
   const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const pad2=n=>String(n).padStart(2,"0");
   const isoD=(y,m,d)=>y+"-"+pad2(m+1)+"-"+pad2(d);
@@ -165,7 +167,7 @@
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
       $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">No access</td></tr>';return;
     }
-    buildRangeChips(); await load(); prefetchAll(); loadPay();
+    buildRangeChips(); await load(); prefetchAll(); loadPay(); loadExtras();
   })();
 
   const cache={};
@@ -364,7 +366,7 @@
     renderPay();
   }
   function render(){
-    renderPay();
+    renderPay();renderExtras();
     const rows=filtered();
     const tot=agg(rows);
     $("#kpis").innerHTML=kpi("Gross Units",IN(tot.gross_units))+kpi("Settled",IN(tot.units))+kpi("Upcoming",IN(tot.upcoming))+
@@ -426,9 +428,48 @@
     render();
   }
 
+  function extrasFilter(list){
+    return (list||[]).filter(r=>{
+      if(state.plat&&r.platform!==state.plat) return false;
+      if(state.co&&r.company!==state.co) return false;
+      const d=r.dt||"";
+      if(state.mode==="month") return d>=state.mfrom&&d<=state.mto;
+      const f=new Date(); f.setDate(f.getDate()-(state.days-1));
+      return d>=isoD(f.getFullYear(),f.getMonth(),f.getDate());
+    });
+  }
+  function renderExtras(){
+    const ex=state.extras||{transfers:[],ads:[]};
+    const tr=extrasFilter(ex.transfers), ad=extrasFilter(ex.ads);
+    const sm=a=>a.reduce((s,r)=>s+(+r.amt||0),0);
+    const c=(k,l,list)=>'<div class="kpi" data-x="'+k+'" style="cursor:pointer;border-color:'+(state.extraOpen===k?'#1f6feb':'#e5e7eb')+'"><div class="lbl">'+l+' '+(state.extraOpen===k?'▾':'▸')+'</div><div class="val '+(sm(list)<0?'prof neg':'')+'">₹'+IN(sm(list))+'</div><div class="lbl">'+list.length+' txns</div></div>';
+    const host=$("#extraCards"); if(host) host.innerHTML=c('transfer','Transfers',tr)+c('ad','Advertisement',ad);
+    renderExtraDetail();
+  }
+  function renderExtraDetail(){
+    const host=$("#extraDetail"); if(!host) return;
+    const k=state.extraOpen;
+    if(!k){host.innerHTML="";return;}
+    const list=extrasFilter(k==='transfer'?state.extras.transfers:state.extras.ads);
+    let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Date</th><th>'+(k==='transfer'?'Transfer / Settlement ID':'Txn / Settlement ID')+'</th><th>Amount ₹</th><th>Description</th><th>Account</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
+    if(!list.length) h+='<tr><td colspan="7" class="empty">No '+(k==='transfer'?'transfers':'advertisement')+' in this window.</td></tr>';
+    for(const r of list){ h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td>'+prof(+r.amt||0)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>'; }
+    h+='</tbody></table></div>';
+    host.innerHTML=h;
+  }
+  async function loadExtras(){
+    if(cache._extras){state.extras=cache._extras;renderExtras();return;}
+    try{
+      const {data,error}=await sb.rpc("payment_extras_json",{});
+      state.extras=(!error&&data)?data:{transfers:[],ads:[]};
+      if(!error) cache._extras=state.extras;
+    }catch(e){state.extras={transfers:[],ads:[]};}
+    renderExtras();
+  }
   function kpi(l,v){return '<div class="kpi"><div class="lbl">'+l+'</div><div class="val">'+v+'</div></div>';}
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+  $("#extraCards").addEventListener("click",e=>{const c=e.target.closest("[data-x]");if(!c)return;state.extraOpen=state.extraOpen===c.dataset.x?null:c.dataset.x;renderExtras();});
   $("#tblwrap").addEventListener("click",e=>{
     const tr=e.target.closest("tr.clk");if(!tr)return;
     if(tr.classList.contains("lvl-sku")){
