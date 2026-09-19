@@ -185,7 +185,7 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit"];
+  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -280,7 +280,7 @@
     cats.sort((x,y)=>y.a.profit-x.a.profit);
 
     // qty / base sub-headers
-    $("#qtyA").innerHTML=qtyRow(['','','','','','','',U(tot.units),U(tot.units),ORD(tot.settled_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.settled_orders),U(tot.units),U(tot.units),'','']);
+    $("#qtyA").innerHTML=qtyRow(['','','','','','','',U(tot.data_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
     $("#qtyE").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'','']);
     $("#qtyAc").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'','']);
 
