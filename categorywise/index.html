@@ -194,7 +194,7 @@
   const mcell=(p,s)=>{const m=margPS(p,s);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
   // ---- three column layouts ----
   function cellsActual(a,skusTxt){
-    return '<td>'+skusTxt+'</td><td>'+IN(a.data_units)+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
+    return '<td>'+skusTxt+'</td><td>'+IN(a.data_units)+'</td><td>'+IN(a.delivered_units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
       +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.courier)+cst(a.rto)+cst(a.retfees)+'<td>'+IN(a.settled)+'</td>'
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+mcell(a.profit,a.revenue)+mcell(a.profit,a.cop);
   }
