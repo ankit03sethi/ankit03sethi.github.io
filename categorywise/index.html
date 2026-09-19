@@ -85,6 +85,20 @@
   <div class="status" id="status"></div>
   <div id="tblwrap">
 
+    <h3 class="ttl">0 · Payment File <span class="sub">— payment file ke saare orders (order file mein ho ya na ho) · saara payment data</span></h3>
+    <div class="wrap"><table class="data" id="tP">
+      <thead>
+        <tr>
+          <th>Category / Sub / Master / SKU</th>
+          <th>SKUs</th><th>Gross Units</th><th>Upcoming</th><th>Settled</th><th>RTO Qty</th><th>Return Qty</th>
+          <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Courier ₹</th><th>RTO ₹</th><th>C Returns ₹</th><th>Settlement ₹</th>
+          <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
+        </tr>
+        <tr class="qtyrow" id="qtyP"></tr>
+      </thead>
+      <tbody id="tbodyP"><tr><td colspan="19" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+    </table></div>
+
     <h3 class="ttl">1 · Actual <span class="sub">— jo aa chuka (settled)</span></h3>
     <div class="wrap"><table class="data" id="tA">
       <thead>
@@ -136,8 +150,8 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15;
-  const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{}};
+  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=19;
+  const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{},payRows:[]};
   const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const pad2=n=>String(n).padStart(2,"0");
   const isoD=(y,m,d)=>y+"-"+pad2(m+1)+"-"+pad2(d);
@@ -151,7 +165,7 @@
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
       $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">No access</td></tr>';return;
     }
-    buildRangeChips(); await load(); prefetchAll();
+    buildRangeChips(); await load(); prefetchAll(); loadPay();
   })();
 
   const cache={};
@@ -318,7 +332,36 @@
   function qtyRow(tds){return tds.map((t,i)=>'<th>'+(i===0?'':t)+'</th>').join('');}
   const U=n=>IN(n)+' u', ORD=n=>IN(n)+' ord';
 
+  function filteredPay(){return state.payRows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
+  function renderPay(){
+    const rows=filteredPay();
+    if(!rows.length){$("#tbodyP").innerHTML='<tr><td colspan="'+NCOLS_P+'" class="empty">—</td></tr>';$("#qtyP").innerHTML='';return;}
+    const tot=agg(rows);
+    const C=tree(rows);
+    const cats=[...C.entries()].map(([cat,S])=>{
+      const subs=[...S.entries()].map(([sub,M])=>{
+        const mss=[...M.entries()].map(([mas,list])=>({mas,list,a:agg(list)}));
+        mss.sort((x,y)=>y.a.profit-x.a.profit);
+        return{sub,mss,a:agg([].concat(...mss.map(m=>m.list)))};
+      });
+      subs.sort((x,y)=>y.a.profit-x.a.profit);
+      return{cat,subs,a:agg([].concat(...subs.flatMap(s=>s.mss.map(m=>m.list))))};
+    });
+    cats.sort((x,y)=>y.a.profit-x.a.profit);
+    $("#qtyP").innerHTML=qtyRow(['','','','','','','',U(tot.data_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
+    $("#tbodyP").innerHTML=buildBody(cats,tot,cellsActual,false,NCOLS_P);
+  }
+  async function loadPay(){
+    if(cache._pay){state.payRows=cache._pay;renderPay();return;}
+    try{
+      const {data,error}=await sb.rpc("category_pnl_pay_json",{});
+      state.payRows=(!error&&Array.isArray(data))?data:[];
+      if(!error) cache._pay=state.payRows;
+    }catch(e){state.payRows=[];}
+    renderPay();
+  }
   function render(){
+    renderPay();
     const rows=filtered();
     const tot=agg(rows);
     $("#kpis").innerHTML=kpi("Gross Units",IN(tot.gross_units))+kpi("Settled",IN(tot.units))+kpi("Upcoming",IN(tot.upcoming))+
