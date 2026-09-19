@@ -383,6 +383,7 @@
              border-radius:10px; box-shadow:0 12px 28px rgba(15,23,42,.14); padding:10px; z-index:60;">
         </div>
       </span>
+      <button class="btn" id="dlFilteredBtn" type="button" title="Download the rows currently shown (after filters) as CSV" style="font-size:12px; padding:5px 11px; margin-left:8px;">&#11015; Download</button>
     </div>
     <div class="hscroll-top hidden" id="hscrollTop"><div></div></div>
     <div class="panel-body" id="tableWrap">
@@ -4081,6 +4082,39 @@
     el.textContent = dt.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
     if (data[0].source_file) el.title = data[0].source_file;
   }
+</script>
+<script>
+(function(){
+  function dl(){
+    var table=document.querySelector('#tableWrap table.data');
+    if(!table||!table.tHead||!table.tBodies[0]){alert('No data to download yet.');return;}
+    var esc=function(v){return '"'+String(v==null?'':v).replace(/\r?\n/g,' ').replace(/"/g,'""')+'"';};
+    var headRow=table.tHead.rows[0];
+    for(var i=0;i<table.tHead.rows.length;i++){ if(table.tHead.rows[i].cells.length>headRow.cells.length) headRow=table.tHead.rows[i]; }
+    var cols=[];
+    for(var j=0;j<headRow.cells.length;j++){ if(headRow.cells[j].offsetWidth>0) cols.push(j); }
+    var lines=[];
+    lines.push(cols.map(function(j){return esc(headRow.cells[j].innerText.trim());}).join(','));
+    var body=table.tBodies[0], cnt=0;
+    for(var r=0;r<body.rows.length;r++){
+      var tr=body.rows[r];
+      if(getComputedStyle(tr).display==='none') continue;
+      lines.push(cols.map(function(j){ var td=tr.cells[j]; return esc(td?td.innerText.trim():''); }).join(','));
+      cnt++;
+    }
+    if(!cnt){alert('No rows to download for current filters.');return;}
+    var csv='﻿'+lines.join('\r\n');
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='sku-wise-data-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ try{a.remove();URL.revokeObjectURL(a.href);}catch(e){} },600);
+  }
+  document.addEventListener('click', function(e){
+    var b=e.target && e.target.closest ? e.target.closest('#dlFilteredBtn') : null;
+    if(b){ e.preventDefault(); dl(); }
+  });
+})();
 </script>
 
 </body>
