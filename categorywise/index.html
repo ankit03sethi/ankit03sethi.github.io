@@ -89,13 +89,13 @@
       <thead>
         <tr>
           <th>Category / Sub / Master / SKU / Order</th>
-          <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>Upcoming</th><th>RTO Qty</th><th>Return Qty</th>
+          <th>SKUs</th><th>Gross Units</th><th>Settled</th><th>RTO Qty</th><th>Return Qty</th>
           <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Courier ₹</th><th>RTO ₹</th><th>C Returns ₹</th><th>Settlement ₹</th>
           <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
         </tr>
         <tr class="qtyrow" id="qtyA"></tr>
       </thead>
-      <tbody id="tbodyA"><tr><td colspan="19" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+      <tbody id="tbodyA"><tr><td colspan="18" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
     </table></div>
 
     <h3 class="ttl">2 · Projected @ Expected <span class="sub">— poora gross, upcoming ko target rate se</span></h3>
@@ -135,7 +135,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15;
+  const NCOLS_A=18, NCOLS_E=15, NCOLS_AC=15;
   const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
 
   (async function boot(){
@@ -194,7 +194,7 @@
   const mcell=(p,s)=>{const m=margPS(p,s);return '<td class="'+(m==null?'muted':(m<0?'prof neg':''))+'">'+(m==null?'—':m+'%')+'</td>';};
   // ---- three column layouts ----
   function cellsActual(a,skusTxt){
-    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.units)+'</td>'+upc(a.upcoming)+'<td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
+    return '<td>'+skusTxt+'</td><td>'+IN(a.data_units)+'</td><td>'+IN(a.units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
       +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.courier)+cst(a.rto)+cst(a.retfees)+'<td>'+IN(a.settled)+'</td>'
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+mcell(a.profit,a.revenue)+mcell(a.profit,a.cop);
   }
@@ -280,7 +280,7 @@
     cats.sort((x,y)=>y.a.profit-x.a.profit);
 
     // qty / base sub-headers
-    $("#qtyA").innerHTML=qtyRow(['','','','','','','',U(tot.data_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
+    $("#qtyA").innerHTML=qtyRow(['','','','','','',U(tot.data_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
     $("#qtyE").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'','']);
     $("#qtyAc").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'','']);
 
@@ -298,7 +298,7 @@
       const st=o.status?' <span class="pill">'+esc(o.status)+'</span>':'';
       const tag=o.paid?'':' <span class="up" title="settlement pending">upcoming</span>';
       h+='<tr class="lvl-ord"><td>'+esc(o.order_ref)+' <span class="muted">'+esc(o.date)+'</span>'+st+tag+'</td>'
-        +'<td>—</td><td>'+IN(o.qty)+'</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>'+(o.paid?'0':IN(o.qty))+'</td><td>—</td><td>—</td>'
+        +'<td>—</td><td>'+IN(o.qty)+'</td><td>'+(o.paid?IN(o.qty):'0')+'</td><td>—</td><td>—</td>'
         +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>'+IN(o.settled)+'</td>'
         +'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>';
     }
