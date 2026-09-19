@@ -280,7 +280,7 @@
     cats.sort((x,y)=>y.a.profit-x.a.profit);
 
     // qty / base sub-headers
-    $("#qtyA").innerHTML=qtyRow(['','','','','','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
+    $("#qtyA").innerHTML=qtyRow(['','','','','','','',U(tot.units),U(tot.units),ORD(tot.settled_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.units),ORD(tot.settled_orders),U(tot.units),U(tot.units),'','']);
     $("#qtyE").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'','']);
     $("#qtyAc").innerHTML=qtyRow(['','','',U(tot.gross_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.gross_units),U(tot.gross_units),ORD(tot.gross_orders),U(tot.gross_units),U(tot.gross_units),'','']);
 
