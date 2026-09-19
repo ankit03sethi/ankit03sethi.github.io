@@ -151,8 +151,26 @@
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
       $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">No access</td></tr>';return;
     }
-    buildRangeChips(); await load();
+    buildRangeChips(); await load(); prefetchAll();
   })();
+
+  const cache={};
+  function winKey(w){return w.mode==="month"?("m:"+w.mfrom+".."+w.mto):("d:"+w.days);}
+  function argsForWin(w){return w.mode==="month"?{p_days:w.days,p_from:w.mfrom,p_to:w.mto}:{p_days:w.days};}
+  async function fetchWin(w){
+    const key=winKey(w);
+    if(cache[key]) return cache[key];
+    const {data,error}=await sb.rpc("category_pnl_json",argsForWin(w));
+    const rows=(!error&&Array.isArray(data))?data:[];
+    if(!error) cache[key]=rows;
+    return rows;
+  }
+  async function prefetchAll(){
+    const wins=[];
+    [30,60,90].forEach(d=>wins.push({mode:"days",days:d}));
+    monthOptions().forEach(o=>wins.push({mode:"month",days:state.days,mfrom:isoD(o.y,o.m,1),mto:isoD(o.y,o.m,new Date(o.y,o.m+1,0).getDate())}));
+    for(const w of wins){ if(!cache[winKey(w)]){ try{await fetchWin(w);}catch(e){} } }
+  }
 
   function monthOptions(){
     const arr=[];const d=new Date();d.setDate(1);
@@ -204,13 +222,16 @@
   }
 
   async function load(){
+    const w={mode:state.mode,days:state.days,mfrom:state.mfrom,mto:state.mto};
+    const key=winKey(w);
+    if(cache[key]){ state.rows=cache[key]; $("#status").textContent=state.rows.length.toLocaleString("en-IN")+" SKUs (cached)"; buildChips();render(); return; }
     $("#status").innerHTML='<span class="spin"></span> reading orders…';
     $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     const t0=Date.now();
-    const args=state.mode==="month"?{p_days:state.days,p_from:state.mfrom,p_to:state.mto}:{p_days:state.days};
-    const {data,error}=await sb.rpc("category_pnl_json",args);
+    const {data,error}=await sb.rpc("category_pnl_json",argsForWin(w));
     if(error){$("#status").textContent="Error: "+error.message;$("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">Could not load</td></tr>';return;}
     state.rows=Array.isArray(data)?data:[];
+    if(!error) cache[key]=state.rows;
     $("#status").textContent=state.rows.length.toLocaleString("en-IN")+" SKUs · loaded in "+((Date.now()-t0)/1000).toFixed(1)+"s";
     buildChips();render();
   }
