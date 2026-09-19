@@ -194,47 +194,15 @@
     return arr;
   }
   function buildRangeChips(){
-    // month chips (top row)
-    const mh=$("#monthChips");mh.innerHTML="";
-    // "All" chip = no month, use day window
-    (function(){
-      const c=document.createElement("span");
-      const on=state.mode==="days";
-      c.className="chip"+(on?" active":"");c.textContent="All";
-      c.onclick=()=>{
-        if(on)return;
-        state.mode="days";state.orders={};$("#dLbl").textContent="last "+state.days+" days";
-        buildRangeChips();load();
-      };
-      mh.appendChild(c);
-    })();
+    const host=$("#monthChips");host.innerHTML="";
+    const chip=(label,active,fn)=>{const c=document.createElement("span");c.className="chip"+(active?" active":"");c.textContent=label;c.onclick=()=>{if(active)return;fn();};host.appendChild(c);};
+    chip("All", state.mode==="days"&&state.days>=99999, ()=>{state.mode="days";state.days=99999;state.orders={};$("#dLbl").textContent="all time";buildRangeChips();load();});
+    [30,60,90].forEach(d=>chip("Last "+d+" days", state.mode==="days"&&state.days===d, ()=>{state.mode="days";state.days=d;state.orders={};$("#dLbl").textContent="last "+d+" days";buildRangeChips();load();}));
     for(const o of monthOptions()){
-      const c=document.createElement("span");
       const on=state.mode==="month"&&state.my===o.y&&state.mm===o.m;
-      c.className="chip"+(on?" active":"");c.textContent=MON[o.m]+" "+o.y;
-      c.onclick=()=>{
-        if(on)return;
-        state.mode="month";state.my=o.y;state.mm=o.m;
-        state.mfrom=isoD(o.y,o.m,1);
-        state.mto=isoD(o.y,o.m,new Date(o.y,o.m+1,0).getDate());
-        state.orders={};$("#dLbl").textContent=MON[o.m]+" "+o.y+" (month)";
-        buildRangeChips();load();
-      };
-      mh.appendChild(c);
+      chip(MON[o.m]+" "+o.y, on, ()=>{state.mode="month";state.my=o.y;state.mm=o.m;state.mfrom=isoD(o.y,o.m,1);state.mto=isoD(o.y,o.m,new Date(o.y,o.m+1,0).getDate());state.orders={};$("#dLbl").textContent=MON[o.m]+" "+o.y+" (month)";buildRangeChips();load();});
     }
-    // day chips (bottom row)
-    const host=$("#dayChips");host.innerHTML="";
-    [30,60,90].forEach(d=>{
-      const c=document.createElement("span");
-      const on=state.mode==="days"&&state.days===d;
-      c.className="chip"+(on?" active":"");c.textContent="Last "+d+" days";
-      c.onclick=()=>{
-        if(on)return;
-        state.mode="days";state.days=d;state.orders={};$("#dLbl").textContent="last "+d+" days";
-        buildRangeChips();load();
-      };
-      host.appendChild(c);
-    });
+    const dh=$("#dayChips"); if(dh) dh.innerHTML="";
   }
 
   async function load(){
