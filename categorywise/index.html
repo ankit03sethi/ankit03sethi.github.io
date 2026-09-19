@@ -156,12 +156,24 @@
 
   function monthOptions(){
     const arr=[];const d=new Date();d.setDate(1);
-    for(let i=0;i<12;i++){arr.push({y:d.getFullYear(),m:d.getMonth()});d.setMonth(d.getMonth()-1);}
+    for(let i=0;i<4;i++){arr.push({y:d.getFullYear(),m:d.getMonth()});d.setMonth(d.getMonth()-1);}
     return arr;
   }
   function buildRangeChips(){
     // month chips (top row)
     const mh=$("#monthChips");mh.innerHTML="";
+    // "All" chip = no month, use day window
+    (function(){
+      const c=document.createElement("span");
+      const on=state.mode==="days";
+      c.className="chip"+(on?" active":"");c.textContent="All";
+      c.onclick=()=>{
+        if(on)return;
+        state.mode="days";state.orders={};$("#dLbl").textContent="last "+state.days+" days";
+        buildRangeChips();load();
+      };
+      mh.appendChild(c);
+    })();
     for(const o of monthOptions()){
       const c=document.createElement("span");
       const on=state.mode==="month"&&state.my===o.y&&state.mm===o.m;
