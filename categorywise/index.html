@@ -69,7 +69,7 @@
     <div style="width:34px;height:34px;background:#1f6feb;border-radius:9px;display:flex;align-items:center;justify-content:center">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
     </div>
-    <div><h1>Category Wise Data</h1><div class="sub">Orders-file based (order date) · Gross = Settled + Upcoming · last <span id="dLbl">30</span> days</div></div>
+    <div><h1>Category Wise Data</h1><div class="sub">Orders-file based (order date) · Gross = Settled + Upcoming · <span id="dLbl">last 30 days</span></div></div>
   </div>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -78,6 +78,7 @@
   <div class="controls">
     <div class="chips" id="platChips"></div>
     <div class="chips" id="coChips"></div>
+    <div class="chips" id="monthChips"></div>
     <div class="chips" id="dayChips"></div>
   </div>
   <div class="cards" id="kpis"></div>
@@ -136,7 +137,10 @@
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
   const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15;
-  const state={rows:[],plat:"",co:"",days:30,open:new Set(),orders:{}};
+  const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{}};
+  const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const pad2=n=>String(n).padStart(2,"0");
+  const isoD=(y,m,d)=>y+"-"+pad2(m+1)+"-"+pad2(d);
 
   (async function boot(){
     const {data:{session}}=await sb.auth.getSession();
@@ -147,15 +151,42 @@
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
       $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">No access</td></tr>';return;
     }
-    buildDayChips(); await load();
+    buildRangeChips(); await load();
   })();
 
-  function buildDayChips(){
+  function monthOptions(){
+    const arr=[];const d=new Date();d.setDate(1);
+    for(let i=0;i<12;i++){arr.push({y:d.getFullYear(),m:d.getMonth()});d.setMonth(d.getMonth()-1);}
+    return arr;
+  }
+  function buildRangeChips(){
+    // month chips (top row)
+    const mh=$("#monthChips");mh.innerHTML="";
+    for(const o of monthOptions()){
+      const c=document.createElement("span");
+      const on=state.mode==="month"&&state.my===o.y&&state.mm===o.m;
+      c.className="chip"+(on?" active":"");c.textContent=MON[o.m]+" "+o.y;
+      c.onclick=()=>{
+        if(on)return;
+        state.mode="month";state.my=o.y;state.mm=o.m;
+        state.mfrom=isoD(o.y,o.m,1);
+        state.mto=isoD(o.y,o.m,new Date(o.y,o.m+1,0).getDate());
+        state.orders={};$("#dLbl").textContent=MON[o.m]+" "+o.y+" (month)";
+        buildRangeChips();load();
+      };
+      mh.appendChild(c);
+    }
+    // day chips (bottom row)
     const host=$("#dayChips");host.innerHTML="";
     [30,60,90].forEach(d=>{
       const c=document.createElement("span");
-      c.className="chip"+(state.days===d?" active":"");c.textContent="Last "+d+" days";
-      c.onclick=()=>{if(state.days===d)return;state.days=d;state.orders={};$("#dLbl").textContent=d;buildDayChips();load();};
+      const on=state.mode==="days"&&state.days===d;
+      c.className="chip"+(on?" active":"");c.textContent="Last "+d+" days";
+      c.onclick=()=>{
+        if(on)return;
+        state.mode="days";state.days=d;state.orders={};$("#dLbl").textContent="last "+d+" days";
+        buildRangeChips();load();
+      };
       host.appendChild(c);
     });
   }
@@ -164,7 +195,8 @@
     $("#status").innerHTML='<span class="spin"></span> reading orders…';
     $("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     const t0=Date.now();
-    const {data,error}=await sb.rpc("category_pnl_json",{p_days:state.days});
+    const args=state.mode==="month"?{p_days:state.days,p_from:state.mfrom,p_to:state.mto}:{p_days:state.days};
+    const {data,error}=await sb.rpc("category_pnl_json",args);
     if(error){$("#status").textContent="Error: "+error.message;$("#tbodyA").innerHTML='<tr><td colspan="'+NCOLS_A+'" class="empty">Could not load</td></tr>';return;}
     state.rows=Array.isArray(data)?data:[];
     $("#status").textContent=state.rows.length.toLocaleString("en-IN")+" SKUs · loaded in "+((Date.now()-t0)/1000).toFixed(1)+"s";
@@ -308,7 +340,8 @@
   async function loadOrders(okey,co,pf,sku){
     state.orders[okey]="loading";render();
     try{
-      const {data,error}=await sb.rpc("category_sku_orders_json",{p_co:co,p_pf:pf,p_sku:sku,p_days:state.days});
+      const oargs=state.mode==="month"?{p_co:co,p_pf:pf,p_sku:sku,p_days:state.days,p_from:state.mfrom,p_to:state.mto}:{p_co:co,p_pf:pf,p_sku:sku,p_days:state.days};
+      const {data,error}=await sb.rpc("category_sku_orders_json",oargs);
       state.orders[okey]=error?[]:(Array.isArray(data)?data:[]);
     }catch(e){state.orders[okey]=[];}
     render();
