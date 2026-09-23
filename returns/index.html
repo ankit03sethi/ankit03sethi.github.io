@@ -151,7 +151,7 @@
   </div>
 
   <div class="card">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span><button id="recheckBtn" class="ghostbtn" style="margin-left:auto">&#8635; Recheck not-found</button></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span><button id="recheckBtn" class="ghostbtn" style="margin-left:auto">&#8635; Recheck not-found</button><button id="delNfBtn" class="ghostbtn" style="margin-left:8px;color:#b91c1c">&#128465; Delete not-found</button></div>
     <div class="tabbar"><span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span><button class="ctab" data-c="Good" aria-selected="false">Good</button><button class="ctab" data-c="Damaged" aria-selected="false">Damaged</button><button class="ctab" data-c="Wrong" aria-selected="false">Wrong</button><button class="ctab" data-c="fault" aria-selected="false">Our Fault</button></div>
     <div class="scroll">
       <table>
@@ -518,6 +518,14 @@
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (idleTimer) clearTimeout(idleTimer); doScan(inp.value); } });
   const rb = $("#recheckBtn");
   if (rb) rb.addEventListener("click", async () => { rb.disabled = true; const o = rb.textContent; rb.textContent = "Checking…"; let n = 0; try { const res = await sb.rpc("return_scan_rematch_all"); n = res.data || 0; } catch(e){} await loadList(); rb.textContent = o; rb.disabled = false; $("#listNote").textContent = n ? (n + " ab match ho gaye") : "koi naya match nahi"; });
+  const dnb = $("#delNfBtn");
+  if (dnb) dnb.addEventListener("click", async () => {
+    if (!confirm("Saare NOT FOUND scans delete kar dein? Dobara scan kar sakte ho.")) return;
+    dnb.disabled = true; const o = dnb.textContent; dnb.textContent = "Deleting…"; let n = 0;
+    try { const res = await sb.rpc("return_scan_delete_notfound"); n = res.data || 0; } catch(e){}
+    await loadList(); dnb.textContent = o; dnb.disabled = false;
+    $("#listNote").textContent = n + " not-found delete ho gaye";
+  });
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
