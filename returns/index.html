@@ -379,9 +379,9 @@
     // Scanned / Matched count the green rows of the Delivered + Undelivered lists (same date
     // range), so Scanned == green(Delivered) + green(Undelivered). Not found = scans with no match.
     const greenDel = wlDel.filter(r=>r.scanned).length, greenUnd = wlUnd.filter(r=>r.scanned).length;
-    counts.total = base.length;
-    counts.ok = base.filter(r=>r.status==="OK").length;
+    counts.ok = greenDel + greenUnd;
     counts.bad = base.filter(r=>r.status!=="OK").length;
+    counts.total = counts.ok + counts.bad;
     counts.fault = base.filter(isFault).length;
     setCounts();
     const rows = base.filter(statusMatch);
