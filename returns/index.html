@@ -320,7 +320,8 @@
     if (!awb || busy || pickerOpen) return;
     busy = true;
     const inp = $("#awb");
-    const dup = allRows.find(function(x){ var a=(x.awb||"").toUpperCase(), o1=(x.order_id||"").toUpperCase(), o2=(x.order_id2||"").toUpperCase(), k=awb.toUpperCase(); return a===k||o1===k||o2===k; });
+    let dup = allRows.find(function(x){ var a=(x.awb||"").toUpperCase(), o1=(x.order_id||"").toUpperCase(), o2=(x.order_id2||"").toUpperCase(), k=awb.toUpperCase(); return a===k||o1===k||o2===k; });
+    if (!dup) { try { const { data:dd } = await sb.rpc("return_scan_dupe", { p_awb: awb }); if (dd && dd[0]) dup = dd[0]; } catch(e){} }
     if (dup) { const el=$("#result"); el.className="result bad"; el.style.display="block"; el.innerHTML="<div class='big'>DUPLICATE</div><div class='kv'><div class='k'>AWB / ID</div><div class='v mono'>"+esc(awb)+"</div><div class='k'>Note</div><div class='v'>Pehle se scan ho chuka hai ("+esc(dup.status==='OK'?'matched':'not found')+", AWB "+esc(dup.awb)+"). Dubara save nahi kiya.</div></div>"; last=null; inp.value=""; inp.focus(); busy=false; return; }
     try {
       const { data: lk } = await sb.rpc("return_scan_lookup", { p_awb: awb });
