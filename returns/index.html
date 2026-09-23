@@ -274,7 +274,7 @@
     if (nfBtn) nfBtn.addEventListener("click", () => doSaveNF(r.awb));
   }
 
-  async function doSaveNF(awb){
+  async function doSaveNF(awb){ var _i1=$("#rmId1"),_i2=$("#rmId2");var _id1=_i1?_i1.value.trim():"",_id2=_i2?_i2.value.trim():"";if(_id1||_id2){await doRematch(awb);return;}
     try { const { data:nf } = await sb.rpc("return_scan_save", { p_awb: awb, p_by: (window.CA && CA.who && CA.who()) || null }); last = (nf && nf[0]) || { awb, status:"NOT_FOUND" }; showResult(last); await loadList(); } catch(e){}
     const i=$("#awb"); if(i) i.focus();
   }
