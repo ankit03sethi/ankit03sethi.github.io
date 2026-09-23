@@ -905,12 +905,12 @@
       td.textContent = a.val == null ? "—" : String(a.val); td.title = a.why;
       td.style.color = a.val == null ? "#cbd5e1" : tone;
     }
-    if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon"].includes(pf)) {
+    if (iE >= 0 && tr.cells[iE] && ["flipkart", "amazon", "meesho"].includes(pf)) {
       const es = expSettleCalc(rr), td = tr.cells[iE];
       td.textContent = es.val == null ? "—" : String(es.val); td.title = es.why;
       td.style.color = es.val == null ? "#cbd5e1" : tone; td.style.fontWeight = es.manual ? "600" : "";
     }
-    if (iP >= 0 && tr.cells[iP] && ["flipkart", "amazon"].includes(pf)) {
+    if (iP >= 0 && tr.cells[iP] && ["flipkart", "amazon", "meesho"].includes(pf)) {
       const ep = expProfitCalc(rr), td = tr.cells[iP];
       td.textContent = ep.val == null ? "—" : String(ep.val); td.title = ep.why;
       td.style.color = ep.val == null ? "#cbd5e1" : (ep.val < 0 ? "#b91c1c" : tone); td.style.fontWeight = ep.val == null ? "" : "600";
