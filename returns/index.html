@@ -458,9 +458,19 @@
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
   }
 
+  function scanRange(){
+    const df = dateFilter; const t = new Date();
+    const iso = d => { const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),da=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+da; };
+    if (df === "all") return { p_from: null, p_to: null };
+    if (df === "today") return { p_from: iso(t), p_to: iso(t) };
+    if (df === "yesterday") { const y=new Date(t); y.setDate(y.getDate()-1); return { p_from: iso(y), p_to: iso(y) }; }
+    if (df === "7d") { const s=new Date(t); s.setDate(s.getDate()-6); return { p_from: iso(s), p_to: iso(t) }; }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(df)) return { p_from: df, p_to: df };
+    return { p_from: null, p_to: null };
+  }
   async function loadList(){
     // API caps a call at 1000 rows — page through so every scan is loaded, no 1000 lock.
-    const { data, error } = await sb.rpc("return_scan_list_json");
+    const rg = scanRange(); const { data, error } = await sb.rpc("return_scan_list_json", rg);
     allRows = (error || !Array.isArray(data)) ? [] : data;
     render();
     loadExpected();
@@ -484,13 +494,13 @@
   document.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
     dateFilter = b.dataset.d;
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed", x===b ? "true":"false"));
-    $("#dpick").value = ""; render(); loadExpected(); $("#awb").focus();
+    $("#dpick").value = ""; loadList(); $("#awb").focus();
   }));
   $("#dpick").addEventListener("change", () => {
     if (!$("#dpick").value) return;
     dateFilter = $("#dpick").value;
     document.querySelectorAll(".dchip").forEach(x => x.setAttribute("aria-pressed","false"));
-    render(); loadExpected();
+    loadList();
   });
   if ($("#wlPend")) { $("#wlPend").addEventListener("click", () => { wlView="pending"; renderExpected(); }); $("#wlScan").addEventListener("click", () => { wlView="scanned"; renderExpected(); }); }
   $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
