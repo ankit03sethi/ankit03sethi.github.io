@@ -2008,7 +2008,7 @@
       // 2026-09-11: the SKU Wise page's own column order (A-T, X-AG, AI-AK).
       // 33 columns, same as the sample.
       const HEADERS = ["S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type","Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","COP","Qty","HSN","Tax %","Promotion %","Packaging","Final COP","Floor Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Amazon Add Rs","Max Step %","Selling Price"];
-      // Expected Settlement is computed on Flipkart / Amazon / Meesho - the same
+      // Expected Settlement is computed on Flipkart / Amazon - the same
       // rule the SKU Wise page and the reprice use: Manual Settlement as typed,
       // else COP + tax + packaging + Manual Margin, else the smaller of Auto
       // Margin (50) and COP x Auto % (100%). Amazon Selling Price = that + Add Rs.
@@ -2028,7 +2028,7 @@
         const rd = r.raw_data || {}, ld = r.listing_data || {};
         const eff = (k) => (ld[k] != null && String(ld[k]).trim() !== "") ? ld[k] : (rd[k] ?? "");
         const pf = String(r.platform || rd["Platform"] || "").toLowerCase();
-        const exp = ["flipkart", "amazon", "meesho"].includes(pf) ? expSettle(rd, ld) : (rd["Expected Settlement"] ?? "");
+        const exp = ["flipkart", "amazon"].includes(pf) ? expSettle(rd, ld) : (rd["Expected Settlement"] ?? "");
         const addRs = courier.has(String(r.id)) ? courier.get(String(r.id)) : (numOf(eff("Amazon Add Rs")) ?? 50);
         const sell = pf === "amazon" ? (exp === "" ? "" : Math.round(Number(exp) + Number(addRs))) : (rd["Selling Price"] ?? "");
         const x = extra.get(String(r.id)) || {};
