@@ -255,7 +255,7 @@
     if (cur==="Damaged" && dmgText(r)) h += "<div class='k'>Damaged</div><div class='v'>"+dmgText(r)+"</div>";
     h += "</div>";
     if (!ok && r.pending) {
-      h += "<div style='margin-top:10px;padding-top:10px;border-top:1px solid #eef2f7'><div class='muted' style='margin-bottom:6px'>Match nahi hua &mdash; Order ID / doosri ID daal ke Save karo:</div><input id='rmId1' placeholder='Order ID' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><input id='rmId2' placeholder='Doosri ID (optional)' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><button class='savebtn' id='rmSave'>Save &amp; match</button> <button class='ghostbtn' id='rmCancel'>Cancel</button></div>";
+      h += "<div style='margin-top:10px;padding-top:10px;border-top:1px solid #eef2f7'><div class='muted' style='margin-bottom:6px'>AWB match nahi hua &mdash; Order ID / doosri ID daal ke match karo, ya bina match "Save as Not Found" karo:</div><input id='rmId1' placeholder='Order ID' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><input id='rmId2' placeholder='Doosri ID (optional)' autocomplete='off' style='padding:8px;border:1px solid #d7dde5;border-radius:8px;margin:0 6px 6px 0' /><button class='savebtn' id='rmSave'>Save &amp; match</button> <button class='savebtn' id='rmNF'>Save as Not Found</button> <button class='ghostbtn' id='rmCancel'>Cancel</button></div>";
     }
     if (r.cond_locked) {
       h += "<div class='lockmsg'>Condition set: <b>"+esc(cur)+"</b> (locked - ab badla nahi ja sakta)</div>";
@@ -270,8 +270,14 @@
     const rm1f = el.querySelector("#rmId1"); if (rm1f) { rm1f.focus(); }
     const cxBtn = el.querySelector("#rmCancel");
     if (cxBtn) cxBtn.addEventListener("click", () => doCancel(r.awb));
+    const nfBtn = el.querySelector("#rmNF");
+    if (nfBtn) nfBtn.addEventListener("click", () => doSaveNF(r.awb));
   }
 
+  async function doSaveNF(awb){
+    try { const { data:nf } = await sb.rpc("return_scan_save", { p_awb: awb, p_by: (window.CA && CA.who && CA.who()) || null }); last = (nf && nf[0]) || { awb, status:"NOT_FOUND" }; showResult(last); await loadList(); } catch(e){}
+    const i=$("#awb"); if(i) i.focus();
+  }
   async function doCancel(awb){
     try { await sb.rpc("return_scan_delete", { p_awb: awb }); } catch(e){}
     last = null; const el = $("#result"); if (el) { el.style.display = "none"; el.innerHTML = ""; }
@@ -322,7 +328,7 @@
         const { data } = await sb.rpc("return_scan_save", { p_awb: awb, p_condition: "Good", p_by: (window.CA && CA.who && CA.who()) || null });
         last = (data && data[0]) || { awb, status:"OK" }; showResult(last); await loadList();
       } else {
-        const { data:nf } = await sb.rpc("return_scan_save", { p_awb: awb, p_by: (window.CA && CA.who && CA.who()) || null }); last = (nf && nf[0]) || { awb, status:"NOT_FOUND" }; showResult(last); await loadList();
+        last = { awb, status:"NOT_FOUND", pending:true }; showResult(last);
       }
     } catch (e) { last = { awb, status:"BAD", return_reason:String(e.message||e) }; showResult(last); }
     inp.value = ""; if (!(last && last.pending)) inp.focus(); busy = false;
