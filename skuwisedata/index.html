@@ -220,12 +220,11 @@
     /* Green: 30-day units >= 30. Orange: a SKU that was green before but has now
        dropped below 30. Full row, beating the per-column group tints (inline,
        no !important) so the whole row reads one colour wherever it lands. */
-    table.data tbody tr.row-green  > td { background:#d6f5de !important; }
-    table.data tbody tr.row-green:hover  > td { background:#c6efd1 !important; }
-    /* Light green: a green SKU that is also trending UP over 7 days
-       (7-day daily avg >= 90-day daily avg). Normal green = green but flat/down. */
-    table.data tbody tr.row-lgreen  > td { background:#effbf3 !important; }
-    table.data tbody tr.row-lgreen:hover  > td { background:#e2f6ea !important; }
+    /* green DOWN/flat over 7 days = lighter green; green UP over 7 days = richer green (row-lgreen) */
+    table.data tbody tr.row-green  > td { background:#effbf3 !important; }
+    table.data tbody tr.row-green:hover  > td { background:#e2f6ea !important; }
+    table.data tbody tr.row-lgreen  > td { background:#d6f5de !important; }
+    table.data tbody tr.row-lgreen:hover  > td { background:#c6efd1 !important; }
     table.data tbody tr.row-orange > td { background:#ffe1c2 !important; }
     table.data tbody tr.row-orange:hover > td { background:#ffd3a6 !important; }
     /* Red: a green/orange row that has gone cold (0 sales in the last 3 days) and
@@ -332,7 +331,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24u</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24v</div>
     </div>
   </a>
   <div class="topbar-right">
