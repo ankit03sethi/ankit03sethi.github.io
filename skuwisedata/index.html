@@ -330,7 +330,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z3</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z4</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2977,8 +2977,11 @@
     // for "good" measures higher is better, for "bad" ones (returns, RTO, costs,
     // tax) lower is better. Totals are divided by their window length to get a
     // daily average; rates and per-order/per-unit figures are compared as-is.
-    const TREND_TOTAL = new Set(["Sold","Returns","RTO","Buyer returns","Units kept","Returns billed","Return cost","Courier total","Total revenue","Settlement","Tax paid","Packaging cost","Product cost","Net profit"]);
+    const TREND_TOTAL = new Set(["Sold","Units kept","Total revenue","Settlement","Net profit"]);   // grow with volume, higher=better -> compare daily average
     const TREND_NEG = new Set(["Returns","Return %","RTO","RTO %","Buyer returns","Buyer return %","Returns billed","Return cost","Cost per return","Courier /unit","Courier total","Courier per order","Return per order","Tax paid","Tax per order","Packaging cost","Pack per order","Product cost"]);
+    // Cost / return TOTALS grow with sales, so raw up/down is misleading. Judge them
+    // as a share of revenue instead (cost per rupee of revenue). Ratio up = red.
+    const RATIO_REV = new Set(["Return cost","Tax paid","Courier total","Packaging cost","Product cost","Returns","RTO","Buyer returns","Returns billed"]);
     function comboNum(html) {
       const t = String(html).replace(/<[^>]*>/g, "").replace(/,/g, "").trim();
       if (!t || t.indexOf("—") >= 0) return null;
@@ -3000,19 +3003,30 @@
         const ti = /title="([^"]*)"/.exec(attrs);
         return { w: w, inner: inner, st: st ? st[1] : "", ti: ti ? ti[1] : "" };
       });
-      const v90 = vals[90];
-      const hasBase = (v90 != null && v90 !== 0);
-      const perDay = TREND_TOTAL.has(c), neg = TREND_NEG.has(c);
-      const base = hasBase ? (perDay ? v90 / 90 : v90) : null;
+      const ratioRev = RATIO_REV.has(c);
+      const perDay = TREND_TOTAL.has(c) && !ratioRev, neg = TREND_NEG.has(c);
+      const wc = ratioRev ? (state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)) || {}) : null;
+      // The comparable number for a window: cost/return as a share of that window's
+      // revenue for the ratio columns (magnitude, since costs display negative);
+      // a per-day average for volume totals; the value as-is for rates/per-unit.
+      const metric = (w) => {
+        const v = vals[w]; if (v == null) return null;
+        if (ratioRev) { const rev = (Number(wc["st" + w]) || 0) + (Number(wc["shc" + w]) || 0); return rev > 0 ? Math.abs(v) / rev : null; }
+        if (perDay) { const days = (w === 0 ? 1 : w); return v / days; }
+        return v;
+      };
+      const base = metric(90);
+      const hasBase = base != null && (ratioRev || base !== 0);
       const parts = raw.map(p => {
         let tick = '<span class="tk" style="background:transparent"></span>';   // placeholder keeps numbers aligned
-        if (hasBase && p.w !== 90 && p.w !== 1 && p.w !== 3 && vals[p.w] != null) {
-          const days = (p.w === 0 ? 1 : p.w);
-          const a = perDay ? vals[p.w] / days : vals[p.w];
-          const up = neg ? (a <= base) : (a >= base);
-          tick = up
-            ? '<span class="tk" title="This window’s average beats the 90-day average" style="background:#16a34a"></span>'
-            : '<span class="tk" title="This window’s average is below the 90-day average" style="background:#dc2626"></span>';
+        if (hasBase && p.w !== 90 && p.w !== 1 && p.w !== 3) {
+          const a = metric(p.w);
+          if (a != null) {
+            const up = neg ? (a <= base) : (a >= base);
+            tick = up
+              ? '<span class="tk" title="Better than the 90-day baseline" style="background:#16a34a"></span>'
+              : '<span class="tk" title="Worse than the 90-day baseline" style="background:#dc2626"></span>';
+          }
         }
         return '<span class="wv"' + (p.st ? ' style="' + p.st + '"' : "")
              + (p.ti ? ' title="' + p.ti + '"' : "") + ">" + tick + p.inner + "</span>";
@@ -3170,10 +3184,9 @@
   // thematic view; in normal view we send null so the RPC just sorts by the Sold window.
   function focusKeysForServer() {
     if (state.viewMode === "normal") return null;
-    // Send only the ACTIVE timeframe's focus set, so the server's orange band
-    // matches the colours: a SKU green only on another window is not orange here.
-    const s = (state.focusedByTf || {})[String(activeTf())];
-    return s ? [...s] : [];
+    // Permanent focus union (green in any timeframe ever) drives the orange band,
+    // so every focused SKU floats/colours as orange when below the active threshold.
+    return [...(state.focusedKeys || [])];
   }
   function syncViewModeChips() {
     const row = document.getElementById("viewModeRow");
@@ -3243,16 +3256,17 @@
         const d7 = Number(wc.d7) || 0;
         const d90 = Number(wc.d90) || 0;
         const up7 = d90 > 0 && (d7 / 7 >= d90 / 90);   // trending up over 7 days
-        const focusedTf = tfSet.has(key);              // was green in the ACTIVE timeframe
-        // Every colour is judged on the ACTIVE timeframe only.
+        const isFocused = state.focusedKeys.has(key);  // ever green in ANY timeframe (permanent)
+        // Green/red judged on the ACTIVE timeframe; orange = any focused SKU now
+        // below the active threshold, so a focused SKU always carries a colour.
         if (floatOn && sold >= gm && sold3 === 0) {
           // Red = green in the active timeframe that has gone cold (0 sales in last 3 days).
           tr.classList.add("row-red");
         } else if (sold >= gm) {
           // green: light green when also trending up over 7 days, normal green otherwise
           tr.classList.add(up7 ? "row-lgreen" : "row-green");
-        } else if (focusedTf) {
-          // orange = was green in THIS timeframe before, now below its threshold
+        } else if (isFocused) {
+          // orange = a remembered-green SKU (any timeframe) now below the active threshold
           tr.classList.add("row-orange");
         }
         if (fi >= 0 && tr.cells[fi]) {
