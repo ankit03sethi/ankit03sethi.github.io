@@ -208,10 +208,6 @@
     table.data tbody tr.row-green:hover  > td { background:#c6efd1 !important; }
     table.data tbody tr.row-orange > td { background:#ffe1c2 !important; }
     table.data tbody tr.row-orange:hover > td { background:#ffd3a6 !important; }
-    /* Yellow: never-green rows whose review Count is at/above the lowest-reviewed
-       focused SKU — i.e. high-review listings not yet focused. */
-    table.data tbody tr.row-yellow > td { background:#fff3bf !important; }
-    table.data tbody tr.row-yellow:hover > td { background:#ffec99 !important; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -312,7 +308,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3012,20 +3008,10 @@
     try { localStorage.setItem(FOCUS_LS, JSON.stringify([...state.focusedKeys])); } catch (e) {}
   }
 
-  // 30-day review count for a SKU (the "Count" column), from the scraped stats.
-  function reviewCount(key) {
-    const st = state.listingStats && state.listingStats.get(key);
-    return Number(st && st.review_count) || 0;
-  }
-
   // Colour every row by its SKU's sale in the ACTIVE timeframe (tf = 30/60/90,
-  // taken from the Sold column's sort), fill the Focus flag, remember any SKU
-  // that reaches green, and mark the "yellow" band. Rules:
+  // taken from the Sold column's sort) and fill the Focus flag. Rules:
   //   green  = tf-day units >= tf   (30d>=30, 60d>=60, 90d>=90)
   //   orange = focused before (green in ANY timeframe) but now below tf
-  //   yellow = never-green (white) SKU whose review Count is >= the LOWEST review
-  //            Count among focused SKUs that actually have reviews. 0/blank-review
-  //            focused SKUs don't set the boundary.
   //   Focus  = set the first time a SKU is green in any timeframe; never cleared.
   function paintFocus() {
     try {
@@ -3034,29 +3020,21 @@
       const table = $("#tableWrap").querySelector("table.data");
       if (!table || !table.tBodies[0]) return;
 
-      // Pass 1 (global, over every loaded row): update the remembered-green set
-      // and find the yellow boundary = min review Count among focused SKUs that
-      // have reviews > 0.
       const tf = activeTf();          // 30 | 60 | 90
       const dk = "d" + tf;            // d30 | d60 | d90
-      let dirty = false, boundary = Infinity;
+      // Remember any SKU that is green now — permanent focused set.
+      let dirty = false;
       state.rowsById.forEach((r) => {
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
         const sold = Number((state.windowCounts.get(key) || {})[dk]) || 0;
         if (sold >= tf && !state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
-        if (state.focusedKeys.has(key)) {
-          const rc = reviewCount(key);
-          if (rc > 0 && rc < boundary) boundary = rc;
-        }
       });
       if (dirty) saveFocusFlags();
-      const hasBoundary = boundary !== Infinity;
 
-      // Pass 2: paint the rows on screen.
       const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
       const fi = heads.indexOf("Focus");
       for (const tr of table.tBodies[0].rows) {
-        tr.classList.remove("row-green", "row-orange", "row-yellow");
+        tr.classList.remove("row-green", "row-orange");
         const r = state.rowsById.get(String(tr.dataset.id));
         if (!r) continue;
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
@@ -3065,8 +3043,6 @@
           tr.classList.add("row-green");
         } else if (state.focusedKeys.has(key)) {
           tr.classList.add("row-orange");
-        } else if (hasBoundary && reviewCount(key) >= boundary) {
-          tr.classList.add("row-yellow");
         }
         if (fi >= 0 && tr.cells[fi]) {
           const on = state.focusedKeys.has(key);
