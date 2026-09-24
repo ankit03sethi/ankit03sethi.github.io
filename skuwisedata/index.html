@@ -312,7 +312,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24g</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24h</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2994,8 +2994,16 @@
   // SKU that later drops below the threshold turns orange (because it was green
   // once), and its Focus cell keeps reading "Focused" forever. A SKU that was
   // never green stays plain, with an empty Focus cell.
-  const GREEN_MIN = 30;                 // 30-day units >= this => green
   const FOCUS_LS  = "ca_focus_flags_v1";
+  // Active timeframe (30/60/90) = the window the Sold column is sorted on;
+  // default 30 (also for 1/3/7/15-day sorts). The green threshold IS this
+  // number: 30d needs >=30, 60d needs >=60, 90d needs >=90.
+  function activeTf() {
+    try {
+      const w = Number(sortWin(state.tools && state.tools["sku_master"], "Sold"));
+      return (w === 60 || w === 90) ? w : 30;
+    } catch (e) { return 30; }
+  }
   function loadFocusFlags() {
     try { state.focusedKeys = new Set(JSON.parse(localStorage.getItem(FOCUS_LS) || "[]")); }
     catch (e) { state.focusedKeys = new Set(); }
@@ -3010,15 +3018,15 @@
     return Number(st && st.review_count) || 0;
   }
 
-  // Colour every row by its SKU's 30-day sale, fill the Focus flag, remember any
-  // SKU that reaches green, and mark the "yellow" band. Rules (per SKU, so they
-  // hold under any sort/filter):
-  //   green  = 30-day units >= GREEN_MIN
-  //   orange = was green before (remembered) but now below GREEN_MIN
+  // Colour every row by its SKU's sale in the ACTIVE timeframe (tf = 30/60/90,
+  // taken from the Sold column's sort), fill the Focus flag, remember any SKU
+  // that reaches green, and mark the "yellow" band. Rules:
+  //   green  = tf-day units >= tf   (30d>=30, 60d>=60, 90d>=90)
+  //   orange = focused before (green in ANY timeframe) but now below tf
   //   yellow = never-green (white) SKU whose review Count is >= the LOWEST review
-  //            Count among focused SKUs that actually have reviews. In a Count
-  //            high->low sort this is exactly "the white rows above the last
-  //            focused row". 0/blank-review focused SKUs don't set the boundary.
+  //            Count among focused SKUs that actually have reviews. 0/blank-review
+  //            focused SKUs don't set the boundary.
+  //   Focus  = set the first time a SKU is green in any timeframe; never cleared.
   function paintFocus() {
     try {
       if (state.view !== "sku_master") return;
@@ -3029,11 +3037,13 @@
       // Pass 1 (global, over every loaded row): update the remembered-green set
       // and find the yellow boundary = min review Count among focused SKUs that
       // have reviews > 0.
+      const tf = activeTf();          // 30 | 60 | 90
+      const dk = "d" + tf;            // d30 | d60 | d90
       let dirty = false, boundary = Infinity;
       state.rowsById.forEach((r) => {
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
-        const sold = Number((state.windowCounts.get(key) || {}).d30) || 0;
-        if (sold >= GREEN_MIN && !state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
+        const sold = Number((state.windowCounts.get(key) || {})[dk]) || 0;
+        if (sold >= tf && !state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
         if (state.focusedKeys.has(key)) {
           const rc = reviewCount(key);
           if (rc > 0 && rc < boundary) boundary = rc;
@@ -3050,8 +3060,8 @@
         const r = state.rowsById.get(String(tr.dataset.id));
         if (!r) continue;
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
-        const sold = Number((state.windowCounts.get(key) || {}).d30) || 0;
-        if (sold >= GREEN_MIN) {
+        const sold = Number((state.windowCounts.get(key) || {})[dk]) || 0;
+        if (sold >= tf) {
           tr.classList.add("row-green");
         } else if (state.focusedKeys.has(key)) {
           tr.classList.add("row-orange");
