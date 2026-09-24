@@ -208,6 +208,10 @@
     table.data tbody tr.row-green:hover  > td { background:#c6efd1 !important; }
     table.data tbody tr.row-orange > td { background:#ffe1c2 !important; }
     table.data tbody tr.row-orange:hover > td { background:#ffd3a6 !important; }
+    /* Yellow: never-green rows whose review Count is at/above the lowest-reviewed
+       focused SKU — i.e. high-review listings not yet focused. */
+    table.data tbody tr.row-yellow > td { background:#fff3bf !important; }
+    table.data tbody tr.row-yellow:hover > td { background:#ffec99 !important; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -308,7 +312,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2993,30 +2997,59 @@
     try { localStorage.setItem(FOCUS_LS, JSON.stringify([...state.focusedKeys])); } catch (e) {}
   }
 
-  // Colour every row by its SKU's 30-day sale, fill the Focus flag, and remember
-  // any SKU that reaches green. Filters/sorts never change the rule — it is per
-  // SKU, by 30-day sale, wherever the row appears.
+  // 30-day review count for a SKU (the "Count" column), from the scraped stats.
+  function reviewCount(key) {
+    const st = state.listingStats && state.listingStats.get(key);
+    return Number(st && st.review_count) || 0;
+  }
+
+  // Colour every row by its SKU's 30-day sale, fill the Focus flag, remember any
+  // SKU that reaches green, and mark the "yellow" band. Rules (per SKU, so they
+  // hold under any sort/filter):
+  //   green  = 30-day units >= GREEN_MIN
+  //   orange = was green before (remembered) but now below GREEN_MIN
+  //   yellow = never-green (white) SKU whose review Count is >= the LOWEST review
+  //            Count among focused SKUs that actually have reviews. In a Count
+  //            high->low sort this is exactly "the white rows above the last
+  //            focused row". 0/blank-review focused SKUs don't set the boundary.
   function paintFocus() {
     try {
       if (state.view !== "sku_master") return;
       if (!state.focusedKeys) loadFocusFlags();
       const table = $("#tableWrap").querySelector("table.data");
       if (!table || !table.tBodies[0]) return;
+
+      // Pass 1 (global, over every loaded row): update the remembered-green set
+      // and find the yellow boundary = min review Count among focused SKUs that
+      // have reviews > 0.
+      let dirty = false, boundary = Infinity;
+      state.rowsById.forEach((r) => {
+        const key = wcKey(r.company_name, r.platform, r.seller_sku);
+        const sold = Number((state.windowCounts.get(key) || {}).d30) || 0;
+        if (sold >= GREEN_MIN && !state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
+        if (state.focusedKeys.has(key)) {
+          const rc = reviewCount(key);
+          if (rc > 0 && rc < boundary) boundary = rc;
+        }
+      });
+      if (dirty) saveFocusFlags();
+      const hasBoundary = boundary !== Infinity;
+
+      // Pass 2: paint the rows on screen.
       const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
       const fi = heads.indexOf("Focus");
-      let dirty = false;
       for (const tr of table.tBodies[0].rows) {
-        tr.classList.remove("row-green", "row-orange");
+        tr.classList.remove("row-green", "row-orange", "row-yellow");
         const r = state.rowsById.get(String(tr.dataset.id));
         if (!r) continue;
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
-        const wc = state.windowCounts.get(key);
-        const sold = Number(wc && wc.d30) || 0;
+        const sold = Number((state.windowCounts.get(key) || {}).d30) || 0;
         if (sold >= GREEN_MIN) {
           tr.classList.add("row-green");
-          if (!state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
         } else if (state.focusedKeys.has(key)) {
           tr.classList.add("row-orange");
+        } else if (hasBoundary && reviewCount(key) >= boundary) {
+          tr.classList.add("row-yellow");
         }
         if (fi >= 0 && tr.cells[fi]) {
           const on = state.focusedKeys.has(key);
@@ -3024,7 +3057,6 @@
           tr.cells[fi].style.cssText = on ? "font-weight:700;color:#166534" : "";
         }
       }
-      if (dirty) saveFocusFlags();
     } catch (e) { /* best-effort, never block the table */ }
   }
 
