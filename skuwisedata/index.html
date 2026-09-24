@@ -306,7 +306,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -525,8 +525,13 @@
     loadHiddenCols();
     installColPicker();
     installArrowScroll();
-    await loadWindowCounts();
+    // Draw the table FIRST so rows show almost immediately — the server already
+    // returns them sorted, so the order is correct without the counts. The heavy
+    // per-SKU day counts + stock map (~9 MB) then load in the background, and a
+    // single redraw fills the day numbers and paints the top-100 green. Earlier
+    // the whole page waited on that ~9 MB before drawing a single row.
     await refresh();
+    loadWindowCounts().then(() => { try { redrawCurrentTable(); } catch (e) {} });
   })();
 
   // Rolling per-SKU order counts for the last 1/3/7/15/30/60 days, keyed on
