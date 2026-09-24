@@ -96,12 +96,12 @@
        number it belongs to, in every row, all the way down the table. */
     .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
              align-items:center; width:100%; }
-    /* The trend dot sits on the line ABOVE the number, centered, so numbers of
-       any width stay aligned and the dots line up one under the other. */
+    /* Trend dot on the line ABOVE the number; a transparent placeholder fills the
+       slot when there is no dot, so every number sits on the same baseline. */
     .wgrid > span { display:flex; flex-direction:column; align-items:center; justify-content:center;
              padding:0 7px; font-variant-numeric:tabular-nums; line-height:1.15; }
     .wgrid > span + span { border-left:2px solid #cbd5e1; }
-    .wgrid > span .tk { display:inline-block; width:8px; height:8px; border-radius:50%; line-height:1; margin:0 0 3px 0; }
+    .wgrid > span .tk { display:inline-block; width:8px; height:8px; border-radius:50%; line-height:1; margin:0 0 2px 0; }
     table.data thead th .wdays { margin-top:3px; }
     table.data thead th .wdays > span { font-size:10px; font-weight:700;
         color:#94a3b8; letter-spacing:0; }
@@ -330,7 +330,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24w</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24x</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2838,10 +2838,12 @@
       if (DAY_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)) || {};
         const n = Number(wc[DAY_COLS[c]]) || 0;
-        // Trend tick on 3/7/15/30/60-day Sold: this window's daily average vs the
-        // 90-day daily average. Green up = selling faster lately, red down = slower.
-        // Needs a 90-day baseline; no baseline (d90=0) => no tick.
-        let tick = "";
+        // Trend dot on 7/15/30/60-day Sold: this window's daily average vs the
+        // 90-day daily average. Green = selling faster lately, red = slower.
+        // Needs a 90-day baseline; no baseline (d90=0) => no dot.
+        // A transparent placeholder of the same size is rendered whenever there is
+        // no dot, so every number in a row sits on the SAME baseline (dot or not).
+        let tick = '<span class="tk" style="background:transparent"></span>';
         const w = parseInt(c, 10);
         if ((w === 7 || w === 15 || w === 30 || w === 60)) {
           const d90 = Number(wc.d90) || 0;
@@ -2851,7 +2853,7 @@
               : '<span class="tk" title="Daily rate below the 90-day average" style="background:#dc2626"></span>';
           }
         }
-        // Dot goes ABOVE the number (flex column in the Sold wgrid stacks it on top).
+        // Dot (or placeholder) goes ABOVE the number; the number's baseline stays put.
         return `<td${n ? "" : ' style="color:#94a3b8"'}>${tick}${n || 0}</td>`;
       }
       // Hand-picked marks per row: locked until the pencil is clicked, saved
