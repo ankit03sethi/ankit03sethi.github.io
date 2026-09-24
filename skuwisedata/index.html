@@ -2775,7 +2775,7 @@
       // Flipkart: Expected Settlement is computed, not typed - COP + tax +
       // packaging + the smaller of Auto Margin (50) and COP x Auto % (100%).
       // The same formula the Suggested Price and the reprice file use.
-      if (c === "Expected Settlement" && ["flipkart", "amazon"].includes(String(r.platform || "").toLowerCase())) {
+      if (c === "Expected Settlement" && ["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase())) {
         const es = expSettleCalc(r);
         if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
         return '<td title="' + escapeHtml(es.why) + '" style="color:#334155' + (es.manual ? ";font-weight:600" : "") + '">' + es.val + "</td>";
@@ -2783,7 +2783,7 @@
       // Expected Profit: settlement less every deduction (tax, promotion, COP,
       // packaging, return cost). Red when it goes negative - a loss at target.
       if (c === "Expected Profit") {
-        if (!["flipkart", "amazon"].includes(String(r.platform || "").toLowerCase()))
+        if (!["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase()))
           return '<td style="color:#cbd5e1">' + DASH + "</td>";
         const ep = expProfitCalc(r);
         if (ep.val == null) return '<td title="' + escapeHtml(ep.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
