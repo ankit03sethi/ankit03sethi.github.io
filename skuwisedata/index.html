@@ -306,7 +306,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2968,34 +2968,33 @@
     paintTop100();
   }
 
-  // The fixed set of the 100 top-selling SKUs by 30-day units — ranked ONCE
-  // across every SKU (all of window counts, not just the loaded page), and
-  // independent of any filter. Recomputed only when the sales data reloads.
+  // The fixed set of the 100 top-selling ROWS by 30-day units — ranked ONCE
+  // across every loaded row (the server returns them 30-day-sorted, so the top
+  // sellers are all here) and independent of any filter. Row-level, so the
+  // count is EXACTLY 100 even when one SKU is listed on more than one row.
   function computeTop100Keys() {
     const arr = [];
-    state.windowCounts.forEach((wc, key) => {
+    state.rowsById.forEach((r, id) => {
+      const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
       const sold = Number(wc && wc.d30) || 0;
-      if (sold > 0) arr.push([key, sold]);
+      if (sold > 0) arr.push([id, sold]);
     });
     arr.sort((a, b) => b[1] - a[1]);
-    state.top100Keys = new Set(arr.slice(0, 100).map(x => x[0]));
+    state.top100Ids = new Set(arr.slice(0, 100).map(x => x[0]));
   }
 
-  // Full row light green for those top-100 SKUs, wherever they show up. Filters
-  // and sorts NEVER change which rows are green — only the global top 100 by
-  // 30-day sale are ever green; a filter just hides the ones that don't match.
+  // Full row light green for exactly those top-100 rows, wherever they show up.
+  // Filters and sorts NEVER change which rows are green — only the global top
+  // 100 by 30-day sale are ever green; a filter just hides ones that don't match.
   function paintTop100() {
     try {
       if (state.view !== "sku_master") return;
-      if (!state.top100Keys) computeTop100Keys();
+      if (!state.top100Ids) computeTop100Keys();
       const table = $("#tableWrap").querySelector("table.data");
       if (!table || !table.tBodies[0]) return;
       for (const tr of table.tBodies[0].rows) {
         tr.classList.remove("top100sale");
-        const r = state.rowsById.get(String(tr.dataset.id));
-        if (!r) continue;
-        if (state.top100Keys.has(wcKey(r.company_name, r.platform, r.seller_sku)))
-          tr.classList.add("top100sale");
+        if (state.top100Ids.has(String(tr.dataset.id))) tr.classList.add("top100sale");
       }
     } catch (e) { /* highlight is best-effort, never block the table */ }
   }
