@@ -222,6 +222,10 @@
        no !important) so the whole row reads one colour wherever it lands. */
     table.data tbody tr.row-green  > td { background:#d6f5de !important; }
     table.data tbody tr.row-green:hover  > td { background:#c6efd1 !important; }
+    /* Light green: a green SKU that is also trending UP over 7 days
+       (7-day daily avg >= 90-day daily avg). Normal green = green but flat/down. */
+    table.data tbody tr.row-lgreen  > td { background:#effbf3 !important; }
+    table.data tbody tr.row-lgreen:hover  > td { background:#e2f6ea !important; }
     table.data tbody tr.row-orange > td { background:#ffe1c2 !important; }
     table.data tbody tr.row-orange:hover > td { background:#ffd3a6 !important; }
     /* Red: a green/orange row that has gone cold (0 sales in the last 3 days) and
@@ -328,7 +332,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24t</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24u</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3061,7 +3065,7 @@
   function colorFilterActive() { return !!(state.colorFilter && state.colorFilter.size); }
   function rowColorName(tr) {
     return tr.classList.contains("row-red") ? "red"
-         : tr.classList.contains("row-green") ? "green"
+         : (tr.classList.contains("row-green") || tr.classList.contains("row-lgreen")) ? "green"
          : tr.classList.contains("row-orange") ? "orange" : "white";
   }
   function colorOK(tr) { return !colorFilterActive() || state.colorFilter.has(rowColorName(tr)); }
@@ -3081,7 +3085,7 @@
       // Don't colour until sales data (windowCounts) has loaded — otherwise every
       // row reads as 0 sales and flashes the wrong colour (all red) on first paint.
       if (!state.windowCounts || state.windowCounts.size === 0) {
-        for (const tr of table.tBodies[0].rows) tr.classList.remove("row-green", "row-orange", "row-red");
+        for (const tr of table.tBodies[0].rows) tr.classList.remove("row-green", "row-lgreen", "row-orange", "row-red");
         return;
       }
 
@@ -3103,19 +3107,23 @@
       const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
       const fi = heads.indexOf("Focus");
       for (const tr of table.tBodies[0].rows) {
-        tr.classList.remove("row-green", "row-orange", "row-red");
+        tr.classList.remove("row-green", "row-lgreen", "row-orange", "row-red");
         const r = state.rowsById.get(String(tr.dataset.id));
         if (!r) continue;
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
         const wc = state.windowCounts.get(key) || {};
         const sold = Number(wc[dk]) || 0;
         const sold3 = Number(wc.d3) || 0;
+        const d7 = Number(wc.d7) || 0;
+        const d90 = Number(wc.d90) || 0;
+        const up7 = d90 > 0 && (d7 / 7 >= d90 / 90);   // trending up over 7 days
         const isFocused = state.focusedKeys.has(key);
         if (floatOn && (sold >= gm || isFocused) && sold3 === 0) {
           // floated to the top because it went cold (0 sales in the last 3 days)
           tr.classList.add("row-red");
         } else if (sold >= gm) {
-          tr.classList.add("row-green");
+          // green: light green when also trending up over 7 days, normal green otherwise
+          tr.classList.add(up7 ? "row-lgreen" : "row-green");
         } else if (isFocused) {
           tr.classList.add("row-orange");
         }
