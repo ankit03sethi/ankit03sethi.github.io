@@ -308,7 +308,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24i</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24j</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1268,6 +1268,7 @@
         p_sort: ss.key, p_dir: ss.dir,
         p_company: state.company || null, p_platform: state.platform || null,
         p_search: state.search || null, p_limit: 1000, p_offset: 0,
+        p_focus_keys: [...(state.focusedKeys || [])],
       });
       data = res.data; error = res.error; count = (res.data || []).length;
     } else if (state.view === "sku_master" && state.search) {
@@ -1570,6 +1571,7 @@
           p_sort: ss2 ? ss2.key : null, p_dir: ss2 ? ss2.dir : "desc",
           p_company: state.company || null, p_platform: state.platform || null,
           p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
+          p_focus_keys: [...(state.focusedKeys || [])],
         });
         data = res.data; error = res.error;
         if (!error) state.hasMore = (data || []).length >= 1000;
