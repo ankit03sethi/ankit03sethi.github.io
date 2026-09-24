@@ -96,8 +96,13 @@
        number it belongs to, in every row, all the way down the table. */
     .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
              align-items:center; width:100%; }
-    .wgrid > span { text-align:right; padding:0 6px; }
+    .wgrid > span { position:relative; text-align:right; padding:0 16px;
+             font-variant-numeric:tabular-nums; }
     .wgrid > span + span { border-left:2px solid #cbd5e1; }
+    /* Trend tick sits in the right padding, absolutely placed, so it never shifts
+       the number — every number stays right-aligned under its day header. */
+    .wgrid > span .tk { position:absolute; right:3px; top:50%; transform:translateY(-50%);
+             font-size:9px; line-height:1; }
     table.data thead th .wdays { margin-top:3px; }
     table.data thead th .wdays > span { font-size:10px; font-weight:700;
         color:#94a3b8; letter-spacing:0; }
@@ -193,7 +198,9 @@
     .scrape-bar .sep { color:#cbd5e1; }
     .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
     table.data { width:100%; border-collapse:collapse; font-size:14px; }
-    table.data th, table.data td { padding:12px 14px; text-align:center; border-bottom:1px solid #eef2f7; }
+    table.data th, table.data td { padding:12px 20px; text-align:center; border-bottom:1px solid #eef2f7; }
+    /* Even-width digits everywhere so numbers of different sizes line up cleanly. */
+    table.data tbody td, table.data thead th { font-variant-numeric:tabular-nums; }
     /* Rows read like data you are meant to act on, not a log dump: a little
        more room and a little more weight. */
     table.data tbody td { font-weight:700; color:#1e293b; }
@@ -317,7 +324,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24o</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24p</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2816,8 +2823,8 @@
           const d90 = Number(wc.d90) || 0;
           if (d90 > 0) {
             tick = (n / w >= d90 / 90)
-              ? ' <span title="Daily rate above the 90-day average" style="color:#16a34a;font-weight:800">▲</span>'
-              : ' <span title="Daily rate below the 90-day average" style="color:#dc2626;font-weight:800">▼</span>';
+              ? '<span class="tk" title="Daily rate at/above the 90-day average" style="color:#16a34a;font-weight:800">▲</span>'
+              : '<span class="tk" title="Daily rate below the 90-day average" style="color:#dc2626;font-weight:800">▼</span>';
           }
         }
         return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}${tick}</td>`;
