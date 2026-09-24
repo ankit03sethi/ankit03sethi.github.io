@@ -213,6 +213,9 @@
        number+arrow stack) centred, and long text kept to one line instead of
        wrapping into a tall row. */
     table.data tbody td { white-space:nowrap; height:48px; padding-top:6px; padding-bottom:6px; vertical-align:middle; }
+    /* The first data row sits right under the sticky filter row, which was covering
+       its trend dots (dots sit above the number). Extra headroom clears them. */
+    table.data tbody tr:first-child > td { padding-top:22px; }
     table.data thead th { background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase;
                           font-size:11px; letter-spacing:.5px; position:sticky; top:14px;
                           border-bottom:1px solid #e2e8f0; }
@@ -332,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z7</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z8</div>
     </div>
   </a>
   <div class="topbar-right">
