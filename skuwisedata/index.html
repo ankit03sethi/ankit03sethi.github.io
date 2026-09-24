@@ -96,13 +96,13 @@
        number it belongs to, in every row, all the way down the table. */
     .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
              align-items:center; width:100%; }
-    .wgrid > span { position:relative; text-align:right; padding:0 16px;
-             font-variant-numeric:tabular-nums; }
+    /* Number on its own line (right-aligned under the day header); the trend tick
+       sits on the line BELOW it, so numbers of any width stay perfectly aligned
+       and the arrows line up one under the other down the column. */
+    .wgrid > span { display:flex; flex-direction:column; align-items:flex-end; justify-content:center;
+             padding:0 7px; font-variant-numeric:tabular-nums; line-height:1.15; }
     .wgrid > span + span { border-left:2px solid #cbd5e1; }
-    /* Trend tick sits in the right padding, absolutely placed, so it never shifts
-       the number — every number stays right-aligned under its day header. */
-    .wgrid > span .tk { position:absolute; right:3px; top:50%; transform:translateY(-50%);
-             font-size:9px; line-height:1; }
+    .wgrid > span .tk { font-size:9px; line-height:1; margin-top:1px; }
     table.data thead th .wdays { margin-top:3px; }
     table.data thead th .wdays > span { font-size:10px; font-weight:700;
         color:#94a3b8; letter-spacing:0; }
@@ -198,7 +198,7 @@
     .scrape-bar .sep { color:#cbd5e1; }
     .load-more-row td { text-align:center; color:#64748b; font-size:12px; padding:14px; }
     table.data { width:100%; border-collapse:collapse; font-size:14px; }
-    table.data th, table.data td { padding:12px 20px; text-align:center; border-bottom:1px solid #eef2f7; }
+    table.data th, table.data td { padding:12px 10px; text-align:center; border-bottom:1px solid #eef2f7; }
     /* Even-width digits everywhere so numbers of different sizes line up cleanly. */
     table.data tbody td, table.data thead th { font-variant-numeric:tabular-nums; }
     /* Rows read like data you are meant to act on, not a log dump: a little
@@ -324,7 +324,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24p</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24q</div>
     </div>
   </a>
   <div class="topbar-right">
