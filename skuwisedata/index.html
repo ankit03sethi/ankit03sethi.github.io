@@ -94,16 +94,19 @@
        it appears straight away, wraps properly and can be read. */
     /* Header and cell share one grid, so the day label sits exactly above the
        number it belongs to, in every row, all the way down the table. */
-    .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
+    /* Every window sub-cell is an EQUAL-width track (minmax(0,1fr) drops the
+       min-content floor, so a big number in one row can't make its track wider
+       than the others). The column itself still grows to fit the widest value in
+       any row, and that width applies to every row — so nothing shifts left/right
+       from row to row and the dots line up straight down the column. */
+    .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr);
              align-items:center; width:100%; }
-    /* Excel-style: the trend dot sits inline to the LEFT of the number, both
-       centred on one line. A transparent placeholder fills the dot slot when there
-       is no dot, so numbers line up and the dot column is stable row to row. One
-       line (never stacked) means nothing peeks out under the frozen header. */
-    .wgrid > span { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:5px;
+    /* Trend dot on the line ABOVE the number; a transparent placeholder fills the
+       slot when there is no dot, so every number sits on the same baseline. */
+    .wgrid > span { display:flex; flex-direction:column; align-items:center; justify-content:center;
              padding:0 7px; font-variant-numeric:tabular-nums; line-height:1.15; }
     .wgrid > span + span { border-left:2px solid #cbd5e1; }
-    .wgrid > span .tk { display:inline-block; width:8px; height:8px; border-radius:50%; line-height:1; flex:0 0 auto; }
+    .wgrid > span .tk { display:inline-block; width:8px; height:8px; border-radius:50%; line-height:1; margin:0 0 2px 0; }
     table.data thead th .wdays { margin-top:3px; }
     table.data thead th .wdays > span { font-size:10px; font-weight:700;
         color:#94a3b8; letter-spacing:0; }
@@ -332,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z5</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z6</div>
     </div>
   </a>
   <div class="topbar-right">
