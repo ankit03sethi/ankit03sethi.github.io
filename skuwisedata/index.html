@@ -94,12 +94,9 @@
        it appears straight away, wraps properly and can be read. */
     /* Header and cell share one grid, so the day label sits exactly above the
        number it belongs to, in every row, all the way down the table. */
-    /* Every window sub-cell is an EQUAL-width track (minmax(0,1fr) drops the
-       min-content floor, so a big number in one row can't make its track wider
-       than the others). The column itself still grows to fit the widest value in
-       any row, and that width applies to every row — so nothing shifts left/right
-       from row to row and the dots line up straight down the column. */
-    .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr);
+    /* Header and cell share one grid, so the day label sits exactly above the
+       number it belongs to, in every row, all the way down the table. */
+    .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
              align-items:center; width:100%; }
     /* Trend dot on the line ABOVE the number; a transparent placeholder fills the
        slot when there is no dot, so every number sits on the same baseline. */
@@ -335,7 +332,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z6</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z7</div>
     </div>
   </a>
   <div class="topbar-right">
