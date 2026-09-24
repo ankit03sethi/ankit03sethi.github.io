@@ -317,7 +317,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24m</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24n</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2812,7 +2812,7 @@
         // Needs a 90-day baseline; no baseline (d90=0) => no tick.
         let tick = "";
         const w = parseInt(c, 10);
-        if ((w === 3 || w === 7 || w === 15 || w === 30 || w === 60)) {
+        if ((w === 1 || w === 3 || w === 7 || w === 15 || w === 30 || w === 60)) {
           const d90 = Number(wc.d90) || 0;
           if (d90 > 0) {
             tick = (n / w >= d90 / 90)
