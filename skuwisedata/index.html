@@ -116,6 +116,11 @@
     .sortpanel .sp-l { font-size:10.5px; letter-spacing:.5px; text-transform:uppercase;
                        color:#64748b; font-weight:700; margin:9px 0 5px; }
     .sortpanel .sp-row { display:flex; flex-wrap:wrap; gap:5px; }
+    .sortpanel .cdot { display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border:1px solid #e2e8f0; background:#fff; border-radius:999px; cursor:pointer; font-size:11.5px; font-weight:700; color:#475569; }
+    .sortpanel .cdot .sw { width:12px; height:12px; border-radius:50%; border:1px solid rgba(0,0,0,.18); }
+    .sortpanel .cdot.on { border-color:#1f6feb; background:#eff6ff; color:#1f6feb; }
+    .sortpanel .gm-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:11.5px; color:#475569; font-weight:700; }
+    .sortpanel .gm { width:52px; padding:4px 6px; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; text-align:center; }
     .pgrp { font-size:10.5px; letter-spacing:.5px; text-transform:uppercase;
             color:#64748b; font-weight:700; margin:10px 0 5px; }
     .prow { display:flex; flex-wrap:wrap; gap:5px; }
@@ -312,7 +317,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24k</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24l</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -530,6 +535,7 @@
     // ~10ms) covers every sort and every page, so there is nothing to race.
     loadHiddenCols();
     loadFocusFlags();
+    loadColorPrefs();
     installColPicker();
     installArrowScroll();
     // Draw the table FIRST so rows show almost immediately — the server already
@@ -576,9 +582,8 @@
     const m = new Map();
     for (const r of wc) m.set(wcKey(r.company_name, r.platform, r.sku), r);
     state.windowCounts = m;
-    // Sales are now known — colour green (>=30) / orange (was green, now <30)
-    // and fill the Focus flag.
-    paintFocus();
+    // Sales are now known — colour green/orange/red, fill Focus, apply colour filter.
+    applyTableTools();
     // Platform stock, off the newest inventory export per company + platform.
     // A SKU missing from an export that exists is Inactive; a company +
     // platform with no export at all shows a dash, not a false Inactive.
@@ -1273,6 +1278,7 @@
         p_company: state.company || null, p_platform: state.platform || null,
         p_search: state.search || null, p_limit: 1000, p_offset: 0,
         p_focus_keys: [...(state.focusedKeys || [])],
+        p_green_min: greenMinFor(activeTf()),
       });
       data = res.data; error = res.error; count = (res.data || []).length;
     } else if (state.view === "sku_master" && state.search) {
@@ -1576,6 +1582,7 @@
           p_company: state.company || null, p_platform: state.platform || null,
           p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
           p_focus_keys: [...(state.focusedKeys || [])],
+          p_green_min: greenMinFor(activeTf()),
         });
         data = res.data; error = res.error;
         if (!error) state.hasMore = (data || []).length >= 1000;
@@ -1618,7 +1625,7 @@
   // applied as rows arrive, until the full set is loaded.
   async function loadAllForFilter() {
     if (state.view === "uploads") return;
-    if (!state.search && !filtersActive()) return;
+    if (!state.search && !filtersActive() && !colorFilterActive()) return;
     if (state.loadingAll) return;
     state.loadingAll = true;
     try {
@@ -2979,16 +2986,16 @@
     const table = $("#tableWrap").querySelector("table.data");
     if (!table) return;
     const t = toolsFor(state.view);
+    paintFocus();
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
     const body = table.querySelector("tbody");
     if (!body) return;
     const picks = picksFor(t);
     const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size);
     for (const tr of body.rows) {
-      const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i])));
+      const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i]))) && colorOK(tr);
       tr.style.display = ok ? "" : "none";
     }
-    paintFocus();
   }
 
   // A SKU is "focused" for good the first time its 30-day units hit the green
@@ -3014,6 +3021,27 @@
     try { localStorage.setItem(FOCUS_LS, JSON.stringify([...state.focusedKeys])); } catch (e) {}
   }
 
+  // Editable green cutoffs per timeframe (default = the timeframe number) and the
+  // colour filter (which of green/orange/red/white to show). Both persist.
+  const GREENMIN_LS = "ca_green_min_v1";
+  const COLORF_LS   = "ca_color_filter_v1";
+  function loadColorPrefs() {
+    try { const g = JSON.parse(localStorage.getItem(GREENMIN_LS) || "null"); state.greenMin = Object.assign({ "30": 30, "60": 60, "90": 90 }, g || {}); }
+    catch (e) { state.greenMin = { "30": 30, "60": 60, "90": 90 }; }
+    try { const a = JSON.parse(localStorage.getItem(COLORF_LS) || "null"); state.colorFilter = (a && a.length) ? new Set(a) : null; }
+    catch (e) { state.colorFilter = null; }
+  }
+  function saveGreenMin()  { try { localStorage.setItem(GREENMIN_LS, JSON.stringify(state.greenMin)); } catch (e) {} }
+  function saveColorFilter(){ try { localStorage.setItem(COLORF_LS, JSON.stringify(state.colorFilter ? [...state.colorFilter] : [])); } catch (e) {} }
+  function greenMinFor(tf)  { const v = Number((state.greenMin || {})[tf]); return (Number.isFinite(v) && v > 0) ? v : tf; }
+  function colorFilterActive() { return !!(state.colorFilter && state.colorFilter.size); }
+  function rowColorName(tr) {
+    return tr.classList.contains("row-red") ? "red"
+         : tr.classList.contains("row-green") ? "green"
+         : tr.classList.contains("row-orange") ? "orange" : "white";
+  }
+  function colorOK(tr) { return !colorFilterActive() || state.colorFilter.has(rowColorName(tr)); }
+
   // Colour every row by its SKU's sale in the ACTIVE timeframe (tf = 30/60/90,
   // taken from the Sold column's sort) and fill the Focus flag. Rules:
   //   green  = tf-day units >= tf   (30d>=30, 60d>=60, 90d>=90)
@@ -3028,12 +3056,13 @@
 
       const tf = activeTf();          // 30 | 60 | 90
       const dk = "d" + tf;            // d30 | d60 | d90
+      const gm = greenMinFor(tf);     // green cutoff for this timeframe (editable)
       // Remember any SKU that is green now — permanent focused set.
       let dirty = false;
       state.rowsById.forEach((r) => {
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
         const sold = Number((state.windowCounts.get(key) || {})[dk]) || 0;
-        if (sold >= tf && !state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
+        if (sold >= gm && !state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
       });
       if (dirty) saveFocusFlags();
 
@@ -3051,10 +3080,10 @@
         const sold = Number(wc[dk]) || 0;
         const sold3 = Number(wc.d3) || 0;
         const isFocused = state.focusedKeys.has(key);
-        if (floatOn && (sold >= tf || isFocused) && sold3 === 0) {
+        if (floatOn && (sold >= gm || isFocused) && sold3 === 0) {
           // floated to the top because it went cold (0 sales in the last 3 days)
           tr.classList.add("row-red");
-        } else if (sold >= tf) {
+        } else if (sold >= gm) {
           tr.classList.add("row-green");
         } else if (isFocused) {
           tr.classList.add("row-orange");
@@ -3074,27 +3103,28 @@
     if (!table) return;
     const t = toolsFor(state.view);
     if (state.view === "sku_master") saveFilters();
+    paintFocus();   // assign green/orange/red classes first, so the colour filter can read them
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
     const body = table.querySelector("tbody");
     const rows = [...body.rows];
 
     // Filter. A column with nothing ticked lets every row through; otherwise a
-    // row has to carry one of the values chosen in that column's dropdown.
+    // row has to carry one of the values chosen in that column's dropdown. The
+    // colour filter, when set, also has to pass.
     const picks = picksFor(t);
     const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size);
     // Nothing to filter and nothing to sort on the client, and the table was
     // not touched by an earlier filter/sort: leave the DOM alone. Walking every
     // one of 20,000+ rows on each 1,000-row page load was the stutter.
-    const trivial = !activeCols.length && !(t.sort && !serverSort());
+    const trivial = !activeCols.length && !colorFilterActive() && !(t.sort && !serverSort());
     if (trivial && !_toolsDirty) {
       const info0 = document.getElementById("filterInfo"); if (info0) info0.textContent = "";
-      paintFocus();
       return;
     }
     _toolsDirty = !trivial;
     let shown = 0;
     for (const tr of rows) {
-      const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i])));
+      const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i]))) && colorOK(tr);
       if ((tr.style.display === "none") === ok) tr.style.display = ok ? "" : "none";
       if (ok) shown++;
     }
@@ -3144,7 +3174,6 @@
       const active = Object.keys(p).filter(k => p[k] && p[k].size).length;
       info.textContent = active ? `${shown} of ${rows.length} rows` : "";
     }
-    paintFocus();
   }
 
   // Adds the filter row and makes the headers clickable. Called after every render.
@@ -3477,6 +3506,48 @@
     const el = document.createElement("div");
     el.className = "sortpanel";
     el.dataset.col = name;
+    // Sold-only extras: a colour filter (which of green/orange/red/white to show)
+    // and editable green cutoffs per 30/60/90 window.
+    const soldExtrasHtml = () => {
+      const cf = state.colorFilter;
+      const on = (c) => c === "all" ? !cf : !!(cf && cf.has(c));
+      const COLORS = [["all", "All", ""], ["green", "Green", "#8fe0a6"], ["orange", "Orange", "#ffbf80"], ["red", "Red", "#ff9d9d"], ["white", "White", "#ffffff"]];
+      const gm = state.greenMin || {};
+      return '<div class="sp-l">Colours &mdash; show</div><div class="sp-row">'
+        + COLORS.map(([c, lbl, sw]) => '<button type="button" class="cdot' + (on(c) ? " on" : "") + '" data-color="' + c + '">'
+            + (sw ? '<span class="sw" style="background:' + sw + '"></span>' : "") + lbl + "</button>").join("")
+        + '</div>'
+        + '<div class="sp-l">Green count &mdash; units in window</div><div class="gm-row">'
+        + [30, 60, 90].map(tw => tw + 'd <input type="number" min="1" class="gm" data-gm="' + tw + '" value="' + (Number(gm[tw]) || tw) + '">').join(" &nbsp; ")
+        + '</div>';
+    };
+    const bindSoldExtras = () => {
+      el.querySelectorAll("[data-color]").forEach(b => b.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const c = b.dataset.color;
+        if (c === "all") state.colorFilter = null;
+        else {
+          if (!state.colorFilter) state.colorFilter = new Set();
+          if (state.colorFilter.has(c)) state.colorFilter.delete(c); else state.colorFilter.add(c);
+          if (!state.colorFilter.size) state.colorFilter = null;
+        }
+        saveColorFilter();
+        paint();
+        if (colorFilterActive()) loadAllForFilter();
+        applyTableTools();
+      }));
+      el.querySelectorAll("[data-gm]").forEach(inp => {
+        inp.addEventListener("click", ev => ev.stopPropagation());
+        inp.addEventListener("change", ev => {
+          ev.stopPropagation();
+          const tw = inp.dataset.gm, v = parseInt(inp.value, 10);
+          if (!state.greenMin) state.greenMin = { "30": 30, "60": 60, "90": 90 };
+          state.greenMin[tw] = (Number.isFinite(v) && v > 0) ? v : Number(tw);
+          saveGreenMin();
+          if (state.view === "sku_master") refresh();
+        });
+      });
+    };
     const paint = () => {
       el.innerHTML = '<div class="sp-h">' + escapeHtml(colLabel(name)) + "</div>"
         + (wins.length
@@ -3489,13 +3560,15 @@
         + '<button type="button" class="pchip' + (cur && cur.dir === "desc" ? " on" : "")
         + '" data-dir="desc">High to low</button>'
         + '<button type="button" class="pchip' + (cur && cur.dir === "asc" ? " on" : "")
-        + '" data-dir="asc">Low to high</button></div>';
+        + '" data-dir="asc">Low to high</button></div>'
+        + (name === "Sold" ? soldExtrasHtml() : "");
       el.querySelectorAll("[data-win]").forEach(b => b.addEventListener("click", ev => {
         ev.stopPropagation(); win = Number(b.dataset.win); paint(); apply();
       }));
       el.querySelectorAll("[data-dir]").forEach(b => b.addEventListener("click", ev => {
         ev.stopPropagation(); dir = b.dataset.dir; apply();
       }));
+      if (name === "Sold") bindSoldExtras();
     };
     const apply = () => {
       t.sort = { col: name, dir: dir, win: win };
