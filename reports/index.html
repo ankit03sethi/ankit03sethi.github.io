@@ -94,7 +94,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-24t</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-24u</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -137,7 +137,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
       <div class="body open" style="display:block">
         <div class="controls">
           <button class="ghost" id="prPreview">Preview</button>
-          <button class="primary" id="prDownload">Download .xlsx</button>
+          <button class="primary" id="prDownload">Download</button>
           <span id="prSel" class="muted" style="font-size:12px;font-weight:700"></span>
           <span id="prStatus" class="muted" style="font-size:12px"></span>
         </div>
@@ -149,6 +149,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 
 <script src="/analyst-access.js?v=10"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -857,12 +858,89 @@ function initPricing() {
   }
   selNote();
   document.querySelector("#prPreview").addEventListener("click", async ()=>{ const d = await fetchRows(); if (d) preview(); });
+  // ---- Amazon: fill the seller's own Price & Quantity template (same file the
+  // desktop app fills) so the download uploads straight into Seller Central.
+  // Template per company lives next to this page; the workbook is edited at the
+  // XML level so Amazon's settings/label/attribute rows stay byte-identical.
+  const AMZ_TPL = { shopperskart: "amazon-price-template-shopperskart.xlsm" };
+  const colLetter = (i) => { let s = ""; i = i + 1; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; };
+  const xmlEsc = (v) => String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const nk = (v) => String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  async function amazonTemplateFile(list) {
+    const co = (list[0] && String(list[0].company||"").toLowerCase().replace(/[^a-z0-9]/g,"")) || "";
+    const tplName = AMZ_TPL[co];
+    if (!tplName) throw new Error("Is company (" + (list[0] ? list[0].company : "?") + ") ka Amazon Price & Quantity template site pe nahi hai - Seller Central se ek baar download karke bhejo.");
+    if (!window.JSZip) throw new Error("Zip library load nahi hui - page refresh karke try karo.");
+    const res = await fetch(tplName + "?v=" + Date.now()); if (!res.ok) throw new Error("template download failed (" + res.status + ")");
+    const buf = await res.arrayBuffer();
+    const zip = await window.JSZip.loadAsync(buf);
+    // Which part is the Template sheet? workbook.xml name -> r:id -> rels target.
+    const wbx = await zip.file("xl/workbook.xml").async("string");
+    const sm = wbx.match(/<sheet\b[^>]*\bname="Template"[^>]*\br:id="([^"]+)"/) || wbx.match(/<sheet\b[^>]*\br:id="([^"]+)"[^>]*\bname="Template"/);
+    if (!sm) throw new Error("Template sheet not found in workbook");
+    const rels = await zip.file("xl/_rels/workbook.xml.rels").async("string");
+    const rm = rels.match(new RegExp('<Relationship\\b[^>]*\\bId="' + sm[1] + '"[^>]*\\bTarget="([^"]+)"')) || rels.match(new RegExp('<Relationship\\b[^>]*\\bTarget="([^"]+)"[^>]*\\bId="' + sm[1] + '"'));
+    if (!rm) throw new Error("Template sheet part not found");
+    const part = rm[1].startsWith("/") ? rm[1].slice(1) : "xl/" + rm[1].replace(/^\.\//, "");
+    let xml = await zip.file(part).async("string");
+    // Column positions from the label row via SheetJS (same lookup as the app).
+    const wb = window.XLSX.read(buf, { type: "array", cellStyles: false, sheets: ["Template"] });
+    const g = window.XLSX.utils.sheet_to_json(wb.Sheets["Template"], { header: 1, raw: true, defval: null });
+    const a1 = String((g[0] || [])[0] || "");
+    const dataRow = Number((a1.match(/dataRow=(\d+)/) || [])[1] || 7);
+    const labelRow = Number((a1.match(/labelRow=(\d+)/) || [])[1] || 4);
+    const labels = (g[labelRow - 1] || []).map(nk);
+    const cSku = labels.indexOf("sku");
+    const cFc = labels.findIndex(l => l.startsWith("fulfillmentchannelcode") || l.startsWith("fulfilmentchannelcode"));
+    const cPrice = labels.findIndex(l => l.startsWith("yourpriceinrsellonamazon") || l.startsWith("yourpriceinr"));
+    const cMin = labels.findIndex(l => l.startsWith("minimumsellerallowedpricesellonamazon") || l.startsWith("minimumsellerallowedprice"));
+    const cMax = labels.findIndex(l => l.startsWith("maximumsellerallowedpricesellonamazon") || l.startsWith("maximumsellerallowedprice"));
+    if (cSku < 0 || cPrice < 0) throw new Error("template columns not found");
+    // Drop old data rows, keep everything above dataRow untouched.
+    const rowsRe = /<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>|<row\b[^>]*\br="(\d+)"[^>]*\/>/g;
+    xml = xml.replace(rowsRe, (m, r1, r2) => (Number(r1 || r2) >= dataRow ? "" : m));
+    const exRow = xml.match(new RegExp('<row\\b[^>]*\\br="' + (dataRow - 1) + '"[^>]*>([\\s\\S]*?)</row>'));
+    const styleOf = (col) => { if (!exRow || col < 0) return ""; const m = exRow[1].match(new RegExp('<c r="' + colLetter(col) + (dataRow - 1) + '"[^>]*\\bs="(\\d+)"')); return m ? ' s="' + m[1] + '"' : ""; };
+    const sS = styleOf(cSku), sF = styleOf(cFc), sP = styleOf(cPrice), sMn = styleOf(cMin), sMx = styleOf(cMax);
+    let r = dataRow; const out = []; let nMin = 0, nMax = 0;
+    for (const x of list) {
+      if (x.new_price == null) continue;
+      const cells = [{ c: cSku, s: '<c r="' + colLetter(cSku) + r + '"' + sS + ' t="inlineStr"><is><t>' + xmlEsc(x.sku) + '</t></is></c>' }];
+      if (cFc >= 0) cells.push({ c: cFc, s: '<c r="' + colLetter(cFc) + r + '"' + sF + ' t="inlineStr"><is><t>' + (String(x.fc||"").toUpperCase() === "AMAZON_IN" ? "AMAZON_IN" : "Fulfillment by Merchant (Default)") + '</t></is></c>' });
+      cells.push({ c: cPrice, s: '<c r="' + colLetter(cPrice) + r + '"' + sP + '><v>' + Number(x.new_price) + '</v></c>' });
+      if (cMin >= 0) { cells.push({ c: cMin, s: '<c r="' + colLetter(cMin) + r + '"' + sMn + '><v>' + (Number(x.new_price) - 2) + '</v></c>' }); nMin++; }
+      if (cMax >= 0 && x.mrp != null) { cells.push({ c: cMax, s: '<c r="' + colLetter(cMax) + r + '"' + sMx + '><v>' + Number(x.mrp) + '</v></c>' }); nMax++; }
+      cells.sort((a, b) => a.c - b.c);
+      out.push('<row r="' + r + '">' + cells.map(c => c.s).join("") + '</row>');
+      r++;
+    }
+    xml = xml.replace("</sheetData>", out.join("") + "</sheetData>");
+    const lastRow = Math.max(r - 1, dataRow - 1);
+    xml = xml.replace(/<dimension ref="([A-Z]+)1:([A-Z]+)\d+"\s*\/>/, (m, a, b) => '<dimension ref="' + a + '1:' + b + lastRow + '" />');
+    zip.file(part, xml);
+    const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.ms-excel.sheet.macroEnabled.12", compression: "DEFLATE" });
+    return { blob, rows: r - dataRow, nMin, nMax };
+  }
   document.querySelector("#prDownload").addEventListener("click", async ()=>{
     const d = await fetchRows(); if (!d) return; preview();
     if (!rows.length) return;
     if (!window.XLSX) { stEl.textContent = "Excel library load nahi hui - page refresh karke try karo."; return; }
     const N = (v)=>/^\d+$/.test(String(v))?Number(v):v;
     const tag = state.co ? titleCase(state.co).replace(/\s+/g,"") : "AllCompanies";
+    if (String(state.plat||"").toLowerCase() === "amazon") {
+      // One company at a time: the template carries that seller's contributor id.
+      const cos = [...new Set(rows.map((r) => String(r.company||"").toLowerCase()))];
+      if (cos.length !== 1) { stEl.textContent = "Amazon upload file ek company ke liye banti hai - upar Company chip select karo."; return; }
+      stEl.textContent = "Amazon Price & Quantity template bhar rahe hain...";
+      try {
+        const out = await amazonTemplateFile(rows);
+        const nm = "PriceAndQuantity_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsm";
+        const a = document.createElement("a"); a.href = URL.createObjectURL(out.blob); a.download = nm; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+        stEl.textContent = "Downloaded " + out.rows + " SKUs -> " + nm + " (Your Price = Selling Price, Min = price-2 on " + out.nMin + ", Max = MRP on " + out.nMax + "). Seller Central > Add Products via Upload mai ye file upload karo.";
+      } catch (e) { stEl.textContent = "Amazon file nahi bani: " + (e.message || e); }
+      return;
+    }
     let aoa, nm;
     if ((window.__prMode||"meesho") === "meesho") {
       const header = ["Catalog ID","Product ID","Variation Name","Variation ID","New Meesho Selling Price (MSP)","Wrong/Defective Return Price (WDRP) (if catalog is part of WDRP)","New Maximum Retail Price (MRP) (Optional)"];
