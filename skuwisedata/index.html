@@ -201,11 +201,13 @@
                           border-bottom:1px solid #e2e8f0; }
     table.data tbody tr { transition:background .12s; }
     table.data tbody tr:hover { background:#eff6ff; }
-    /* Top 100 SKUs by 30-day units sold, within the current filter/view —
-       full row light green. Beats the per-column group tints (inline, no
-       !important) so the whole row reads green wherever it lands. */
-    table.data tbody tr.top100sale > td { background:#d6f5de !important; }
-    table.data tbody tr.top100sale:hover > td { background:#c6efd1 !important; }
+    /* Green: 30-day units >= 30. Orange: a SKU that was green before but has now
+       dropped below 30. Full row, beating the per-column group tints (inline,
+       no !important) so the whole row reads one colour wherever it lands. */
+    table.data tbody tr.row-green  > td { background:#d6f5de !important; }
+    table.data tbody tr.row-green:hover  > td { background:#c6efd1 !important; }
+    table.data tbody tr.row-orange > td { background:#ffe1c2 !important; }
+    table.data tbody tr.row-orange:hover > td { background:#ffd3a6 !important; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -306,7 +308,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -523,6 +525,7 @@
     // lookup that had not arrived yet. One small table (about 2,000 rows,
     // ~10ms) covers every sort and every page, so there is nothing to race.
     loadHiddenCols();
+    loadFocusFlags();
     installColPicker();
     installArrowScroll();
     // Draw the table FIRST so rows show almost immediately — the server already
@@ -569,9 +572,9 @@
     const m = new Map();
     for (const r of wc) m.set(wcKey(r.company_name, r.platform, r.sku), r);
     state.windowCounts = m;
-    // 30-day sales are now known: rank the global top 100 once, then colour.
-    computeTop100Keys();
-    paintTop100();
+    // Sales are now known — colour green (>=30) / orange (was green, now <30)
+    // and fill the Focus flag.
+    paintFocus();
     // Platform stock, off the newest inventory export per company + platform.
     // A SKU missing from an export that exists is Inactive; a company +
     // platform with no export at all shows a dash, not a false Inactive.
@@ -2652,6 +2655,13 @@
     const DASH = "\u2014";
 
     function renderCell(r, i, c) {
+      // Focus: auto-filled. "Focused" for any SKU that has ever hit the green
+      // threshold; blank otherwise. Set once, never cleared (paintFocus keeps it
+      // in sync live; this is the value on first render / re-render).
+      if (c === "Focus") {
+        const on = state.focusedKeys && state.focusedKeys.has(wcKey(r.company_name, r.platform, r.seller_sku));
+        return on ? '<td style="font-weight:700;color:#166534">Focused</td>' : "<td></td>";
+      }
       // Return cost per order: the return charges the platform actually billed
       // over the last 90 days (RTO excluded), spread across Net sales (the units
       // that stayed sold = sold minus returned) - the same 90d Net sales figure
@@ -2965,38 +2975,57 @@
       const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i])));
       tr.style.display = ok ? "" : "none";
     }
-    paintTop100();
+    paintFocus();
   }
 
-  // The fixed set of the 100 top-selling ROWS by 30-day units — ranked ONCE
-  // across every loaded row (the server returns them 30-day-sorted, so the top
-  // sellers are all here) and independent of any filter. Row-level, so the
-  // count is EXACTLY 100 even when one SKU is listed on more than one row.
-  function computeTop100Keys() {
-    const arr = [];
-    state.rowsById.forEach((r, id) => {
-      const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-      const sold = Number(wc && wc.d30) || 0;
-      if (sold > 0) arr.push([id, sold]);
-    });
-    arr.sort((a, b) => b[1] - a[1]);
-    state.top100Ids = new Set(arr.slice(0, 100).map(x => x[0]));
+  // A SKU is "focused" for good the first time its 30-day units hit the green
+  // threshold. That memory is kept in localStorage so it survives reloads: a
+  // SKU that later drops below the threshold turns orange (because it was green
+  // once), and its Focus cell keeps reading "Focused" forever. A SKU that was
+  // never green stays plain, with an empty Focus cell.
+  const GREEN_MIN = 30;                 // 30-day units >= this => green
+  const FOCUS_LS  = "ca_focus_flags_v1";
+  function loadFocusFlags() {
+    try { state.focusedKeys = new Set(JSON.parse(localStorage.getItem(FOCUS_LS) || "[]")); }
+    catch (e) { state.focusedKeys = new Set(); }
+  }
+  function saveFocusFlags() {
+    try { localStorage.setItem(FOCUS_LS, JSON.stringify([...state.focusedKeys])); } catch (e) {}
   }
 
-  // Full row light green for exactly those top-100 rows, wherever they show up.
-  // Filters and sorts NEVER change which rows are green — only the global top
-  // 100 by 30-day sale are ever green; a filter just hides ones that don't match.
-  function paintTop100() {
+  // Colour every row by its SKU's 30-day sale, fill the Focus flag, and remember
+  // any SKU that reaches green. Filters/sorts never change the rule — it is per
+  // SKU, by 30-day sale, wherever the row appears.
+  function paintFocus() {
     try {
       if (state.view !== "sku_master") return;
-      if (!state.top100Ids) computeTop100Keys();
+      if (!state.focusedKeys) loadFocusFlags();
       const table = $("#tableWrap").querySelector("table.data");
       if (!table || !table.tBodies[0]) return;
+      const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
+      const fi = heads.indexOf("Focus");
+      let dirty = false;
       for (const tr of table.tBodies[0].rows) {
-        tr.classList.remove("top100sale");
-        if (state.top100Ids.has(String(tr.dataset.id))) tr.classList.add("top100sale");
+        tr.classList.remove("row-green", "row-orange");
+        const r = state.rowsById.get(String(tr.dataset.id));
+        if (!r) continue;
+        const key = wcKey(r.company_name, r.platform, r.seller_sku);
+        const wc = state.windowCounts.get(key);
+        const sold = Number(wc && wc.d30) || 0;
+        if (sold >= GREEN_MIN) {
+          tr.classList.add("row-green");
+          if (!state.focusedKeys.has(key)) { state.focusedKeys.add(key); dirty = true; }
+        } else if (state.focusedKeys.has(key)) {
+          tr.classList.add("row-orange");
+        }
+        if (fi >= 0 && tr.cells[fi]) {
+          const on = state.focusedKeys.has(key);
+          tr.cells[fi].textContent = on ? "Focused" : "";
+          tr.cells[fi].style.cssText = on ? "font-weight:700;color:#166534" : "";
+        }
       }
-    } catch (e) { /* highlight is best-effort, never block the table */ }
+      if (dirty) saveFocusFlags();
+    } catch (e) { /* best-effort, never block the table */ }
   }
 
   let _toolsDirty = false;
@@ -3019,7 +3048,7 @@
     const trivial = !activeCols.length && !(t.sort && !serverSort());
     if (trivial && !_toolsDirty) {
       const info0 = document.getElementById("filterInfo"); if (info0) info0.textContent = "";
-      paintTop100();
+      paintFocus();
       return;
     }
     _toolsDirty = !trivial;
@@ -3075,7 +3104,7 @@
       const active = Object.keys(p).filter(k => p[k] && p[k].size).length;
       info.textContent = active ? `${shown} of ${rows.length} rows` : "";
     }
-    paintTop100();
+    paintFocus();
   }
 
   // Adds the filter row and makes the headers clickable. Called after every render.
