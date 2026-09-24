@@ -317,7 +317,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24l</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24m</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2805,9 +2805,22 @@
           : `<td>${dot("#9ca3af")}Inactive</td>`;
       }
       if (DAY_COLS[c]) {
-        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const n = wc ? wc[DAY_COLS[c]] : 0;
-        return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}</td>`;
+        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)) || {};
+        const n = Number(wc[DAY_COLS[c]]) || 0;
+        // Trend tick on 3/7/15/30/60-day Sold: this window's daily average vs the
+        // 90-day daily average. Green up = selling faster lately, red down = slower.
+        // Needs a 90-day baseline; no baseline (d90=0) => no tick.
+        let tick = "";
+        const w = parseInt(c, 10);
+        if ((w === 3 || w === 7 || w === 15 || w === 30 || w === 60)) {
+          const d90 = Number(wc.d90) || 0;
+          if (d90 > 0) {
+            tick = (n / w >= d90 / 90)
+              ? ' <span title="Daily rate above the 90-day average" style="color:#16a34a;font-weight:800">▲</span>'
+              : ' <span title="Daily rate below the 90-day average" style="color:#dc2626;font-weight:800">▼</span>';
+          }
+        }
+        return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}${tick}</td>`;
       }
       // Hand-picked marks per row: locked until the pencil is clicked, saved
       // only when Save is pressed. A blank first entry clears the mark.
