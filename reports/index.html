@@ -94,7 +94,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-14a</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-24r</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -133,7 +133,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
   <section class="section" id="secPricing" style="display:none">
     <div class="section-head"><h2>Pricing</h2><div class="rule"></div><span class="cnt" id="cntPricing"></span></div>
     <div class="card">
-      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Upar ke Company aur Platform chips se select karo (All = sabka data). Sirf woh SKUs aayenge jinka target price current live price se alag hai. Phir upload-format Excel download karo &mdash; seedha Meesho panel pe upload kar do.</p></div></div>
+      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Upar ke Company aur Platform chips se select karo (All = sabka data). Sirf woh SKUs aayenge jinka target price current live price se alag hai. Phir Excel download karo &mdash; Meesho ke liye seedha panel-upload template, Amazon/Flipkart/Myntra ke liye SKU + ID + New Price list.</p></div></div>
       <div class="body open" style="display:block">
         <div class="controls">
           <button class="ghost" id="prPreview">Preview</button>
@@ -819,11 +819,13 @@ function initPricing() {
   async function fetchRows() {
     selNote();
     const pf = String(state.plat || "").toLowerCase();
-    if (pf && pf !== "meesho") { stEl.textContent = "Abhi sirf Meesho supported hai — upar Platform chip Meesho ya All karo."; rows = []; wrap.innerHTML = ""; if (cnt) cnt.textContent = ""; return null; }
+    window.__prMode = (pf === "meesho") ? "meesho" : "generic";
     stEl.innerHTML = '<span class="spin"></span> computing&hellip;';
     rows = [];
     const co = state.co || "";
-    const { data, error } = await sb.rpc("meesho_price_export_json", { p_company: co });
+    let data, error;
+    if (window.__prMode === "meesho") { ({ data, error } = await sb.rpc("meesho_price_export_json", { p_company: co })); }
+    else { ({ data, error } = await sb.rpc("sku_price_export_json", { p_company: co, p_platform: state.plat || "" })); }
     if (error) { stEl.textContent = "Error: " + error.message; return null; }
     let list = Array.isArray(data) ? data : [];
     // Safety: chip ke company ke alawa kuch bhi table me na aaye
@@ -833,11 +835,16 @@ function initPricing() {
     return rows;
   }
   function preview() {
-    const missSup = rows.some((r) => !r.supplier_id);
+    const missSup = (window.__prMode||"meesho")==="meesho" && rows.some((r) => !r.supplier_id);
     if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
     const cos = [...new Set(rows.map((r) => titleCase(r.company)))];
     stEl.textContent = rows.length + " SKUs (latest inventory) · " + (cos.length ? cos.join(", ") : "-") + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
     if (!rows.length) { wrap.innerHTML = '<div class="note">Is company ki inventory / settlement data nahi mila. Upar Company/Platform chip badal ke dekho.</div>'; return; }
+    if ((window.__prMode||"meesho") !== "meesho") {
+      let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Platform</th><th>SKU</th><th>ASIN / FSN / Style ID</th><th class="num">Live Price</th><th class="num">New Price</th></tr></thead><tbody>';
+      for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(titleCase(r.platform))+"</td><td>"+esc(r.sku)+"</td><td>"+esc(r.platform_id)+'</td><td class="num">'+(r.live_price==null?"—":r.live_price)+'</td><td class="num">'+r.new_price+'</td></tr>'; }
+      h += "</tbody></table></div>"; wrap.innerHTML = h; return;
+    }
     let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Catalog ID</th><th>Product ID</th><th>Variation</th><th>Var ID</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th>Open</th></tr></thead><tbody>';
     for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(r.catalog_id)+"</td><td>"+esc(r.product_id)+"</td><td>"+esc(r.variation_name)+"</td><td>"+esc(r.variation_id)+'</td><td class="num">'+r.new_msp+'</td><td class="num">'+r.wdrp+'</td><td class="num">'+r.mrp+'</td><td><a href="'+esc(r.product_url)+'" target="_blank" rel="noopener">Open</a></td></tr>'; }
     h += "</tbody></table></div>";
@@ -849,15 +856,23 @@ function initPricing() {
     const d = await fetchRows(); if (!d) return; preview();
     if (!rows.length) return;
     if (!window.XLSX) { stEl.textContent = "Excel library load nahi hui - page refresh karke try karo."; return; }
-    const header = ["Catalog ID","Product ID","Variation Name","Variation ID","New Meesho Selling Price (MSP)","Wrong/Defective Return Price (WDRP) (if catalog is part of WDRP)","New Maximum Retail Price (MRP) (Optional)"];
-    const aoa = [header];
     const N = (v)=>/^\d+$/.test(String(v))?Number(v):v;
-    for (const r of rows) aoa.push([ N(r.catalog_id), N(r.product_id), r.variation_name, N(r.variation_id), r.new_msp, r.wdrp, r.mrp ]);
+    const tag = state.co ? titleCase(state.co).replace(/\s+/g,"") : "AllCompanies";
+    let aoa, nm;
+    if ((window.__prMode||"meesho") === "meesho") {
+      const header = ["Catalog ID","Product ID","Variation Name","Variation ID","New Meesho Selling Price (MSP)","Wrong/Defective Return Price (WDRP) (if catalog is part of WDRP)","New Maximum Retail Price (MRP) (Optional)"];
+      aoa = [header];
+      for (const r of rows) aoa.push([ N(r.catalog_id), N(r.product_id), r.variation_name, N(r.variation_id), r.new_msp, r.wdrp, r.mrp ]);
+      nm = "Meesho_Price_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
+    } else {
+      aoa = [["Company","Platform","SKU","ASIN / FSN / Style ID","Live Price","New Price"]];
+      for (const r of rows) aoa.push([ titleCase(r.company), titleCase(r.platform), r.sku, r.platform_id, r.live_price, r.new_price ]);
+      const ptag = state.plat ? titleCase(state.plat).replace(/\s+/g,"") : "AllPlatforms";
+      nm = ptag + "_Price_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
+    }
     const ws = window.XLSX.utils.aoa_to_sheet(aoa);
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    const tag = state.co ? titleCase(state.co).replace(/\s+/g,"") : "AllCompanies";
-    const nm = "Meesho_Price_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
     window.XLSX.writeFile(wb, nm);
     stEl.textContent = "Downloaded " + rows.length + " rows -> " + nm;
   });
