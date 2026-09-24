@@ -312,7 +312,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24g</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -470,7 +470,7 @@
     stockHave: new Set(),      // company::platform pairs that have an inventory export at all
     // Which day-windows show inside a combined column, and which kinds of
     // measure show at all. 1 and 3 day ride along with 30/60/90 by default.
-    win: new Set([1, 3, 30, 60, 90]),
+    win: new Set([1, 3, 7, 15, 30, 60, 90]),
     kind: new Set(["units", "pct", "value"]),
     rowsById: new Map(),       // id -> row, so an edited cell can find its row
     // The SKU master view opens on 30-day units, highest first. Ordered by
@@ -1788,6 +1788,13 @@
       if (ord) state.colOrder = new Map(JSON.parse(ord));
       const w = localStorage.getItem(COLPICK_KEY + "_win");
       if (w) state.win = new Set(JSON.parse(w).map(Number));
+      // One-time: turn 7d and 15d on for anyone whose saved selection predates
+      // them being default. Runs once, so the user can still hide them later.
+      if (!localStorage.getItem(COLPICK_KEY + "_win_715")) {
+        state.win.add(7); state.win.add(15);
+        localStorage.setItem(COLPICK_KEY + "_win", JSON.stringify([...state.win]));
+        localStorage.setItem(COLPICK_KEY + "_win_715", "1");
+      }
       const k = localStorage.getItem(COLPICK_KEY + "_kind");
       if (k) state.kind = new Set(JSON.parse(k));
     } catch (e) { /* blocked storage - just show everything, default order */ }
