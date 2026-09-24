@@ -201,6 +201,11 @@
                           border-bottom:1px solid #e2e8f0; }
     table.data tbody tr { transition:background .12s; }
     table.data tbody tr:hover { background:#eff6ff; }
+    /* Top 100 SKUs by 30-day units sold, within the current filter/view —
+       full row light green. Beats the per-column group tints (inline, no
+       !important) so the whole row reads green wherever it lands. */
+    table.data tbody tr.top100sale > td { background:#d6f5de !important; }
+    table.data tbody tr.top100sale:hover > td { background:#c6efd1 !important; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -301,7 +306,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-14d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -559,6 +564,8 @@
     const m = new Map();
     for (const r of wc) m.set(wcKey(r.company_name, r.platform, r.sku), r);
     state.windowCounts = m;
+    // 30-day sales are now known, so colour the top 100 straight away.
+    paintTop100();
     // Platform stock, off the newest inventory export per company + platform.
     // A SKU missing from an export that exists is Inactive; a company +
     // platform with no export at all shows a dash, not a false Inactive.
@@ -2952,6 +2959,33 @@
       const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i])));
       tr.style.display = ok ? "" : "none";
     }
+    paintTop100();
+  }
+
+  // Full row light green for the top 100 SKUs by 30-day units sold, computed
+  // over the rows currently VISIBLE — so it re-ranks itself whenever a column
+  // filter, a platform chip, or a sort changes. SKU Master view only, and only
+  // rows that actually have a 30-day sale (a zero-sale row is never a top seller).
+  function paintTop100() {
+    try {
+      if (state.view !== "sku_master") return;
+      const table = $("#tableWrap").querySelector("table.data");
+      if (!table || !table.tBodies[0]) return;
+      const trs = table.tBodies[0].rows;
+      const vis = [];
+      for (const tr of trs) {
+        tr.classList.remove("top100sale");
+        if (tr.style.display === "none") continue;
+        const r = state.rowsById.get(String(tr.dataset.id));
+        if (!r) continue;
+        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const sold = wc ? (Number(wc.d30) || 0) : 0;
+        if (sold > 0) vis.push([tr, sold]);
+      }
+      vis.sort((a, b) => b[1] - a[1]);
+      const n = Math.min(100, vis.length);
+      for (let i = 0; i < n; i++) vis[i][0].classList.add("top100sale");
+    } catch (e) { /* highlight is best-effort, never block the table */ }
   }
 
   let _toolsDirty = false;
@@ -2974,6 +3008,7 @@
     const trivial = !activeCols.length && !(t.sort && !serverSort());
     if (trivial && !_toolsDirty) {
       const info0 = document.getElementById("filterInfo"); if (info0) info0.textContent = "";
+      paintTop100();
       return;
     }
     _toolsDirty = !trivial;
@@ -3029,6 +3064,7 @@
       const active = Object.keys(p).filter(k => p[k] && p[k].size).length;
       info.textContent = active ? `${shown} of ${rows.length} rows` : "";
     }
+    paintTop100();
   }
 
   // Adds the filter row and makes the headers clickable. Called after every render.
