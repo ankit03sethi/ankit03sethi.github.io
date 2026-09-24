@@ -208,6 +208,10 @@
     table.data tbody tr.row-green:hover  > td { background:#c6efd1 !important; }
     table.data tbody tr.row-orange > td { background:#ffe1c2 !important; }
     table.data tbody tr.row-orange:hover > td { background:#ffd3a6 !important; }
+    /* Red: a green/orange row that has gone cold (0 sales in the last 3 days) and
+       is floated to the top under a 30/60/90 sort. Back to green/orange once it sells again. */
+    table.data tbody tr.row-red > td { background:#ffd9d9 !important; }
+    table.data tbody tr.row-red:hover > td { background:#ffc4c4 !important; }
     table.data thead th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
     table.data thead th.sortable:hover { color:#1f6feb; }
     table.data thead th .sort-caret { color:#1f6feb; margin-left:4px; }
@@ -308,7 +312,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24j</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24k</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3033,17 +3037,26 @@
       });
       if (dirty) saveFocusFlags();
 
+      // Float active only when the Sold column is sorted by a 30/60/90 window.
+      const ss = serverSort();
+      const floatOn = !!(ss && (ss.key === "d30" || ss.key === "d60" || ss.key === "d90"));
       const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
       const fi = heads.indexOf("Focus");
       for (const tr of table.tBodies[0].rows) {
-        tr.classList.remove("row-green", "row-orange");
+        tr.classList.remove("row-green", "row-orange", "row-red");
         const r = state.rowsById.get(String(tr.dataset.id));
         if (!r) continue;
         const key = wcKey(r.company_name, r.platform, r.seller_sku);
-        const sold = Number((state.windowCounts.get(key) || {})[dk]) || 0;
-        if (sold >= tf) {
+        const wc = state.windowCounts.get(key) || {};
+        const sold = Number(wc[dk]) || 0;
+        const sold3 = Number(wc.d3) || 0;
+        const isFocused = state.focusedKeys.has(key);
+        if (floatOn && (sold >= tf || isFocused) && sold3 === 0) {
+          // floated to the top because it went cold (0 sales in the last 3 days)
+          tr.classList.add("row-red");
+        } else if (sold >= tf) {
           tr.classList.add("row-green");
-        } else if (state.focusedKeys.has(key)) {
+        } else if (isFocused) {
           tr.classList.add("row-orange");
         }
         if (fi >= 0 && tr.cells[fi]) {
