@@ -324,7 +324,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24q</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24r</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3073,6 +3073,13 @@
       if (!state.focusedKeys) loadFocusFlags();
       const table = $("#tableWrap").querySelector("table.data");
       if (!table || !table.tBodies[0]) return;
+
+      // Don't colour until sales data (windowCounts) has loaded — otherwise every
+      // row reads as 0 sales and flashes the wrong colour (all red) on first paint.
+      if (!state.windowCounts || state.windowCounts.size === 0) {
+        for (const tr of table.tBodies[0].rows) tr.classList.remove("row-green", "row-orange", "row-red");
+        return;
+      }
 
       const tf = activeTf();          // 30 | 60 | 90
       const dk = "d" + tf;            // d30 | d60 | d90
