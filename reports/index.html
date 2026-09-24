@@ -94,7 +94,7 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 <header>
   <a href="/home/" class="brand"><div>
     <div class="brand-name">Cursive Analyst</div>
-    <div class="nav-sub">Reports &middot; build 2026-09-24s</div>
+    <div class="nav-sub">Reports &middot; build 2026-09-24t</div>
   </div></a>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
@@ -834,6 +834,11 @@ function initPricing() {
     lastKey = co + "|" + pf;
     return rows;
   }
+  // Amazon Price & Quantity file: Your Price = the SKU Master Selling Price (exact,
+  // no step), Minimum = price - 2, Maximum = MRP off the latest Active Listings file.
+  const isAmz = (r) => String(r.platform||"").toLowerCase()==="amazon";
+  const amzMin = (r) => (isAmz(r) && r.new_price!=null) ? r.new_price-2 : null;
+  const amzMax = (r) => (isAmz(r) && r.mrp!=null) ? r.mrp : null;
   function preview() {
     const missSup = (window.__prMode||"meesho")==="meesho" && rows.some((r) => !r.supplier_id);
     if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
@@ -841,8 +846,8 @@ function initPricing() {
     stEl.textContent = rows.length + " SKUs (latest inventory) · " + (cos.length ? cos.join(", ") : "-") + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
     if (!rows.length) { wrap.innerHTML = '<div class="note">Is company ki inventory / settlement data nahi mila. Upar Company/Platform chip badal ke dekho.</div>'; return; }
     if ((window.__prMode||"meesho") !== "meesho") {
-      let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Platform</th><th>ASIN / FSN / Style ID</th><th>SKU</th><th>Master Code</th><th class="num">Current Selling Price</th><th class="num">New Selling Price</th></tr></thead><tbody>';
-      for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(titleCase(r.platform))+"</td><td>"+esc(r.platform_id)+"</td><td>"+esc(r.sku)+"</td><td>"+esc(r.master_code)+'</td><td class="num">'+(r.current_price==null?"—":r.current_price)+'</td><td class="num">'+(r.new_price==null?"—":r.new_price)+'</td></tr>'; }
+      let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Platform</th><th>ASIN / FSN / Style ID</th><th>SKU</th><th>Master Code</th><th class="num">Current Selling Price</th><th class="num">New Selling Price</th><th class="num">Min (Amazon)</th><th class="num">Max / MRP (Amazon)</th></tr></thead><tbody>';
+      for (const r of rows) { h += "<tr><td>"+esc(titleCase(r.company))+"</td><td>"+esc(titleCase(r.platform))+"</td><td>"+esc(r.platform_id)+"</td><td>"+esc(r.sku)+"</td><td>"+esc(r.master_code)+'</td><td class="num">'+(r.current_price==null?"—":r.current_price)+'</td><td class="num">'+(r.new_price==null?"—":r.new_price)+'</td><td class="num">'+(amzMin(r)==null?"—":amzMin(r))+'</td><td class="num">'+(amzMax(r)==null?"—":amzMax(r))+'</td></tr>'; }
       h += "</tbody></table></div>"; wrap.innerHTML = h; return;
     }
     let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Catalog ID</th><th>Product ID</th><th>Variation</th><th>Var ID</th><th class="num">New MSP</th><th class="num">WDRP</th><th class="num">MRP</th><th>Open</th></tr></thead><tbody>';
@@ -865,8 +870,8 @@ function initPricing() {
       for (const r of rows) aoa.push([ N(r.catalog_id), N(r.product_id), r.variation_name, N(r.variation_id), r.new_msp, r.wdrp, r.mrp ]);
       nm = "Meesho_Price_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
     } else {
-      aoa = [["Company","Platform","ASIN / FSN / Style ID","SKU","Master Code","Current Selling Price","New Selling Price"]];
-      for (const r of rows) aoa.push([ titleCase(r.company), titleCase(r.platform), r.platform_id, r.sku, r.master_code, r.current_price, r.new_price ]);
+      aoa = [["Company","Platform","ASIN / FSN / Style ID","SKU","Master Code","Current Selling Price","New Selling Price","Minimum Seller Allowed Price (Amazon)","Maximum Seller Allowed Price / MRP (Amazon)"]];
+      for (const r of rows) aoa.push([ titleCase(r.company), titleCase(r.platform), r.platform_id, r.sku, r.master_code, r.current_price, r.new_price, amzMin(r), amzMax(r) ]);
       const ptag = state.plat ? titleCase(state.plat).replace(/\s+/g,"") : "AllPlatforms";
       nm = ptag + "_Price_" + tag + "_" + new Date().toISOString().slice(0,10) + ".xlsx";
     }
