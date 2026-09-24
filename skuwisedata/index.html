@@ -330,7 +330,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24z2</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3672,6 +3672,10 @@
         + '</div>'
         + '<div class="sp-l">Green count &mdash; units in window</div><div class="gm-row">'
         + [30, 60, 90].map(tw => tw + 'd <input type="number" min="1" class="gm" data-gm="' + tw + '" value="' + (Number(gm[tw]) || tw) + '">').join(" &nbsp; ")
+        + '</div>'
+        + '<div class="sp-row" style="margin-top:8px;align-items:center">'
+        + '<button type="button" class="pchip on" data-gm-save>Save</button>'
+        + '<span id="gmOk" style="display:none;color:#16a34a;font-weight:800;margin-left:8px">✓ Saved</span>'
         + '</div>';
     };
     const bindSoldExtras = () => {
@@ -3695,16 +3699,23 @@
         if (colorFilterActive()) loadAllForFilter();
         applyTableTools();
       }));
+      // Green counts apply only on Save (typing no longer refreshes on every keystroke).
+      // Editing hides the "Saved" tick so it always reflects the last saved state.
       el.querySelectorAll("[data-gm]").forEach(inp => {
         inp.addEventListener("click", ev => ev.stopPropagation());
-        inp.addEventListener("change", ev => {
-          ev.stopPropagation();
+        inp.addEventListener("input", ev => { ev.stopPropagation(); const ok = el.querySelector("#gmOk"); if (ok) ok.style.display = "none"; });
+      });
+      const gmSave = el.querySelector("[data-gm-save]");
+      if (gmSave) gmSave.addEventListener("click", ev => {
+        ev.stopPropagation();
+        if (!state.greenMin) state.greenMin = { "30": 30, "60": 60, "90": 90 };
+        el.querySelectorAll("[data-gm]").forEach(inp => {
           const tw = inp.dataset.gm, v = parseInt(inp.value, 10);
-          if (!state.greenMin) state.greenMin = { "30": 30, "60": 60, "90": 90 };
           state.greenMin[tw] = (Number.isFinite(v) && v > 0) ? v : Number(tw);
-          saveGreenMin();
-          if (state.view === "sku_master") refresh();
         });
+        saveGreenMin();
+        const ok = el.querySelector("#gmOk"); if (ok) ok.style.display = "";
+        if (state.view === "sku_master") refresh();
       });
     };
     const paint = () => {
