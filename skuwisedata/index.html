@@ -96,13 +96,12 @@
        number it belongs to, in every row, all the way down the table. */
     .wgrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
              align-items:center; width:100%; }
-    /* Number on its own line (right-aligned under the day header); the trend tick
-       sits on the line BELOW it, so numbers of any width stay perfectly aligned
-       and the arrows line up one under the other down the column. */
+    /* The trend dot sits on the line ABOVE the number, centered, so numbers of
+       any width stay aligned and the dots line up one under the other. */
     .wgrid > span { display:flex; flex-direction:column; align-items:center; justify-content:center;
              padding:0 7px; font-variant-numeric:tabular-nums; line-height:1.15; }
     .wgrid > span + span { border-left:2px solid #cbd5e1; }
-    .wgrid > span .tk { font-size:9px; line-height:1; margin-top:1px; }
+    .wgrid > span .tk { display:inline-block; width:8px; height:8px; border-radius:50%; line-height:1; margin:0 0 3px 0; }
     table.data thead th .wdays { margin-top:3px; }
     table.data thead th .wdays > span { font-size:10px; font-weight:700;
         color:#94a3b8; letter-spacing:0; }
@@ -331,7 +330,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24v</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-24w</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -390,6 +389,11 @@
     <div class="plat-chip" data-p="myntra">Myntra</div>
     <div class="plat-chip" data-p="firstcry">FirstCry</div>
     <button class="btn" id="clearFiltersBtn" title="Company, platform, search, every column filter and the sort - all back to default" style="margin-left:auto; color:#b91c1c; border-color:#fecaca; background:#fff">Clear filters</button>
+  </div>
+
+  <div class="platform-row" id="viewModeRow" style="display:none">
+    <div class="plat-chip" data-vm="thematic" title="Colour bands float to the top: cold (red) first, then green, orange, white - each high to low">Thematic view</div>
+    <div class="plat-chip" data-vm="normal" title="Plain sort by the Sold window (high to low / low to high). Colours still show on every row, but rows are not re-ordered into bands">Normal view</div>
   </div>
 
   <div class="kpi-grid" id="kpis"></div>
@@ -498,6 +502,7 @@
     // landed on FirstCry, the one platform with no orders file at all. Opening
     // on what is actually moving is the answer to "why is everything zero".
     tools: { sku_master: { filters: {}, sort: { col: "Sold", dir: "desc" } } },
+    viewMode: "thematic",      // thematic = colour bands float to top; normal = plain Sold sort, colours still per row
     platformIds: new Map(),    // company|platform|sku -> { platform_id, other_listing_id }
     platformSellers: new Map(),// company|platform -> our own seller name on that marketplace
     listingStats: new Map(),   // company|platform|sku -> latest scraped price/rating/count/seller
@@ -550,6 +555,8 @@
     loadHiddenCols();
     loadFocusFlags();
     loadColorPrefs();
+    loadViewMode();
+    syncViewModeChips();
     installColPicker();
     installArrowScroll();
     // Draw the table FIRST so rows show almost immediately — the server already
@@ -657,6 +664,7 @@
       $("#platformRow").style.display = "";
       refresh();
     }
+    syncViewModeChips();
   });
   document.getElementById("platformRow").addEventListener("click", (e) => {
     const c = e.target.closest(".plat-chip"); if (!c) return;
@@ -673,6 +681,15 @@
     state.company = c.dataset.c || "";
     saveFilters();
     refresh();
+  });
+  document.getElementById("viewModeRow").addEventListener("click", (e) => {
+    const c = e.target.closest(".plat-chip"); if (!c) return;
+    const vm = c.dataset.vm === "normal" ? "normal" : "thematic";
+    if (vm === state.viewMode) return;
+    state.viewMode = vm;
+    saveViewMode();
+    syncViewModeChips();
+    refresh();   // re-query: thematic sends focus keys (bands float), normal sends null (plain sort)
   });
   // The dropdown columns after Color. Each cell holds one of these or nothing.
   const TAG_COLS = {};   // MOQ moved to the typed columns (site value wins)
@@ -1291,7 +1308,7 @@
         p_sort: ss.key, p_dir: ss.dir,
         p_company: state.company || null, p_platform: state.platform || null,
         p_search: state.search || null, p_limit: 1000, p_offset: 0,
-        p_focus_keys: [...(state.focusedKeys || [])],
+        p_focus_keys: focusKeysForServer(),
         p_green_min: greenMinFor(activeTf()),
       });
       data = res.data; error = res.error; count = (res.data || []).length;
@@ -1595,7 +1612,7 @@
           p_sort: ss2 ? ss2.key : null, p_dir: ss2 ? ss2.dir : "desc",
           p_company: state.company || null, p_platform: state.platform || null,
           p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
-          p_focus_keys: [...(state.focusedKeys || [])],
+          p_focus_keys: focusKeysForServer(),
           p_green_min: greenMinFor(activeTf()),
         });
         data = res.data; error = res.error;
@@ -2830,11 +2847,12 @@
           const d90 = Number(wc.d90) || 0;
           if (d90 > 0) {
             tick = (n / w >= d90 / 90)
-              ? '<span class="tk" title="Daily rate at/above the 90-day average" style="color:#16a34a;font-weight:800">▲</span>'
-              : '<span class="tk" title="Daily rate below the 90-day average" style="color:#dc2626;font-weight:800">▼</span>';
+              ? '<span class="tk" title="Daily rate at/above the 90-day average" style="background:#16a34a"></span>'
+              : '<span class="tk" title="Daily rate below the 90-day average" style="background:#dc2626"></span>';
           }
         }
-        return `<td${n ? "" : ' style="color:#94a3b8"'}>${n || 0}${tick}</td>`;
+        // Dot goes ABOVE the number (flex column in the Sold wgrid stacks it on top).
+        return `<td${n ? "" : ' style="color:#94a3b8"'}>${tick}${n || 0}</td>`;
       }
       // Hand-picked marks per row: locked until the pencil is clicked, saved
       // only when Save is pressed. A blank first entry clears the mark.
@@ -3060,6 +3078,20 @@
   }
   function saveGreenMin()  { try { localStorage.setItem(GREENMIN_LS, JSON.stringify(state.greenMin)); } catch (e) {} }
   function saveColorFilter(){ try { localStorage.setItem(COLORF_LS, JSON.stringify(state.colorFilter ? [...state.colorFilter] : [])); } catch (e) {} }
+  // View mode: thematic (colour bands float to the top) or normal (plain Sold sort,
+  // colours still shown per row but no band re-ordering). Persists across reloads.
+  const VIEWMODE_LS = "ca_view_mode_v1";
+  function loadViewMode() { try { const v = localStorage.getItem(VIEWMODE_LS); state.viewMode = (v === "normal") ? "normal" : "thematic"; } catch (e) { state.viewMode = "thematic"; } }
+  function saveViewMode() { try { localStorage.setItem(VIEWMODE_LS, state.viewMode); } catch (e) {} }
+  // Focus keys are sent to the server (which floats the colour bands) only in
+  // thematic view; in normal view we send null so the RPC just sorts by the Sold window.
+  function focusKeysForServer() { return (state.viewMode === "normal") ? null : [...(state.focusedKeys || [])]; }
+  function syncViewModeChips() {
+    const row = document.getElementById("viewModeRow");
+    if (!row) return;
+    row.style.display = (state.view === "sku_master") ? "" : "none";
+    row.querySelectorAll(".plat-chip").forEach(x => x.classList.toggle("active", (x.dataset.vm || "") === state.viewMode));
+  }
   function greenMinFor(tf)  { const v = Number((state.greenMin || {})[tf]); return (Number.isFinite(v) && v > 0) ? v : tf; }
   function colorFilterActive() { return !!(state.colorFilter && state.colorFilter.size); }
   function rowColorName(tr) {
