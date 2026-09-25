@@ -248,9 +248,14 @@
       h += "<div class='k'>SKU</div><div class='v mono'>"+esc(r.sku||"-")+"</div>";
       h += "<div class='k'>Platform</div><div class='v'>"+esc(r.platform||"-")+(r.company_name?(" / "+esc(r.company_name)):"")+"</div>";
       h += "<div class='k'>Order</div><div class='v mono'>"+esc(r.order_id||"-")+"</div>";
+      if (r.order_id2) h += "<div class='k'>Other ID</div><div class='v mono'>"+esc(r.order_id2)+"</div>";
       h += "<div class='k'>Reason</div><div class='v'>"+esc(r.return_reason||"-")+"</div>";
     } else {
-      h += "<div class='k'>Note</div><div class='v'>Yeh AWB returns data mein nahi mila.</div>";
+      h += "<div class='k'>Note</div><div class='v'>Yeh AWB returns data mein nahi mila"+(r.pending?"":" &mdash; saved as Not Found")+".</div>";
+      if (!r.pending && (r.order_id || r.order_id2)) {
+        h += "<div class='k'>Order</div><div class='v mono'>"+esc(r.order_id||"-")+"</div>";
+        h += "<div class='k'>Other ID</div><div class='v mono'>"+esc(r.order_id2||"-")+"</div>";
+      }
     }
     if (cur==="Damaged" && dmgText(r)) h += "<div class='k'>Damaged</div><div class='v'>"+dmgText(r)+"</div>";
     h += "</div>";
@@ -290,16 +295,10 @@
     if (dupR) { alert("Yeh Order / ID pehle se scan ho chuka hai (duplicate). Dubara save nahi kiya."); return; }
     try {
       const { data } = await sb.rpc("return_scan_rematch", { p_awb: awb, p_id1: id1, p_id2: id2 });
-      if (data && data[0]) {
-        if (data[0].status === "OK") { last = data[0]; showResult(last); await loadList(); }
-        else {
-          // Not matched → nothing saved. Keep the form open so another ID can be tried.
-          last = { awb, status:"NOT_FOUND", pending:true, order_id:id1, order_id2:id2 };
-          showResult(last);
-          const el = $("#result"); const note = el.querySelector(".muted"); if (note) note.innerHTML = "<b style='color:#b91c1c'>Match nahi hua &mdash; save nahi kiya.</b> Sahi Order ID / doosri ID daal ke Save karo, ya Cancel.";
-          const f1 = el.querySelector("#rmId1"); if (f1) { f1.value = id1; } const f2 = el.querySelector("#rmId2"); if (f2) { f2.value = id2; }
-        }
-      }
+      // Saved either way: OK when an id matched a return, else NOT_FOUND with the
+      // AWB + typed ids kept on the row (the nightly rematch picks it up later).
+      if (data && data[0]) { last = data[0]; showResult(last); await loadList(); }
+      else { last = { awb, status:"NOT_FOUND", order_id:id1, order_id2:id2 }; showResult(last); await loadList(); }
     } catch(e){}
     $("#awb").focus();
   }
