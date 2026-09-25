@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1154,6 +1154,9 @@
     const sw = document.getElementById("allSearchWrap"); if (sw) sw.classList.remove("on");
     state.search = "";
     try { localStorage.removeItem(FILTER_KEY); } catch (e) { /* ignore */ }
+    // 2026-09-25: the colour filter (red / green / orange dots) goes too - a
+    // saved colour pick used to survive this button and keep hiding rows.
+    state.colorFilter = null; saveColorFilter();
     refresh();
   });
   // Reload re-reads the day counts too, so a fresh orders file shows up here
@@ -1671,6 +1674,14 @@
     if (state.view === "uploads") return;
     if (!state.search && !filtersActive() && !colorFilterActive()) return;
     if (state.loadingAll) return;
+    // 2026-09-25: a column / colour filter over every company AND every
+    // platform means pulling all ~27,000 rows into the page, which froze the
+    // browser. Ask for a company or a platform first; the rows already loaded
+    // stay filtered as they are.
+    if (state.view === "sku_master" && !state.search && !state.company && !state.platform) {
+      $("#rowCount").textContent = rowCountLabel() + " \u00b7 pick a company or platform to filter every row";
+      return;
+    }
     state.loadingAll = true;
     try {
       let guard = 0;
