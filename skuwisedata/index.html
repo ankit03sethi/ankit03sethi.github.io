@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2893,9 +2893,9 @@
         // 2026-09-25: when the platform's own listing status is known (Flipkart
         // listing file, Myntra Listings Report) it wins: Inactive / Rejected even
         // though the SKU is in the file.
+        // Only two states on the page: Active / Inactive (a rejected style counts as Inactive).
         const ls = String((st && st.listing_status) || "").toUpperCase();
-        if (st && ls === "REJECTED") return `<td title="Rejected by the marketplace (${escapeHtml(st.source_file || "")})">${dot("#dc2626")}Rejected</td>`;
-        if (st && ls === "INACTIVE") return `<td title="Inactive on the marketplace (${escapeHtml(st.source_file || "")})">${dot("#9ca3af")}Inactive</td>`;
+        if (st && (ls === "INACTIVE" || ls === "REJECTED")) return `<td title="Inactive on the marketplace (${escapeHtml(st.source_file || "")})">${dot("#9ca3af")}Inactive</td>`;
         return st
           ? `<td title="${escapeHtml(st.source_file || "")}">${dot("#16a34a")}Active</td>`
           : `<td>${dot("#9ca3af")}Inactive</td>`;
@@ -3858,7 +3858,7 @@
     "Other Price": "That seller's price.",
     "Other Assured": "F Assured when that seller carries the Assured badge.",
     "W Qty": "Warehouse stock for this Master SKU (Warehouse Stock workbook): In stock (qty > 0), Out of stock (qty 0 or not in the warehouse file), Deleted (qty < 0).",
-    "P Qty": "From the inventory export: Active (SKU is in the file, any qty including 0), Inactive (SKU not in the file). Where the marketplace reports a listing status (Flipkart listing file, Myntra Listings Report) that wins: Inactive / Rejected.",
+    "P Qty": "From the inventory export: Active (SKU is in the file, any qty including 0), Inactive (SKU not in the file). Where the marketplace reports a listing status (Flipkart listing file, Myntra Listings Report) that wins (a rejected style shows as Inactive).",
     "Qty": "Stock on the platform, from the same export.",
     "COP": "What one unit costs you to buy. You fill this in.",
     "HSN": "Tax code from the master sheet.",
