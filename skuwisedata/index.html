@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1298,15 +1298,17 @@
     }
     let data, count, error;
     const ss = serverSort();
-    if (state.view === "sku_master" && ss) {
+    const tagsS = tagPicksForServer();
+    if (state.view === "sku_master" && (ss || tagsS)) {
       // Order in the database over all 26,901 rows. Sorting the loaded page in
       // the browser ranked 500 rows and called it the top of the list.
       const res = await sb.rpc("sku_master_page", {
-        p_sort: ss.key, p_dir: ss.dir,
+        p_sort: ss ? ss.key : null, p_dir: ss ? ss.dir : "desc",
         p_company: state.company || null, p_platform: state.platform || null,
         p_search: state.search || null, p_limit: 1000, p_offset: 0,
         p_focus_keys: focusKeysForServer(),
         p_green_min: greenMinFor(activeTf()),
+        p_tags: tagsS,
       });
       data = res.data; error = res.error; count = (res.data || []).length;
     } else if (state.view === "sku_master" && state.search) {
@@ -1347,7 +1349,7 @@
     }
     // "Is there another page" cannot come from the total when the total is
     // unknown: a full page back means keep going, a short one means the end.
-    state.hasMore = (state.view === "sku_master" && (ss || state.search))
+    state.hasMore = (state.view === "sku_master" && (ss || state.search || tagsS))
       ? (data || []).length >= 1000
       : state.loaded < state.total;
     // The day counts, the platform ids and the scraped listing values are NOT
@@ -1602,7 +1604,8 @@
       const ss2 = serverSort();
       // A search pages through sku_master_page too (it takes p_offset), so a
       // 10,000-match search is no longer clipped to its first 1,000 rows.
-      const paged = state.view === "sku_master" && (ss2 || state.search);
+      const tags2 = tagPicksForServer();
+      const paged = state.view === "sku_master" && (ss2 || state.search || tags2);
       let data, error;
       if (paged) {
         const res = await sb.rpc("sku_master_page", {
@@ -1611,6 +1614,7 @@
           p_search: state.search || null, p_limit: 1000, p_offset: state.loaded,
           p_focus_keys: focusKeysForServer(),
           p_green_min: greenMinFor(activeTf()),
+          p_tags: tags2,
         });
         data = res.data; error = res.error;
         if (!error) state.hasMore = (data || []).length >= 1000;
@@ -1643,7 +1647,19 @@
   function filtersActive() {
     const t = toolsFor(state.view);
     const p = (t && t.picks) || {};
-    return Object.keys(p).some(k => p[k] && p[k].size);
+    // Dropdown-tag columns (Advertising) are filtered in the database, so they
+    // never start the "load every row" loop below.
+    return Object.keys(p).some(k => p[k] && p[k].size && !(state.view === "sku_master" && TAG_COLS[k]));
+  }
+  // 2026-09-25: tag-column picks (Advertising: Yes / No / blank) go to the server
+  // as {col: [values]} so only the matching listings are fetched - a filter over
+  // all companies + platforms used to pull all ~17,000 rows into the page.
+  function tagPicksForServer() {
+    if (state.view !== "sku_master") return null;
+    const t = toolsFor("sku_master"); const p = (t && t.picks) || {};
+    const o = {}; let any = false;
+    for (const k of Object.keys(TAG_COLS)) if (p[k] && p[k].size) { o[k] = [...p[k]]; any = true; }
+    return any ? o : null;
   }
 
   // When a search or a column filter is active, the user wants the WHOLE matching
@@ -3514,6 +3530,9 @@
     function commit() {
       if (chosen.size) picks[name] = new Set(chosen); else delete picks[name];
       paintFilterButton(btn, t);
+      // Tag columns (Advertising) filter in the database: reload the table so
+      // only the matching listings come back, instead of scanning every row here.
+      if (state.view === "sku_master" && TAG_COLS[name]) { saveFilters(); refresh(); return; }
       applyTableTools();
       // A newly applied filter must see every matching row, not just the page
       // that happens to be loaded - fetch the rest in the background.
