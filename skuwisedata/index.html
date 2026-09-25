@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -687,7 +687,9 @@
     refresh();
   });
   // The dropdown columns after Color. Each cell holds one of these or nothing.
-  const TAG_COLS = {};   // MOQ moved to the typed columns (site value wins)
+  // 2026-09-25: Advertising - your own Yes / No mark per listing (after Focus).
+  // Saved in listing_data like the other tags; filter it from the column header.
+  const TAG_COLS = { "Advertising": ["Yes", "No"] };   // MOQ moved to the typed columns (site value wins)
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
@@ -2290,7 +2292,8 @@
       // pre-cash way of guessing these same figures from an average settle
       // rate. The cash block above answers all of it from money that actually
       // moved, so keeping both only invited reading the guess by mistake.
-      "Focus"
+      "Focus",
+      "Advertising"
   ];
 
   function renderTable(rows, startIndex, rowsOnly) {
@@ -3875,6 +3878,7 @@
     "Seller": "Seller name shown on the live listing.",
     "Link": "Opens the live listing.",
     "Focus": "Your own flag. Nothing is calculated from it.",
+    "Advertising": "Your own Yes / No mark: is this listing being advertised? Click the pencil, pick, then Save. Filter the column from its header.",
 
     "Settle/unit": "Average money the platform has paid you per unit, across every paid order. Fees already taken out.",
     "Last 3 Settle": "Same thing but only the 3 most recent paid orders. Green means it meets Expected Settlement, red means short.",
