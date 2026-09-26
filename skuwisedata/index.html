@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-25e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -690,6 +690,11 @@
   // 2026-09-25: Advertising - your own Yes / No mark per listing (after Focus).
   // Saved in listing_data like the other tags; filter it from the column header.
   const TAG_COLS = { "Advertising": ["Yes", "No"] };   // MOQ moved to the typed columns (site value wins)
+  // 2026-09-26: these master text columns filter IN THE DATABASE. The dropdown
+  // lists every value the account has (sku_master_col_values), not just the
+  // rows already loaded, and picking one reloads the table with the matches.
+  const SERVER_COLS = { "Company":1, "Platform":1, "Brand":1, "Category":1, "Sub Category":1, "Product":1, "Color":1,
+                        "Master Sku":1, "HSN":1, "Type":1, "Listed By":1, "Vertical":1, "Return Type":1 };
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
@@ -1302,7 +1307,8 @@
     let data, count, error;
     const ss = serverSort();
     const tagsS = tagPicksForServer();
-    if (state.view === "sku_master" && (ss || tagsS)) {
+    const colsS = colPicksForServer();
+    if (state.view === "sku_master" && (ss || tagsS || colsS)) {
       // Order in the database over all 26,901 rows. Sorting the loaded page in
       // the browser ranked 500 rows and called it the top of the list.
       const res = await sb.rpc("sku_master_page", {
@@ -1312,6 +1318,7 @@
         p_focus_keys: focusKeysForServer(),
         p_green_min: greenMinFor(activeTf()),
         p_tags: tagsS,
+        p_cols: colsS,
       });
       data = res.data; error = res.error; count = (res.data || []).length;
     } else if (state.view === "sku_master" && state.search) {
@@ -1608,7 +1615,8 @@
       // A search pages through sku_master_page too (it takes p_offset), so a
       // 10,000-match search is no longer clipped to its first 1,000 rows.
       const tags2 = tagPicksForServer();
-      const paged = state.view === "sku_master" && (ss2 || state.search || tags2);
+      const cols2 = colPicksForServer();
+      const paged = state.view === "sku_master" && (ss2 || state.search || tags2 || cols2);
       let data, error;
       if (paged) {
         const res = await sb.rpc("sku_master_page", {
@@ -1618,6 +1626,7 @@
           p_focus_keys: focusKeysForServer(),
           p_green_min: greenMinFor(activeTf()),
           p_tags: tags2,
+          p_cols: cols2,
         });
         data = res.data; error = res.error;
         if (!error) state.hasMore = (data || []).length >= 1000;
@@ -1652,7 +1661,7 @@
     const p = (t && t.picks) || {};
     // Dropdown-tag columns (Advertising) are filtered in the database, so they
     // never start the "load every row" loop below.
-    return Object.keys(p).some(k => p[k] && p[k].size && !(state.view === "sku_master" && TAG_COLS[k]));
+    return Object.keys(p).some(k => p[k] && p[k].size && !(state.view === "sku_master" && (TAG_COLS[k] || SERVER_COLS[k])));
   }
   // 2026-09-25: tag-column picks (Advertising: Yes / No / blank) go to the server
   // as {col: [values]} so only the matching listings are fetched - a filter over
@@ -1662,6 +1671,14 @@
     const t = toolsFor("sku_master"); const p = (t && t.picks) || {};
     const o = {}; let any = false;
     for (const k of Object.keys(TAG_COLS)) if (p[k] && p[k].size) { o[k] = [...p[k]]; any = true; }
+    return any ? o : null;
+  }
+  // Master text-column picks ({col: [values]}) for sku_master_page / sku_master_col_values.
+  function colPicksForServer() {
+    if (state.view !== "sku_master") return null;
+    const t = toolsFor("sku_master"); const p = (t && t.picks) || {};
+    const o = {}; let any = false;
+    for (const k of Object.keys(SERVER_COLS)) if (p[k] && p[k].size) { o[k] = [...p[k]]; any = true; }
     return any ? o : null;
   }
 
@@ -3165,7 +3182,7 @@
     const body = table.querySelector("tbody");
     if (!body) return;
     const picks = picksFor(t);
-    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size);
+    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size && !(state.view === "sku_master" && SERVER_COLS[n]));
     for (const tr of body.rows) {
       const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i]))) && colorOK(tr);
       tr.style.display = ok ? "" : "none";
@@ -3334,7 +3351,7 @@
     // row has to carry one of the values chosen in that column's dropdown. The
     // colour filter, when set, also has to pass.
     const picks = picksFor(t);
-    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size);
+    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size && !(state.view === "sku_master" && SERVER_COLS[n]));
     // Nothing to filter and nothing to sort on the client, and the table was
     // not touched by an earlier filter/sort: leave the DOM alone. Walking every
     // one of 20,000+ rows on each 1,000-row page load was the stutter.
@@ -3486,7 +3503,7 @@
 
     const picks = picksFor(t);
     const chosen = new Set(picks[name] || []);
-    const values = columnValues(table, colIndex);
+    let values = columnValues(table, colIndex);
 
     const panel = document.createElement("div");
     panel.className = "fpanel";
@@ -3543,7 +3560,7 @@
       paintFilterButton(btn, t);
       // Tag columns (Advertising) filter in the database: reload the table so
       // only the matching listings come back, instead of scanning every row here.
-      if (state.view === "sku_master" && TAG_COLS[name]) { saveFilters(); refresh(); return; }
+      if (state.view === "sku_master" && (TAG_COLS[name] || SERVER_COLS[name])) { saveFilters(); refresh(); return; }
       applyTableTools();
       // A newly applied filter must see every matching row, not just the page
       // that happens to be loaded - fetch the rest in the background.
@@ -3570,6 +3587,20 @@
     panel.querySelector(".ffoot button").addEventListener("click", closeFilterPanel);
 
     draw();
+
+    // Master text columns: swap in every value the account has, from the
+    // database, once it answers (the local list only knew the loaded rows).
+    if (state.view === "sku_master" && SERVER_COLS[name]) {
+      const others = colPicksForServer();
+      sb.rpc("sku_master_col_values", {
+        p_col: name, p_company: state.company || null, p_platform: state.platform || null,
+        p_search: state.search || null, p_cols: others,
+      }).then(res => {
+        if (res.error || !Array.isArray(res.data) || openPanel !== panel) return;
+        values = res.data.map(o => ({ v: o.v == null ? "" : String(o.v), n: Number(o.n) || 0 }));
+        draw();
+      }).catch(() => {});
+    }
 
     // Sit under the button, pulled back on screen when the column is near an edge.
     const r = btn.getBoundingClientRect();
