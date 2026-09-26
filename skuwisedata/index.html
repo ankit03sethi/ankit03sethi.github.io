@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1895,7 +1895,18 @@
          + '<div class="value" style="font-size:15px;display:flex;flex-wrap:wrap;align-items:flex-end;margin-top:4px">' + body + '</div>'
          + '<div class="foot" id="kpiSalesFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
   }
-  // Fill the Total / Platforms / Latest / Sales cards from the filtered summary once it arrives.
+  // Active / Inactive / not in the platform file, for the filtered rows (same rule as P Qty).
+  function statusKpi() {
+    const dot = (bg) => '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + bg + ';margin-right:4px;vertical-align:middle"></span>';
+    const item = (bg, id, lab) => '<span style="display:inline-flex;align-items:center;margin-right:12px;white-space:nowrap" title="' + lab + '">'
+      + dot(bg) + '<b id="' + id + '">\u2026</b><span style="font-size:11px;color:#94a3b8;margin-left:4px">' + lab + '</span></span>';
+    return '<div class="kpi"><div class="tile" style="background:#16a34a;">&#9989;</div><div>'
+         + '<div class="label">Active / Inactive</div>'
+         + '<div class="value" style="font-size:16px;display:flex;flex-wrap:wrap;align-items:center;line-height:1.5">'
+         + item("#16a34a", "kpiStActive", "Active") + item("#94a3b8", "kpiStInactive", "Inactive") + item("#e2e8f0", "kpiStNone", "No file") + '</div>'
+         + '<div class="foot" id="kpiStFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
+  }
+  // Fill the Total / Platforms / Latest / Sales / Status cards from the filtered summary once it arrives.
   let _kpiSeq = 0;
   async function updateKpiSummary() {
     if (state.view !== "sku_master") return;
@@ -1913,6 +1924,9 @@
     const sales = s.sales || {};
     for (const [k] of SALES_WINS) { const e = el("kpiSales_" + k); if (e) e.textContent = (Number(sales[k]) || 0).toLocaleString("en-IN"); }
     if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = kpiFilterLabel();
+    const st = s.status || {};
+    for (const [k, id] of [["active","kpiStActive"],["inactive","kpiStInactive"],["none","kpiStNone"]]) { const e = el(id); if (e) e.textContent = (Number(st[k]) || 0).toLocaleString("en-IN"); }
+    if (el("kpiStFoot")) el("kpiStFoot").textContent = kpiFilterLabel();
   }
   async function updateColorWhite() {
     const el = document.getElementById("ckWhite"); if (!el) return;
@@ -1955,6 +1969,7 @@
         <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;" id="kpiLatest">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
         ${colorCountsKpi()}
         ${salesKpi()}
+        ${statusKpi()}
       `;
       updateKpiSummary();
       updateColorWhite();
