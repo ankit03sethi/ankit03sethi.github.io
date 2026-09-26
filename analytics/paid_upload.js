@@ -210,7 +210,7 @@
       key: initData.razorpay.keyId,
       amount: initData.razorpay.amountPaise,
       currency: initData.razorpay.currency,
-      name: "SHOPPERSKART",
+      name: "CURSIVE PRIVATE LIMITED",
       description: "cursive - " + initData.summary.rows + " product" + (initData.summary.rows === 1 ? "" : "s"),
       order_id: initData.razorpay.orderId,
       prefill: { email: session.id, contact: initData.customerMobile || "" },
