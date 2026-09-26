@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1883,7 +1883,19 @@
   function fetchFilteredTotal() {
     return fetchSummary().then(s => (s ? Number(s.total) || 0 : null));
   }
-  // Fill the Total / Platforms / Latest cards from the filtered summary once it arrives.
+  // Units sold in each window for the filtered SKUs (filled by updateKpiSummary).
+  const SALES_WINS = [["d1","1d"],["d3","3d"],["d7","7d"],["d15","15d"],["d30","30d"],["d60","60d"],["d90","90d"]];
+  function salesKpi() {
+    const body = SALES_WINS.map(([k, lab]) =>
+      '<span style="display:inline-flex;flex-direction:column;align-items:center;margin-right:10px;line-height:1.15">'
+      + '<b id="kpiSales_' + k + '" style="font-size:15px">\u2026</b>'
+      + '<span style="font-size:10px;color:#94a3b8;font-weight:600">' + lab + '</span></span>').join("");
+    return '<div class="kpi"><div class="tile" style="background:#0ea5e9;">&#128722;</div><div>'
+         + '<div class="label">Sales (units)</div>'
+         + '<div class="value" style="font-size:15px;display:flex;flex-wrap:wrap;align-items:flex-end;margin-top:4px">' + body + '</div>'
+         + '<div class="foot" id="kpiSalesFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
+  }
+  // Fill the Total / Platforms / Latest / Sales cards from the filtered summary once it arrives.
   let _kpiSeq = 0;
   async function updateKpiSummary() {
     if (state.view !== "sku_master") return;
@@ -1898,6 +1910,9 @@
     if (el("kpiPlat")) el("kpiPlat").textContent = String(plats.length);
     if (el("kpiPlatFoot")) el("kpiPlatFoot").textContent = plats.join(", ") || "\u2014";
     if (el("kpiLatest")) el("kpiLatest").textContent = s.latest ? new Date(s.latest).toLocaleString("en-IN") : "\u2014";
+    const sales = s.sales || {};
+    for (const [k] of SALES_WINS) { const e = el("kpiSales_" + k); if (e) e.textContent = (Number(sales[k]) || 0).toLocaleString("en-IN"); }
+    if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = kpiFilterLabel();
   }
   async function updateColorWhite() {
     const el = document.getElementById("ckWhite"); if (!el) return;
@@ -1939,6 +1954,7 @@
         <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value" id="kpiPlat">${platforms.size}</div><div class="foot" id="kpiPlatFoot">${[...platforms].join(", ") || "—"}</div></div></div>
         <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;" id="kpiLatest">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
         ${colorCountsKpi()}
+        ${salesKpi()}
       `;
       updateKpiSummary();
       updateColorWhite();
