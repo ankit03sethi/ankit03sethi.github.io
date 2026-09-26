@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1645,6 +1645,8 @@
       if (tbody) tbody.insertAdjacentHTML("beforeend", renderTable(rows, state.loaded, true));
       state.loaded += rows.length;
       if (!paged) state.hasMore = state.loaded < state.total;
+      // Colour counts on the KPI card count the loaded matches when a filter is on.
+      if (paged && state.view === "sku_master" && !state.loadingAll) { try { renderKpis([...state.rowsById.values()], state.grandTotal || state.total || 0); } catch (e) {} }
       // Re-apply the filter as rows stream in. During a bulk "load all" we only
       // hide/show non-matches (no re-sort) so the table does not jump on every
       // page; the single final sort runs once when loading finishes.
@@ -1827,7 +1829,15 @@
     const co = (state.company || "").trim().toLowerCase();
     const pf = (state.platform || "").trim().toLowerCase();
     let red = 0, green = 0, light = 0, orange = 0;   // green = 7d-up (richer), light = 7d-down (lighter)
+    // A search / Advertising / column filter narrows the rows to the ones the
+    // database sent back: count only those SKUs, so the card follows the filter.
+    let inFilter = null;
+    if (state.view === "sku_master" && (state.search || tagPicksForServer() || colPicksForServer())) {
+      inFilter = new Set();
+      for (const r of state.rowsById.values()) inFilter.add(wcKey(r.company_name, r.platform, r.seller_sku));
+    }
     for (const [key, wc] of state.windowCounts) {
+      if (inFilter && !inFilter.has(key)) continue;
       if (co && String(wc.company_name || "").toLowerCase() !== co) continue;
       if (pf && String(wc.platform || "").toLowerCase() !== pf) continue;
       const sold = Number(wc[dk]) || 0, sold3 = Number(wc.d3) || 0;
@@ -1842,15 +1852,52 @@
     }
     return { red, green, light, orange };
   }
+  // Everything the KPI cards depend on, as one string: a change means a new summary.
+  function kpiFilterSig() {
+    return JSON.stringify([state.company || "", state.platform || "", state.search || "", tagPicksForServer(), colPicksForServer()]);
+  }
+  function kpiFilterLabel() {
+    const parts = [];
+    if (state.company) parts.push(state.company);
+    if (state.platform) parts.push(state.platform);
+    if (state.search) parts.push('"' + state.search + '"');
+    const t = tagPicksForServer() || {}, c = colPicksForServer() || {};
+    for (const k of [...Object.keys(t), ...Object.keys(c)]) parts.push(colLabel(k));
+    return parts.length ? "Filtered: " + parts.join(" · ") : "All time";
+  }
+  // Filtered total / platforms / latest row from the database (sku_master_summary),
+  // cached per filter combination.
+  function fetchSummary() {
+    const key = kpiFilterSig();
+    if (!state.masterSummaries) state.masterSummaries = new Map();
+    if (state.masterSummaries.has(key)) return Promise.resolve(state.masterSummaries.get(key));
+    return sb.rpc("sku_master_summary", {
+      p_company: state.company || null, p_platform: state.platform || null,
+      p_search: state.search || null, p_tags: tagPicksForServer(), p_cols: colPicksForServer(),
+    }).then(res => {
+      if (res.error || !res.data) return null;
+      state.masterSummaries.set(key, res.data);
+      return res.data;
+    }).catch(() => null);
+  }
   function fetchFilteredTotal() {
-    const key = (state.company || "") + "|" + (state.platform || "");
-    if (!state.masterTotals) state.masterTotals = new Map();
-    if (state.masterTotals.has(key)) return Promise.resolve(state.masterTotals.get(key));
-    let qb = sb.from("seller_sku_master").select("id", { count: "exact", head: true });
-    if (state.company)  qb = qb.ilike("company_name", state.company);
-    if (state.platform) qb = qb.ilike("platform", state.platform);
-    return qb.then(({ count }) => { const n = count || 0; state.masterTotals.set(key, n); return n; })
-             .catch(() => null);
+    return fetchSummary().then(s => (s ? Number(s.total) || 0 : null));
+  }
+  // Fill the Total / Platforms / Latest cards from the filtered summary once it arrives.
+  let _kpiSeq = 0;
+  async function updateKpiSummary() {
+    if (state.view !== "sku_master") return;
+    const seq = ++_kpiSeq;
+    const s = await fetchSummary();
+    if (!s || seq !== _kpiSeq) return;
+    const total = Number(s.total) || 0;
+    const plats = Array.isArray(s.platforms) ? s.platforms : [];
+    const el = id => document.getElementById(id);
+    if (el("kpiTotal")) el("kpiTotal").textContent = total.toLocaleString("en-IN");
+    if (el("kpiTotalFoot")) el("kpiTotalFoot").textContent = kpiFilterLabel();
+    if (el("kpiPlat")) el("kpiPlat").textContent = String(plats.length);
+    if (el("kpiPlatFoot")) el("kpiPlatFoot").textContent = plats.join(", ") || "\u2014";
+    if (el("kpiLatest")) el("kpiLatest").textContent = s.latest ? new Date(s.latest).toLocaleString("en-IN") : "\u2014";
   }
   async function updateColorWhite() {
     const el = document.getElementById("ckWhite"); if (!el) return;
@@ -1888,11 +1935,12 @@
     const latestStr = latestIso ? new Date(latestIso).toLocaleString("en-IN") : "—";
     if (state.view === "sku_master") {
       $("#kpis").innerHTML = `
-        <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total mappings</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div></div>
-        <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value">${platforms.size}</div><div class="foot">${[...platforms].join(", ") || "—"}</div></div></div>
-        <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total mappings</div><div class="value" id="kpiTotal">${total.toLocaleString("en-IN")}</div><div class="foot" id="kpiTotalFoot">${escapeHtml(kpiFilterLabel())}</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value" id="kpiPlat">${platforms.size}</div><div class="foot" id="kpiPlatFoot">${[...platforms].join(", ") || "—"}</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;" id="kpiLatest">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
         ${colorCountsKpi()}
       `;
+      updateKpiSummary();
       updateColorWhite();
     } else {
       $("#kpis").innerHTML = `
