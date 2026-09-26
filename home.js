@@ -909,7 +909,7 @@
       key: initData.razorpay.keyId,
       amount: initData.razorpay.amountPaise,
       currency: initData.razorpay.currency,
-      name: "SHOPPERSKART",
+      name: "CURSIVE PRIVATE LIMITED",
       description: "cursive - " + currentService,
       order_id: initData.razorpay.orderId,
       prefill: { email: currentEmail, contact: currentMobile },
