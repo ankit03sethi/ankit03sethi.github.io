@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1922,8 +1922,7 @@
       const wc = state.windowCounts.get(key);
       if (wc) for (const k in sales) sales[k] += Number(wc[k]) || 0;
       const st = state.stockMap && state.stockMap.get(key);
-      if (!st) none++;
-      else if (["INACTIVE","REJECTED"].includes(String(st.listing_status || "").toUpperCase())) inactive++;
+      if (!st || ["INACTIVE","REJECTED"].includes(String(st.listing_status || "").toUpperCase())) inactive++;
       else active++;
     }
     const foot = "Shown rows" + (state.hasMore ? " (loaded so far)" : "");
@@ -1936,7 +1935,6 @@
     if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = foot;
     if (el("kpiStActive")) el("kpiStActive").textContent = active.toLocaleString("en-IN");
     if (el("kpiStInactive")) el("kpiStInactive").textContent = inactive.toLocaleString("en-IN");
-    if (el("kpiStNone")) el("kpiStNone").textContent = none.toLocaleString("en-IN");
     if (el("kpiStFoot")) el("kpiStFoot").textContent = foot;
     return true;
   }
@@ -1960,7 +1958,7 @@
     return '<div class="kpi"><div class="tile" style="background:#16a34a;">&#9989;</div><div>'
          + '<div class="label">Active / Inactive</div>'
          + '<div class="value" style="font-size:16px;display:flex;flex-wrap:wrap;align-items:center;line-height:1.5">'
-         + item("#16a34a", "kpiStActive", "Active") + item("#94a3b8", "kpiStInactive", "Inactive") + item("#e2e8f0", "kpiStNone", "No file") + '</div>'
+         + item("#16a34a", "kpiStActive", "Active") + item("#94a3b8", "kpiStInactive", "Inactive") + '</div>'
          + '<div class="foot" id="kpiStFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
   }
   // Fill the Total / Platforms / Latest / Sales / Status cards from the filtered summary once it arrives.
@@ -1982,7 +1980,8 @@
     for (const [k] of SALES_WINS) { const e = el("kpiSales_" + k); if (e) e.textContent = (Number(sales[k]) || 0).toLocaleString("en-IN"); }
     if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = kpiFilterLabel();
     const st = s.status || {};
-    for (const [k, id] of [["active","kpiStActive"],["inactive","kpiStInactive"],["none","kpiStNone"]]) { const e = el(id); if (e) e.textContent = (Number(st[k]) || 0).toLocaleString("en-IN"); }
+    if (el("kpiStActive")) el("kpiStActive").textContent = (Number(st.active) || 0).toLocaleString("en-IN");
+    if (el("kpiStInactive")) el("kpiStInactive").textContent = ((Number(st.inactive) || 0) + (Number(st.none) || 0)).toLocaleString("en-IN");
     if (el("kpiStFoot")) el("kpiStFoot").textContent = kpiFilterLabel();
   }
   async function updateColorWhite() {
