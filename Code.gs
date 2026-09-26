@@ -430,12 +430,12 @@ function trialGenerateOtp_() { return String(Math.floor(100000 + Math.random() *
 
 var PAID_PER_ROW_RUPEES = 5;
 var PAID_GST_RATE = 0.18;
-var BIZ_NAME = "SHOPPERSKART";
+var BIZ_NAME = "CURSIVE PRIVATE LIMITED";
 var BIZ_BRAND = "cursive";
 var BIZ_PROPRIETOR = "Ankit Sethi";
-var BIZ_GSTIN = "07CJPPS7017B2Z1";
+var BIZ_GSTIN = "07AAOCC1744L1ZC";
 var BIZ_STATE_CODE = "07";
-var BIZ_ADDRESS = "C-165, Shop No. 4, Ground Floor, Hari Nagar, New Delhi, Delhi - 110064";
+var BIZ_ADDRESS = "WZ-367, Shop No. 4, CD-4, Ground Floor, Hari Nagar Clock Tower, Janak Puri (West), New Delhi, Delhi - 110064";
 var BIZ_EMAIL = "Contact@cursive.world";
 var BIZ_PHONE = "+91 96257 37475";
 var PAID_PENDING_TAB   = "Pending Payments";
@@ -704,7 +704,7 @@ function generateInvoicePdf_(inv) {
   body.appendParagraph(BIZ_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1);
   body.appendParagraph(BIZ_BRAND + ' — seller analytics').setItalic(true);
   body.appendParagraph(BIZ_ADDRESS);
-  body.appendParagraph('GSTIN: ' + BIZ_GSTIN + '  ·  Proprietor: ' + BIZ_PROPRIETOR);
+  body.appendParagraph('GSTIN: ' + BIZ_GSTIN + '  ·  Director: ' + BIZ_PROPRIETOR);
   body.appendParagraph('Email: ' + BIZ_EMAIL + '  ·  Phone: ' + BIZ_PHONE);
   body.appendHorizontalRule();
   body.appendParagraph('TAX INVOICE').setHeading(DocumentApp.ParagraphHeading.HEADING2);
@@ -2048,7 +2048,7 @@ function generateServiceInvoicePdf_(inv, serviceName) {
   body.appendParagraph(BIZ_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1);
   body.appendParagraph(BIZ_BRAND + ' - seller services').setItalic(true);
   body.appendParagraph(BIZ_ADDRESS);
-  body.appendParagraph('GSTIN: ' + BIZ_GSTIN + '  ·  Proprietor: ' + BIZ_PROPRIETOR);
+  body.appendParagraph('GSTIN: ' + BIZ_GSTIN + '  ·  Director: ' + BIZ_PROPRIETOR);
   body.appendParagraph('Email: ' + BIZ_EMAIL + '  ·  Phone: ' + BIZ_PHONE);
   body.appendHorizontalRule();
   body.appendParagraph('TAX INVOICE').setHeading(DocumentApp.ParagraphHeading.HEADING2);
