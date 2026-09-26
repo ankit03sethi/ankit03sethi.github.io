@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1715,6 +1715,8 @@
     } finally {
       state.loadingAll = false;
       $("#rowCount").textContent = rowCountLabel();
+      // every matching row is in now: the cards count the final on-screen set
+      if (state.view === "sku_master") { try { renderKpis([...state.rowsById.values()], state.grandTotal || state.total || 0); } catch (e) {} }
     }
   }
 
@@ -1832,7 +1834,11 @@
     // A search / Advertising / column filter narrows the rows to the ones the
     // database sent back: count only those SKUs, so the card follows the filter.
     let inFilter = null;
-    if (state.view === "sku_master" && (state.search || tagPicksForServer() || colPicksForServer())) {
+    const vis = visibleRowsForKpi();
+    if (vis) {
+      inFilter = new Set();
+      for (const r of vis) inFilter.add(wcKey(r.company_name, r.platform, r.seller_sku));
+    } else if (state.view === "sku_master" && (state.search || tagPicksForServer() || colPicksForServer())) {
       inFilter = new Set();
       for (const r of state.rowsById.values()) inFilter.add(wcKey(r.company_name, r.platform, r.seller_sku));
     }
@@ -1881,7 +1887,58 @@
     }).catch(() => null);
   }
   function fetchFilteredTotal() {
+    const vis = visibleRowsForKpi();
+    if (vis) return Promise.resolve(vis.length);
     return fetchSummary().then(s => (s ? Number(s.total) || 0 : null));
+  }
+  // When a column filter that runs in the browser (P Qty, W Qty, MOQ, Mapped,
+  // numbers...) or the colour filter is on, the cards describe the rows on
+  // screen. Returns those rows, or null when no such filter is active.
+  function visibleRowsForKpi() {
+    if (state.view !== "sku_master") return null;
+    if (!(filtersActive() || colorFilterActive())) return null;
+    const table = $("#tableWrap").querySelector("table.data");
+    if (!table || !table.tBodies[0]) return null;
+    const out = [];
+    for (const tr of table.tBodies[0].rows) {
+      if (tr.style.display === "none") continue;
+      const r = state.rowsById.get(String(tr.dataset.id));
+      if (r) out.push(r);
+    }
+    return out;
+  }
+  // Fill every card from the rows on screen. True when it did (client filter on).
+  function updateKpiFromDom() {
+    const vis = visibleRowsForKpi();
+    if (!vis) return false;
+    _kpiSeq++;   // a server summary still in flight must not overwrite these
+    const el = id => document.getElementById(id);
+    const plats = new Set(); let latest = null, active = 0, inactive = 0, none = 0;
+    const sales = { d1:0, d3:0, d7:0, d15:0, d30:0, d60:0, d90:0 };
+    for (const r of vis) {
+      if (r.platform) plats.add(String(r.platform).toLowerCase());
+      if (r.updated_at && (!latest || r.updated_at > latest)) latest = r.updated_at;
+      const key = wcKey(r.company_name, r.platform, r.seller_sku);
+      const wc = state.windowCounts.get(key);
+      if (wc) for (const k in sales) sales[k] += Number(wc[k]) || 0;
+      const st = state.stockMap && state.stockMap.get(key);
+      if (!st) none++;
+      else if (["INACTIVE","REJECTED"].includes(String(st.listing_status || "").toUpperCase())) inactive++;
+      else active++;
+    }
+    const foot = "Shown rows" + (state.hasMore ? " (loaded so far)" : "");
+    if (el("kpiTotal")) el("kpiTotal").textContent = vis.length.toLocaleString("en-IN");
+    if (el("kpiTotalFoot")) el("kpiTotalFoot").textContent = foot;
+    if (el("kpiPlat")) el("kpiPlat").textContent = String(plats.size);
+    if (el("kpiPlatFoot")) el("kpiPlatFoot").textContent = [...plats].join(", ") || "\u2014";
+    if (el("kpiLatest")) el("kpiLatest").textContent = latest ? new Date(latest).toLocaleString("en-IN") : "\u2014";
+    for (const [k] of SALES_WINS) { const e = el("kpiSales_" + k); if (e) e.textContent = sales[k].toLocaleString("en-IN"); }
+    if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = foot;
+    if (el("kpiStActive")) el("kpiStActive").textContent = active.toLocaleString("en-IN");
+    if (el("kpiStInactive")) el("kpiStInactive").textContent = inactive.toLocaleString("en-IN");
+    if (el("kpiStNone")) el("kpiStNone").textContent = none.toLocaleString("en-IN");
+    if (el("kpiStFoot")) el("kpiStFoot").textContent = foot;
+    return true;
   }
   // Units sold in each window for the filtered SKUs (filled by updateKpiSummary).
   const SALES_WINS = [["d1","1d"],["d3","3d"],["d7","7d"],["d15","15d"],["d30","30d"],["d60","60d"],["d90","90d"]];
@@ -1912,7 +1969,7 @@
     if (state.view !== "sku_master") return;
     const seq = ++_kpiSeq;
     const s = await fetchSummary();
-    if (!s || seq !== _kpiSeq) return;
+    if (!s || seq !== _kpiSeq || visibleRowsForKpi()) return;
     const total = Number(s.total) || 0;
     const plats = Array.isArray(s.platforms) ? s.platforms : [];
     const el = id => document.getElementById(id);
@@ -1971,7 +2028,7 @@
         ${salesKpi()}
         ${statusKpi()}
       `;
-      updateKpiSummary();
+      if (!updateKpiFromDom()) updateKpiSummary();
       updateColorWhite();
     } else {
       $("#kpis").innerHTML = `
@@ -3491,6 +3548,10 @@
       const p = picksFor(t);
       const active = Object.keys(p).filter(k => p[k] && p[k].size).length;
       info.textContent = active ? `${shown} of ${rows.length} rows` : "";
+    }
+    // The cards follow the rows on screen while a browser-side filter is on.
+    if (state.view === "sku_master" && !state.loadingAll) {
+      try { renderKpis([...state.rowsById.values()], state.grandTotal || state.total || 0); } catch (e) {}
     }
   }
 
