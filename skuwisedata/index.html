@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-27a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1441,8 +1441,8 @@
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
-                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
+                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ IF": "moq_if" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price", "MOQ IF"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -2441,7 +2441,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ IF","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Expected Profit","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -4039,6 +4039,7 @@
     "Color": "Colour from the master sheet.",
     "Mapped": "Yes once any seller other than us has been seen on the listing (Flipkart sellers list, or a different buy-box seller). Set automatically by the checker and never cleared. Mapped rows are checked first, at least once a day.",
     "MOQ": "Minimum order quantity. Flipkart: read off the product page (Min order quantity is N units) on every check - that value wins. Blank = 1 (normal listing). Type a number only as a stand-in until the page has been checked; file and page stay in sync.",
+    "MOQ IF": "Minimum order quantity as it stands in the latest inventory (Flipkart listing) file, matched to this row by FSN. Blank = the SKU was not in the latest file, or its MOQ cell was blank.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
