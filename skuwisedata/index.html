@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-27a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-27b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -489,6 +489,7 @@
     company: "",
     companies: [],
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
+    fileMoq: new Map(),        // company|platform|sku -> MOQ IF from the newest inventory file (loaded once at startup, like windowCounts)
     stockMap: new Map(),       // company::platform::sku -> { qty, listing_status, ... } from the newest inventory export
     stockHave: new Set(),      // company::platform pairs that have an inventory export at all
     // Which day-windows show inside a combined column, and which kinds of
@@ -603,10 +604,16 @@
       console.warn(fn + "_json failed, falling back to slices", error);
       return sliced(fn);
     }
-    const [wc, st] = await Promise.all([whole("sku_order_window_counts"), whole("sku_stock_map")]);
+    const [wc, st, mq] = await Promise.all([whole("sku_order_window_counts"), whole("sku_stock_map"), whole("sku_moq_map")]);
     const m = new Map();
     for (const r of wc) m.set(wcKey(r.company_name, r.platform, r.sku), r);
     state.windowCounts = m;
+    // MOQ IF, off the newest inventory file per company+platform (matched by FSN).
+    // Loaded here, in the same fast startup pass, so the column fills on the first
+    // redraw instead of waiting on the heavy per-row listing-stats load.
+    const fm = new Map();
+    for (const r of (mq || [])) fm.set(wcKey(r.company_name, r.platform, r.sku), r.moq_if);
+    state.fileMoq = fm;
     // Sales are now known — colour green/orange/red, fill Focus, apply colour filter.
     applyTableTools();
     // Platform stock, off the newest inventory export per company + platform.
@@ -1441,8 +1448,8 @@
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
-                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ IF": "moq_if" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price", "MOQ IF"]);
+                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq" };
+    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -3128,6 +3135,14 @@
           if (fm.val == null) return '<td title="' + escapeHtml(fm.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
           return '<td title="' + escapeHtml(fm.why) + '" style="color:#334155;font-weight:600">' + fm.val + "</td>";
         }
+      }
+      // MOQ IF: minimum order quantity from the newest inventory file, matched by
+      // FSN. Filled from the fast startup map so it shows without waiting on the
+      // heavy listing-stats load. Blank = SKU not in the latest file, or MOQ blank.
+      if (c === "MOQ IF") {
+        const fm = state.fileMoq.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        return fm == null ? "<td></td>"
+          : '<td title="Minimum order quantity in the latest inventory file (matched by FSN)." style="color:#1d4ed8;font-weight:600">' + escapeHtml(String(fm)) + "</td>";
       }
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
