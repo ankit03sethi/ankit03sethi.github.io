@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2773,12 +2773,18 @@
     function orderBasis(wc, w) {
       if (wc["os" + w] !== undefined && wc["os" + w] !== null) {
         return { po: Number(wc["d" + w]) || 0, pu: Number(wc["u" + w]) || 0, ru: Number(wc["ur" + w]) || 0,
-                 st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0 };
+                 st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0,
+                 // how many of those orders/units actually have a payment line, and
+                 // how many return charges were billed - shown under each figure
+                 ppo: Number(wc["opo" + w]) || 0, ppu: Number(wc["opu" + w]) || 0, rn: Number(wc["orc" + w]) || 0 };
       }
       return { po: Number(wc["po" + w]) || 0, pu: Number(wc["pu" + w]) || 0, ru: Number(wc["ru" + w]) || 0,
                st: Number(wc["st" + w]) || 0, gs: Number(wc["gs" + w]) || 0,
-               rl: Number(wc["rl" + w]) || 0 };
+               rl: Number(wc["rl" + w]) || 0,
+               ppo: Number(wc["po" + w]) || 0, ppu: Number(wc["pu" + w]) || 0, rn: Number(wc["rc" + w]) || 0 };
     }
+    const fmtN = (n) => Number(n || 0).toLocaleString("en-IN");
+    const subU = (u, o) => fmtN(u) + " u \u00b7 " + fmtN(o) + " ord";
     function moneyCell(wc, col) {
       if (!wc) return null;
       const w = MONEY_WIN[col];
@@ -2822,9 +2828,10 @@
       // single total. Sorting still uses the combined figure.
       if (col.endsWith("Ret Fees")) {
         // actual charges only (no estimate for returns not yet billed)
-        const L  = orderBasis(wc, w).rl;
+        const obr = orderBasis(wc, w);
+        const L  = obr.rl;
         const lr = Number(wc["rlr" + w]) || 0;
-        return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0 };
+        return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0, sub: fmtN(obr.rn) + " ret charged" };
       }
       // The cash block. Everything below is counted on the PAYMENT date, not
       // the order date: st is settlement that actually landed, shc the forward
@@ -2848,7 +2855,7 @@
         // of two. RTOs are excluded from perRet on both: they are mostly billed
         // at nothing, and a 0 or a 13 sitting under a column of 150s is not a
         // cheap return, it is the wrong number.
-        let settle, ship, ret, perRet;
+        let settle, ship, ret, perRet, subO = "";
         if (w === 0) {
           settle = Number(wc.ls_unit);
           if (!Number.isFinite(settle)) return null;
@@ -2870,11 +2877,12 @@
           // until the next file lands. Payments for orders that are not in the
           // order file are ignored.
           const ob = orderBasis(wc, w);
-          const po = ob.po;
+          const po = ob.ppo || ob.po;          // money per order = over orders that have a payment line
           if (po <= 0) return null;
           settle = ob.st / po;
           ship   = (Number(wc["shc" + w]) || 0) / po;
-          ret    = ob.rl / po;
+          ret    = ob.rl / (ob.po || 1);       // return charges spread over every order
+          subO   = "\u00f7 " + fmtN(po) + " ord";
           const nSR = Number(wc["rcs" + w]) || 0;
           perRet = nSR ? (Number(wc["rls" + w]) || 0) / nSR : NaN;
         }
@@ -2888,22 +2896,28 @@
         // carries no gross figure.
         let gross = NaN;
         if (w === 0) { const g = Number(wc.ls_gross); if (Number.isFinite(g) && g > 0) gross = g; }
-        else { const ob = orderBasis(wc, w); if (ob.gs > 0 && ob.po > 0) gross = ob.gs / ob.po; }
+        else { const ob = orderBasis(wc, w); const n = ob.ppo || ob.po; if (ob.gs > 0 && n > 0) gross = ob.gs / n; }
         const rev  = Number.isFinite(gross) ? gross : settle + ship;
         const cour = Number.isFinite(gross) ? Math.max(gross - settle, 0) : ship;
-        if (col.endsWith("d Rev/u"))    return { v: rev,     txt: money(rev) };
-        if (col.endsWith("d Ship/u"))   return { v: -cour,   txt: cour ? money(-cour) : "0" };
-        if (col.endsWith("d Settle/u")) return { v: settle,  txt: money(settle) };
+        if (col.endsWith("d Rev/u"))    return { v: rev,     txt: money(rev), sub: subO };
+        if (col.endsWith("d Ship/u"))   return { v: -cour,   txt: cour ? money(-cour) : "0", sub: subO };
+        if (col.endsWith("d Settle/u")) return { v: settle,  txt: money(settle), sub: subO };
         if (col.endsWith("d Ret/u"))
           return (Number.isFinite(perRet) && perRet > 0)
-               ? { v: -perRet, txt: money(-perRet) } : null;
-        if (col.endsWith("d Tax/u"))    return { v: -taxu,   txt: taxu ? money(-taxu) : "0" };
+               ? { v: -perRet, txt: money(-perRet), sub: w ? "\u00f7 " + fmtN(Number(wc["rcs" + w]) || 0) + " ret" : "" } : null;
+        if (col.endsWith("d Tax/u"))    return { v: -taxu,   txt: taxu ? money(-taxu) : "0", sub: subO };
         if (col.endsWith("d Pack/u"))   return { v: -packu,  txt: packu ? money(-packu) : "0" };
         if (!Number.isFinite(cop)) return null;
         let goodsu = cop * units0;                        // COP x the order's units
+        let subN = "";
         if (w !== 0) {
+          // Net per order = whole window's profit over EVERY order in it
           const ob = orderBasis(wc, w);
-          goodsu = cop * Math.max(ob.pu - ob.ru, 0) / (ob.po || 1);
+          const n = ob.po || 1;
+          const tax = (Number(wc.tax_pct) || 0) / 100 * ob.st;
+          const goods = cop * Math.max(ob.pu - ob.ru, 0);
+          const v2 = (ob.st - ob.rl - tax - packu * ob.po - goods) / n;
+          return { v: v2, txt: money(v2), sub: "\u00f7 " + fmtN(ob.po) + " ord" };
         }
         const v = settle - ret - taxu - packu - goodsu;
         return { v: v, txt: money(v) };
@@ -2923,16 +2937,17 @@
         // Revenue = order value from the platform's payment file; courier
         // = revenue - settlement. Old settle + billed-courier only as fallback.
         const revw = ob.gs > 0 ? ob.gs : st + shc;
-        if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw) };
-        if (col.endsWith("d Cash"))     return { v: st,    txt: money(st) };
-        if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0" };
-        if (col.endsWith("d Packing"))  return { v: -pack, txt: pack ? money(-pack) : "0" };
+        const sPaid = subU(ob.ppu, ob.ppo), sAll = subU(pu, ob.po);
+        if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw), sub: sPaid };
+        if (col.endsWith("d Cash"))     return { v: st,    txt: money(st), sub: sPaid };
+        if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0", sub: sPaid };
+        if (col.endsWith("d Packing"))  return { v: -pack, txt: pack ? money(-pack) : "0", sub: fmtN(ob.po) + " ord" };
         // Product cost and net profit cannot be answered without a COP, and a
         // missing COP would quietly read as free stock and a fat profit. A dash
         // says "fill the sheet", which is the truth.
         if (!Number.isFinite(cop)) return null;
         const goods = cop * netu;
-        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0" };
+        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0", sub: fmtN(netu) + " u (" + fmtN(pu) + " \u2212 " + fmtN(ru) + " ret)" };
         const fin2 = st - retf - tax2 - pack - goods;
         // Two ways of asking whether this SKU is worth it: how much of every
         // rupee that came in you keep, and how much every rupee of stock
@@ -2940,11 +2955,11 @@
         // dash, not a spectacular percentage of nothing.
         if (col.endsWith("d Net %Rev")) {
           const rev = revw;
-          return rev > 0 ? { v: fin2 / rev * 100, txt: (fin2 / rev * 100).toFixed(0) } : null;
+          return rev > 0 ? { v: fin2 / rev * 100, txt: (fin2 / rev * 100).toFixed(0), sub: sAll } : null;
         }
         if (col.endsWith("d Net %Cost"))
-          return goods > 0 ? { v: fin2 / goods * 100, txt: (fin2 / goods * 100).toFixed(0) } : null;
-        return { v: fin2, txt: money(fin2) };
+          return goods > 0 ? { v: fin2 / goods * 100, txt: (fin2 / goods * 100).toFixed(0), sub: sAll } : null;
+        return { v: fin2, txt: money(fin2), sub: sAll };
       }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
@@ -3081,10 +3096,11 @@
         // warn = an RTO was billed on a platform that should never bill for
         // one. Money to claim back, so it does not get to look like every
         // other number in the column.
+        const subHtml = out.sub ? '<div style="font-size:10px;line-height:1.1;color:#64748b;font-weight:400;white-space:nowrap">' + out.sub + '</div>' : "";
         if (out.warn) return '<td title="An RTO was charged here - on Flipkart,'
           + ' Meesho and Myntra that should not happen, so it is money to claim back"'
-          + ' style="color:#0f172a">' + out.txt + "</td>";
-        return `<td style="color:#0f172a">${out.txt}</td>`;
+          + ' style="color:#0f172a">' + out.txt + subHtml + "</td>";
+        return `<td style="color:#0f172a">${out.txt}${subHtml}</td>`;
       }
       if (PCT_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
