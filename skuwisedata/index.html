@@ -340,7 +340,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28h</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28i</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2706,7 +2706,7 @@
           tip = "Last order settled at " + money(v) + " against " + money(exp) + " expected" + when;
         }
         return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">'
-             + withSub(money(v), wc.settle_last_on ? escapeHtml(String(wc.settle_last_on)) : "") + "</td>";
+             + withSub(money(v), wc.ls_odate ? "ordered " + escapeHtml(String(wc.ls_odate)) : "") + "</td>";
       }
       if (col === "Last Ship" || col === "Last Ret Ship") {
         const fwd = col === "Last Ship";
@@ -2721,9 +2721,10 @@
           return '<td title="No forward freight has ever been charged on this SKU here"'
                + ' style="color:#cbd5e1">' + DASH_ + "</td>";
         const w2 = fwd ? wc.sh_last_on : wc.rs_last_on;
+        const od2 = fwd ? wc.sh_last_odate : wc.rs_last_odate;
         return '<td title="The last order that carried a charge'
-             + (w2 ? " \u00b7 " + escapeHtml(String(w2)) : "")
-             + '" style="color:#7c2d12;font-weight:600">' + withSub(money2(v2), w2 ? escapeHtml(String(w2)) : "") + "</td>";
+             + (od2 ? " \u00b7 ordered " + escapeHtml(String(od2)) : "") + (w2 ? " \u00b7 charged " + escapeHtml(String(w2)) : "")
+             + '" style="color:#7c2d12;font-weight:600">' + withSub(money2(v2), od2 ? "ordered " + escapeHtml(String(od2)) : "") + "</td>";
       }
       const amt = Number(wc.lr_amt);
       if (!Number.isFinite(amt)) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
@@ -2740,7 +2741,7 @@
       let tip = "Last charged return: " + kind + when
               + (Number.isFinite(units) && units > 1 ? " \u00b7 " + units + " units" : "");
       if (wrong) tip = "RTO charged on " + pf + " - it should not have been. " + tip;
-      return '<td title="' + tip + '" style="color:#0f172a">' + withSub(money(v), wc.lr_on ? escapeHtml(String(wc.lr_on)) : "") + "</td>";
+      return '<td title="' + tip + '" style="color:#0f172a">' + withSub(money(v), wc.lr_odate ? "ordered " + escapeHtml(String(wc.lr_odate)) : "") + "</td>";
     }
     function shipCell(wc, col) {
       const spec = SHIP_COLS[col];
@@ -3071,7 +3072,7 @@
         const tip = (c === "Last Return Order" ? "Last return the platform charged" : "Last clean paid order")
                   + (odt ? " · ordered " + escapeHtml(String(odt)) : "") + (when ? " · paid " + escapeHtml(String(when)) : "");
         return '<td title="' + tip + '" style="font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap">'
-             + withSub(escapeHtml(String(k)), odt ? "ordered " + escapeHtml(String(odt)) : (when ? "paid " + escapeHtml(String(when)) : "")) + "</td>";
+             + withSub(escapeHtml(String(k)), odt ? "ordered " + escapeHtml(String(odt)) : "") + "</td>";
       }
       if (LAST_COLS.has(c)) {
         return lastCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c, r.platform);
@@ -3103,7 +3104,7 @@
             tip += " · fill Expected Settlement in the master sheet to flag shortfalls";
           }
           return '<td title="' + tip + '" style="color:' + col + ';font-weight:600">'
-               + withSub(money(v3), wc.settle_last_on ? "last " + escapeHtml(String(wc.settle_last_on)) : "") + "</td>";
+               + withSub(money(v3), wc.ls_odate ? "ordered " + escapeHtml(String(wc.ls_odate)) : "") + "</td>";
         }
         if (c === "Settle/unit")      out = Number.isFinite(su) ? { v: su, txt: money(su) } : null;
         else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
