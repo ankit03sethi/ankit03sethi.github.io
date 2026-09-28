@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1817,7 +1817,7 @@
       if (only && String(wc.company_name || "").toLowerCase() !== only) continue;
       // 2026-09-28: courier = order value (payment file) - settled, on every
       // platform; the billed courier line is only the fallback.
-      const g = Number(wc.gs30), s = Number(wc.st30);
+      const ob = orderBasis(wc, 30); const g = ob.gs, s = ob.st;
       if (Number.isFinite(g) && g > 0) { cost += Math.max(g - (s || 0), 0); seen.add(wc.platform); continue; }
       if (wc.sh_avail === false) { blind.add(wc.platform); continue; }
       const c = Number(wc.shc30);
@@ -2765,6 +2765,20 @@
     // these six are cash, the older Margin / Net columns are settle-rate x units.
     const CASH_COLS = /d (Revenue|Cash|Tax Paid|Packing|Goods|Profit|Net %Rev|Net %Cost)$/;
     const UNIT_COLS = /d (Rev|Ship|Settle|Ret|Tax|Pack|Net)\/u$/;
+    // One window, one basis. Orders, units and returned units come from the
+    // ORDER file (d*/u*/ur*, order date); settled (os*), order value (og*) and
+    // return charges (orl*) are what the payment file shows for exactly those
+    // orders - settled or scheduled alike. Older caches without og*/os* fall
+    // back to the payment-date figures.
+    function orderBasis(wc, w) {
+      if (wc["os" + w] !== undefined && wc["os" + w] !== null) {
+        return { po: Number(wc["d" + w]) || 0, pu: Number(wc["u" + w]) || 0, ru: Number(wc["ur" + w]) || 0,
+                 st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0 };
+      }
+      return { po: Number(wc["po" + w]) || 0, pu: Number(wc["pu" + w]) || 0, ru: Number(wc["ru" + w]) || 0,
+               st: Number(wc["st" + w]) || 0, gs: Number(wc["gs" + w]) || 0,
+               rl: Number(wc["rl" + w]) || 0 };
+    }
     function moneyCell(wc, col) {
       if (!wc) return null;
       const w = MONEY_WIN[col];
@@ -2807,7 +2821,8 @@
       // error on Flipkart, Meesho and Myntra - it has nowhere to hide in a
       // single total. Sorting still uses the combined figure.
       if (col.endsWith("Ret Fees")) {
-        const L  = Number.isFinite(loss) ? loss : booked;
+        // actual charges only (no estimate for returns not yet billed)
+        const L  = orderBasis(wc, w).rl;
         const lr = Number(wc["rlr" + w]) || 0;
         return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0 };
       }
@@ -2848,11 +2863,18 @@
           ret  = 0;
           perRet = wc.lr_kind === "customer" ? Number(wc.lr_amt) : NaN;   // the whole return charge
         } else {
-          const po = Number(wc["po" + w]) || 0;   // orders the cash paid for
+          // 2026-09-28 (Ankit): the window is the ORDER file. Every order placed
+          // in the last N days counts - its units, its packing, its COP - with
+          // whatever the payment file shows for it (settled or scheduled). An
+          // order with no payment row yet is still an order; it just has 0 money
+          // until the next file lands. Payments for orders that are not in the
+          // order file are ignored.
+          const ob = orderBasis(wc, w);
+          const po = ob.po;
           if (po <= 0) return null;
-          settle = (Number(wc["st" + w]) || 0) / po;
+          settle = ob.st / po;
           ship   = (Number(wc["shc" + w]) || 0) / po;
-          ret    = (Number.isFinite(loss) ? loss : booked) / po;
+          ret    = ob.rl / po;
           const nSR = Number(wc["rcs" + w]) || 0;
           perRet = nSR ? (Number(wc["rls" + w]) || 0) / nSR : NaN;
         }
@@ -2866,7 +2888,7 @@
         // carries no gross figure.
         let gross = NaN;
         if (w === 0) { const g = Number(wc.ls_gross); if (Number.isFinite(g) && g > 0) gross = g; }
-        else { const g = Number(wc["gs" + w]), po = Number(wc["po" + w]) || 0; if (Number.isFinite(g) && g > 0 && po > 0) gross = g / po; }
+        else { const ob = orderBasis(wc, w); if (ob.gs > 0 && ob.po > 0) gross = ob.gs / ob.po; }
         const rev  = Number.isFinite(gross) ? gross : settle + ship;
         const cour = Number.isFinite(gross) ? Math.max(gross - settle, 0) : ship;
         if (col.endsWith("d Rev/u"))    return { v: rev,     txt: money(rev) };
@@ -2880,25 +2902,27 @@
         if (!Number.isFinite(cop)) return null;
         let goodsu = cop * units0;                        // COP x the order's units
         if (w !== 0) {
-          const u = Number(wc["pu" + w]) || 0, po = Number(wc["po" + w]) || 1;
-          goodsu = cop * Math.max(u - (Number(wc["ru" + w]) || 0), 0) / po;
+          const ob = orderBasis(wc, w);
+          goodsu = cop * Math.max(ob.pu - ob.ru, 0) / (ob.po || 1);
         }
         const v = settle - ret - taxu - packu - goodsu;
         return { v: v, txt: money(v) };
       }
       if (CASH_COLS.test(col)) {
-        const st  = Number(wc["st"  + w]) || 0;
+        // Order-file basis (see orderBasis): orders/units from the order sheet,
+        // money from whatever the payment file shows for those same orders.
+        const ob  = orderBasis(wc, w);
+        const st  = ob.st;
         const shc = Number(wc["shc" + w]) || 0;
-        const pu  = Number(wc["pu"  + w]) || 0;
-        const ru  = Number(wc["ru"  + w]) || 0;
+        const pu  = ob.pu;
+        const ru  = ob.ru;
         const netu = Math.max(pu - ru, 0);
-        const retf = Number.isFinite(loss) ? loss : booked;
+        const retf = ob.rl;
         const tax2 = (Number(wc.tax_pct) || 0) / 100 * st;
-        const pack = (Number(wc.pack_unit) || 0) * (Number(wc["po" + w]) || 0);   // once per order
-        // Revenue = order value from the platform's payment file (gs*); courier
+        const pack = (Number(wc.pack_unit) || 0) * ob.po;   // once per order
+        // Revenue = order value from the platform's payment file; courier
         // = revenue - settlement. Old settle + billed-courier only as fallback.
-        const gsw = Number(wc["gs" + w]);
-        const revw = (Number.isFinite(gsw) && gsw > 0) ? gsw : st + shc;
+        const revw = ob.gs > 0 ? ob.gs : st + shc;
         if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw) };
         if (col.endsWith("d Cash"))     return { v: st,    txt: money(st) };
         if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0" };
