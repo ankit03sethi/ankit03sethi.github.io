@@ -340,7 +340,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28g</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28h</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -3067,10 +3067,11 @@
         const k = wc0 ? (c === "Last Return Order" ? wc0.lr_key : wc0.ls_key) : null;
         if (!k) return '<td style="color:#cbd5e1">' + DASH + "</td>";
         const when = c === "Last Return Order" ? wc0.lr_on : wc0.settle_last_on;
+        const odt  = c === "Last Return Order" ? wc0.lr_odate : wc0.ls_odate;   // the ORDER's date
         const tip = (c === "Last Return Order" ? "Last return the platform charged" : "Last clean paid order")
-                  + (when ? " · paid " + escapeHtml(String(when)) : "");
+                  + (odt ? " · ordered " + escapeHtml(String(odt)) : "") + (when ? " · paid " + escapeHtml(String(when)) : "");
         return '<td title="' + tip + '" style="font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap">'
-             + withSub(escapeHtml(String(k)), when ? "updated " + escapeHtml(String(when)) : "") + "</td>";
+             + withSub(escapeHtml(String(k)), odt ? "ordered " + escapeHtml(String(odt)) : (when ? "paid " + escapeHtml(String(when)) : "")) + "</td>";
       }
       if (LAST_COLS.has(c)) {
         return lastCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c, r.platform);
