@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28e</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2700,7 +2700,9 @@
           col2 = v >= exp ? "#047857" : "#0f172a";
           tip = "Last order settled at " + money(v) + " against " + money(exp) + " expected" + when;
         }
-        return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">' + money(v) + "</td>";
+        const sub1 = (wc.ls_key ? escapeHtml(String(wc.ls_key)) : "") + (wc.settle_last_on ? (wc.ls_key ? " \u00b7 " : "") + escapeHtml(String(wc.settle_last_on)) : "");
+        return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">' + money(v)
+             + (sub1 ? '<div style="font-size:10px;line-height:1.1;color:#64748b;font-weight:400;white-space:nowrap">' + sub1 + '</div>' : "") + "</td>";
       }
       if (col === "Last Ship" || col === "Last Ret Ship") {
         const fwd = col === "Last Ship";
@@ -2734,7 +2736,9 @@
       let tip = "Last charged return: " + kind + when
               + (Number.isFinite(units) && units > 1 ? " \u00b7 " + units + " units" : "");
       if (wrong) tip = "RTO charged on " + pf + " - it should not have been. " + tip;
-      return '<td title="' + tip + '" style="color:#0f172a">' + money(v) + "</td>";
+      const sub2 = (wc.lr_key ? escapeHtml(String(wc.lr_key)) : "") + (wc.lr_on ? (wc.lr_key ? " \u00b7 " : "") + escapeHtml(String(wc.lr_on)) : "");
+      return '<td title="' + tip + '" style="color:#0f172a">' + money(v)
+           + (sub2 ? '<div style="font-size:10px;line-height:1.1;color:#64748b;font-weight:400;white-space:nowrap">' + sub2 + '</div>' : "") + "</td>";
     }
     function shipCell(wc, col) {
       const spec = SHIP_COLS[col];
@@ -2776,7 +2780,10 @@
         // packing and COP too (Ankit, 28-09): an order with no payment line yet
         // is in the Orders columns, not in the cash block. Returned orders have
         // no positive payout, so their units are already out of the goods line.
-        return { po: Number(wc["opo" + w]) || 0, pu: Number(wc["opu" + w]) || 0, ru: 0,
+        return { po: Number(wc["oao" + w]) || Number(wc["opo" + w]) || 0,   // orders with ANY payment/return line (0 or minus too)
+                 pu: Number(wc["opu" + w]) || 0,                               // units the platform paid for -> COP
+                 au: Number(wc["oau" + w]) || Number(wc["opu" + w]) || 0,    // units behind those orders
+                 ru: 0,
                  st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0,
                  // how many of those orders/units actually have a payment line, and
                  // how many return charges were billed - shown under each figure
@@ -2785,7 +2792,7 @@
                  // (an offer-only or adjustment line is not an order's settlement)
                  fo: Number(wc["ofo" + w]) || 0, fst: Number(wc["osf" + w]) || 0, fgs: Number(wc["ogf" + w]) || 0 };
       }
-      return { po: Number(wc["po" + w]) || 0, pu: Number(wc["pu" + w]) || 0, ru: Number(wc["ru" + w]) || 0,
+      return { po: Number(wc["po" + w]) || 0, pu: Number(wc["pu" + w]) || 0, au: Number(wc["pu" + w]) || 0, ru: Number(wc["ru" + w]) || 0,
                st: Number(wc["st" + w]) || 0, gs: Number(wc["gs" + w]) || 0,
                rl: Number(wc["rl" + w]) || 0,
                ppo: Number(wc["po" + w]) || 0, ppu: Number(wc["pu" + w]) || 0, rn: Number(wc["rc" + w]) || 0,
@@ -2945,7 +2952,7 @@
         // Revenue = order value from the platform's payment file; courier
         // = revenue - settlement. Old settle + billed-courier only as fallback.
         const revw = ob.gs > 0 ? ob.gs : st + shc;
-        const sPaid = subU(ob.ppu, ob.ppo), sAll = subU(pu, ob.po);
+        const sPaid = subU(ob.au, ob.po), sAll = subU(ob.au, ob.po);
         if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw), sub: sPaid };
         if (col.endsWith("d Cash"))     return { v: st,    txt: money(st), sub: sPaid };
         if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0", sub: sPaid };
@@ -2955,7 +2962,7 @@
         // says "fill the sheet", which is the truth.
         if (!Number.isFinite(cop)) return null;
         const goods = cop * netu;
-        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0", sub: ru ? fmtN(netu) + " u (" + fmtN(pu) + " \u2212 " + fmtN(ru) + " ret)" : fmtN(netu) + " u" };
+        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0", sub: fmtN(netu) + " u paid" + (ob.au > netu ? " (" + fmtN(ob.au - netu) + " ret/0 out)" : "") };
         const fin2 = st - retf - tax2 - pack - goods;
         // Two ways of asking whether this SKU is worth it: how much of every
         // rupee that came in you keep, and how much every rupee of stock
