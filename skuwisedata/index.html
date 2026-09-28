@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2776,12 +2776,16 @@
                  st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0,
                  // how many of those orders/units actually have a payment line, and
                  // how many return charges were billed - shown under each figure
-                 ppo: Number(wc["opo" + w]) || 0, ppu: Number(wc["opu" + w]) || 0, rn: Number(wc["orc" + w]) || 0 };
+                 ppo: Number(wc["opo" + w]) || 0, ppu: Number(wc["opu" + w]) || 0, rn: Number(wc["orc" + w]) || 0,
+                 // per-order averages: only orders whose SALE line has been paid
+                 // (an offer-only or adjustment line is not an order's settlement)
+                 fo: Number(wc["ofo" + w]) || 0, fst: Number(wc["osf" + w]) || 0, fgs: Number(wc["ogf" + w]) || 0 };
       }
       return { po: Number(wc["po" + w]) || 0, pu: Number(wc["pu" + w]) || 0, ru: Number(wc["ru" + w]) || 0,
                st: Number(wc["st" + w]) || 0, gs: Number(wc["gs" + w]) || 0,
                rl: Number(wc["rl" + w]) || 0,
-               ppo: Number(wc["po" + w]) || 0, ppu: Number(wc["pu" + w]) || 0, rn: Number(wc["rc" + w]) || 0 };
+               ppo: Number(wc["po" + w]) || 0, ppu: Number(wc["pu" + w]) || 0, rn: Number(wc["rc" + w]) || 0,
+               fo: Number(wc["po" + w]) || 0, fst: Number(wc["st" + w]) || 0, fgs: Number(wc["gs" + w]) || 0 };
     }
     const fmtN = (n) => Number(n || 0).toLocaleString("en-IN");
     const subU = (u, o) => fmtN(u) + " u \u00b7 " + fmtN(o) + " ord";
@@ -2877,9 +2881,9 @@
           // until the next file lands. Payments for orders that are not in the
           // order file are ignored.
           const ob = orderBasis(wc, w);
-          const po = ob.ppo || ob.po;          // money per order = over orders that have a payment line
+          const po = ob.fo || ob.ppo || ob.po; // money per order = over orders whose sale line is paid
           if (po <= 0) return null;
-          settle = ob.st / po;
+          settle = (ob.fo ? ob.fst : ob.st) / po;
           ship   = (Number(wc["shc" + w]) || 0) / po;
           ret    = ob.rl / (ob.po || 1);       // return charges spread over every order
           subO   = "\u00f7 " + fmtN(po) + " ord";
@@ -2896,7 +2900,7 @@
         // carries no gross figure.
         let gross = NaN;
         if (w === 0) { const g = Number(wc.ls_gross); if (Number.isFinite(g) && g > 0) gross = g; }
-        else { const ob = orderBasis(wc, w); const n = ob.ppo || ob.po; if (ob.gs > 0 && n > 0) gross = ob.gs / n; }
+        else { const ob = orderBasis(wc, w); const n = ob.fo || ob.ppo || ob.po; const g = ob.fo ? ob.fgs : ob.gs; if (g > 0 && n > 0) gross = g / n; }
         const rev  = Number.isFinite(gross) ? gross : settle + ship;
         const cour = Number.isFinite(gross) ? Math.max(gross - settle, 0) : ship;
         if (col.endsWith("d Rev/u"))    return { v: rev,     txt: money(rev), sub: subO };
