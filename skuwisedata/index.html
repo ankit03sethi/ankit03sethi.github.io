@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-27c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1815,6 +1815,10 @@
     const only = (state.company || "").trim().toLowerCase();
     for (const wc of state.windowCounts.values()) {
       if (only && String(wc.company_name || "").toLowerCase() !== only) continue;
+      // 2026-09-28: courier = order value (payment file) - settled, on every
+      // platform; the billed courier line is only the fallback.
+      const g = Number(wc.gs30), s = Number(wc.st30);
+      if (Number.isFinite(g) && g > 0) { cost += Math.max(g - (s || 0), 0); seen.add(wc.platform); continue; }
       if (wc.sh_avail === false) { blind.add(wc.platform); continue; }
       const c = Number(wc.shc30);
       if (Number.isFinite(c)) { cost += c; seen.add(wc.platform); }
@@ -2853,8 +2857,20 @@
           perRet = nSR ? (Number(wc["rls" + w]) || 0) / nSR : NaN;
         }
         const taxu = (Number(wc.tax_pct) || 0) / 100 * settle;
-        if (col.endsWith("d Rev/u"))    { const v = settle + ship; return { v: v, txt: money(v) }; }
-        if (col.endsWith("d Ship/u"))   return { v: -ship,   txt: ship ? money(-ship) : "0" };
+        // 2026-09-28: Revenue is the ORDER VALUE the platform's own payment
+        // file reports (Flipkart: Sale Amount + offer + add-ons; Meesho: Total
+        // Sale Amount incl. shipping; Amazon: product sales + shipping credits;
+        // Myntra: customer paid; FirstCry: Gross Amount). Courier is simply
+        // revenue minus what was settled, so revenue = settlement + courier on
+        // every platform. Falls back to settle + billed courier when a file
+        // carries no gross figure.
+        let gross = NaN;
+        if (w === 0) { const g = Number(wc.ls_gross); if (Number.isFinite(g) && g > 0) gross = g; }
+        else { const g = Number(wc["gs" + w]), po = Number(wc["po" + w]) || 0; if (Number.isFinite(g) && g > 0 && po > 0) gross = g / po; }
+        const rev  = Number.isFinite(gross) ? gross : settle + ship;
+        const cour = Number.isFinite(gross) ? Math.max(gross - settle, 0) : ship;
+        if (col.endsWith("d Rev/u"))    return { v: rev,     txt: money(rev) };
+        if (col.endsWith("d Ship/u"))   return { v: -cour,   txt: cour ? money(-cour) : "0" };
         if (col.endsWith("d Settle/u")) return { v: settle,  txt: money(settle) };
         if (col.endsWith("d Ret/u"))
           return (Number.isFinite(perRet) && perRet > 0)
@@ -2879,7 +2895,11 @@
         const retf = Number.isFinite(loss) ? loss : booked;
         const tax2 = (Number(wc.tax_pct) || 0) / 100 * st;
         const pack = (Number(wc.pack_unit) || 0) * (Number(wc["po" + w]) || 0);   // once per order
-        if (col.endsWith("d Revenue"))  { const v = st + shc; return { v: v, txt: money(v) }; }
+        // Revenue = order value from the platform's payment file (gs*); courier
+        // = revenue - settlement. Old settle + billed-courier only as fallback.
+        const gsw = Number(wc["gs" + w]);
+        const revw = (Number.isFinite(gsw) && gsw > 0) ? gsw : st + shc;
+        if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw) };
         if (col.endsWith("d Cash"))     return { v: st,    txt: money(st) };
         if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0" };
         if (col.endsWith("d Packing"))  return { v: -pack, txt: pack ? money(-pack) : "0" };
@@ -2895,7 +2915,7 @@
         // returns. Both need a real denominator - no revenue or no COP is a
         // dash, not a spectacular percentage of nothing.
         if (col.endsWith("d Net %Rev")) {
-          const rev = st + shc;
+          const rev = revw;
           return rev > 0 ? { v: fin2 / rev * 100, txt: (fin2 / rev * 100).toFixed(0) } : null;
         }
         if (col.endsWith("d Net %Cost"))
@@ -4171,7 +4191,7 @@
     COL_HELP[w+"d Net"]           = "Margin minus return cost minus tax. Everything in, less everything out.";
     COL_HELP[w+"d Net/unit"]      = "Profit divided by the units that stayed sold.";
     COL_HELP[w+"d Net %COP"]      = "Profit per order as a percentage of COP. What each rupee of stock returns.";
-    COL_HELP[w+"d Revenue"]        = "Cash that landed plus the forward courier the platform kept - what the orders were worth before freight. Counted on the payment date.";
+    COL_HELP[w+"d Revenue"]        = "Order value as the platform's payment file reports it (Flipkart sale amount + offer, Meesho total sale amount, Amazon product sales + shipping credits). Revenue = settled + courier. Counted on the payment date.";
     COL_HELP[w+"d Cash"]           = "Cash that actually landed in the window. Revenue minus courier. Counted on the payment date, not the order date.";
     COL_HELP[w+"d Tax Paid"]       = "Tax % from the master sheet on the settlement received. Blank Tax % reads as 0.";
     COL_HELP[w+"d Packing"]        = "Packaging from the master sheet on every unit that shipped, returns included - the pack was already used. Blank reads as 0.";
@@ -4179,8 +4199,8 @@
     COL_HELP[w+"d Profit"]         = "Settlement less return charges, tax, packaging and product cost. Real cash, not an estimate. Dash means no COP on the sheet.";
     COL_HELP[w+"d Net %Rev"]       = "Net profit as a share of total revenue - how much of every rupee that came in you keep.";
     COL_HELP[w+"d Net %Cost"]      = "Net profit as a share of product cost - what every rupee of stock returned.";
-    COL_HELP[w+"d Rev/u"]         = "What one order was worth before freight came off. Last is the most recent paid order that was never charged a return, whole order.";
-    COL_HELP[w+"d Ship/u"]        = "Forward courier per order. Last is the courier billed on that same order.";
+    COL_HELP[w+"d Rev/u"]         = "Order value per order from the platform's payment file - what the order was worth before fees and courier came off. Last is the most recent paid order that was never charged a return, whole order.";
+    COL_HELP[w+"d Ship/u"]        = "Courier and fees per order = order value minus settled. Last is that same order.";
     COL_HELP[w+"d Settle/u"]      = "Cash that landed per order. Last is the most recent paid order that was never charged a return - all its units.";
     COL_HELP[w+"d Ret/u"]         = "What one buyer return cost: return money taken over the buyer returns actually billed. RTOs excluded. Last is the most recent charged buyer return. This is a cost per return, not a share of every unit, so it does not add down into Profit /unit - profit carries the return cost spread over units.";
     COL_HELP[w+"d Tax/u"]         = "Tax % from the master sheet on the settlement per order. Blank Tax % reads as 0.";
