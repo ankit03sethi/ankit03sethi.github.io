@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2772,7 +2772,11 @@
     // back to the payment-date figures.
     function orderBasis(wc, w) {
       if (wc["os" + w] !== undefined && wc["os" + w] !== null) {
-        return { po: Number(wc["d" + w]) || 0, pu: Number(wc["u" + w]) || 0, ru: Number(wc["ur" + w]) || 0,
+        // Only orders that have money in the payment file count for tax,
+        // packing and COP too (Ankit, 28-09): an order with no payment line yet
+        // is in the Orders columns, not in the cash block. Returned orders have
+        // no positive payout, so their units are already out of the goods line.
+        return { po: Number(wc["opo" + w]) || 0, pu: Number(wc["opu" + w]) || 0, ru: 0,
                  st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0,
                  // how many of those orders/units actually have a payment line, and
                  // how many return charges were billed - shown under each figure
@@ -2951,7 +2955,7 @@
         // says "fill the sheet", which is the truth.
         if (!Number.isFinite(cop)) return null;
         const goods = cop * netu;
-        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0", sub: fmtN(netu) + " u (" + fmtN(pu) + " \u2212 " + fmtN(ru) + " ret)" };
+        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0", sub: ru ? fmtN(netu) + " u (" + fmtN(pu) + " \u2212 " + fmtN(ru) + " ret)" : fmtN(netu) + " u" };
         const fin2 = st - retf - tax2 - pack - goods;
         // Two ways of asking whether this SKU is worth it: how much of every
         // rupee that came in you keep, and how much every rupee of stock
