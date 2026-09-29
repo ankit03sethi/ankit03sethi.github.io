@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-30f: units/orders on every card -->
+<!-- pnl build 2026-09-30g: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -463,6 +463,7 @@
     const cbdAll=extrasFilter((state.extras&&state.extras.charges_by_day)||[]);
     const dayKey=r=>String(r.platform||'').toLowerCase()+'|'+String(r.company||'').toLowerCase()+'|'+(r.dt||'');
     const cbd={}; for(const c of cbdAll){cbd[dayKey(c)]=((+c.ads||0)+(+c.other||0));}
+    const adset={}; for(const a of ((state.extras&&state.extras.ads_by_settlement)||[])){ if(!state.plat||String(a.platform).toLowerCase()===String(state.plat).toLowerCase()){ if(!state.co||a.company===state.co) adset[String(a.sid)]=(adset[String(a.sid)]||0)+(+a.amt||0); } }
     const used={};
     let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Date</th><th>'+(isT?'Transfer / NEFT / Batch ID':'Txn / Settlement ID')+'</th>'+(isT?'<th>Orders</th><th>Gross payout ₹</th><th>Ads / charges ₹</th><th>Transfer to bank ₹</th>':'<th>Amount ₹</th>')+'<th>Description</th><th>Type / Account</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
     if(!list.length) h+='<tr><td colspan="10" class="empty">No '+(isT?'transfers':'advertisement')+' in this window.</td></tr>';
@@ -470,7 +471,7 @@
     for(const r of list){
       sum+=(+r.amt||0); so+=(+r.n||0);
       if(isT){
-        const dk=dayKey(r); const ded=used[dk]?0:(cbd[dk]||0); used[dk]=1; sded+=ded;
+        const dk=dayKey(r); let ded; if(adset[String(r.id)]!==undefined){ ded=adset[String(r.id)]; delete adset[String(r.id)]; } else { ded=used[dk]?0:(cbd[dk]||0); used[dk]=1; } sded+=ded;
         h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td><td>'+IN(+r.n||0)+'</td>'+prof(+r.amt||0)+prof(ded)+prof((+r.amt||0)+ded)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
       } else {
         h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td>'+prof(+r.amt||0)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
