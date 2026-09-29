@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29y: units/orders on every card -->
+<!-- pnl build 2026-09-29z: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -344,7 +344,7 @@
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
       +card("Tax to govt",-tot.tax,'output GST · from payment file: '+O(tot.n_gstf)+(tot.gross_orders-tot.n_gstf>0?' · master GST %: '+O(tot.gross_orders-tot.n_gstf):''))
       +'<div class="kpi" data-x="itc" style="cursor:pointer;border-color:'+(state.extraOpen==='itc'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Input GST (ITC) '+(state.extraOpen==='itc'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(itcGst))+'</div><div class="lbl">'+IN(itc.length)+' invoice lines · ₹'+IN(Math.round(itcTaxable))+' taxable · click for invoices</div></div>'
-      +card("GST payable (net)",-(tot.tax-itcGst),'tax to govt − input GST')
+      +card("GST payable (net)",-(tot.tax-itcGst-Math.abs(tot.x_tcs||0)),'tax to govt − input GST − TCS credit ₹'+IN(Math.round(Math.abs(tot.x_tcs||0)))+' · TDS ₹'+IN(Math.round(Math.abs(tot.x_tds||0)))+' = income-tax credit, GST se alag')
       +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(tot.net_profit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(tot.net_profit))+'</div><div class="lbl">'+all+' · after ads &amp; charges</div></div>'
       +card("Margin on revenue",(margPS(tot.net_profit,tot.revenue)==null?'—':margPS(tot.net_profit,tot.revenue)+'%'),'net profit ÷ revenue','')
       +card("Margin on COP",(margPS(tot.net_profit,tot.cop)==null?'—':margPS(tot.net_profit,tot.cop)+'%'),'net profit ÷ COP','');
