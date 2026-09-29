@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-30b: units/orders on every card -->
+<!-- pnl build 2026-09-30c: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -343,11 +343,11 @@
 
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
-      +'<div class="kpi" data-x="itc" style="cursor:pointer;border-color:'+(state.extraOpen==='itc'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">GST payable (net) '+(state.extraOpen==='itc'?'▾':'▸')+'</div><div class="val '+(gstNet>0?'prof neg':'prof pos')+'">₹'+IN(Math.round(-gstNet))+'</div>'
-        +'<div class="lbl" style="margin-top:4px">Tax to govt (output GST) <b>₹'+IN(Math.round(tot.tax))+'</b> · file: '+O(tot.n_gstf)+(tot.gross_orders-tot.n_gstf>0?' · master %: '+O(tot.gross_orders-tot.n_gstf):'')+'</div>'
-        +'<div class="lbl">− Input GST (purchases) <b>₹'+IN(Math.round(itcGst))+'</b> · '+IN(itc.length)+' invoice lines · click for list</div>'
-        +'<div class="lbl">− TCS credit <b>₹'+IN(Math.round(tcsCr))+'</b> · TDS ₹'+IN(Math.round(Math.abs(tot.x_tds||0)))+' income-tax credit (not in GST)</div></div>'
-      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(netProfit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(netProfit))+'</div><div class="lbl">'+all+'</div><div class="lbl" style="margin-top:4px">Net payout <b>₹'+IN(Math.round(tot.net_payout))+'</b> − COP <b>₹'+IN(Math.round(tot.cop))+'</b> − packaging <b>₹'+IN(Math.round(tot.packaging))+'</b></div><div class="lbl">− GST payable (net) <b>₹'+IN(Math.round(gstNet))+'</b> = tax ₹'+IN(Math.round(tot.tax))+' − ITC ₹'+IN(Math.round(itcGst))+' − TCS ₹'+IN(Math.round(tcsCr))+'</div></div>'
+      +'<div class="kpi" style="border-color:'+((state.extraOpen==='itc'||state.extraOpen==='gst')?'#1f6feb':'#e5e7eb')+'"><div class="lbl">GST payable (net)</div><div class="val '+(gstNet>0?'prof neg':'prof pos')+'">₹'+IN(Math.round(-gstNet))+'</div>'
+        +'<div class="lbl" data-x="gst" style="cursor:pointer;margin-top:4px">Tax <b>₹'+IN(Math.round(tot.tax))+'</b> · '+all+' ▸</div>'
+        +'<div class="lbl" data-x="itc" style="cursor:pointer">Input <b>₹'+IN(Math.round(itcGst))+'</b> · '+IN(new Set(itc.map(r=>r.id)).size)+' invoices ▸</div>'
+        +'<div class="lbl" data-x="gst" style="cursor:pointer">TCS <b>₹'+IN(Math.round(tcsCr))+'</b> · '+O(tot.n_tcs)+' ▸</div></div>'
+      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(netProfit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(netProfit))+'</div><div class="lbl">'+all+' · payout − COP − packaging − GST net</div></div>'
       +card("Margin on revenue",(margPS(netProfit,tot.revenue)==null?'—':margPS(netProfit,tot.revenue)+'%'),'net profit ÷ revenue','')
       +card("Margin on COP",(margPS(netProfit,tot.cop)==null?'—':margPS(netProfit,tot.cop)+'%'),'net profit ÷ COP','');
   }
@@ -398,6 +398,19 @@
     const host=$("#extraCards"); if(host) host.innerHTML=c('transfer','Transfers',tr)+c('ad','Advertisement',ad);
     renderExtraDetail();
   }
+  function gstDetailHtml(){
+    const rows=filteredPay(); const g={};
+    for(const r of rows){ const k=(r.platform||'')+'|'+(r.company||''); const o=g[k]||(g[k]={platform:r.platform,company:r.company,tax:0,tcs:0,tds:0,u:0,n:0,nf:0}); o.tax+=(+r.tax||0); o.tcs+=Math.abs(+r.x_tcs||0); o.tds+=Math.abs(+r.x_tds||0); o.u+=(+r.gross_units||0); o.n+=(+r.gross_orders||0); o.nf+=(+r.n_gstf||0); }
+    const itc=extrasFilter((state.extras&&state.extras.itc)||[]); const im={};
+    for(const r of itc){ const k=String(r.platform||'').toLowerCase()+'|'+String(r.company||'').toLowerCase(); im[k]=(im[k]||0)+(+r.gst||0); }
+    let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Platform</th><th>Company</th><th>Units</th><th>Orders</th><th>Tax to govt ₹</th><th>basis</th><th>Input GST ₹</th><th>TCS credit ₹</th><th>GST payable ₹</th><th>TDS (income tax) ₹</th></tr></thead><tbody>';
+    let T=0,I=0,C=0,D=0;
+    for(const o of Object.values(g).sort((a,b)=>b.tax-a.tax)){ const ik=String(o.platform||'').toLowerCase()+'|'+String(o.company||'').toLowerCase(); const i=im[ik]||0; T+=o.tax;I+=i;C+=o.tcs;D+=o.tds;
+      h+='<tr><td>'+esc(o.platform)+'</td><td>'+esc(o.company)+'</td><td>'+IN(o.u)+'</td><td>'+IN(o.n)+'</td><td>'+IN(Math.round(o.tax))+'</td><td>'+(o.nf>=o.n?'file':(o.nf>0?'file+master':'master %'))+'</td><td>'+IN(Math.round(i))+'</td><td>'+IN(Math.round(o.tcs))+'</td>'+prof(Math.round(o.tax-i-o.tcs))+'<td>'+IN(Math.round(o.tds))+'</td></tr>'; }
+    h+='<tr style="font-weight:700"><td>Total</td><td></td><td></td><td></td><td>'+IN(Math.round(T))+'</td><td></td><td>'+IN(Math.round(I))+'</td><td>'+IN(Math.round(C))+'</td>'+prof(Math.round(T-I-C))+'<td>'+IN(Math.round(D))+'</td></tr>';
+    h+='</tbody></table></div>';
+    return h;
+  }
   function itcDetailHtml(){
     const rows=extrasFilter((state.extras&&state.extras.itc)||[]);
     let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Invoice date</th><th>Invoice no.</th><th>Vendor</th><th>Period</th><th>Item</th><th>Taxable ₹</th><th>GST ₹</th><th>Total ₹</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
@@ -444,6 +457,7 @@
     if(!k){host.innerHTML="";return;}
     if(k==='pending'){ host.innerHTML=pendingDetailHtml(); return; }
     if(k==='itc'){ host.innerHTML=itcDetailHtml(); return; }
+    if(k==='gst'){ host.innerHTML=gstDetailHtml(); return; }
     const list=extrasFilter(k==='transfer'?state.extras.transfers:state.extras.ads);
     const isT=k==='transfer';
     const cbdAll=extrasFilter((state.extras&&state.extras.charges_by_day)||[]);
