@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29x: units/orders on every card -->
+<!-- pnl build 2026-09-29y: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -319,6 +319,7 @@
     const pend=(ex.pending||[]).filter(r=>(!state.plat||String(r.platform).toLowerCase()===String(state.plat).toLowerCase())&&(!state.co||r.company===state.co));
     const pAmt=pend.reduce((a,r)=>a+(+r.amt||0),0), pN=pend.reduce((a,r)=>a+(+r.n||0),0), pDue=pend.reduce((a,r)=>a+(+r.amt_due||0),0), pFut=pend.reduce((a,r)=>a+(+r.amt_future||0),0);
     const pbd=extrasFilter(ex.pending_by_day||[]);
+    const itc=extrasFilter(ex.itc||[]), itcGst=itc.reduce((a,r)=>a+(+r.gst||0),0), itcTaxable=itc.reduce((a,r)=>a+(+r.taxable||0),0);
     const pbSched=pbd.filter(r=>r.sched).reduce((a,r)=>a+(+r.amt||0),0), pbUnsch=pbd.filter(r=>!r.sched).reduce((a,r)=>a+(+r.amt||0),0);
     $("#kpis").innerHTML=
       card("Sale (gross)",tot.gross_revenue,all+' · full sale value')
@@ -341,7 +342,9 @@
 
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
-      +card("Tax to govt",-tot.tax,'GST from payment file: '+O(tot.n_gstf)+(tot.gross_orders-tot.n_gstf>0?' · master GST %: '+O(tot.gross_orders-tot.n_gstf):''))
+      +card("Tax to govt",-tot.tax,'output GST · from payment file: '+O(tot.n_gstf)+(tot.gross_orders-tot.n_gstf>0?' · master GST %: '+O(tot.gross_orders-tot.n_gstf):''))
+      +'<div class="kpi" data-x="itc" style="cursor:pointer;border-color:'+(state.extraOpen==='itc'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Input GST (ITC) '+(state.extraOpen==='itc'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(itcGst))+'</div><div class="lbl">'+IN(itc.length)+' invoice lines · ₹'+IN(Math.round(itcTaxable))+' taxable · click for invoices</div></div>'
+      +card("GST payable (net)",-(tot.tax-itcGst),'tax to govt − input GST')
       +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(tot.net_profit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(tot.net_profit))+'</div><div class="lbl">'+all+' · after ads &amp; charges</div></div>'
       +card("Margin on revenue",(margPS(tot.net_profit,tot.revenue)==null?'—':margPS(tot.net_profit,tot.revenue)+'%'),'net profit ÷ revenue','')
       +card("Margin on COP",(margPS(tot.net_profit,tot.cop)==null?'—':margPS(tot.net_profit,tot.cop)+'%'),'net profit ÷ COP','');
@@ -393,6 +396,17 @@
     const host=$("#extraCards"); if(host) host.innerHTML=c('transfer','Transfers',tr)+c('ad','Advertisement',ad);
     renderExtraDetail();
   }
+  function itcDetailHtml(){
+    const rows=extrasFilter((state.extras&&state.extras.itc)||[]);
+    let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Invoice date</th><th>Invoice no.</th><th>Vendor</th><th>Period</th><th>Item</th><th>Taxable ₹</th><th>GST ₹</th><th>Total ₹</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
+    if(!rows.length) h+='<tr><td colspan="10" class="empty">No tax invoices in this window. Platform ki monthly tax invoice (GST) download karke company folder mein daalo.</td></tr>';
+    let st=0,sg=0,sT=0;
+    for(const r of rows){ st+=(+r.taxable||0); sg+=(+r.gst||0); sT+=(+r.total||0);
+      h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td><td style="text-align:left">'+esc(r.vendor||'')+'</td><td>'+esc(r.period||'')+'</td><td style="text-align:left">'+esc(r.item||'')+'</td><td>'+IN(+r.taxable||0)+'</td><td>'+IN(+r.gst||0)+'</td><td>'+IN(+r.total||0)+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>'; }
+    if(rows.length) h+='<tr style="font-weight:700"><td>Total</td><td>'+IN(rows.length)+' lines</td><td></td><td></td><td></td><td>'+IN(st)+'</td><td>'+IN(sg)+'</td><td>'+IN(sT)+'</td><td></td><td></td></tr>';
+    h+='</tbody></table></div>';
+    return h;
+  }
   function pendingDetailHtml(){
     const ex=state.extras||{};
     const rows=extrasFilter(ex.pending_by_day||[]);
@@ -427,6 +441,7 @@
     const k=state.extraOpen;
     if(!k){host.innerHTML="";return;}
     if(k==='pending'){ host.innerHTML=pendingDetailHtml(); return; }
+    if(k==='itc'){ host.innerHTML=itcDetailHtml(); return; }
     const list=extrasFilter(k==='transfer'?state.extras.transfers:state.extras.ads);
     const isT=k==='transfer';
     const cbdAll=extrasFilter((state.extras&&state.extras.charges_by_day)||[]);
