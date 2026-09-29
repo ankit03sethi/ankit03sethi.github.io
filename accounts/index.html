@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Accounts — Cursive</title>
-<!-- accounts build 2026-09-30c -->
+<!-- accounts build 2026-09-30d -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -94,6 +94,8 @@
   <div class="status" id="status"></div>
   <h3 class="ttl">Input GST by our GSTIN <span class="sub">— kis GSTIN par kitna input credit</span></h3>
   <div class="cards" id="gstBox"></div>
+  <h3 class="ttl">Input GST by vendor GSTIN <span class="sub">— kis vendor ke kis GST number se kata (Amazon KA/DL, Meesho 3 entities)</span></h3>
+  <div class="cards" id="vendBox"></div>
 
   <h3 class="ttl">Purchases <span class="sub">— vendor invoices (Meesho Ltd / Meesho Technologies / Valmo … auto from invoice zip) + jo tum manually add karo · GST portal (GSTR-2B) se cross-check ke liye</span></h3>
   <div class="wrap"><table class="data">
@@ -194,6 +196,8 @@
     const invs=new Set(rows.map(r=>r.invoice_no)).size;
     const byg={}; for(const r of rows){const k=r.buyer_gstin||'(no GSTIN)'; const o=byg[k]||(byg[k]={t:0,g:0,n:0}); o.t+=n(r.taxable); o.g+=n(r.cgst)+n(r.sgst)+n(r.igst); o.n++;}
     const gh=$("#gstBox"); if(gh) gh.innerHTML=Object.entries(byg).sort((a,b)=>b[1].g-a[1].g).map(([k,o])=>'<div class="kpi" style="min-width:210px"><div class="lbl">'+esc(k)+'</div><div class="val">₹'+IN(Math.round(o.g))+'</div><div class="lbl">input GST · taxable ₹'+IN(Math.round(o.t))+' · '+o.n+' lines</div></div>').join('');
+    const byv={}; for(const r of rows){const k=r.vendor_gstin||'(no GSTIN)'; const o=byv[k]||(byv[k]={g:0,n:0,v:r.vendor||''}); o.g+=n(r.cgst)+n(r.sgst)+n(r.igst); o.n++;}
+    const vh=$("#vendBox"); if(vh) vh.innerHTML=Object.entries(byv).sort((a,b)=>b[1].g-a[1].g).map(([k,o])=>'<div class="kpi" style="min-width:230px"><div class="lbl">'+esc(k)+'</div><div class="val">₹'+IN(Math.round(o.g))+'</div><div class="lbl">'+esc(o.v)+' · '+o.n+' lines</div></div>').join('');
     $("#kpis").innerHTML=card("Purchases (taxable)",'₹'+IN(Math.round(tx)),invs+' invoices · '+rows.length+' lines')
       +card("Input GST (ITC)",'₹'+IN(Math.round(c+s+i)),invs+' invoices · net of credit notes')
       +card("IGST — interstate",'₹'+IN(Math.round(i)),'e.g. Karnataka (Amazon/Meesho)')
