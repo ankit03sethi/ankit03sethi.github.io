@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29n: units/orders on every card -->
+<!-- pnl build 2026-09-29o: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -196,7 +196,7 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret"];
+  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret","n_sched","u_sched"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -331,8 +331,8 @@
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
       card("Net payout",tot.net_payout,all+' · settlement + ads + charges','prof pos')
-      +card("Transferred to bank",trAmt,O(trOrd)+' · '+IN(trs.length)+' transfers in window','prof pos')
-      +card("Pending from platform",pAmt,O(pN)+' · due ₹'+IN(Math.round(pDue))+' · later ₹'+IN(Math.round(pFut)),'')
+      +card("Transferred to bank",trAmt,O(trOrd)+' · '+IN(trs.length)+' transfers in window · payout = transferred + pending + ads/charges','prof pos')
+      +card("Pending from platform",tot.x_sched,UU(tot.u_sched)+' · '+O(tot.n_sched)+' scheduled in window'+(pFut?' · +₹'+IN(Math.round(pFut))+' dated after today (not in window)':''),'')
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
       +card("Tax to govt",-tot.tax,paid+' · on settlement')
