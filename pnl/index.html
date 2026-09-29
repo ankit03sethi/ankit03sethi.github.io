@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29h: transfers/ads detail cards removed -->
+<!-- pnl build 2026-09-29i: scheduled + pre-ads profit cards removed -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -311,7 +311,7 @@
     $("#kpis").innerHTML=
       card("Sale (gross)",tot.gross_revenue,IN(tot.gross_orders)+' ord · '+IN(tot.gross_units)+' u')+card("Revenue",tot.revenue,du)+card("Sale returns",tot.x_ret,ru)
       +card("Platform fees",tot.x_fees,du)+card("Shipping",tot.x_shipf,du)+card("Return shipping",tot.x_shipr,ru)+card("TCS / TDS",tot.x_tax,du)+card("Claims / recovery",tot.x_claims,'')
-      +card("Settlement",tot.settled,su,'prof pos')+card("of which scheduled",tot.x_sched,'','')+card("Ads",tot.x_ads,'allocated by sale')+card("Other charges",tot.x_other,'fines, storage…');
+      +card("Settlement",tot.settled,su,'prof pos')+card("Ads",tot.x_ads,'allocated by sale')+card("Other charges",tot.x_other,'fines, storage…');
     // transferred = bank transfers in this window; pending = every upcoming / scheduled / unscheduled line the platform still shows (any date)
     const ex=state.extras||{transfers:[],ads:[],pending:[]};
     const trs=extrasFilter(ex.transfers||[]), trAmt=trs.reduce((a,r)=>a+(+r.amt||0),0);
@@ -322,7 +322,6 @@
       +card("Transferred to bank",trAmt,IN(trs.length)+' transfers in window','prof pos')
       +card("Pending from platform",pAmt,IN(pN)+' ord · due '+'₹'+IN(Math.round(pDue))+' · later ₹'+IN(Math.round(pFut)),'')
       +card("Cost of product (COP)",-tot.cop,IN(tot.delivered_units)+' u delivered')+card("Packaging",-tot.packaging,IN(tot.ship_orders)+' ord shipped')+card("Tax to govt",-tot.tax,'on settlement')
-      +card("Profit",tot.profit,'before ads / charges',tot.profit<0?'prof neg':'prof pos')
       +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(tot.net_profit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(tot.net_profit))+'</div><div class="lbl">after ads &amp; charges</div></div>'
       +card("Margin on revenue",(margPS(tot.net_profit,tot.revenue)==null?'—':margPS(tot.net_profit,tot.revenue)+'%'),'','')
       +card("Margin on COP",(margPS(tot.net_profit,tot.cop)==null?'—':margPS(tot.net_profit,tot.cop)+'%'),'','');
