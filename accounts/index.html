@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Accounts — Cursive</title>
-<!-- accounts build 2026-09-29a -->
+<!-- accounts build 2026-09-30b -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -92,16 +92,19 @@
   </div>
   <div class="cards" id="kpis"></div>
   <div class="status" id="status"></div>
+  <h3 class="ttl">Input GST by our GSTIN <span class="sub">— kis GSTIN par kitna input credit</span></h3>
+  <div class="cards" id="gstBox"></div>
 
   <h3 class="ttl">Purchases <span class="sub">— vendor invoices (Meesho Ltd / Meesho Technologies / Valmo … auto from invoice zip) + jo tum manually add karo · GST portal (GSTR-2B) se cross-check ke liye</span></h3>
   <div class="wrap"><table class="data">
-    <thead><tr><th>Invoice date</th><th>Invoice no.</th><th>Vendor</th><th>Period</th><th>Item</th><th>SAC/HSN</th><th>Taxable ₹</th><th>CGST ₹</th><th>SGST ₹</th><th>IGST ₹</th><th>GST ₹</th><th>Total ₹</th><th>Company</th><th>Platform</th><th>Source</th><th></th></tr></thead>
-    <tbody id="tbody"><tr><td colspan="16" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+    <thead><tr><th>Invoice date</th><th>Invoice no.</th><th>Vendor</th><th>Period</th><th>Item</th><th>SAC/HSN</th><th>Taxable ₹</th><th>CGST ₹</th><th>SGST ₹</th><th>IGST ₹</th><th>GST ₹</th><th>Total ₹</th><th>Company</th><th>Our GSTIN</th><th>Platform</th><th>Source</th><th></th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="17" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
   </table></div>
 
   <h3 class="ttl">Add a purchase manually <span class="sub">— koi bhi purchase / expense invoice (packaging, courier, software, stock …). Same invoice no. + item dobara daloge to replace hoga, double nahi.</span></h3>
   <form class="frm" id="frm" autocomplete="off">
     <div><label>Company</label><input name="company_name" list="coList" required placeholder="Shopperskart"><datalist id="coList"></datalist></div>
+    <div><label>Our GSTIN</label><input name="buyer_gstin" placeholder="07XXXXX...."></div>
     <div><label>Platform / type</label><select name="platform"><option value="other">Other</option><option value="meesho">Meesho</option><option value="flipkart">Flipkart</option><option value="amazon">Amazon</option><option value="myntra">Myntra</option><option value="firstcry">FirstCry</option><option value="packaging">Packaging</option><option value="courier">Courier</option><option value="stock">Stock purchase</option></select></div>
     <div><label>Vendor</label><input name="vendor" placeholder="Vendor name"></div>
     <div><label>Vendor GSTIN (optional)</label><input name="gstin" placeholder="07XXXXX…"></div>
@@ -139,7 +142,7 @@
     if(!CA.access||!CA.access.active){$("#status").textContent="Cursive Analyst subscription required.";return;}
     if(!(CA.access.is_owner||CA.can("skuwise.financial","view"))){
       $("#status").textContent="You do not have access to financial data. Ask the account owner.";
-      $("#tbody").innerHTML='<tr><td colspan="16" class="empty">No access</td></tr>';return;
+      $("#tbody").innerHTML='<tr><td colspan="17" class="empty">No access</td></tr>';return;
     }
     buildRangeChips(); await load();
   })();
@@ -158,7 +161,7 @@
   async function load(){
     $("#status").innerHTML='<span class="spin"></span> reading invoices…';
     const {data,error}=await sb.from("seller_tax_invoices").select("*").order("invoice_date",{ascending:false}).order("id",{ascending:false}).limit(5000);
-    if(error){$("#status").textContent="Error: "+error.message;$("#tbody").innerHTML='<tr><td colspan="16" class="empty">Could not load</td></tr>';return;}
+    if(error){$("#status").textContent="Error: "+error.message;$("#tbody").innerHTML='<tr><td colspan="17" class="empty">Could not load</td></tr>';return;}
     state.rows=data||[];
     $("#status").textContent=state.rows.length+" invoice lines on file";
     buildChips(); render();
@@ -189,6 +192,8 @@
     const n=x=>Number(x||0);
     const tx=rows.reduce((a,r)=>a+n(r.taxable),0), c=rows.reduce((a,r)=>a+n(r.cgst),0), s=rows.reduce((a,r)=>a+n(r.sgst),0), i=rows.reduce((a,r)=>a+n(r.igst),0), t=rows.reduce((a,r)=>a+n(r.total),0);
     const invs=new Set(rows.map(r=>r.invoice_no)).size;
+    const byg={}; for(const r of rows){const k=r.buyer_gstin||'(no GSTIN)'; const o=byg[k]||(byg[k]={t:0,g:0,n:0}); o.t+=n(r.taxable); o.g+=n(r.cgst)+n(r.sgst)+n(r.igst); o.n++;}
+    const gh=$("#gstBox"); if(gh) gh.innerHTML=Object.entries(byg).sort((a,b)=>b[1].g-a[1].g).map(([k,o])=>'<div class="kpi" style="min-width:210px"><div class="lbl">'+esc(k)+'</div><div class="val">₹'+IN(Math.round(o.g))+'</div><div class="lbl">input GST · taxable ₹'+IN(Math.round(o.t))+' · '+o.n+' lines</div></div>').join('');
     $("#kpis").innerHTML=card("Purchases (taxable)",'₹'+IN(Math.round(tx)),invs+' invoices · '+rows.length+' lines')
       +card("Input GST (ITC)",'₹'+IN(Math.round(c+s+i)),'CGST ₹'+IN(Math.round(c))+' · SGST ₹'+IN(Math.round(s))+' · IGST ₹'+IN(Math.round(i)))
       +card("Invoice total",'₹'+IN(Math.round(t)),'taxable + GST');
@@ -197,11 +202,11 @@
       const gst=n(r.cgst)+n(r.sgst)+n(r.igst);
       h+='<tr><td>'+esc(r.invoice_date)+'</td><td>'+esc(r.invoice_no)+'</td><td style="text-align:left">'+esc(r.vendor||'')+'</td><td>'+esc(r.period||'')+'</td><td style="text-align:left">'+esc(r.item||'')+'</td><td>'+esc(r.sac||'')+'</td>'
         +'<td>'+IN(r.taxable)+'</td><td>'+IN(r.cgst)+'</td><td>'+IN(r.sgst)+'</td><td>'+IN(r.igst)+'</td><td class="prof pos">'+IN(gst)+'</td><td>'+IN(r.total)+'</td>'
-        +'<td>'+esc(r.company_name)+'</td><td>'+esc(r.platform)+'</td><td><span class="src'+(r.source_file==='manual'?' manual':'')+'">'+(r.source_file==='manual'?'manual':esc(r.source_file||'file'))+'</span></td>'
+        +'<td>'+esc(r.company_name)+'</td><td style="font-variant-numeric:tabular-nums">'+esc(r.buyer_gstin||'—')+'</td><td>'+esc(r.platform)+'</td><td><span class="src'+(r.source_file==='manual'?' manual':'')+'">'+(r.source_file==='manual'?'manual':esc(r.source_file||'file'))+'</span></td>'
         +'<td><button class="btn del" data-del="'+r.id+'">delete</button></td></tr>';
     }
-    if(!rows.length) h='<tr><td colspan="16" class="empty">No purchase invoices in this window.</td></tr>';
-    else h+='<tr class="totrow"><td>Total</td><td>'+invs+' invoices</td><td></td><td></td><td></td><td></td><td>'+IN(tx)+'</td><td>'+IN(c)+'</td><td>'+IN(s)+'</td><td>'+IN(i)+'</td><td>'+IN(c+s+i)+'</td><td>'+IN(t)+'</td><td></td><td></td><td></td><td></td></tr>';
+    if(!rows.length) h='<tr><td colspan="17" class="empty">No purchase invoices in this window.</td></tr>';
+    else h+='<tr class="totrow"><td>Total</td><td>'+invs+' invoices</td><td></td><td></td><td></td><td></td><td>'+IN(tx)+'</td><td>'+IN(c)+'</td><td>'+IN(s)+'</td><td>'+IN(i)+'</td><td>'+IN(c+s+i)+'</td><td>'+IN(t)+'</td><td></td><td></td><td></td><td></td><td></td></tr>';
     $("#tbody").innerHTML=h;
   }
   $("#tbody").addEventListener("click",async e=>{
