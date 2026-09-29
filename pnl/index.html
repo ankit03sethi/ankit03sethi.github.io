@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29w: units/orders on every card -->
+<!-- pnl build 2026-09-29x: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -197,7 +197,7 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret","n_sched","u_sched","x_tcs","x_tds","n_tcs","n_tds"];
+  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret","n_sched","u_sched","x_tcs","x_tds","n_tcs","n_tds","n_gstf"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -341,7 +341,7 @@
 
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
-      +card("Tax to govt",-tot.tax,paid+' · on settlement')
+      +card("Tax to govt",-tot.tax,'GST from payment file: '+O(tot.n_gstf)+(tot.gross_orders-tot.n_gstf>0?' · master GST %: '+O(tot.gross_orders-tot.n_gstf):''))
       +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(tot.net_profit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(tot.net_profit))+'</div><div class="lbl">'+all+' · after ads &amp; charges</div></div>'
       +card("Margin on revenue",(margPS(tot.net_profit,tot.revenue)==null?'—':margPS(tot.net_profit,tot.revenue)+'%'),'net profit ÷ revenue','')
       +card("Margin on COP",(margPS(tot.net_profit,tot.cop)==null?'—':margPS(tot.net_profit,tot.cop)+'%'),'net profit ÷ COP','');
