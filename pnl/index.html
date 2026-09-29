@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29b: P&L statement (every payment-file line) + category table -->
+<!-- pnl build 2026-09-29c: cards for every payment-file bucket -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -83,6 +83,7 @@
     <div class="chips" id="dayChips"></div>
   </div>
   <div class="cards" id="kpis"></div>
+  <div class="cards" id="detailCards"></div>
   <div class="status" id="status"></div>
   <div class="cards" id="extraCards"></div>
   <div id="extraDetail"></div>
@@ -314,7 +315,7 @@
   }
   function renderDetail(){
     const rows=(state.detail||[]).filter(r=>(!state.plat||String(r.pf).toLowerCase()===String(state.plat).toLowerCase())&&(!state.co||r.company===state.co));
-    if(!rows.length){$("#tbodyD").innerHTML='<tr><td colspan="3" class="empty">—</td></tr>';return;}
+    if(!rows.length){$("#tbodyD").innerHTML='<tr><td colspan="3" class="empty">—</td></tr>';const hc=$("#detailCards");if(hc)hc.innerHTML="";return;}
     // sum across companies (when no company chip) per platform + line
     const M=new Map();
     for(const r of rows){const k=r.pf+"|"+r.sec+"|"+r.ord+"|"+r.label; const a=M.get(k)||{pf:r.pf,sec:r.sec,ord:+r.ord,label:r.label,amount:0,n:0}; a.amount+=+r.amount||0; a.n+=+r.n||0; M.set(k,a);}
@@ -328,6 +329,28 @@
     }
     h='<tr class="totrow"><td style="text-align:left">Σ NET PAYOUT (all shown platforms)</td>'+prof(Math.round(grand))+'<td></td></tr>'+h;
     $("#tbodyD").innerHTML=h;
+    renderDetailCards(list);
+  }
+  // Top cards: one per bucket of the payment file (all platforms shown, summed)
+  function renderDetailCards(list){
+    const b={sale:0,ret:0,fees:0,ship:0,tax:0,claims:0,other:0,total:0,sched:0,ads:0,charges:0,net:0};
+    for(const r of list){
+      const o=r.ord, L=r.label.toLowerCase(), a=r.amount;
+      if(o===90) b.total+=a; else if(o===91) b.sched+=a; else if(o===300) b.net+=a;
+      else if(o>=200&&o<300){ if(/\bad/.test(L)) b.ads+=a; else b.charges+=a; }
+      else if(o>=100&&o<200){ /* by type: informational */ }
+      else if(o===89) b.other+=a;
+      else if(o>=50&&o<=59) b.claims+=a;
+      else if(o>=36&&o<=41) b.tax+=a;
+      else if(o>=30&&o<=35) b.ship+=a;
+      else if(o>=20&&o<=29) b.fees+=a;
+      else if(o>=10&&o<=19){ if(/return|refund/.test(L)) b.ret+=a; else b.sale+=a; }
+    }
+    const c=(l,v,cls)=>'<div class="kpi"><div class="lbl">'+l+'</div><div class="val '+(cls||(v<0?'prof neg':''))+'">₹'+IN(Math.round(v))+'</div></div>';
+    const host=$("#detailCards"); if(!host) return;
+    host.innerHTML=c("Sale",b.sale)+c("Returns / refunds",b.ret)+c("Platform fees",b.fees)+c("Shipping / courier",b.ship)+c("TCS / TDS / GST",b.tax)+c("Claims / recovery",b.claims)
+      +(b.other?c("Other / rounding",b.other):"")+c("Order sheet total",b.total,'prof pos')+c("of which scheduled",b.sched,'')+c("Ads",b.ads)+c("Other charges (fines, storage…)",b.charges)
+      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PAYOUT</div><div class="val '+(b.net<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(b.net))+'</div></div>';
   }
   function render(){
     renderExtras();
