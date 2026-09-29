@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29c: cards for every payment-file bucket -->
+<!-- pnl build 2026-09-29d: line columns in the table, cards with units, cost cards after transfers -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -83,17 +83,11 @@
     <div class="chips" id="dayChips"></div>
   </div>
   <div class="cards" id="kpis"></div>
-  <div class="cards" id="detailCards"></div>
   <div class="status" id="status"></div>
   <div class="cards" id="extraCards"></div>
   <div id="extraDetail"></div>
+  <div class="cards" id="costCards"></div>
   <div id="tblwrap">
-
-    <h3 class="ttl">P&amp;L Statement <span class="sub">— har platform ki payment file ki har line: order sheet ke columns + baaki sheets (ads, fines, storage, claims, recovery…) · payment date · settled + scheduled till today</span></h3>
-    <div class="wrap"><table class="data" id="tD">
-      <thead><tr><th style="text-align:left">Line</th><th>Amount ₹</th><th>Rows</th></tr></thead>
-      <tbody id="tbodyD"><tr><td colspan="3" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
-    </table></div>
 
     <h3 class="ttl">Payment File P&amp;L <span class="sub">— payment file ke saare orders (order file mein ho ya na ho) · settled + scheduled sab · returns = sirf charge · COP sirf delivered units</span></h3>
     <div class="wrap"><table class="data" id="tP">
@@ -101,12 +95,13 @@
         <tr>
           <th>Category / Sub / Master / SKU</th>
           <th>SKUs</th><th>Gross Units</th><th>Upcoming</th><th>Settled</th><th>RTO Qty</th><th>Return Qty</th>
-          <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Courier ₹</th><th>RTO ₹</th><th>C Returns ₹</th><th>Settlement ₹</th>
-          <th>COP ₹</th><th>Packaging ₹</th><th>Tax ₹</th><th>Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
+          <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Sale Returns ₹</th><th>Platform Fees ₹</th><th>Shipping ₹</th><th>Return Shipping ₹</th><th>TCS/TDS ₹</th><th>Claims / Recovery ₹</th>
+          <th>RTO ₹</th><th>C Returns ₹</th><th>Settlement ₹</th><th>Scheduled ₹</th><th>Ads ₹</th><th>Other Charges ₹</th><th>Net Payout ₹</th>
+          <th>COP ₹</th><th>Packaging ₹</th><th>Govt Tax ₹</th><th>Profit ₹</th><th>Net Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
         </tr>
         <tr class="qtyrow" id="qtyP"></tr>
       </thead>
-      <tbody id="tbodyP"><tr><td colspan="19" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+      <tbody id="tbodyP"><tr><td colspan="28" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
     </table></div>
 
 
@@ -119,7 +114,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=19;
+  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=28;
   const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{},payRows:[],extras:{transfers:[],ads:[]},extraOpen:null};
   const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const pad2=n=>String(n).padStart(2,"0");
@@ -195,13 +190,13 @@
   }
   function draw(host,list,key,allLbl){
     host.innerHTML="";
-    const mk=(v,l)=>{const c=document.createElement("span");c.className="chip"+(state[key]===v?" active":"");c.textContent=l;c.onclick=()=>{state[key]=v;buildChips();render();renderDetail();};host.appendChild(c);};
+    const mk=(v,l)=>{const c=document.createElement("span");c.className="chip"+(state[key]===v?" active":"");c.textContent=l;c.onclick=()=>{state[key]=v;buildChips();render();};host.appendChild(c);};
     mk("",allLbl);for(const v of list)mk(v,v);
   }
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit"];
+  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -213,6 +208,12 @@
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.gross_units-a.data_units)+'</td><td>'+IN(a.data_units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
       +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.courier)+cst(a.rto)+cst(a.retfees)+'<td>'+IN(a.settled)+'</td>'
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+mcell(a.profit,a.revenue)+mcell(a.profit,a.cop);
+  }
+  function cellsPay(a,skusTxt){
+    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.gross_units-a.data_units)+'</td><td>'+IN(a.data_units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
+      +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.x_ret)+cst(a.x_fees)+cst(a.x_shipf)+cst(a.x_shipr)+cst(a.x_tax)+cst(a.x_claims)
+      +cst(a.rto)+cst(a.retfees)+'<td>'+IN(a.settled)+'</td>'+upc(a.x_sched)+cst(a.x_ads)+cst(a.x_other)+'<td>'+IN(a.net_payout)+'</td>'
+      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+prof(a.net_profit)+mcell(a.net_profit,a.revenue)+mcell(a.net_profit,a.cop);
   }
   function cellsExp(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td>'
@@ -272,7 +273,7 @@
   function filteredPay(){return state.payRows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
   function renderPay(){
     const rows=filteredPay();
-    if(!rows.length){$("#tbodyP").innerHTML='<tr><td colspan="'+NCOLS_P+'" class="empty">—</td></tr>';$("#qtyP").innerHTML='';return;}
+    if(!rows.length){$("#tbodyP").innerHTML='<tr><td colspan="'+NCOLS_P+'" class="empty">—</td></tr>';$("#qtyP").innerHTML='';$("#kpis").innerHTML='';const hc=$("#costCards");if(hc)hc.innerHTML='';return;}
     const tot=agg(rows);
     const C=tree(rows);
     const cats=[...C.entries()].map(([cat,S])=>{
@@ -285,13 +286,15 @@
       return{cat,subs,a:agg([].concat(...subs.flatMap(s=>s.mss.map(m=>m.list))))};
     });
     cats.sort((x,y)=>y.a.profit-x.a.profit);
-    $("#qtyP").innerHTML=qtyRow(['','','','','','','',U(tot.data_units),U(tot.delivered_units),ORD(tot.delivered_orders),U(tot.rto_qty),U(tot.return_units),U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
-    $("#tbodyP").innerHTML=buildBody(cats,tot,cellsActual,false,NCOLS_P);
+    const DU=U(tot.delivered_units), DO=ORD(tot.delivered_orders);
+    $("#qtyP").innerHTML=qtyRow(['','','','','','','',U(tot.data_units),DU,U(tot.return_units),DU,DU,U(tot.return_units),DU,DU,U(tot.rto_qty),U(tot.return_units),U(tot.units),'','','',U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),U(tot.units),'','']);
+    $("#tbodyP").innerHTML=buildBody(cats,tot,cellsPay,false,NCOLS_P);
+    renderCards(tot);
   }
   async function loadPay(){
     const w={mode:state.mode,days:state.days,mfrom:state.mfrom,mto:state.mto};
     const key="p:"+winKey(w);
-    if(cache[key]){state.payRows=cache[key];buildChips();render();loadDetail();return;}
+    if(cache[key]){state.payRows=cache[key];buildChips();render();return;}
     $("#tbodyP").innerHTML='<tr><td colspan="'+NCOLS_P+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     try{
       const {data,error}=await sb.rpc("category_pnl_pay_json",argsForWin(w));
@@ -299,68 +302,25 @@
       if(!error) cache[key]=state.payRows;
     }catch(e){state.payRows=[];}
     $("#status").textContent=state.payRows.length.toLocaleString("en-IN")+" SKUs";
-    buildChips();render();loadDetail();
+    buildChips();render();
   }
-  async function loadDetail(){
-    const w={mode:state.mode,days:state.days,mfrom:state.mfrom,mto:state.mto};
-    const key="d:"+winKey(w);
-    if(cache[key]){state.detail=cache[key];renderDetail();return;}
-    $("#tbodyD").innerHTML='<tr><td colspan="3" class="empty"><span class="spin"></span> loading…</td></tr>';
-    try{
-      const {data,error}=await sb.rpc("pnl_detail_json",argsForWin(w));
-      state.detail=(!error&&data&&Array.isArray(data.rows))?data.rows:[];
-      if(!error) cache[key]=state.detail;
-    }catch(e){state.detail=[];}
-    renderDetail();
-  }
-  function renderDetail(){
-    const rows=(state.detail||[]).filter(r=>(!state.plat||String(r.pf).toLowerCase()===String(state.plat).toLowerCase())&&(!state.co||r.company===state.co));
-    if(!rows.length){$("#tbodyD").innerHTML='<tr><td colspan="3" class="empty">—</td></tr>';const hc=$("#detailCards");if(hc)hc.innerHTML="";return;}
-    // sum across companies (when no company chip) per platform + line
-    const M=new Map();
-    for(const r of rows){const k=r.pf+"|"+r.sec+"|"+r.ord+"|"+r.label; const a=M.get(k)||{pf:r.pf,sec:r.sec,ord:+r.ord,label:r.label,amount:0,n:0}; a.amount+=+r.amount||0; a.n+=+r.n||0; M.set(k,a);}
-    const list=[...M.values()].sort((x,y)=>x.pf.localeCompare(y.pf)||x.ord-y.ord||x.label.localeCompare(y.label));
-    let h="", pf="", sec="", grand=0;
-    for(const r of list){
-      if(r.pf!==pf){pf=r.pf;sec="";h+='<tr class="lvl-cat"><td style="text-align:left;font-weight:800">'+esc(pf.toUpperCase())+'</td><td></td><td></td></tr>';}
-      if(r.sec!==sec){sec=r.sec;h+='<tr class="lvl-sub"><td style="text-align:left;color:#64748b;font-weight:700">'+esc(sec)+'</td><td></td><td></td></tr>';}
-      const isTot=r.ord===90||r.ord===300; if(r.ord===300) grand+=r.amount;
-      h+='<tr'+(isTot?' class="totrow"':'')+'><td style="text-align:left;padding-left:'+(isTot?10:22)+'px">'+esc(r.label)+'</td>'+prof(Math.round(r.amount))+'<td class="muted">'+(r.n?IN(r.n):'')+'</td></tr>';
-    }
-    h='<tr class="totrow"><td style="text-align:left">Σ NET PAYOUT (all shown platforms)</td>'+prof(Math.round(grand))+'<td></td></tr>'+h;
-    $("#tbodyD").innerHTML=h;
-    renderDetailCards(list);
-  }
-  // Top cards: one per bucket of the payment file (all platforms shown, summed)
-  function renderDetailCards(list){
-    const b={sale:0,ret:0,fees:0,ship:0,tax:0,claims:0,other:0,total:0,sched:0,ads:0,charges:0,net:0};
-    for(const r of list){
-      const o=r.ord, L=r.label.toLowerCase(), a=r.amount;
-      if(o===90) b.total+=a; else if(o===91) b.sched+=a; else if(o===300) b.net+=a;
-      else if(o>=200&&o<300){ if(/\bad/.test(L)) b.ads+=a; else b.charges+=a; }
-      else if(o>=100&&o<200){ /* by type: informational */ }
-      else if(o===89) b.other+=a;
-      else if(o>=50&&o<=59) b.claims+=a;
-      else if(o>=36&&o<=41) b.tax+=a;
-      else if(o>=30&&o<=35) b.ship+=a;
-      else if(o>=20&&o<=29) b.fees+=a;
-      else if(o>=10&&o<=19){ if(/return|refund/.test(L)) b.ret+=a; else b.sale+=a; }
-    }
-    const c=(l,v,cls)=>'<div class="kpi"><div class="lbl">'+l+'</div><div class="val '+(cls||(v<0?'prof neg':''))+'">₹'+IN(Math.round(v))+'</div></div>';
-    const host=$("#detailCards"); if(!host) return;
-    host.innerHTML=c("Sale",b.sale)+c("Returns / refunds",b.ret)+c("Platform fees",b.fees)+c("Shipping / courier",b.ship)+c("TCS / TDS / GST",b.tax)+c("Claims / recovery",b.claims)
-      +(b.other?c("Other / rounding",b.other):"")+c("Order sheet total",b.total,'prof pos')+c("of which scheduled",b.sched,'')+c("Ads",b.ads)+c("Other charges (fines, storage…)",b.charges)
-      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PAYOUT</div><div class="val '+(b.net<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(b.net))+'</div></div>';
-  }
-  function render(){
-    renderExtras();
-    const rows=filteredPay();
-    const tot=agg(rows);
-    $("#kpis").innerHTML=kpi("Orders",IN(tot.gross_orders))+kpi("Units",IN(tot.gross_units))+kpi("RTO",IN(tot.rto_qty))+kpi("Returns",IN(tot.return_units))+
-      kpi("Revenue","₹"+IN(tot.revenue))+kpi("Settlement","₹"+IN(tot.settled))+
-      '<div class="kpi"><div class="lbl">Profit</div><div class="val '+(tot.profit<0?'prof neg':'prof pos')+'">₹'+IN(tot.profit)+'</div></div>'+
-      kpi("Margin",(margPS(tot.profit,tot.settled)==null?'—':margPS(tot.profit,tot.settled)+'%'));
-    renderPay();
+  function render(){ renderExtras(); renderPay(); }
+  const card=(l,v,sub,cls)=>'<div class="kpi"><div class="lbl">'+l+'</div><div class="val '+(cls||(v<0?'prof neg':''))+'">'+(typeof v==='number'?'₹'+IN(Math.round(v)):v)+'</div>'+(sub?'<div class="lbl">'+sub+'</div>':'')+'</div>';
+  function renderCards(tot){
+    const du=IN(tot.delivered_units)+' u · '+IN(tot.delivered_orders)+' ord', ru=IN(tot.return_units)+' u', su=IN(tot.units)+' u · '+IN(tot.settled_orders)+' ord';
+    $("#kpis").innerHTML=
+      card("Orders",IN(tot.gross_orders),'','')+card("Units",IN(tot.gross_units),'','')+card("RTO",IN(tot.rto_qty)+' u','','')+card("Returns",IN(tot.return_units)+' u','','')
+      +card("Sale (gross)",tot.gross_revenue,IN(tot.data_units)+' u')+card("Revenue",tot.revenue,du)+card("Sale returns",tot.x_ret,ru)
+      +card("Platform fees",tot.x_fees,du)+card("Shipping",tot.x_shipf,du)+card("Return shipping",tot.x_shipr,ru)+card("TCS / TDS",tot.x_tax,du)+card("Claims / recovery",tot.x_claims,'')
+      +card("RTO loss",-tot.rto,IN(tot.rto_qty)+' u')+card("Return charges",-tot.retfees,ru)
+      +card("Settlement",tot.settled,su,'prof pos')+card("of which scheduled",tot.x_sched,'','')+card("Ads",tot.x_ads,'allocated by sale')+card("Other charges",tot.x_other,'fines, storage…');
+    const host=$("#costCards"); if(host) host.innerHTML=
+      card("Net payout",tot.net_payout,'settlement + ads + charges','prof pos')
+      +card("Cost of product (COP)",-tot.cop,IN(tot.delivered_units)+' u delivered')+card("Packaging",-tot.packaging,IN(tot.ship_orders)+' ord shipped')+card("Tax to govt",-tot.tax,'on settlement')
+      +card("Profit",tot.profit,'before ads / charges',tot.profit<0?'prof neg':'prof pos')
+      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(tot.net_profit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(tot.net_profit))+'</div><div class="lbl">after ads &amp; charges</div></div>'
+      +card("Margin on revenue",(margPS(tot.net_profit,tot.revenue)==null?'—':margPS(tot.net_profit,tot.revenue)+'%'),'','')
+      +card("Margin on COP",(margPS(tot.net_profit,tot.cop)==null?'—':margPS(tot.net_profit,tot.cop)+'%'),'','');
   }
 
   function ordersHtml(okey,ncols){
