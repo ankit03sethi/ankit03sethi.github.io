@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Accounts — Cursive</title>
-<!-- accounts build 2026-09-30b -->
+<!-- accounts build 2026-09-30c -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -195,7 +195,9 @@
     const byg={}; for(const r of rows){const k=r.buyer_gstin||'(no GSTIN)'; const o=byg[k]||(byg[k]={t:0,g:0,n:0}); o.t+=n(r.taxable); o.g+=n(r.cgst)+n(r.sgst)+n(r.igst); o.n++;}
     const gh=$("#gstBox"); if(gh) gh.innerHTML=Object.entries(byg).sort((a,b)=>b[1].g-a[1].g).map(([k,o])=>'<div class="kpi" style="min-width:210px"><div class="lbl">'+esc(k)+'</div><div class="val">₹'+IN(Math.round(o.g))+'</div><div class="lbl">input GST · taxable ₹'+IN(Math.round(o.t))+' · '+o.n+' lines</div></div>').join('');
     $("#kpis").innerHTML=card("Purchases (taxable)",'₹'+IN(Math.round(tx)),invs+' invoices · '+rows.length+' lines')
-      +card("Input GST (ITC)",'₹'+IN(Math.round(c+s+i)),'CGST ₹'+IN(Math.round(c))+' · SGST ₹'+IN(Math.round(s))+' · IGST ₹'+IN(Math.round(i)))
+      +card("Input GST (ITC)",'₹'+IN(Math.round(c+s+i)),invs+' invoices · net of credit notes')
+      +card("IGST — interstate",'₹'+IN(Math.round(i)),'e.g. Karnataka (Amazon/Meesho)')
+      +card("CGST + SGST — intrastate",'₹'+IN(Math.round(c+s)),'Delhi · CGST ₹'+IN(Math.round(c))+' + SGST ₹'+IN(Math.round(s)))
       +card("Invoice total",'₹'+IN(Math.round(t)),'taxable + GST');
     let h='';
     for(const r of rows){
