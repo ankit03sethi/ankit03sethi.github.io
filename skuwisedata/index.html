@@ -340,7 +340,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-28i</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-29a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2928,15 +2928,14 @@
         if (col.endsWith("d Pack/u"))   return { v: -packu,  txt: packu ? money(-packu) : "0" };
         if (!Number.isFinite(cop)) return null;
         let goodsu = cop * units0;                        // COP x the order's units
-        let subN = "";
         if (w !== 0) {
-          // Net per order = whole window's profit over EVERY order in it
+          // Net per order = the same arithmetic as the per-order columns to
+          // its left: settle/order - returns/order - tax - packing - COP,
+          // all over the orders whose sale line is in the file (subO).
           const ob = orderBasis(wc, w);
-          const n = ob.po || 1;
-          const tax = (Number(wc.tax_pct) || 0) / 100 * ob.st;
-          const goods = cop * Math.max(ob.pu - ob.ru, 0);
-          const v2 = (ob.st - ob.rl - tax - packu * ob.po - goods) / n;
-          return { v: v2, txt: money(v2), sub: "\u00f7 " + fmtN(ob.po) + " ord" };
+          const n = ob.fo || ob.ppo || ob.po || 1;
+          const v2 = settle - ob.rl / n - taxu - packu - cop;
+          return { v: v2, txt: money(v2), sub: subO };
         }
         const v = settle - ret - taxu - packu - goodsu;
         return { v: v, txt: money(v) };
