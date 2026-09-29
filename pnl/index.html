@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29v: units/orders on every card -->
+<!-- pnl build 2026-09-29w: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -318,6 +318,8 @@
     const trs=extrasFilter(ex.transfers||[]), trAmt=trs.reduce((a,r)=>a+(+r.amt||0),0), trOrd=trs.reduce((a,r)=>a+(+r.n||0),0);
     const pend=(ex.pending||[]).filter(r=>(!state.plat||String(r.platform).toLowerCase()===String(state.plat).toLowerCase())&&(!state.co||r.company===state.co));
     const pAmt=pend.reduce((a,r)=>a+(+r.amt||0),0), pN=pend.reduce((a,r)=>a+(+r.n||0),0), pDue=pend.reduce((a,r)=>a+(+r.amt_due||0),0), pFut=pend.reduce((a,r)=>a+(+r.amt_future||0),0);
+    const pbd=extrasFilter(ex.pending_by_day||[]);
+    const pbSched=pbd.filter(r=>r.sched).reduce((a,r)=>a+(+r.amt||0),0), pbUnsch=pbd.filter(r=>!r.sched).reduce((a,r)=>a+(+r.amt||0),0);
     $("#kpis").innerHTML=
       card("Sale (gross)",tot.gross_revenue,all+' · full sale value')
       +card("Sale returns",tot.x_ret,UU(tot.u_ret)+' · '+O(tot.n_ret)+' · sale reversed')
@@ -332,10 +334,10 @@
       +card("Ads",tot.x_ads,(um.x_ads?'₹'+IN(Math.round(-um.x_ads))+' not mapped to any SKU':'all mapped to SKUs'))
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
-      card("Net payout",tot.net_payout,all+' · settlement + ads + charges','prof pos')
-      +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt+(tot.x_ads||0)+(tot.x_other||0)))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · ₹'+IN(Math.round(trAmt))+' order payouts − ₹'+IN(Math.round(-((tot.x_ads||0)+(tot.x_other||0))))+' ads/charges deducted · click for list</div></div>'
+      card("Net payout",tot.net_payout,all,'prof pos')
+      +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt+(tot.x_ads||0)+(tot.x_other||0)))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · click for list</div></div>'
 
-      +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' scheduled'+(pFut?' · of which ₹'+IN(Math.round(pFut))+' dated after today':'')+' · click for dates</div></div>'
+      +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
 
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
