@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29r: units/orders on every card -->
+<!-- pnl build 2026-09-29s: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -394,15 +394,26 @@
     if(!k){host.innerHTML="";return;}
     const list=extrasFilter(k==='transfer'?state.extras.transfers:state.extras.ads);
     const isT=k==='transfer';
-    let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Date</th><th>'+(isT?'Transfer / NEFT / Batch ID':'Txn / Settlement ID')+'</th>'+(isT?'<th>Orders</th>':'')+'<th>Amount ₹</th><th>Description</th><th>Type / Account</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
-    if(!list.length) h+='<tr><td colspan="8" class="empty">No '+(isT?'transfers':'advertisement')+' in this window.</td></tr>';
-    let sum=0, so=0;
-    for(const r of list){ sum+=(+r.amt||0); so+=(+r.n||0); h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td>'+(isT?'<td>'+IN(+r.n||0)+'</td>':'')+prof(+r.amt||0)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>'; }
+    const cbdAll=extrasFilter((state.extras&&state.extras.charges_by_day)||[]);
+    const dayKey=r=>String(r.platform||'').toLowerCase()+'|'+String(r.company||'').toLowerCase()+'|'+(r.dt||'');
+    const cbd={}; for(const c of cbdAll){cbd[dayKey(c)]=((+c.ads||0)+(+c.other||0));}
+    const used={};
+    let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Date</th><th>'+(isT?'Transfer / NEFT / Batch ID':'Txn / Settlement ID')+'</th>'+(isT?'<th>Orders</th><th>Gross payout ₹</th><th>Ads / charges ₹</th><th>Transfer to bank ₹</th>':'<th>Amount ₹</th>')+'<th>Description</th><th>Type / Account</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
+    if(!list.length) h+='<tr><td colspan="10" class="empty">No '+(isT?'transfers':'advertisement')+' in this window.</td></tr>';
+    let sum=0, so=0, sded=0;
+    for(const r of list){
+      sum+=(+r.amt||0); so+=(+r.n||0);
+      if(isT){
+        const dk=dayKey(r); const ded=used[dk]?0:(cbd[dk]||0); used[dk]=1; sded+=ded;
+        h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td><td>'+IN(+r.n||0)+'</td>'+prof(+r.amt||0)+prof(ded)+prof((+r.amt||0)+ded)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
+      } else {
+        h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td>'+prof(+r.amt||0)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
+      }
+    }
     if(isT&&list.length){
-      const tot=agg(filteredPay()); const ded=(tot.x_ads||0)+(tot.x_other||0);
-      h+='<tr style="font-weight:600"><td>Total</td><td>'+IN(list.length)+' transfers</td><td>'+IN(so)+'</td>'+prof(sum)+'<td style="text-align:left">order payouts in window</td><td></td><td></td><td></td></tr>';
-      h+='<tr><td></td><td>Ads / charges deducted</td><td></td>'+prof(ded)+'<td style="text-align:left">from Ads / charges sheets (deduction dates in window)</td><td></td><td></td><td></td></tr>';
-      h+='<tr style="font-weight:700"><td></td><td>Net to bank</td><td></td>'+prof(sum+ded)+'<td style="text-align:left">= Transferred to bank card</td><td></td><td></td><td></td></tr>';
+      const tot=agg(filteredPay()); const dedAll=(tot.x_ads||0)+(tot.x_other||0); const rest=dedAll-sded;
+      if(Math.round(rest)) h+='<tr><td>—</td><td>Ads / charges on days with no transfer</td><td></td>'+prof(0)+prof(rest)+prof(rest)+'<td style="text-align:left">deduction dates in window without a bank transfer that day</td><td></td><td></td><td></td></tr>';
+      h+='<tr style="font-weight:700"><td>Total</td><td>'+IN(list.length)+' transfers</td><td>'+IN(so)+'</td>'+prof(sum)+prof(dedAll)+prof(sum+dedAll)+'<td style="text-align:left">gross payout − ads/charges = transferred to bank (card)</td><td></td><td></td><td></td></tr>';
     }
     h+='</tbody></table></div>';
     host.innerHTML=h;
