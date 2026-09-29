@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29t: units/orders on every card -->
+<!-- pnl build 2026-09-29u: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -83,19 +83,20 @@
     <div class="chips" id="dayChips"></div>
   </div>
   <div class="cards" id="kpis"></div>
-  <div class="status" id="status"></div>
+  <hr style="border:0;border-top:2px solid #e5e7eb;margin:10px 0 14px">
   <div class="cards" id="extraCards" style="display:none"></div>
   <div class="cards" id="costCards"></div>
   <div id="extraDetail"></div>
   <div id="tblwrap">
 
+    <div class="status" id="status"></div>
     <h3 class="ttl">Payment File P&amp;L <span class="sub">— payment file ke saare orders (order file mein ho ya na ho) · settled + scheduled sab · returns = sirf charge · COP sirf delivered units · ads/charges sirf tab SKU pe jab line mein product id ho, warna upar "Unmapped" row mein</span></h3>
     <div class="wrap"><table class="data" id="tP">
       <thead>
         <tr>
           <th>Category / Sub / Master / SKU</th>
           <th>SKUs</th><th>Units</th><th>RTO Qty</th><th>Return Qty</th>
-          <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Sale Returns ₹</th><th>Platform Fees ₹</th><th>Shipping ₹</th><th>Return Shipping ₹</th><th>TCS/TDS ₹</th><th>Claims / Recovery ₹</th>
+          <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Sale Returns ₹</th><th>Platform Fees ₹</th><th>Shipping ₹</th><th>Return Shipping ₹</th><th>TCS ₹</th><th>TDS ₹</th><th>Claims / Recovery ₹</th>
           <th>Settlement ₹</th><th>Ads ₹</th><th>Other Charges ₹</th><th>Net Payout ₹</th>
           <th>COP ₹</th><th>Packaging ₹</th><th>Govt Tax ₹</th><th>Net Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
         </tr>
@@ -114,7 +115,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=23;
+  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=24;
   const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{},payRows:[],extras:{transfers:[],ads:[]},extraOpen:null};
   const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const pad2=n=>String(n).padStart(2,"0");
@@ -196,7 +197,7 @@
 
   function filtered(){return state.rows.filter(r=>(!state.plat||r.platform===state.plat)&&(!state.co||r.company===state.co));}
 
-  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret","n_sched","u_sched"];
+  const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret","n_sched","u_sched","x_tcs","x_tds","n_tcs","n_tds"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
@@ -211,7 +212,7 @@
   }
   function cellsPay(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
-      +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.x_ret)+cst(a.x_fees)+cst(a.x_shipf)+cst(a.x_shipr)+cst(a.x_tax)+cst(a.x_claims)
+      +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.x_ret)+cst(a.x_fees)+cst(a.x_shipf)+cst(a.x_shipr)+cst(a.x_tcs)+cst(a.x_tds)+cst(a.x_claims)
       +'<td>'+IN(a.settled)+'</td>'+cst(a.x_ads)+cst(a.x_other)+'<td>'+IN(a.net_payout)+'</td>'
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.net_profit)+mcell(a.net_profit,a.revenue)+mcell(a.net_profit,a.cop);
   }
@@ -289,7 +290,7 @@
     // charges with no product id in the line stay on their own row, on top - never spread over SKUs
     const ui=cats.findIndex(c=>c.cat==="Unmapped charges"); if(ui>0){const u=cats.splice(ui,1)[0];cats.unshift(u);}
     const DU=U(tot.delivered_units), DO=ORD(tot.delivered_orders);
-    $("#qtyP").innerHTML=qtyRow(['','','','','',U(tot.data_units),DU,U(tot.return_units),DU,DU,U(tot.return_units),DU,DU,U(tot.units),'','',U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
+    $("#qtyP").innerHTML=qtyRow(['','','','','',U(tot.data_units),DU,U(tot.return_units),DU,DU,U(tot.return_units),DU,DU,DU,U(tot.units),'','',U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
     $("#tbodyP").innerHTML=buildBody(cats,tot,cellsPay,false,NCOLS_P);
     renderCards(tot);
   }
@@ -324,7 +325,8 @@
       +card("Platform fees",tot.x_fees,O(tot.n_fees)+' charged')
       +card("Shipping",tot.x_shipf,O(tot.n_shipf)+' charged')
       +card("Return shipping",tot.x_shipr,O(tot.n_shipr)+' charged')
-      +card("TCS / TDS",tot.x_tax,O(tot.n_tax))
+      +card("TCS",tot.x_tcs,O(tot.n_tcs))
+      +card("TDS",tot.x_tds,O(tot.n_tds))
       +card("Claims / recovery",tot.x_claims,O(tot.n_claims))
       +card("Settlement",tot.settled,all,'prof pos')
       +card("Ads",tot.x_ads,(um.x_ads?'₹'+IN(Math.round(-um.x_ads))+' not mapped to any SKU':'all mapped to SKUs'))
