@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29j: table columns match the cards -->
+<!-- pnl build 2026-09-29k: no allocation - unmapped charges row -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -89,7 +89,7 @@
   <div class="cards" id="costCards"></div>
   <div id="tblwrap">
 
-    <h3 class="ttl">Payment File P&amp;L <span class="sub">— payment file ke saare orders (order file mein ho ya na ho) · settled + scheduled sab · returns = sirf charge · COP sirf delivered units</span></h3>
+    <h3 class="ttl">Payment File P&amp;L <span class="sub">— payment file ke saare orders (order file mein ho ya na ho) · settled + scheduled sab · returns = sirf charge · COP sirf delivered units · ads/charges sirf tab SKU pe jab line mein product id ho, warna upar "Unmapped" row mein</span></h3>
     <div class="wrap"><table class="data" id="tP">
       <thead>
         <tr>
@@ -286,6 +286,8 @@
       return{cat,subs,a:agg([].concat(...subs.flatMap(s=>s.mss.map(m=>m.list))))};
     });
     cats.sort((x,y)=>y.a.profit-x.a.profit);
+    // charges with no product id in the line stay on their own row, on top - never spread over SKUs
+    const ui=cats.findIndex(c=>c.cat==="Unmapped charges"); if(ui>0){const u=cats.splice(ui,1)[0];cats.unshift(u);}
     const DU=U(tot.delivered_units), DO=ORD(tot.delivered_orders);
     $("#qtyP").innerHTML=qtyRow(['','','','','',U(tot.data_units),DU,U(tot.return_units),DU,DU,U(tot.return_units),DU,DU,U(tot.units),'','',U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
     $("#tbodyP").innerHTML=buildBody(cats,tot,cellsPay,false,NCOLS_P);
@@ -307,11 +309,12 @@
   function render(){ renderExtras(); renderPay(); }
   const card=(l,v,sub,cls)=>'<div class="kpi"><div class="lbl">'+l+'</div><div class="val '+(cls||(v<0?'prof neg':''))+'">'+(typeof v==='number'?'₹'+IN(Math.round(v)):v)+'</div>'+(sub?'<div class="lbl">'+sub+'</div>':'')+'</div>';
   function renderCards(tot){
+    const um=agg(filteredPay().filter(r=>r.k_sku==="__unmapped__"));
     const du=IN(tot.delivered_units)+' u · '+IN(tot.delivered_orders)+' ord', ru=IN(tot.return_units)+' u', su=IN(tot.units)+' u · '+IN(tot.settled_orders)+' ord';
     $("#kpis").innerHTML=
       card("Sale (gross)",tot.gross_revenue,IN(tot.gross_orders)+' ord · '+IN(tot.gross_units)+' u')+card("Revenue",tot.revenue,du)+card("Sale returns",tot.x_ret,ru)
       +card("Platform fees",tot.x_fees,du)+card("Shipping",tot.x_shipf,du)+card("Return shipping",tot.x_shipr,ru)+card("TCS / TDS",tot.x_tax,du)+card("Claims / recovery",tot.x_claims,'')
-      +card("Settlement",tot.settled,su,'prof pos')+card("Ads",tot.x_ads,'allocated by sale')+card("Other charges",tot.x_other,'fines, storage…');
+      +card("Settlement",tot.settled,su,'prof pos')+card("Ads",tot.x_ads,(um.x_ads?'₹'+IN(Math.round(-um.x_ads))+' not mapped to any SKU':'all mapped to SKUs'))+card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     // transferred = bank transfers in this window; pending = every upcoming / scheduled / unscheduled line the platform still shows (any date)
     const ex=state.extras||{transfers:[],ads:[],pending:[]};
     const trs=extrasFilter(ex.transfers||[]), trAmt=trs.reduce((a,r)=>a+(+r.amt||0),0);
