@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29i: scheduled + pre-ads profit cards removed -->
+<!-- pnl build 2026-09-29j: table columns match the cards -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -94,14 +94,14 @@
       <thead>
         <tr>
           <th>Category / Sub / Master / SKU</th>
-          <th>SKUs</th><th>Gross Units</th><th>Upcoming</th><th>Settled</th><th>RTO Qty</th><th>Return Qty</th>
+          <th>SKUs</th><th>Units</th><th>RTO Qty</th><th>Return Qty</th>
           <th>Gross Revenue ₹</th><th>Revenue ₹</th><th>Sale Returns ₹</th><th>Platform Fees ₹</th><th>Shipping ₹</th><th>Return Shipping ₹</th><th>TCS/TDS ₹</th><th>Claims / Recovery ₹</th>
-          <th>Settlement ₹</th><th>Scheduled ₹</th><th>Ads ₹</th><th>Other Charges ₹</th><th>Net Payout ₹</th>
-          <th>COP ₹</th><th>Packaging ₹</th><th>Govt Tax ₹</th><th>Profit ₹</th><th>Net Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
+          <th>Settlement ₹</th><th>Ads ₹</th><th>Other Charges ₹</th><th>Net Payout ₹</th>
+          <th>COP ₹</th><th>Packaging ₹</th><th>Govt Tax ₹</th><th>Net Profit ₹</th><th>R Margin %</th><th>C Margin %</th>
         </tr>
         <tr class="qtyrow" id="qtyP"></tr>
       </thead>
-      <tbody id="tbodyP"><tr><td colspan="26" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
+      <tbody id="tbodyP"><tr><td colspan="23" class="empty"><span class="spin"></span> loading…</td></tr></tbody>
     </table></div>
 
 
@@ -114,7 +114,7 @@
   const sb = createClient("https://bttppihskbfmxwujyztj.supabase.co","sb_publishable_ooT6WLYpHh6NOVWJBH7ECw_E78_gwqQ",{auth:{persistSession:true,storageKey:"pd_tracker_auth"}});
   const $=s=>document.querySelector(s);
   const IN=n=>Number(n||0).toLocaleString("en-IN");
-  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=26;
+  const NCOLS_A=19, NCOLS_E=15, NCOLS_AC=15, NCOLS_P=23;
   const state={rows:[],plat:"",co:"",days:30,mode:"days",my:null,mm:null,mfrom:null,mto:null,open:new Set(),orders:{},payRows:[],extras:{transfers:[],ads:[]},extraOpen:null};
   const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const pad2=n=>String(n).padStart(2,"0");
@@ -210,10 +210,10 @@
       +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+mcell(a.profit,a.revenue)+mcell(a.profit,a.cop);
   }
   function cellsPay(a,skusTxt){
-    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.gross_units-a.data_units)+'</td><td>'+IN(a.data_units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
+    return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td><td>'+IN(a.rto_qty)+'</td><td>'+IN(a.return_units)+'</td>'
       +'<td>'+IN(a.gross_revenue)+'</td><td>'+IN(a.revenue)+'</td>'+cst(a.x_ret)+cst(a.x_fees)+cst(a.x_shipf)+cst(a.x_shipr)+cst(a.x_tax)+cst(a.x_claims)
-      +'<td>'+IN(a.settled)+'</td>'+upc(a.x_sched)+cst(a.x_ads)+cst(a.x_other)+'<td>'+IN(a.net_payout)+'</td>'
-      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.profit)+prof(a.net_profit)+mcell(a.net_profit,a.revenue)+mcell(a.net_profit,a.cop);
+      +'<td>'+IN(a.settled)+'</td>'+cst(a.x_ads)+cst(a.x_other)+'<td>'+IN(a.net_payout)+'</td>'
+      +cst(a.cop)+cst(a.packaging)+cst(a.tax)+prof(a.net_profit)+mcell(a.net_profit,a.revenue)+mcell(a.net_profit,a.cop);
   }
   function cellsExp(a,skusTxt){
     return '<td>'+skusTxt+'</td><td>'+IN(a.gross_units)+'</td>'
@@ -287,7 +287,7 @@
     });
     cats.sort((x,y)=>y.a.profit-x.a.profit);
     const DU=U(tot.delivered_units), DO=ORD(tot.delivered_orders);
-    $("#qtyP").innerHTML=qtyRow(['','','','','','','',U(tot.data_units),DU,U(tot.return_units),DU,DU,U(tot.return_units),DU,DU,U(tot.units),'','','',U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),U(tot.units),'','']);
+    $("#qtyP").innerHTML=qtyRow(['','','','','',U(tot.data_units),DU,U(tot.return_units),DU,DU,U(tot.return_units),DU,DU,U(tot.units),'','',U(tot.units),U(tot.delivered_units),ORD(tot.ship_orders),U(tot.units),U(tot.units),'','']);
     $("#tbodyP").innerHTML=buildBody(cats,tot,cellsPay,false,NCOLS_P);
     renderCards(tot);
   }
