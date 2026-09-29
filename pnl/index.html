@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-30d: units/orders on every card -->
+<!-- pnl build 2026-09-30e: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -347,7 +347,7 @@
         +'<div class="lbl" data-x="gst" style="cursor:pointer;margin-top:4px">Tax <b>₹'+IN(Math.round(tot.tax))+'</b> · '+all+' ▸</div>'
         +'<div class="lbl" data-x="itc" style="cursor:pointer">Input <b>₹'+IN(Math.round(itcGst))+'</b> · '+IN(new Set(itc.map(r=>r.id)).size)+' invoices ▸</div>'
         +'<div class="lbl" data-x="gst" style="cursor:pointer">TCS <b>₹'+IN(Math.round(tcsCr))+'</b> · '+O(tot.n_tcs)+' ▸</div></div>'
-      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(netProfit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(netProfit))+'</div><div class="lbl" style="margin-top:4px">Bank cash <b>₹'+IN(Math.round(trAmt+(tot.x_ads||0)+(tot.x_other||0)))+'</b></div><div class="lbl">TDS <b>₹'+IN(Math.round(Math.abs(tot.x_tds||0)))+'</b></div></div>'
+      +'<div class="kpi" style="border-color:#1f6feb"><div class="lbl">NET PROFIT</div><div class="val '+(netProfit<0?'prof neg':'prof pos')+'">₹'+IN(Math.round(netProfit))+'</div><div class="lbl" style="margin-top:4px">TDS <b>₹'+IN(Math.round(Math.abs(tot.x_tds||0)))+'</b></div><div class="lbl">Cash profit <b>₹'+IN(Math.round(netProfit-Math.abs(tot.x_tds||0)))+'</b> · net profit − TDS</div></div>'
       +card("Margin on revenue",(margPS(netProfit,tot.revenue)==null?'—':margPS(netProfit,tot.revenue)+'%'),'net profit ÷ revenue','')
       +card("Margin on COP",(margPS(netProfit,tot.cop)==null?'—':margPS(netProfit,tot.cop)+'%'),'net profit ÷ COP','');
   }
