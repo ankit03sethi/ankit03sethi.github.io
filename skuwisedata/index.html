@@ -340,7 +340,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-29a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-29b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2955,7 +2955,10 @@
         // Revenue = order value from the platform's payment file; courier
         // = revenue - settlement. Old settle + billed-courier only as fallback.
         const revw = ob.gs > 0 ? ob.gs : st + shc;
-        const sPaid = subU(ob.au, ob.po), sAll = subU(ob.au, ob.po);
+        // Revenue / Settled / Tax / Goods / Profit stand on orders that have
+        // money (paid or scheduled) - returns and 0-lines are not in them.
+        // Packing alone is on every order that shipped (has any line).
+        const sPaid = subU(ob.pu, ob.ppo), sAll = subU(ob.pu, ob.ppo);
         if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw), sub: sPaid };
         if (col.endsWith("d Cash"))     return { v: st,    txt: money(st), sub: sPaid };
         if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0", sub: sPaid };
