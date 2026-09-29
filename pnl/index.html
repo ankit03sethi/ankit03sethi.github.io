@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29m: units/orders on every card -->
+<!-- pnl build 2026-09-29n: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -320,7 +320,7 @@
     $("#kpis").innerHTML=
       card("Sale (gross)",tot.gross_revenue,all+' · full sale value')
       +card("Sale returns",tot.x_ret,UU(tot.u_ret)+' · '+O(tot.n_ret)+' · sale reversed')
-      +card("Revenue",tot.revenue,'gross − sale returns · '+all)
+      +card("Revenue",tot.revenue,UU(tot.delivered_units)+' · '+O(tot.delivered_orders)+' not returned · gross − sale returns')
       +card("Platform fees",tot.x_fees,O(tot.n_fees)+' charged')
       +card("Shipping",tot.x_shipf,O(tot.n_shipf)+' charged')
       +card("Return shipping",tot.x_shipr,O(tot.n_shipr)+' charged')
