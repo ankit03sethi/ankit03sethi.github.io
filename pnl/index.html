@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-29o: units/orders on every card -->
+<!-- pnl build 2026-09-29p: units/orders on every card -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -331,7 +331,7 @@
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
       card("Net payout",tot.net_payout,all+' · settlement + ads + charges','prof pos')
-      +card("Transferred to bank",trAmt,O(trOrd)+' · '+IN(trs.length)+' transfers in window · payout = transferred + pending + ads/charges','prof pos')
+      +card("Transferred to bank",trAmt+(tot.x_ads||0)+(tot.x_other||0),O(trOrd)+' · '+IN(trs.length)+' transfers · ₹'+IN(Math.round(trAmt))+' order payouts − ₹'+IN(Math.round(-((tot.x_ads||0)+(tot.x_other||0))))+' ads/charges deducted','prof pos')
       +card("Pending from platform",tot.x_sched,UU(tot.u_sched)+' · '+O(tot.n_sched)+' scheduled in window'+(pFut?' · +₹'+IN(Math.round(pFut))+' dated after today (not in window)':''),'')
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
