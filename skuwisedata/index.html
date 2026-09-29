@@ -340,7 +340,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-29b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-29c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2783,7 +2783,7 @@
         // packing and COP too (Ankit, 28-09): an order with no payment line yet
         // is in the Orders columns, not in the cash block. Returned orders have
         // no positive payout, so their units are already out of the goods line.
-        return { po: Number(wc["oao" + w]) || Number(wc["opo" + w]) || 0,   // orders with ANY payment/return line (0 or minus too)
+        return { po: Number(wc["opk" + w]) || Number(wc["oao" + w]) || Number(wc["opo" + w]) || 0,   // orders with a NON-ZERO payment/return line (paid, scheduled, RTO, return) -> packing
                  pu: Number(wc["opu" + w]) || 0,                               // units the platform paid for -> COP
                  au: Number(wc["oau" + w]) || Number(wc["opu" + w]) || 0,    // units behind those orders
                  ru: 0,
