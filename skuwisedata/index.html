@@ -213,11 +213,6 @@
        number+arrow stack) centred, and long text kept to one line instead of
        wrapping into a tall row. */
     table.data tbody td { white-space:nowrap; height:48px; padding-top:6px; padding-bottom:6px; vertical-align:middle; }
-    /* 2026-09-28: every money cell is two fixed lines - the figure, then a
-       small grey note (units / orders / date) - so the figures in a column
-       sit on one line whether or not the cell has a note. */
-    table.data tbody td .mv { display:block; line-height:18px; }
-    table.data tbody td .ms { display:block; font-size:10px; line-height:12px; height:12px; color:#64748b; font-weight:400; white-space:nowrap; }
     /* The first data row sits right under the sticky filter row, which was covering
        its trend dots (dots sit above the number). Extra headroom clears them. */
     table.data tbody tr:first-child > td { padding-top:22px; }
@@ -340,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-29c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-09-26f</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -494,7 +489,6 @@
     company: "",
     companies: [],
     windowCounts: new Map(),   // normalised SKU -> { d1, d3, ... } from the RPC
-    fileMoq: new Map(),        // company|platform|sku -> MOQ IF from the newest inventory file (loaded once at startup, like windowCounts)
     stockMap: new Map(),       // company::platform::sku -> { qty, listing_status, ... } from the newest inventory export
     stockHave: new Set(),      // company::platform pairs that have an inventory export at all
     // Which day-windows show inside a combined column, and which kinds of
@@ -609,16 +603,10 @@
       console.warn(fn + "_json failed, falling back to slices", error);
       return sliced(fn);
     }
-    const [wc, st, mq] = await Promise.all([whole("sku_order_window_counts"), whole("sku_stock_map"), whole("sku_moq_map")]);
+    const [wc, st] = await Promise.all([whole("sku_order_window_counts"), whole("sku_stock_map")]);
     const m = new Map();
     for (const r of wc) m.set(wcKey(r.company_name, r.platform, r.sku), r);
     state.windowCounts = m;
-    // MOQ IF, off the newest inventory file per company+platform (matched by FSN).
-    // Loaded here, in the same fast startup pass, so the column fills on the first
-    // redraw instead of waiting on the heavy per-row listing-stats load.
-    const fm = new Map();
-    for (const r of (mq || [])) fm.set(wcKey(r.company_name, r.platform, r.sku), r.moq_if);
-    state.fileMoq = fm;
     // Sales are now known — colour green/orange/red, fill Focus, apply colour filter.
     applyTableTools();
     // Platform stock, off the newest inventory export per company + platform.
@@ -710,7 +698,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "50" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "4" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -749,7 +737,7 @@
     // Settlement IS the post-promotion figure. Profit is what remains once the
     // real costs come off it: tax (a flat % of the settlement), COP, packaging
     // and return cost/order. Promotion is NOT deducted again.
-    const taxAmt = (tax > 0 && tax < 100) ? Math.round(settle * tax / 100) : 0;
+    const taxAmt = (tax > 0 && tax < 100) ? Math.round(settle * tax / (100 + tax)) : 0;
     const profit = Math.round(settle - taxAmt - cop - pack - rc);
     const why = "Expected Settlement " + settle + " - tax " + taxAmt + " - COP " + Math.round(cop)
       + " - packaging " + Math.round(pack) + " - return cost " + rc + " = " + profit
@@ -761,10 +749,13 @@
   // column shows; Auto Settlement adds it on top. Null when there is no data.
   function returnCostPerOrder(r) {
     const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-    const net = wc ? (Number(wc.u90) || 0) - (Number(wc.ur90) || 0) : NaN;
+    const u90 = wc ? (Number(wc.u90) || 0) : 0;
+    const net = wc ? u90 - (Number(wc.ur90) || 0) : NaN;
     const rl = wc ? Number(wc.rls90) : NaN;
-    if (!(net > 0) || !(rl > 0)) return null;
-    return Math.round(rl / net);
+    if (!(u90 >= 10) || !(net > 0) || !(rl > 0)) return null;
+    const cop = numOf((r.raw_data || {})["COP"]);
+    const v = Math.round(rl / net);
+    return (cop != null && cop > 0) ? Math.min(v, cop) : v;
   }
   // Auto Settlement: the full auto number - COP + tax + packaging + margin (the
   // same auto base as Expected Settlement, ignoring any typed Manual Settlement)
@@ -783,13 +774,13 @@
              : ap != null ? cop * ap / 100
              : Math.min(50, cop);
     const rc = returnCostPerOrder(r) || 0;
-    // All costs except promotion: COP + margin + packaging + return cost. Tax is
-    // a flat % taken off the settlement, so gross the whole thing up:
-    // costs / (1 - tax%). That is the TARGET (Expected Settlement) before promotion.
+    // All costs except promotion: COP + margin + packaging + return cost. The
+    // settlement is tax-inclusive (reverse GST), so add tax on the whole base:
+    // round(costs * (1 + tax%)). That is the TARGET (Expected Settlement) before promotion.
     const costs = cop + pack + mg + rc;
     const base = Math.round(costs);
-    const sub = (tax > 0 && tax < 100) ? Math.ceil(costs / (1 - tax / 100)) : Math.ceil(costs);
-    const subWhy = "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " grossed up for " + tax + "% tax" : "") + " = " + sub;
+    const sub = Math.round(costs * (1 + tax / 100));
+    const subWhy = "costs COP+margin+packaging+return cost (" + base + ")" + (tax > 0 ? " + " + tax + "% tax" : "") + " = " + sub;
     const pf = String(r.platform || "").toLowerCase();
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
     // Promotion is a % cut the platform makes. Amazon: WE set the price, so the
@@ -822,14 +813,14 @@
                   + "; + " + promoPct + "% promotion on selling price " + Math.round(sp) + " (" + spSrc + (spWhen ? ", " + spWhen : "") + ") = +" + promo
                   + ", total " + (sub + promo) + " so the promotion cut still leaves " + sub + ". Auto - computed, not typed." };
   }
-  // Amazon Add Rs in force: courier of the last clean order, else typed, else 50.
+  // Amazon Add Rs in force: typed wins, else courier of the last clean order, else 65.
   function amazonAddRs(r) {
     const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
     const ld0 = r.listing_data || {}, rd0 = r.raw_data || {};
     const typed = numOf(ld0["Amazon Add Rs"]) ?? numOf(rd0["Amazon Add Rs"]);
-    if (wc && wc.ls_ship != null) return { val: Number(wc.ls_ship), src: "courier on last order" + (wc.ls_key ? " " + wc.ls_key : "") };
     if (typed != null) return { val: typed, src: "typed Amazon Add Rs" };
-    return { val: 50, src: "default 50" };
+    if (wc && wc.ls_ship != null) return { val: Number(wc.ls_ship), src: "courier on last order" + (wc.ls_key ? " " + wc.ls_key : "") };
+    return { val: 65, src: "default 65" };
   }
   // Amazon selling price = final settlement + Amazon Add Rs, grossed up for
   // Promotion % (we set the Amazon price, so the promo is absorbed by a higher
@@ -841,7 +832,7 @@
     const base = es.val + ad.val;
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
     const promoPct = (numOf(ld0["Promotion %"]) ?? numOf(rd0["Promotion %"])) || 0;
-    const val = (promoPct > 0 && promoPct < 100) ? Math.ceil(base / (1 - promoPct / 100)) : Math.round(base);
+    const val = (promoPct > 0 && promoPct < 100) ? Math.round(base / (1 - promoPct / 100)) : Math.round(base);
     const why = "Settlement " + es.val + " + " + Math.round(ad.val) + " (" + ad.src + ")"
       + (promoPct > 0 ? "; grossed up for " + promoPct + "% promotion = " + val : "") + ". The price the Amazon file gets.";
     return { val: val, why: why };
@@ -1820,10 +1811,6 @@
     const only = (state.company || "").trim().toLowerCase();
     for (const wc of state.windowCounts.values()) {
       if (only && String(wc.company_name || "").toLowerCase() !== only) continue;
-      // 2026-09-28: courier = order value (payment file) - settled, on every
-      // platform; the billed courier line is only the fallback.
-      const ob = orderBasis(wc, 30); const g = ob.gs, s = ob.st;
-      if (Number.isFinite(g) && g > 0) { cost += Math.max(g - (s || 0), 0); seen.add(wc.platform); continue; }
       if (wc.sh_avail === false) { blind.add(wc.platform); continue; }
       const c = Number(wc.shc30);
       if (Number.isFinite(c)) { cost += c; seen.add(wc.platform); }
@@ -2457,7 +2444,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ IF","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Expected Profit","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -2692,10 +2679,10 @@
                                "Last Ship", "Last Ret Ship"]);
     function lastCell(wc, col, plat) {
       const DASH_ = "\u2014";
-      if (!wc) return '<td style="color:#cbd5e1">' + withSub(DASH_, "") + "</td>";
+      if (!wc) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
       if (col === "Last Settle") {
         const v = Number(wc.ls_unit);
-        if (!Number.isFinite(v)) return '<td style="color:#cbd5e1">' + withSub(DASH_, "") + "</td>";
+        if (!Number.isFinite(v)) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
         // Same test as Last 3 Settle: green at or above Expected Settlement,
         // red below. Blank Expected Settlement means nothing to judge against.
         const exp = Number(wc.exp_settle);
@@ -2705,8 +2692,7 @@
           col2 = v >= exp ? "#047857" : "#0f172a";
           tip = "Last order settled at " + money(v) + " against " + money(exp) + " expected" + when;
         }
-        return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">'
-             + withSub(money(v), wc.ls_odate ? "ordered " + escapeHtml(String(wc.ls_odate)) : "") + "</td>";
+        return '<td title="' + tip + '" style="color:' + col2 + ';font-weight:600">' + money(v) + "</td>";
       }
       if (col === "Last Ship" || col === "Last Ret Ship") {
         const fwd = col === "Last Ship";
@@ -2721,10 +2707,9 @@
           return '<td title="No forward freight has ever been charged on this SKU here"'
                + ' style="color:#cbd5e1">' + DASH_ + "</td>";
         const w2 = fwd ? wc.sh_last_on : wc.rs_last_on;
-        const od2 = fwd ? wc.sh_last_odate : wc.rs_last_odate;
         return '<td title="The last order that carried a charge'
-             + (od2 ? " \u00b7 ordered " + escapeHtml(String(od2)) : "") + (w2 ? " \u00b7 charged " + escapeHtml(String(w2)) : "")
-             + '" style="color:#7c2d12;font-weight:600">' + withSub(money2(v2), od2 ? "ordered " + escapeHtml(String(od2)) : "") + "</td>";
+             + (w2 ? " \u00b7 " + escapeHtml(String(w2)) : "")
+             + '" style="color:#7c2d12;font-weight:600">' + money2(v2) + "</td>";
       }
       const amt = Number(wc.lr_amt);
       if (!Number.isFinite(amt)) return '<td style="color:#cbd5e1">' + DASH_ + "</td>";
@@ -2741,7 +2726,7 @@
       let tip = "Last charged return: " + kind + when
               + (Number.isFinite(units) && units > 1 ? " \u00b7 " + units + " units" : "");
       if (wrong) tip = "RTO charged on " + pf + " - it should not have been. " + tip;
-      return '<td title="' + tip + '" style="color:#0f172a">' + withSub(money(v), wc.lr_odate ? "ordered " + escapeHtml(String(wc.lr_odate)) : "") + "</td>";
+      return '<td title="' + tip + '" style="color:#0f172a">' + money(v) + "</td>";
     }
     function shipCell(wc, col) {
       const spec = SHIP_COLS[col];
@@ -2772,38 +2757,6 @@
     // these six are cash, the older Margin / Net columns are settle-rate x units.
     const CASH_COLS = /d (Revenue|Cash|Tax Paid|Packing|Goods|Profit|Net %Rev|Net %Cost)$/;
     const UNIT_COLS = /d (Rev|Ship|Settle|Ret|Tax|Pack|Net)\/u$/;
-    // One window, one basis. Orders, units and returned units come from the
-    // ORDER file (d*/u*/ur*, order date); settled (os*), order value (og*) and
-    // return charges (orl*) are what the payment file shows for exactly those
-    // orders - settled or scheduled alike. Older caches without og*/os* fall
-    // back to the payment-date figures.
-    function orderBasis(wc, w) {
-      if (wc["os" + w] !== undefined && wc["os" + w] !== null) {
-        // Only orders that have money in the payment file count for tax,
-        // packing and COP too (Ankit, 28-09): an order with no payment line yet
-        // is in the Orders columns, not in the cash block. Returned orders have
-        // no positive payout, so their units are already out of the goods line.
-        return { po: Number(wc["opk" + w]) || Number(wc["oao" + w]) || Number(wc["opo" + w]) || 0,   // orders with a NON-ZERO payment/return line (paid, scheduled, RTO, return) -> packing
-                 pu: Number(wc["opu" + w]) || 0,                               // units the platform paid for -> COP
-                 au: Number(wc["oau" + w]) || Number(wc["opu" + w]) || 0,    // units behind those orders
-                 ru: 0,
-                 st: Number(wc["os" + w]) || 0, gs: Number(wc["og" + w]) || 0, rl: Number(wc["orl" + w]) || 0,
-                 // how many of those orders/units actually have a payment line, and
-                 // how many return charges were billed - shown under each figure
-                 ppo: Number(wc["opo" + w]) || 0, ppu: Number(wc["opu" + w]) || 0, rn: Number(wc["orc" + w]) || 0,
-                 // per-order averages: only orders whose SALE line has been paid
-                 // (an offer-only or adjustment line is not an order's settlement)
-                 fo: Number(wc["ofo" + w]) || 0, fst: Number(wc["osf" + w]) || 0, fgs: Number(wc["ogf" + w]) || 0 };
-      }
-      return { po: Number(wc["po" + w]) || 0, pu: Number(wc["pu" + w]) || 0, au: Number(wc["pu" + w]) || 0, ru: Number(wc["ru" + w]) || 0,
-               st: Number(wc["st" + w]) || 0, gs: Number(wc["gs" + w]) || 0,
-               rl: Number(wc["rl" + w]) || 0,
-               ppo: Number(wc["po" + w]) || 0, ppu: Number(wc["pu" + w]) || 0, rn: Number(wc["rc" + w]) || 0,
-               fo: Number(wc["po" + w]) || 0, fst: Number(wc["st" + w]) || 0, fgs: Number(wc["gs" + w]) || 0 };
-    }
-    const fmtN = (n) => Number(n || 0).toLocaleString("en-IN");
-    const withSub = (main, sub) => '<span class="mv">' + main + '</span><span class="ms">' + (sub || "") + '</span>';
-    const subU = (u, o) => fmtN(u) + " u \u00b7 " + fmtN(o) + " ord";
     function moneyCell(wc, col) {
       if (!wc) return null;
       const w = MONEY_WIN[col];
@@ -2846,11 +2799,9 @@
       // error on Flipkart, Meesho and Myntra - it has nowhere to hide in a
       // single total. Sorting still uses the combined figure.
       if (col.endsWith("Ret Fees")) {
-        // actual charges only (no estimate for returns not yet billed)
-        const obr = orderBasis(wc, w);
-        const L  = obr.rl;
+        const L  = Number.isFinite(loss) ? loss : booked;
         const lr = Number(wc["rlr" + w]) || 0;
-        return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0, sub: fmtN(obr.rn) + " ret charged" };
+        return { v: -L, txt: L ? money(-L) : "0", warn: lr > 0 };
       }
       // The cash block. Everything below is counted on the PAYMENT date, not
       // the order date: st is settlement that actually landed, shc the forward
@@ -2874,7 +2825,7 @@
         // of two. RTOs are excluded from perRet on both: they are mostly billed
         // at nothing, and a 0 or a 13 sitting under a column of 150s is not a
         // cheap return, it is the wrong number.
-        let settle, ship, ret, perRet, subO = "";
+        let settle, ship, ret, perRet;
         if (w === 0) {
           settle = Number(wc.ls_unit);
           if (!Number.isFinite(settle)) return null;
@@ -2889,98 +2840,63 @@
           ret  = 0;
           perRet = wc.lr_kind === "customer" ? Number(wc.lr_amt) : NaN;   // the whole return charge
         } else {
-          // 2026-09-28 (Ankit): the window is the ORDER file. Every order placed
-          // in the last N days counts - its units, its packing, its COP - with
-          // whatever the payment file shows for it (settled or scheduled). An
-          // order with no payment row yet is still an order; it just has 0 money
-          // until the next file lands. Payments for orders that are not in the
-          // order file are ignored.
-          const ob = orderBasis(wc, w);
-          const po = ob.fo || ob.ppo || ob.po; // money per order = over orders whose sale line is paid
+          const po = Number(wc["po" + w]) || 0;   // orders the cash paid for
           if (po <= 0) return null;
-          settle = (ob.fo ? ob.fst : ob.st) / po;
+          settle = (Number(wc["st" + w]) || 0) / po;
           ship   = (Number(wc["shc" + w]) || 0) / po;
-          ret    = ob.rl / (ob.po || 1);       // return charges spread over every order
-          subO   = "\u00f7 " + fmtN(po) + " ord";
+          ret    = (Number.isFinite(loss) ? loss : booked) / po;
           const nSR = Number(wc["rcs" + w]) || 0;
           perRet = nSR ? (Number(wc["rls" + w]) || 0) / nSR : NaN;
         }
         const taxu = (Number(wc.tax_pct) || 0) / 100 * settle;
-        // 2026-09-28: Revenue is the ORDER VALUE the platform's own payment
-        // file reports (Flipkart: Sale Amount + offer + add-ons; Meesho: Total
-        // Sale Amount incl. shipping; Amazon: product sales + shipping credits;
-        // Myntra: customer paid; FirstCry: Gross Amount). Courier is simply
-        // revenue minus what was settled, so revenue = settlement + courier on
-        // every platform. Falls back to settle + billed courier when a file
-        // carries no gross figure.
-        let gross = NaN;
-        if (w === 0) { const g = Number(wc.ls_gross); if (Number.isFinite(g) && g > 0) gross = g; }
-        else { const ob = orderBasis(wc, w); const n = ob.fo || ob.ppo || ob.po; const g = ob.fo ? ob.fgs : ob.gs; if (g > 0 && n > 0) gross = g / n; }
-        const rev  = Number.isFinite(gross) ? gross : settle + ship;
-        const cour = Number.isFinite(gross) ? Math.max(gross - settle, 0) : ship;
-        if (col.endsWith("d Rev/u"))    return { v: rev,     txt: money(rev), sub: subO };
-        if (col.endsWith("d Ship/u"))   return { v: -cour,   txt: cour ? money(-cour) : "0", sub: subO };
-        if (col.endsWith("d Settle/u")) return { v: settle,  txt: money(settle), sub: subO };
+        if (col.endsWith("d Rev/u"))    { const v = settle + ship; return { v: v, txt: money(v) }; }
+        if (col.endsWith("d Ship/u"))   return { v: -ship,   txt: ship ? money(-ship) : "0" };
+        if (col.endsWith("d Settle/u")) return { v: settle,  txt: money(settle) };
         if (col.endsWith("d Ret/u"))
           return (Number.isFinite(perRet) && perRet > 0)
-               ? { v: -perRet, txt: money(-perRet), sub: w ? "\u00f7 " + fmtN(Number(wc["rcs" + w]) || 0) + " ret" : "" } : null;
-        if (col.endsWith("d Tax/u"))    return { v: -taxu,   txt: taxu ? money(-taxu) : "0", sub: subO };
+               ? { v: -perRet, txt: money(-perRet) } : null;
+        if (col.endsWith("d Tax/u"))    return { v: -taxu,   txt: taxu ? money(-taxu) : "0" };
         if (col.endsWith("d Pack/u"))   return { v: -packu,  txt: packu ? money(-packu) : "0" };
         if (!Number.isFinite(cop)) return null;
         let goodsu = cop * units0;                        // COP x the order's units
         if (w !== 0) {
-          // Net per order = the same arithmetic as the per-order columns to
-          // its left: settle/order - returns/order - tax - packing - COP,
-          // all over the orders whose sale line is in the file (subO).
-          const ob = orderBasis(wc, w);
-          const n = ob.fo || ob.ppo || ob.po || 1;
-          const v2 = settle - ob.rl / n - taxu - packu - cop;
-          return { v: v2, txt: money(v2), sub: subO };
+          const u = Number(wc["pu" + w]) || 0, po = Number(wc["po" + w]) || 1;
+          goodsu = cop * Math.max(u - (Number(wc["ru" + w]) || 0), 0) / po;
         }
         const v = settle - ret - taxu - packu - goodsu;
         return { v: v, txt: money(v) };
       }
       if (CASH_COLS.test(col)) {
-        // Order-file basis (see orderBasis): orders/units from the order sheet,
-        // money from whatever the payment file shows for those same orders.
-        const ob  = orderBasis(wc, w);
-        const st  = ob.st;
+        const st  = Number(wc["st"  + w]) || 0;
         const shc = Number(wc["shc" + w]) || 0;
-        const pu  = ob.pu;
-        const ru  = ob.ru;
+        const pu  = Number(wc["pu"  + w]) || 0;
+        const ru  = Number(wc["ru"  + w]) || 0;
         const netu = Math.max(pu - ru, 0);
-        const retf = ob.rl;
+        const retf = Number.isFinite(loss) ? loss : booked;
         const tax2 = (Number(wc.tax_pct) || 0) / 100 * st;
-        const pack = (Number(wc.pack_unit) || 0) * ob.po;   // once per order
-        // Revenue = order value from the platform's payment file; courier
-        // = revenue - settlement. Old settle + billed-courier only as fallback.
-        const revw = ob.gs > 0 ? ob.gs : st + shc;
-        // Revenue / Settled / Tax / Goods / Profit stand on orders that have
-        // money (paid or scheduled) - returns and 0-lines are not in them.
-        // Packing alone is on every order that shipped (has any line).
-        const sPaid = subU(ob.pu, ob.ppo), sAll = subU(ob.pu, ob.ppo);
-        if (col.endsWith("d Revenue"))  return { v: revw, txt: money(revw), sub: sPaid };
-        if (col.endsWith("d Cash"))     return { v: st,    txt: money(st), sub: sPaid };
-        if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0", sub: sPaid };
-        if (col.endsWith("d Packing"))  return { v: -pack, txt: pack ? money(-pack) : "0", sub: fmtN(ob.po) + " ord" };
+        const pack = (Number(wc.pack_unit) || 0) * (Number(wc["po" + w]) || 0);   // once per order
+        if (col.endsWith("d Revenue"))  { const v = st + shc; return { v: v, txt: money(v) }; }
+        if (col.endsWith("d Cash"))     return { v: st,    txt: money(st) };
+        if (col.endsWith("d Tax Paid")) return { v: -tax2, txt: tax2 ? money(-tax2) : "0" };
+        if (col.endsWith("d Packing"))  return { v: -pack, txt: pack ? money(-pack) : "0" };
         // Product cost and net profit cannot be answered without a COP, and a
         // missing COP would quietly read as free stock and a fat profit. A dash
         // says "fill the sheet", which is the truth.
         if (!Number.isFinite(cop)) return null;
         const goods = cop * netu;
-        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0", sub: fmtN(netu) + " u paid" + (ob.au > netu ? " (" + fmtN(ob.au - netu) + " ret/0 out)" : "") };
+        if (col.endsWith("d Goods"))    return { v: -goods, txt: goods ? money(-goods) : "0" };
         const fin2 = st - retf - tax2 - pack - goods;
         // Two ways of asking whether this SKU is worth it: how much of every
         // rupee that came in you keep, and how much every rupee of stock
         // returns. Both need a real denominator - no revenue or no COP is a
         // dash, not a spectacular percentage of nothing.
         if (col.endsWith("d Net %Rev")) {
-          const rev = revw;
-          return rev > 0 ? { v: fin2 / rev * 100, txt: (fin2 / rev * 100).toFixed(0), sub: sAll } : null;
+          const rev = st + shc;
+          return rev > 0 ? { v: fin2 / rev * 100, txt: (fin2 / rev * 100).toFixed(0) } : null;
         }
         if (col.endsWith("d Net %Cost"))
-          return goods > 0 ? { v: fin2 / goods * 100, txt: (fin2 / goods * 100).toFixed(0), sub: sAll } : null;
-        return { v: fin2, txt: money(fin2), sub: sAll };
+          return goods > 0 ? { v: fin2 / goods * 100, txt: (fin2 / goods * 100).toFixed(0) } : null;
+        return { v: fin2, txt: money(fin2) };
       }
       if (!Number.isFinite(su) || !Number.isFinite(cop)) return null;
       const net = sold - ret;
@@ -3070,11 +2986,9 @@
         const k = wc0 ? (c === "Last Return Order" ? wc0.lr_key : wc0.ls_key) : null;
         if (!k) return '<td style="color:#cbd5e1">' + DASH + "</td>";
         const when = c === "Last Return Order" ? wc0.lr_on : wc0.settle_last_on;
-        const odt  = c === "Last Return Order" ? wc0.lr_odate : wc0.ls_odate;   // the ORDER's date
         const tip = (c === "Last Return Order" ? "Last return the platform charged" : "Last clean paid order")
-                  + (odt ? " · ordered " + escapeHtml(String(odt)) : "") + (when ? " · paid " + escapeHtml(String(when)) : "");
-        return '<td title="' + tip + '" style="font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap">'
-             + withSub(escapeHtml(String(k)), odt ? "ordered " + escapeHtml(String(odt)) : "") + "</td>";
+                  + (when ? " · paid " + escapeHtml(String(when)) : "");
+        return '<td title="' + tip + '" style="font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap">' + escapeHtml(String(k)) + "</td>";
       }
       if (LAST_COLS.has(c)) {
         return lastCell(state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku)), c, r.platform);
@@ -3106,7 +3020,7 @@
             tip += " · fill Expected Settlement in the master sheet to flag shortfalls";
           }
           return '<td title="' + tip + '" style="color:' + col + ';font-weight:600">'
-               + withSub(money(v3), wc.ls_odate ? "ordered " + escapeHtml(String(wc.ls_odate)) : "") + "</td>";
+               + money(v3) + "</td>";
         }
         if (c === "Settle/unit")      out = Number.isFinite(su) ? { v: su, txt: money(su) } : null;
         else if (c === "Margin/unit") out = (Number.isFinite(su) && Number.isFinite(cop))
@@ -3114,15 +3028,15 @@
         else if (c === "Margin %COP") out = (Number.isFinite(su) && Number.isFinite(cop) && cop > 0)
                                             ? { v: (su-cop)/cop*100, txt: ((su-cop)/cop*100).toFixed(0) } : null;
         else out = moneyCell(wc, c);
-        if (!out) return `<td style="color:#cbd5e1">${withSub(DASH, "")}</td>`;
+        if (!out) return `<td style="color:#cbd5e1">${DASH}</td>`;
         if (out.html) return `<td>${out.html}</td>`;
         // warn = an RTO was billed on a platform that should never bill for
         // one. Money to claim back, so it does not get to look like every
         // other number in the column.
         if (out.warn) return '<td title="An RTO was charged here - on Flipkart,'
           + ' Meesho and Myntra that should not happen, so it is money to claim back"'
-          + ' style="color:#0f172a">' + withSub(out.txt, out.sub) + "</td>";
-        return `<td style="color:#0f172a">${withSub(out.txt, out.sub)}</td>`;
+          + ' style="color:#0f172a">' + out.txt + "</td>";
+        return `<td style="color:#0f172a">${out.txt}</td>`;
       }
       if (PCT_COLS[c]) {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
@@ -3218,14 +3132,6 @@
           return '<td title="' + escapeHtml(fm.why) + '" style="color:#334155;font-weight:600">' + fm.val + "</td>";
         }
       }
-      // MOQ IF: minimum order quantity from the newest inventory file, matched by
-      // FSN. Filled from the fast startup map so it shows without waiting on the
-      // heavy listing-stats load. Blank = SKU not in the latest file, or MOQ blank.
-      if (c === "MOQ IF") {
-        const fm = state.fileMoq.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        return fm == null ? "<td></td>"
-          : '<td title="Minimum order quantity in the latest inventory file (matched by FSN)." style="color:#1d4ed8;font-weight:600">' + escapeHtml(String(fm)) + "</td>";
-      }
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
         const cur = String(ld[c] != null && ld[c] !== "" ? ld[c] : (rd[c] != null ? rd[c] : "")).trim();
@@ -3238,14 +3144,12 @@
           tip = "No page check and no orders yet. Type the minimum order quantity as a stand-in; blank = 1.";
         }
         if (c === "Amazon Add Rs" && String(r.platform || "").toLowerCase() === "amazon") {
-          const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
-          // The courier actually charged wins over anything typed: it moves with
-          // every new clean order. The typed number is only the stand-in until
-          // a courier line has settled.
-          if (wc && wc.ls_ship != null) {
-            return '<td title="' + escapeHtml("Courier charged on the last non-returned order" + (wc.ls_key ? " " + wc.ls_key : "") + ": " + wc.ls_ship + ". Updates with every new order. Typed stand-in: " + (cur || "50")) + '" style="color:#334155;font-weight:600">' + Math.round(Number(wc.ls_ship)) + "</td>";
-          }
-          tip = "No courier line settled on the last order yet - the typed number (or 50) is used until one does.";
+          // Typed wins (override with the pencil), else courier on the last
+          // non-returned order, else 65. Always editable so it can be overridden.
+          const eff = amazonAddRs(r);
+          ph = String(Math.round(eff.val));
+          tip = "Amazon Add Rs: typed wins, else courier on the last non-returned order, else 65. Now: " + Math.round(eff.val) + " (" + eff.src + "). Click the pencil to override.";
+          return editCell("tagnum", c, r.id, cur, null, ph, tip);
         }
         return editCell("tagnum", c, r.id, cur, null, ph, tip);
       }
@@ -4136,7 +4040,6 @@
     "Color": "Colour from the master sheet.",
     "Mapped": "Yes once any seller other than us has been seen on the listing (Flipkart sellers list, or a different buy-box seller). Set automatically by the checker and never cleared. Mapped rows are checked first, at least once a day.",
     "MOQ": "Minimum order quantity. Flipkart: read off the product page (Min order quantity is N units) on every check - that value wins. Blank = 1 (normal listing). Type a number only as a stand-in until the page has been checked; file and page stay in sync.",
-    "MOQ IF": "Minimum order quantity as it stands in the latest inventory (Flipkart listing) file, matched to this row by FSN. Blank = the SKU was not in the latest file, or its MOQ cell was blank.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
@@ -4153,7 +4056,7 @@
     "Return Cost/Order": "Return charges the platform actually billed over the last 90 days (RTO excluded), divided by 90d Net sales (units that stayed sold = sold minus returned) - the return cost carried by each order that stays sold. Read-only, per listing. Add it to your Manual Settlement.",
     "Manual Settlement": "Type a settlement here and it IS the Expected Settlement - every margin column is ignored. With a competitor the price still follows him down to the floor. Blank = computed.",
     "Max Step %": "How far one file update may move the settlement toward its target. Blank = the global setting (4%).",
-    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Shows the courier actually charged on this SKU's last non-returned order and moves with every new order. The typed number (file or page) is only the stand-in until a courier line has settled; blank = 50.",
+    "Amazon Add Rs": "Amazon only: listing price = Expected Settlement + this. Shows the courier actually charged on this SKU's last non-returned order and moves with every new order. The typed number (file or page) is only the stand-in until a courier line has settled; typed wins, blank = 65.",
     "Kit Qty": "Qty from the C Kits tab of the Warehouse Stock workbook, matched on Master SKU. Updates the moment a new workbook is uploaded on the Uploads page. Deleted = a part is missing in the workbook.",
     "Other Seller": "Flipkart only: leaving out the buy-box seller, the cheapest seller WITH the Assured badge; if none of the others has it, the cheapest overall.",
     "Other Price": "That seller's price.",
@@ -4253,7 +4156,7 @@
     COL_HELP[w+"d Net"]           = "Margin minus return cost minus tax. Everything in, less everything out.";
     COL_HELP[w+"d Net/unit"]      = "Profit divided by the units that stayed sold.";
     COL_HELP[w+"d Net %COP"]      = "Profit per order as a percentage of COP. What each rupee of stock returns.";
-    COL_HELP[w+"d Revenue"]        = "Order value as the platform's payment file reports it (Flipkart sale amount + offer, Meesho total sale amount, Amazon product sales + shipping credits). Revenue = settled + courier. Counted on the payment date.";
+    COL_HELP[w+"d Revenue"]        = "Cash that landed plus the forward courier the platform kept - what the orders were worth before freight. Counted on the payment date.";
     COL_HELP[w+"d Cash"]           = "Cash that actually landed in the window. Revenue minus courier. Counted on the payment date, not the order date.";
     COL_HELP[w+"d Tax Paid"]       = "Tax % from the master sheet on the settlement received. Blank Tax % reads as 0.";
     COL_HELP[w+"d Packing"]        = "Packaging from the master sheet on every unit that shipped, returns included - the pack was already used. Blank reads as 0.";
@@ -4261,8 +4164,8 @@
     COL_HELP[w+"d Profit"]         = "Settlement less return charges, tax, packaging and product cost. Real cash, not an estimate. Dash means no COP on the sheet.";
     COL_HELP[w+"d Net %Rev"]       = "Net profit as a share of total revenue - how much of every rupee that came in you keep.";
     COL_HELP[w+"d Net %Cost"]      = "Net profit as a share of product cost - what every rupee of stock returned.";
-    COL_HELP[w+"d Rev/u"]         = "Order value per order from the platform's payment file - what the order was worth before fees and courier came off. Last is the most recent paid order that was never charged a return, whole order.";
-    COL_HELP[w+"d Ship/u"]        = "Courier and fees per order = order value minus settled. Last is that same order.";
+    COL_HELP[w+"d Rev/u"]         = "What one order was worth before freight came off. Last is the most recent paid order that was never charged a return, whole order.";
+    COL_HELP[w+"d Ship/u"]        = "Forward courier per order. Last is the courier billed on that same order.";
     COL_HELP[w+"d Settle/u"]      = "Cash that landed per order. Last is the most recent paid order that was never charged a return - all its units.";
     COL_HELP[w+"d Ret/u"]         = "What one buyer return cost: return money taken over the buyer returns actually billed. RTOs excluded. Last is the most recent charged buyer return. This is a cost per return, not a share of every unit, so it does not add down into Profit /unit - profit carries the return cost spread over units.";
     COL_HELP[w+"d Tax/u"]         = "Tax % from the master sheet on the settlement per order. Blank Tax % reads as 0.";
