@@ -698,7 +698,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "100" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
+  const NUM_COLS = { "Margin": { def: "10" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
