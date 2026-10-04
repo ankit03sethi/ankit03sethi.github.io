@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -896,14 +896,6 @@
     const key = wcKey(r.company_name, r.platform, r.seller_sku);
     const st = state.listingStats && state.listingStats.get(key);
     const wc = state.windowCounts.get(key);
-    // Flipkart: MOQ ki source of truth = inventory file (moq_if) - jo platform pe
-    // actually set hai. Scraping doosre seller ka MOQ dikha sakti hai, isliye file
-    // wins. (Amazon neeche scraped page MOQ use karta hai.)
-    const _pfM = String(r.platform || "").toLowerCase();
-    if (_pfM === "flipkart") {
-      const mf = (st && st.moq_if != null) ? Number(st.moq_if) : null;
-      if (mf != null && mf >= 2) return { src: "file", val: mf, tip: "MOQ Flipkart inventory file se: " + mf + " (us SKU ka platform pe set MOQ)." };
-    }
     const checked = !!(st && ["ok", "out_of_stock"].includes(String(st.last_check_status || "")) && st.last_checked_at);
     const chkAt = checked ? Date.parse(st.last_checked_at) : NaN;
     const cnt = wc ? Number(wc.moq_o_cnt) || 0 : 0;
@@ -1466,7 +1458,7 @@
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
-                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq" };
+                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ AP": "moq_if" };
     const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
@@ -1484,6 +1476,20 @@
         // Return Type: only overwrite once the page has said something; until
         // then the cell keeps the master sheet's value.
         if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
+        // MOQ AP: Flipkart inventory-file MOQ, repainted once listing stats load.
+        if (c === "MOQ AP") {
+          const pf = String(r.platform || "").toLowerCase();
+          const mf = (pf === "flipkart" && st.moq_if != null) ? Number(st.moq_if) : null;
+          const want2 = mf != null ? String(mf) : "\u2014";
+          if (td.dataset.moqap !== "1" || td.textContent.trim() !== want2) {
+            td.className = ""; td.dataset.moqap = "1";
+            td.title = mf != null ? "Flipkart inventory file MOQ: " + mf + " (platform pe set minimum order qty)." : "";
+            td.style.color = mf != null ? "#1d4ed8" : "#cbd5e1";
+            td.style.fontWeight = mf != null ? "600" : "";
+            td.textContent = want2;
+          }
+          continue;
+        }
         // MOQ: only overwrite once the page has stated one; a typed stand-in stays until then.
         if (c === "MOQ") {
           // Same resolver as the first paint, now that the page check has arrived.
@@ -2466,7 +2472,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Expected Profit","Amazon Add Rs","Max Step %",
       "Selling Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -3153,6 +3159,17 @@
           if (fm.val == null) return '<td title="' + escapeHtml(fm.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
           return '<td title="' + escapeHtml(fm.why) + '" style="color:#334155;font-weight:600">' + fm.val + "</td>";
         }
+      }
+      // MOQ AP: Flipkart inventory-file MOQ (what's set on the platform), read
+      // from the uploaded Flipkart inventory file (seller_file_moq -> moq_if).
+      // Separate from the MOQ column, which shows the scraped page value.
+      if (c === "MOQ AP") {
+        const pf = String(r.platform || "").toLowerCase();
+        if (pf !== "flipkart") return '<td style="color:#cbd5e1">' + DASH + "</td>";
+        const stap = state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const mf = (stap && stap.moq_if != null) ? Number(stap.moq_if) : null;
+        if (mf == null) return '<td data-moqap="1" style="color:#cbd5e1">' + DASH + "</td>";
+        return '<td data-moqap="1" title="Flipkart inventory file MOQ: ' + mf + ' (platform pe set minimum order qty)." style="color:#1d4ed8;font-weight:600">' + escapeHtml(String(mf)) + "</td>";
       }
       if (NUM_COLS[c]) {
         const ld = r.listing_data || {}, rd = r.raw_data || {};
@@ -4062,6 +4079,7 @@
     "Color": "Colour from the master sheet.",
     "Mapped": "Yes once any seller other than us has been seen on the listing (Flipkart sellers list, or a different buy-box seller). Set automatically by the checker and never cleared. Mapped rows are checked first, at least once a day.",
     "MOQ": "Minimum order quantity. Flipkart: read off the product page (Min order quantity is N units) on every check - that value wins. Blank = 1 (normal listing). Type a number only as a stand-in until the page has been checked; file and page stay in sync.",
+    "MOQ AP": "Flipkart inventory-file MOQ - the minimum order quantity set on the platform, read straight from the uploaded Flipkart inventory file. Blank / dash = not in the file. This is the file value; the MOQ column beside it is the scraped page value.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
