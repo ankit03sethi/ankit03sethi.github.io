@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -753,7 +753,12 @@
   function suggSettleVal(r) {
     const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
     if (!st || st.sugg_price == null || st.file_price == null || st.file_settle == null || st.slope == null) return null;
-    return Math.round(Number(st.file_settle) + (Number(st.sugg_price) - Number(st.file_price)) * Number(st.slope));
+    let v = Math.round(Number(st.file_settle) + (Number(st.sugg_price) - Number(st.file_price)) * Number(st.slope));
+    // Never above Expected Settlement - the Auto Margin (max-margin) cap. When a
+    // competitor is expensive we could in theory charge more, but the cap holds.
+    const es = expSettleCalc(r);
+    if (es && es.val != null) v = Math.min(v, es.val);
+    return v;
   }
   // Suggested Profit: profit at the Suggested Settlement, same deductions as Expected Profit.
   function suggProfitCalc(r) {
