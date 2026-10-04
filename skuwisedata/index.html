@@ -768,11 +768,17 @@
     const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
     const am = numOf(ld0["Auto Margin"]) ?? numOf(rd0["Auto Margin"]);
     const ap = numOf(ld0["Auto %"]) ?? numOf(rd0["Auto %"]);
+    // MOQ per-order cap: Auto Margin is the MAX margin per ORDER. One order = MOQ units
+    // (Flipkart: inventory-file MOQ = st.moq_if; Amazon: scraped MOQ = st.moq; else 1),
+    // so the per-unit Auto Margin ceiling is divided by MOQ.
+    const _pfU = String(r.platform || "").toLowerCase();
+    const _stU = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+    const moqU = Math.max(1, Number(_pfU === "flipkart" ? (_stU && _stU.moq_if) : _pfU === "amazon" ? (_stU && _stU.moq) : 1) || 1);
     const mg = mm != null ? mm
-             : (am != null && ap != null) ? Math.min(am, cop * ap / 100)
-             : am != null ? am
+             : (am != null && ap != null) ? Math.min(am / moqU, cop * ap / 100)
+             : am != null ? am / moqU
              : ap != null ? cop * ap / 100
-             : Math.min(50, cop);
+             : Math.min(50 / moqU, cop);
     const rc = returnCostPerOrder(r) || 0;
     // All costs except promotion: COP + margin + packaging + return cost. The
     // settlement is tax-inclusive (reverse GST), so add tax on the whole base:
