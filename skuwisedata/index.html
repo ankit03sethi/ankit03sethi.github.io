@@ -896,6 +896,14 @@
     const key = wcKey(r.company_name, r.platform, r.seller_sku);
     const st = state.listingStats && state.listingStats.get(key);
     const wc = state.windowCounts.get(key);
+    // Flipkart: MOQ ki source of truth = inventory file (moq_if) - jo platform pe
+    // actually set hai. Scraping doosre seller ka MOQ dikha sakti hai, isliye file
+    // wins. (Amazon neeche scraped page MOQ use karta hai.)
+    const _pfM = String(r.platform || "").toLowerCase();
+    if (_pfM === "flipkart") {
+      const mf = (st && st.moq_if != null) ? Number(st.moq_if) : null;
+      if (mf != null && mf >= 2) return { src: "file", val: mf, tip: "MOQ Flipkart inventory file se: " + mf + " (us SKU ka platform pe set MOQ)." };
+    }
     const checked = !!(st && ["ok", "out_of_stock"].includes(String(st.last_check_status || "")) && st.last_checked_at);
     const chkAt = checked ? Date.parse(st.last_checked_at) : NaN;
     const cnt = wc ? Number(wc.moq_o_cnt) || 0 : 0;
