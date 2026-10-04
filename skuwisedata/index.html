@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04g</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1514,7 +1514,7 @@
           const below = (sv != null && es2.val != null && sv < es2.val);
           td.className = ""; td.dataset.suggset = "1";
           td.style.color = sv != null ? (below ? "#6d28d9" : "#334155") : "#cbd5e1";
-          td.style.background = below ? "#ede9fe" : "";
+          if (below) td.style.setProperty("background","#ede9fe","important"); else td.style.removeProperty("background");
           td.style.fontWeight = sv != null ? "600" : "";
           td.title = sv != null ? ("Settlement at the Suggested (competitor) price. Expected is " + (es2.val != null ? es2.val : "-") + ".") : "";
           td.textContent = want2;
@@ -1526,7 +1526,7 @@
           const belowP = (spf.val != null && ep2.val != null && spf.val < ep2.val);
           td.className = ""; td.dataset.suggprof = "1";
           td.style.color = spf.val != null ? (spf.val < 0 ? "#b91c1c" : (belowP ? "#6d28d9" : "#334155")) : "#cbd5e1";
-          td.style.background = belowP ? "#ede9fe" : "";
+          if (belowP) td.style.setProperty("background","#ede9fe","important"); else td.style.removeProperty("background");
           td.style.fontWeight = spf.val != null ? "600" : "";
           td.title = spf.why || "";
           td.textContent = want2;
@@ -3206,7 +3206,7 @@
         const sv = suggSettleVal(r); const es2 = expSettleCalc(r);
         if (sv == null) return '<td data-suggset="1" style="color:#cbd5e1">' + DASH + "</td>";
         const below = (es2.val != null && sv < es2.val);
-        const col = below ? "#6d28d9" : "#334155"; const bg = below ? ";background:#ede9fe" : "";
+        const col = below ? "#6d28d9" : "#334155"; const bg = below ? ";background:#ede9fe !important" : "";
         return '<td data-suggset="1" title="Settlement at the Suggested (competitor) price. Expected is ' + (es2.val != null ? es2.val : "-") + '." style="color:' + col + ';font-weight:600' + bg + '">' + sv + "</td>";
       }
       // Expected Profit: settlement less every deduction (tax, promotion, COP,
@@ -3224,7 +3224,7 @@
         const spf = suggProfitCalc(r); const ep2 = expProfitCalc(r);
         if (spf.val == null) return '<td data-suggprof="1" style="color:#cbd5e1">' + DASH + "</td>";
         const belowP = (ep2.val != null && spf.val < ep2.val);
-        const colP = spf.val < 0 ? "#b91c1c" : (belowP ? "#6d28d9" : "#334155"); const bgP = belowP ? ";background:#ede9fe" : "";
+        const colP = spf.val < 0 ? "#b91c1c" : (belowP ? "#6d28d9" : "#334155"); const bgP = belowP ? ";background:#ede9fe !important" : "";
         return '<td data-suggprof="1" title="' + escapeHtml(spf.why) + '" style="color:' + colP + ';font-weight:600' + bgP + '">' + spf.val + "</td>";
       }
       // Selling Price is never typed on the three big platforms. Amazon: the
