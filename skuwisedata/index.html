@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04c</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04d</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -745,6 +745,32 @@
     const why = "Expected Settlement " + settle + " - tax " + taxAmt + " - COP " + Math.round(cop)
       + " - packaging " + Math.round(pack) + " - return cost " + rc + " = " + profit
       + ". Promotion is already out before the settlement, so it is not deducted again.";
+    return { val: profit, why: why };
+  }
+  // Suggested Settlement: the settlement actually received if we sell at the
+  // Suggested (competitor-driven) price. settle(price) = file settle + (price -
+  // file price) x slope; slope comes from sku_slopes. Flipkart only.
+  function suggSettleVal(r) {
+    const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+    if (!st || st.sugg_price == null || st.file_price == null || st.file_settle == null || st.slope == null) return null;
+    return Math.round(Number(st.file_settle) + (Number(st.sugg_price) - Number(st.file_price)) * Number(st.slope));
+  }
+  // Suggested Profit: profit at the Suggested Settlement, same deductions as Expected Profit.
+  function suggProfitCalc(r) {
+    const settle = suggSettleVal(r);
+    if (settle == null) return { val: null, why: "" };
+    const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
+    const a = autoSettleCalc(r);
+    const cop = numOf(rd0["COP"]) || 0;
+    const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0;
+    const pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
+    const rc = (a && a.rc) || 0;
+    const taxAmt = (tax > 0 && tax < 100) ? Math.round(settle * tax / (100 + tax)) : 0;
+    const _pfP = String(r.platform || "").toLowerCase();
+    const _stP = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+    const _spP = Math.max(1, Number(_pfP === "flipkart" ? (_stP && _stP.moq_if) : _pfP === "amazon" ? (_stP && _stP.moq) : 1) || 1);
+    const profit = Math.round(settle - taxAmt - cop - pack / _spP - rc / _spP);
+    const why = "Suggested Settlement " + settle + " - tax " + taxAmt + " - COP " + Math.round(cop) + " - packaging " + Math.round(pack) + " - return cost " + rc + " = " + profit + ". At the competitor-driven Suggested Price.";
     return { val: profit, why: why };
   }
   // Return cost per order: return charges billed over 90 days (RTO excluded)
@@ -1458,7 +1484,7 @@
                    "Our Price": "our_price", "Our Assured": "our_assured",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
-                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ AP": "moq_if" };
+                   "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ AP": "moq_if", "Suggested Settlement": "sugg_price", "Suggested Profit": "sugg_price" };
     const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
@@ -1476,6 +1502,31 @@
         // Return Type: only overwrite once the page has said something; until
         // then the cell keeps the master sheet's value.
         if (c === "Return Type") { if (!blank(v) && td.textContent !== String(v)) td.textContent = String(v); continue; }
+        // Suggested Settlement / Profit: at the competitor-driven Suggested price, repainted once stats+slope load.
+        if (c === "Suggested Settlement") {
+          const sv = suggSettleVal(r); const es2 = expSettleCalc(r);
+          const want2 = sv != null ? String(sv) : "\u2014";
+          if (td.dataset.suggset !== "1" || td.textContent.trim() !== want2) {
+            td.className = ""; td.dataset.suggset = "1";
+            td.style.color = sv != null ? ((es2.val != null && sv < es2.val) ? "#b45309" : "#334155") : "#cbd5e1";
+            td.style.fontWeight = sv != null ? "600" : "";
+            td.title = sv != null ? ("Settlement at the Suggested (competitor) price. Expected is " + (es2.val != null ? es2.val : "-") + ".") : "";
+            td.textContent = want2;
+          }
+          continue;
+        }
+        if (c === "Suggested Profit") {
+          const spf = suggProfitCalc(r);
+          const want2 = spf.val != null ? String(spf.val) : "\u2014";
+          if (td.dataset.suggprof !== "1" || td.textContent.trim() !== want2) {
+            td.className = ""; td.dataset.suggprof = "1";
+            td.style.color = spf.val != null ? (spf.val < 0 ? "#b91c1c" : "#334155") : "#cbd5e1";
+            td.style.fontWeight = spf.val != null ? "600" : "";
+            td.title = spf.why || "";
+            td.textContent = want2;
+          }
+          continue;
+        }
         // MOQ AP: Flipkart inventory-file MOQ, repainted once listing stats load.
         if (c === "MOQ AP") {
           const pf = String(r.platform || "").toLowerCase();
@@ -1627,9 +1678,18 @@
     // 500 keys per call: a reply is capped at 1,000 rows, and with more than
     // that many rows loaded the ones past the cap simply came back empty.
     for (let i = 0; i < keys.length; i += 500) {
-      const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: keys.slice(i, i + 500) });
+      const slice = keys.slice(i, i + 500);
+      const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: slice });
       if (error) { console.warn("sku_listing_stats failed", error); continue; }   // keep going; what we have stays
       for (const r of (data || [])) state.listingStats.set(wcKey(r.company_name, r.platform, r.sku), r);
+      // Slope per SKU (for Suggested Settlement / Profit) - a light separate RPC.
+      try {
+        const sl = await sb.rpc("sku_slopes", { p_keys: slice });
+        if (!sl.error) for (const rr of (sl.data || [])) {
+          const st2 = state.listingStats.get(wcKey(rr.company_name, rr.platform, rr.sku));
+          if (st2) st2.slope = rr.slope;
+        }
+      } catch (e) { /* slope optional */ }
     }
   }
 
@@ -2182,7 +2242,7 @@
   // Financial columns need the "Financial data" permission. Prices stay visible
   // (listing work needs them); cost, margin, settlement, revenue and profit do not.
   const FIN_KEEP = new Set(["Selling Price","Site Price","Other Price","Our Price","File Price","Suggested Price"]);
-  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Expected Profit","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
+  const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
   const canFin = () => !window.CA || !CA.access || CA.can("skuwise.financial", "view");
   const finHidden = (c) => !canFin() && !FIN_KEEP.has(c) && (FIN_EXTRA.has(c) || colKind(c) === "value");
   const FIN_RAW = /price|amount|settle|value|profit|cost|revenue|margin|fee|charge|tax|gst|total|payment|payout|commission|\brs\b|₹|mrp|discount|invoice/i;
@@ -2460,7 +2520,7 @@
   // Units / % / Values switch reaches them too.
   const FLAT_KIND = {
     "COP": "value", "Final COP": "value", "Packaging": "value", "Tax %": "pct",
-    "Expected Settlement": "value", "Expected Profit": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Promotion %": "pct", "Selling Price": "value", "Site Price": "value",
+    "Expected Settlement": "value", "Suggested Settlement": "value", "Expected Profit": "value", "Suggested Profit": "value", "Auto Settlement": "value", "Return Cost/Order": "value", "Promotion %": "pct", "Selling Price": "value", "Site Price": "value",
     "Last 3 Settle": "value", "Last Settle": "value", "Settle/unit": "value",
     "Margin/unit": "value", "Margin %COP": "pct",
     "Last Ret Charge": "value", "Last Ret Cost": "value",
@@ -2473,7 +2533,7 @@
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
       "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
-      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Expected Profit","Amazon Add Rs","Max Step %",
+      "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Amazon Add Rs","Max Step %",
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
@@ -3134,6 +3194,15 @@
         if (es.val == null) return '<td title="' + escapeHtml(es.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
         return '<td title="' + escapeHtml(es.why) + '" style="color:#334155' + (es.manual ? ";font-weight:600" : "") + '">' + es.val + "</td>";
       }
+      // Suggested Settlement: the settlement actually achieved at the Suggested
+      // (competitor-driven) price. Amber when below Expected Settlement.
+      if (c === "Suggested Settlement") {
+        if (!["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase())) return '<td style="color:#cbd5e1">' + DASH + "</td>";
+        const sv = suggSettleVal(r); const es2 = expSettleCalc(r);
+        if (sv == null) return '<td data-suggset="1" style="color:#cbd5e1">' + DASH + "</td>";
+        const col = (es2.val != null && sv < es2.val) ? "#b45309" : "#334155";
+        return '<td data-suggset="1" title="Settlement at the Suggested (competitor) price. Expected is ' + (es2.val != null ? es2.val : "-") + '." style="color:' + col + ';font-weight:600">' + sv + "</td>";
+      }
       // Expected Profit: settlement less every deduction (tax, promotion, COP,
       // packaging, return cost). Red when it goes negative - a loss at target.
       if (c === "Expected Profit") {
@@ -3142,6 +3211,13 @@
         const ep = expProfitCalc(r);
         if (ep.val == null) return '<td title="' + escapeHtml(ep.why) + '" style="color:#cbd5e1">' + DASH + "</td>";
         return '<td title="' + escapeHtml(ep.why) + '" style="color:' + (ep.val < 0 ? "#b91c1c" : "#334155") + ';font-weight:600">' + ep.val + "</td>";
+      }
+      // Suggested Profit: profit at the Suggested Settlement (competitor price).
+      if (c === "Suggested Profit") {
+        if (!["flipkart", "amazon", "meesho"].includes(String(r.platform || "").toLowerCase())) return '<td style="color:#cbd5e1">' + DASH + "</td>";
+        const spf = suggProfitCalc(r);
+        if (spf.val == null) return '<td data-suggprof="1" style="color:#cbd5e1">' + DASH + "</td>";
+        return '<td data-suggprof="1" title="' + escapeHtml(spf.why) + '" style="color:' + (spf.val < 0 ? "#b91c1c" : "#334155") + ';font-weight:600">' + spf.val + "</td>";
       }
       // Selling Price is never typed on the three big platforms. Amazon: the
       // price the reprice file gets (Expected Settlement + Add Rs). Flipkart:
@@ -4111,6 +4187,8 @@
     "Final COP": "COP plus packaging - the full cost of one unit.",
     "Expected Settlement": "Flipkart + Amazon + Meesho: computed - Manual Settlement if typed, else COP + tax + packaging + Manual Margin if typed, else the smaller of Auto Margin (50) and COP x Auto % (100%). This is the settlement the price is built to land when there is no competitor to price against. Amazon listing price = this + Amazon Add Rs. Other platforms: you fill this in.",
     "Expected Profit": "What is left after the real costs come off the Expected Settlement: tax, COP, packaging and return cost/order. Promotion is already taken out before the settlement lands, so it is NOT deducted again. With no manual settlement this equals your margin. Red = a loss at target. Computed, not typed.",
+    "Suggested Settlement": "The settlement you actually receive if you sell at the Suggested (competitor-driven) price, not the ideal Expected Settlement. Amber when below Expected - a competitor is squeezing the margin. Flipkart only.",
+    "Suggested Profit": "Profit at the Suggested Settlement (competitor price), same deductions as Expected Profit. What you really keep once a competitor forces the price down. Flipkart only.",
     "Selling Price": "Amazon: Expected Settlement + Amazon Add Rs - the price the Amazon file gets. Flipkart: live price from the last price/inventory file (Flipkart pricing runs on Expected Settlement). Meesho: what the last order sold at (Supplier Discounted Price). Others: from the master sheet.",
     "Site Price": "Price found on the live listing.",
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
