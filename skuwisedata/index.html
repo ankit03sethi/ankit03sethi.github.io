@@ -728,7 +728,7 @@
     const es = expSettleCalc(r);
     if (es.val == null) return { val: null, why: es.why };
     const a = autoSettleCalc(r);
-    const cop = numOf(rd0["COP"]) || 0;
+    const cop = (numOf(ld0["COP"]) ?? numOf(rd0["COP"])) || 0;
     const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0;
     const pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
     const rc = (a && a.rc) || 0;
@@ -766,7 +766,7 @@
     if (settle == null) return { val: null, why: "" };
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
     const a = autoSettleCalc(r);
-    const cop = numOf(rd0["COP"]) || 0;
+    const cop = (numOf(ld0["COP"]) ?? numOf(rd0["COP"])) || 0;
     const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0;
     const pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
     const rc = (a && a.rc) || 0;
@@ -787,7 +787,7 @@
     const net = wc ? u90 - (Number(wc.ur90) || 0) : NaN;
     const rl = wc ? Number(wc.rls90) : NaN;
     if (!(u90 >= 10) || !(net > 0) || !(rl > 0)) return null;
-    const cop = numOf((r.raw_data || {})["COP"]);
+    const cop = (numOf((r.listing_data || {})["COP"]) ?? numOf((r.raw_data || {})["COP"]));
     const v = Math.round(rl / net);
     return (cop != null && cop > 0) ? Math.min(v, cop) : v;
   }
@@ -796,7 +796,7 @@
   // PLUS the return cost per order. Computed, never typed.
   function autoSettleCalc(r) {
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
-    const cop = numOf(rd0["COP"]);
+    const cop = numOf(ld0["COP"]) ?? numOf(rd0["COP"]);
     if (cop == null || cop <= 0) return { val: null, why: "No COP on the master sheet" };
     const tax = (numOf(ld0["Tax %"]) ?? numOf(rd0["Tax %"])) || 0, pack = (numOf(ld0["Packaging"]) ?? numOf(rd0["Packaging"])) || 0;
     const mm = numOf(ld0["Manual Margin"]) ?? numOf(rd0["Manual Margin"]);
