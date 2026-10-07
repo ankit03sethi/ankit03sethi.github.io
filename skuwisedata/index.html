@@ -752,7 +752,12 @@
   // file price) x slope; slope comes from sku_slopes. Flipkart only.
   function suggSettleVal(r) {
     const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
-    if (!st || st.sugg_price == null || st.file_price == null || st.file_settle == null || st.slope == null) return null;
+    if (!st) return null;
+    // Reprice preview = the exact settlement the reprice file drives to (k-ratio,
+    // floored + capped). Prefer it so the page matches the file.
+    if (st.rp_settle != null) return Number(st.rp_settle);
+    // Fallback: older slope estimate when the preview is unavailable.
+    if (st.sugg_price == null || st.file_price == null || st.file_settle == null || st.slope == null) return null;
     let v = Math.round(Number(st.file_settle) + (Number(st.sugg_price) - Number(st.file_price)) * Number(st.slope));
     // Never above Expected Settlement - the Auto Margin (max-margin) cap. When a
     // competitor is expensive we could in theory charge more, but the cap holds.
@@ -947,6 +952,7 @@
   // Suggested Price cell text: the price, or why there is none.
   function suggText(st) {
     if (!st) return "";
+    if (st.rp_price != null) return String(st.rp_price);
     if (st.sugg_price != null) return String(st.sugg_price);
     const n = String(st.sugg_note || "");
     if (n === "hold") return "Hold";
@@ -958,9 +964,11 @@
     return "";
   }
   function suggColor(st) {
-    if (!st || st.sugg_price == null) return "#64748b";
+    if (!st) return "#64748b";
+    const sp = (st.rp_price != null) ? st.rp_price : st.sugg_price;
+    if (sp == null) return "#64748b";
     if (st.file_price == null) return "#0f172a";
-    return st.sugg_price > st.file_price ? "#047857" : st.sugg_price < st.file_price ? "#b91c1c" : "#0f172a";
+    return sp > st.file_price ? "#047857" : sp < st.file_price ? "#b91c1c" : "#0f172a";
   }
   // Edits do not save by themselves. A cell is locked until its pencil is
   // clicked; a changed value turns amber and waits in PENDING until Save is
@@ -1695,6 +1703,16 @@
           if (st2) st2.slope = rr.slope;
         }
       } catch (e) { /* slope optional */ }
+      // Reprice preview per SKU (Flipkart): the exact settlement/price the
+      // reprice file drives to (same k-ratio math, floored + capped). Suggested
+      // Settlement / Price / Profit read this so the page matches the file.
+      try {
+        const rp = await sb.rpc("sku_reprice_preview", { p_keys: slice });
+        if (!rp.error) for (const rr of (rp.data || [])) {
+          const st3 = state.listingStats.get(rr.key);
+          if (st3) { st3.rp_settle = rr.new_settle; st3.rp_price = rr.new_price; st3.rp_min = rr.min_price; }
+        }
+      } catch (e) { /* preview optional */ }
     }
   }
 
