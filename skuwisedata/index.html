@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-04g</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-08a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -4836,21 +4836,62 @@
 </script>
 <script>
 (function(){
+  // 2026-10-08: CSV export rebuilt. The old version read each cell's innerText,
+  // which (a) depends on CSS - on this table it collapsed a whole row into the
+  // first field with tabs, (b) packed a combined 30D/60D/90D cell into one value
+  // ("39 34 32"), and (c) dumped every <option> of the Advertising dropdown
+  // ("Yes No"). Now: walk the real <th>/<td> structure with textContent, give
+  // every window (.wv) its own column, read dropdowns/inputs by value (a Yes/No
+  // pick exports "Yes" or blank), and write Excel-friendly numbers.
   function dl(){
     var table=document.querySelector('#tableWrap table.data');
     if(!table||!table.tHead||!table.tBodies[0]){alert('No data to download yet.');return;}
-    var esc=function(v){return '"'+String(v==null?'':v).replace(/\r?\n/g,' ').replace(/"/g,'""')+'"';};
+    var txt=function(el){ return el ? String(el.textContent||'').replace(/\s+/g,' ').trim() : ''; };
+    var num=function(v){
+      // "-1,026" / "−1,026" / "1,466" -> plain numbers Excel can add; dashes -> blank
+      if(v==='—'||v==='–'||v==='-'||v==='') return '';
+      var t=v.replace(/−/g,'-');
+      if(/^-?[\d,]+(\.\d+)?$/.test(t)) return t.replace(/,/g,'');
+      return v;
+    };
+    var esc=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
     var headRow=table.tHead.rows[0];
-    for(var i=0;i<table.tHead.rows.length;i++){ if(table.tHead.rows[i].cells.length>headRow.cells.length) headRow=table.tHead.rows[i]; }
-    var cols=[];
-    for(var j=0;j<headRow.cells.length;j++){ if(headRow.cells[j].offsetWidth>0) cols.push(j); }
-    var lines=[];
-    lines.push(cols.map(function(j){return esc(headRow.cells[j].innerText.trim());}).join(','));
+    var ths=Array.prototype.slice.call(headRow.children);
+    var header=[], cols=[];
+    for(var j=0;j<ths.length;j++){
+      var th=ths[j];
+      if(getComputedStyle(th).display==='none') continue;          // hidden via Columns picker
+      var cid=txt(th.querySelector('.colid')), lab=th.querySelector('.hlab');
+      var name=lab?txt(lab):txt(th).replace(/^[A-Z]{1,2}\s+/,'');
+      var full=(cid?cid+' ':'')+name;
+      var days=th.querySelectorAll('.wdays > span');
+      var n=days.length||1;
+      if(days.length){ for(var k=0;k<days.length;k++) header.push(full+' '+txt(days[k])); }
+      else header.push(full);
+      cols.push({j:j,n:n});
+    }
+    var cellVals=function(td,n){
+      var out=[],k;
+      if(!td){ for(k=0;k<n;k++) out.push(''); return out; }
+      var wv=td.querySelectorAll('.wgrid > .wv');
+      if(wv.length){ for(k=0;k<n;k++) out.push(wv[k]?num(txt(wv[k])):''); return out; }
+      var sel=td.querySelector('select.edin');
+      if(sel){ var sv=String(sel.value||'').trim(); out.push(sv==='No'?'':sv); }
+      else{
+        var inp=td.querySelector('input.edin');
+        out.push(inp? num(String(inp.value||'').trim()) : num(txt(td)));
+      }
+      while(out.length<n) out.push('');
+      return out;
+    };
+    var lines=[header.map(esc).join(',')];
     var body=table.tBodies[0], cnt=0;
     for(var r=0;r<body.rows.length;r++){
       var tr=body.rows[r];
       if(getComputedStyle(tr).display==='none') continue;
-      lines.push(cols.map(function(j){ var td=tr.cells[j]; return esc(td?td.innerText.trim():''); }).join(','));
+      var tds=tr.children, fields=[];
+      for(var c=0;c<cols.length;c++){ Array.prototype.push.apply(fields, cellVals(tds[cols[c].j], cols[c].n)); }
+      lines.push(fields.map(esc).join(','));
       cnt++;
     }
     if(!cnt){alert('No rows to download for current filters.');return;}
