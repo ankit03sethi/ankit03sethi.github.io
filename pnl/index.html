@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-09-30g: units/orders on every card -->
+<!-- pnl build 2026-10-08a: Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -316,6 +316,7 @@
     const all=UU(tot.gross_units)+' · '+O(tot.gross_orders);        // every order in the payment file
     const ex=state.extras||{transfers:[],ads:[],pending:[]};
     const trs=extrasFilter(ex.transfers||[]), trAmt=trs.reduce((a,r)=>a+(+r.amt||0),0), trOrd=trs.reduce((a,r)=>a+(+r.n||0),0);
+    const trDed=(tot.net_payout||0)-(tot.settled||0); // ads/charges actually taken out of the payout in this window (0 for Amazon: its Transfer row is already net)
     const pend=(ex.pending||[]).filter(r=>(!state.plat||String(r.platform).toLowerCase()===String(state.plat).toLowerCase())&&(!state.co||r.company===state.co));
     const pAmt=pend.reduce((a,r)=>a+(+r.amt||0),0), pN=pend.reduce((a,r)=>a+(+r.n||0),0), pDue=pend.reduce((a,r)=>a+(+r.amt_due||0),0), pFut=pend.reduce((a,r)=>a+(+r.amt_future||0),0);
     const pbd=extrasFilter(ex.pending_by_day||[]);
@@ -337,7 +338,7 @@
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
       card("Net payout",tot.net_payout,all,'prof pos')
-      +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt+(tot.x_ads||0)+(tot.x_other||0)))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · click for list</div></div>'
+      +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt+trDed))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · click for list</div></div>'
 
       +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
 
@@ -471,14 +472,14 @@
     for(const r of list){
       sum+=(+r.amt||0); so+=(+r.n||0);
       if(isT){
-        const dk=dayKey(r); let ded; if(adset[String(r.id)]!==undefined){ ded=adset[String(r.id)]; delete adset[String(r.id)]; } else { ded=used[dk]?0:(cbd[dk]||0); used[dk]=1; } sded+=ded;
+        const dk=dayKey(r); let ded; if(String(r.platform).toLowerCase()==='amazon'){ ded=0; } else { ded=used[dk]?0:(cbd[dk]||0); used[dk]=1; } sded+=ded;
         h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td><td>'+IN(+r.n||0)+'</td>'+prof(+r.amt||0)+prof(ded)+prof((+r.amt||0)+ded)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
       } else {
         h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td>'+prof(+r.amt||0)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
       }
     }
     if(isT&&list.length){
-      const tot=agg(filteredPay()); const dedAll=(tot.x_ads||0)+(tot.x_other||0); const rest=dedAll-sded;
+      const tot=agg(filteredPay()); const dedAll=(tot.net_payout||0)-(tot.settled||0); const rest=dedAll-sded;
       if(Math.round(rest)) h+='<tr><td>—</td><td>Ads / charges on days with no transfer</td><td></td>'+prof(0)+prof(rest)+prof(rest)+'<td style="text-align:left">deduction dates in window without a bank transfer that day</td><td></td><td></td><td></td></tr>';
       h+='<tr style="font-weight:700"><td>Total</td><td>'+IN(list.length)+' transfers</td><td>'+IN(so)+'</td>'+prof(sum)+prof(dedAll)+prof(sum+dedAll)+'<td style="text-align:left">gross payout − ads/charges = transferred to bank (card)</td><td></td><td></td><td></td></tr>';
     }
