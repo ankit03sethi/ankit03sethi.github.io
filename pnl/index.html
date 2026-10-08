@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-10-08d: separate clickable "Settled, NEFT awaited" card with platform/company table; Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
+<!-- pnl build 2026-10-08e: Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -200,6 +200,7 @@
   const F=["gross_units","gross_orders","units","upcoming","rto_qty","return_units","settled_orders","ship_orders","data_orders","data_units","delivered_orders","delivered_units","gross_revenue","revenue","rto","retfees","courier","settled","cop","packaging","tax","profit","e_grev","e_rev","e_rto","e_ret","e_cour","e_settle","g_cop","g_pack","e_tax","e_profit","a_grev","a_rev","a_rto","a_ret","a_cour","a_settle","a_tax","a_profit","x_ret","x_fees","x_shipf","x_shipr","x_tax","x_claims","x_sched","x_ads","x_other","net_payout","net_profit","n_ret","n_fees","n_shipf","n_shipr","n_tax","n_claims","n_paid","u_paid","u_ret","n_sched","u_sched","x_tcs","x_tds","n_tcs","n_tds","n_gstf"];
   function agg(rows){const a={skus:new Set()};for(const f of F)a[f]=0;for(const r of rows){for(const f of F)a[f]+=+r[f]||0;a.skus.add(r.seller_sku+"|"+r.k_co+"|"+r.k_pf);}a.nskus=a.skus.size;return a;}
   const margPS=(p,s)=>s>0?Math.round(1000*p/s)/10:null;
+  const bank=r=>(r.bank!==undefined&&r.bank!==null)?(+r.bank||0):((+r.amt||0)+(+r.ded||0));
   const prof=v=>'<td class="prof '+(v<0?'neg':(v>0?'pos':''))+'">'+IN(v)+'</td>';
   const cst=v=>'<td class="cost">'+(v?IN(v):'0')+'</td>';
   const upc=v=>'<td class="up">'+(v?IN(v):'0')+'</td>';
@@ -315,8 +316,8 @@
     const paid=UU(tot.u_paid)+' · '+O(tot.n_paid);                 // orders that carry money
     const all=UU(tot.gross_units)+' · '+O(tot.gross_orders);        // every order in the payment file
     const ex=state.extras||{transfers:[],ads:[],pending:[]};
-    const trs=extrasFilter(ex.transfers||[]), trAmt=trs.reduce((a,r)=>a+(+r.amt||0),0), trOrd=trs.reduce((a,r)=>a+(+r.n||0),0);
-    const trDed=(tot.net_payout||0)-(tot.settled||0); // ads/charges actually taken out of the payout in this window (0 for Amazon: its Transfer row is already net)
+    // exact bank credits: each transfer row carries bank = gross payout + the ads/charges the platform took out of THAT payout (payment_extras_json_v2)
+    const trs=extrasFilter(ex.transfers||[]), trAmt=trs.reduce((a,r)=>a+bank(r),0), trOrd=trs.reduce((a,r)=>a+(+r.n||0),0), trDed=0;
     const pend=(ex.pending||[]).filter(r=>(!state.plat||String(r.platform).toLowerCase()===String(state.plat).toLowerCase())&&(!state.co||r.company===state.co));
     const pAmt=pend.reduce((a,r)=>a+(+r.amt||0),0), pN=pend.reduce((a,r)=>a+(+r.n||0),0), pDue=pend.reduce((a,r)=>a+(+r.amt_due||0),0), pFut=pend.reduce((a,r)=>a+(+r.amt_future||0),0);
     const pbd=extrasFilter(ex.pending_by_day||[]);
@@ -338,7 +339,7 @@
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
       card("Net payout",tot.net_payout,all,'prof pos')
-      +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt+trDed))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · click for list</div></div>'
+      +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · exact bank credits · click for list</div></div>'
 
       +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
 
@@ -396,7 +397,7 @@
     if(state.payRows&&state.payRows.length&&$("#costCards")){ try{ renderCards(agg(filteredPay())); }catch(e){} }
     const ex=state.extras||{transfers:[],ads:[]};
     const tr=extrasFilter(ex.transfers), ad=extrasFilter(ex.ads);
-    const sm=a=>a.reduce((s,r)=>s+(+r.amt||0),0);
+    const sm=a=>a.reduce((s,r)=>s+bank(r),0);
     const c=(k,l,list)=>'<div class="kpi" data-x="'+k+'" style="cursor:pointer;border-color:'+(state.extraOpen===k?'#1f6feb':'#e5e7eb')+'"><div class="lbl">'+l+' '+(state.extraOpen===k?'▾':'▸')+'</div><div class="val '+(sm(list)<0?'prof neg':'')+'">₹'+IN(sm(list))+'</div><div class="lbl">'+list.length+' txns</div></div>';
     const host=$("#extraCards"); if(host) host.innerHTML=c('transfer','Transfers',tr)+c('ad','Advertisement',ad);
     renderExtraDetail();
@@ -430,8 +431,8 @@
   function awaitedRows(){
     const m={}; const g=(pf,co)=>{const k=pf+'|'+co; return m[k]=m[k]||{pf,co,st:0,np:0,sc:0,tr:0,n:0};};
     for(const r of filteredPay()){const o=g(String(r.platform||'').toLowerCase(),r.company||''); o.st+=(+r.settled||0); o.np+=(+r.net_payout||0); o.sc+=(+r.x_sched||0);}
-    for(const t of extrasFilter((state.extras&&state.extras.transfers)||[])){const o=g(String(t.platform||'').toLowerCase(),t.company||''); o.tr+=(+t.amt||0); o.n+=1;}
-    const out=Object.values(m).map(o=>{o.ded=o.np-o.st; o.trc=o.tr+o.ded; o.aw=o.np-o.trc-o.sc; return o;});
+    for(const t of extrasFilter((state.extras&&state.extras.transfers)||[])){const o=g(String(t.platform||'').toLowerCase(),t.company||''); o.tr+=bank(t); o.n+=1;}
+    const out=Object.values(m).map(o=>{o.trc=o.tr; o.aw=o.np-o.trc-o.sc; return o;});
     return out.filter(o=>Math.round(o.st)||Math.round(o.tr)||Math.round(o.sc)).sort((a,b)=>Math.abs(b.aw)-Math.abs(a.aw));
   }
   function awaitedDetailHtml(){
@@ -500,16 +501,15 @@
     for(const r of list){
       sum+=(+r.amt||0); so+=(+r.n||0);
       if(isT){
-        const dk=dayKey(r); let ded; if(String(r.platform).toLowerCase()==='amazon'){ ded=0; } else { ded=used[dk]?0:(cbd[dk]||0); used[dk]=1; } sded+=ded;
+        const ded=+r.ded||0; sded+=ded;
         h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td><td>'+IN(+r.n||0)+'</td>'+prof(+r.amt||0)+prof(ded)+prof((+r.amt||0)+ded)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
       } else {
         h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+esc(r.id||'—')+'</td>'+prof(+r.amt||0)+'<td style="text-align:left">'+esc(r.descr||'—')+'</td><td style="text-align:left">'+esc(r.acct||'—')+'</td><td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
       }
     }
     if(isT&&list.length){
-      const tot=agg(filteredPay()); const dedAll=(tot.net_payout||0)-(tot.settled||0); const rest=dedAll-sded;
-      if(Math.round(rest)) h+='<tr><td>—</td><td>Ads / charges on days with no transfer</td><td></td>'+prof(0)+prof(rest)+prof(rest)+'<td style="text-align:left">deduction dates in window without a bank transfer that day</td><td></td><td></td><td></td></tr>';
-      h+='<tr style="font-weight:700"><td>Total</td><td>'+IN(list.length)+' transfers</td><td>'+IN(so)+'</td>'+prof(sum)+prof(dedAll)+prof(sum+dedAll)+'<td style="text-align:left">gross payout − ads/charges = transferred to bank (card)</td><td></td><td></td><td></td></tr>';
+      const dedAll=sded;
+      h+='<tr style="font-weight:700"><td>Total</td><td>'+IN(list.length)+' transfers</td><td>'+IN(so)+'</td>'+prof(sum)+prof(dedAll)+prof(sum+dedAll)+'<td style="text-align:left">gross payout − ads/charges taken out of that payout = bank credit (card)</td><td></td><td></td><td></td></tr>';
     }
     h+='</tbody></table></div>';
     host.innerHTML=h;
@@ -517,7 +517,7 @@
   async function loadExtras(){
     if(cache._extras){state.extras=cache._extras;renderExtras();return;}
     try{
-      const {data,error}=await sb.rpc("payment_extras_json",{});
+      const {data,error}=await sb.rpc("payment_extras_json_v2",{});
       state.extras=(!error&&data)?data:{transfers:[],ads:[]};
       if(!error) cache._extras=state.extras;
     }catch(e){state.extras={transfers:[],ads:[]};}
