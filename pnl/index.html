@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-10-08c: NEFT-awaited split per platform; Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
+<!-- pnl build 2026-10-08d: separate clickable "Settled, NEFT awaited" card with platform/company table; Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -337,21 +337,13 @@
       +card("Ads",tot.x_ads,(um.x_ads?'₹'+IN(Math.round(-um.x_ads))+' not mapped to any SKU':'all mapped to SKUs'))
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
-      (function(){ const transferred=trAmt+trDed, awaited=(tot.net_payout||0)-transferred-(tot.x_sched||0);
-        // per platform: settled in window - transfers in window - pending in window (negative = this window's transfers also paid older orders)
-        const byPf={}; const g=k=>(byPf[k]=byPf[k]||{st:0,sc:0,tr:0});
-        for(const r of filteredPay()){const o=g(String(r.platform||'').toLowerCase()); o.st+=(+r.settled||0); o.sc+=(+r.x_sched||0);}
-        for(const t of trs){ g(String(t.platform||'').toLowerCase()).tr+=(+t.amt||0); }
-        const parts=Object.entries(byPf).map(([k,o])=>[k,o.st-o.tr-o.sc]).filter(x=>Math.round(x[1])).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1]))
-          .map(([k,a])=>k.charAt(0).toUpperCase()+k.slice(1)+' <b>'+IN(Math.round(a))+'</b>').join(' · ');
-        return '<div class="kpi"><div class="lbl">Net payout</div><div class="val prof pos">₹'+IN(Math.round(tot.net_payout||0))+'</div><div class="lbl">'+all+'</div>'
-          +'<div class="lbl" style="margin-top:4px">Settled, NEFT awaited <b>₹'+IN(Math.round(awaited))+'</b></div>'
-          +'<div class="lbl">= net payout − transferred − pending</div>'
-          +(parts?'<div class="lbl">'+parts+'</div><div class="lbl">(minus = is window ke transfers ne purane orders bhi pay kiye)</div>':'')+'</div>'; })()
+      card("Net payout",tot.net_payout,all,'prof pos')
       +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt+trDed))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · click for list</div></div>'
 
       +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
 
+      +(function(){ const aw=awaitedRows(); const awT=aw.reduce((a,r)=>a+r.aw,0);
+          return '<div class="kpi" data-x="awaited" style="cursor:pointer;border-color:'+(state.extraOpen==='awaited'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Settled, NEFT awaited '+(state.extraOpen==='awaited'?'▾':'▸')+'</div><div class="val '+(awT<0?'prof neg':'')+'">₹'+IN(Math.round(awT))+'</div><div class="lbl">net payout − transferred − pending · click for platform / company</div></div>'; })()
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
       +'<div class="kpi" style="border-color:'+((state.extraOpen==='itc'||state.extraOpen==='gst')?'#1f6feb':'#e5e7eb')+'"><div class="lbl">GST payable (net)</div><div class="val '+(gstNet>0?'prof neg':'prof pos')+'">₹'+IN(Math.round(-gstNet))+'</div>'
@@ -433,6 +425,31 @@
     h+='</tbody></table></div>';
     return h;
   }
+  // Settled in window - transfers in window - pending in window, per platform+company.
+  // Positive = platform ne settle kar diya par NEFT abhi nahi aaya. Negative = is window ke transfers ne window se pehle ke orders bhi pay kiye (timing).
+  function awaitedRows(){
+    const m={}; const g=(pf,co)=>{const k=pf+'|'+co; return m[k]=m[k]||{pf,co,st:0,np:0,sc:0,tr:0,n:0};};
+    for(const r of filteredPay()){const o=g(String(r.platform||'').toLowerCase(),r.company||''); o.st+=(+r.settled||0); o.np+=(+r.net_payout||0); o.sc+=(+r.x_sched||0);}
+    for(const t of extrasFilter((state.extras&&state.extras.transfers)||[])){const o=g(String(t.platform||'').toLowerCase(),t.company||''); o.tr+=(+t.amt||0); o.n+=1;}
+    const out=Object.values(m).map(o=>{o.ded=o.np-o.st; o.trc=o.tr+o.ded; o.aw=o.np-o.trc-o.sc; return o;});
+    return out.filter(o=>Math.round(o.st)||Math.round(o.tr)||Math.round(o.sc)).sort((a,b)=>Math.abs(b.aw)-Math.abs(a.aw));
+  }
+  function awaitedDetailHtml(){
+    const rows=awaitedRows();
+    let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Platform</th><th>Company</th><th>Net payout ₹</th><th>Transferred to bank ₹</th><th>Pending from platform ₹</th><th>Settled, NEFT awaited ₹</th><th>Transfers</th><th>Note</th></tr></thead><tbody>';
+    if(!rows.length) h+='<tr><td colspan="8" class="empty">Nothing in this window.</td></tr>';
+    let T={np:0,trc:0,sc:0,aw:0,n:0};
+    for(const r of rows){
+      T.np+=r.np; T.trc+=r.trc; T.sc+=r.sc; T.aw+=r.aw; T.n+=r.n;
+      const note = r.pf==='firstcry' ? 'FirstCry advice file mein NEFT/UTR column nahi hota — transfer page ko dikhta nahi'
+        : (Math.round(r.aw)<0 ? 'minus: is window ke transfers ne window se pehle ke orders bhi pay kiye (timing)'
+        : (Math.round(r.aw)>0 ? 'settle ho gaya, NEFT/Transaction ID abhi file mein nahi aaya' : '—'));
+      h+='<tr><td>'+esc(r.pf)+'</td><td>'+esc(r.co)+'</td>'+prof(Math.round(r.np))+prof(Math.round(r.trc))+prof(Math.round(r.sc))+prof(Math.round(r.aw))+'<td>'+IN(r.n)+'</td><td style="text-align:left">'+note+'</td></tr>';
+    }
+    if(rows.length) h+='<tr style="font-weight:700;border-top:2px solid #1f6feb"><td>Total</td><td></td>'+prof(Math.round(T.np))+prof(Math.round(T.trc))+prof(Math.round(T.sc))+prof(Math.round(T.aw))+'<td>'+IN(T.n)+'</td><td style="text-align:left">net payout = transferred + pending + awaited</td></tr>';
+    h+='</tbody></table></div>';
+    return h;
+  }
   function pendingDetailHtml(){
     const ex=state.extras||{};
     const rows=extrasFilter(ex.pending_by_day||[]);
@@ -467,6 +484,7 @@
     const k=state.extraOpen;
     if(!k){host.innerHTML="";return;}
     if(k==='pending'){ host.innerHTML=pendingDetailHtml(); return; }
+    if(k==='awaited'){ host.innerHTML=awaitedDetailHtml(); return; }
     if(k==='itc'){ host.innerHTML=itcDetailHtml(); return; }
     if(k==='gst'){ host.innerHTML=gstDetailHtml(); return; }
     const list=extrasFilter(k==='transfer'?state.extras.transfers:state.extras.ads);
