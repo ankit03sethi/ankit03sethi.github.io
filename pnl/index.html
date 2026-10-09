@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-10-08f: "Settled, NEFT awaited" is row-level from payment_awaited_json (settled rows with blank NEFT/Transaction ID; Amazon released after last Transfer; FirstCry flagged no_ref); Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
+<!-- pnl build 2026-10-09a: Settlement shown gross on Amazon (ads/other added back) so Settlement - Ads - Other = Net payout; Net payout card shows the Flipkart ads-wallet (topup vs used) reconciling item; "Settled, NEFT awaited" is row-level from payment_awaited_json (settled rows with blank NEFT/Transaction ID; Amazon released after last Transfer; FirstCry flagged no_ref); Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -295,6 +295,16 @@
     $("#tbodyP").innerHTML=buildBody(cats,tot,cellsPay,false,NCOLS_P);
     renderCards(tot);
   }
+  // Amazon's ads (Cost of Advertising) and other charges are settlement rows, so the RPC's `settled` already has them
+  // taken out. Add them back so Settlement is gross on every platform and Settlement - Ads - Other charges = Net payout.
+  function normalizePay(rows){
+    for(const r of rows){
+      if(String(r.platform||'').toLowerCase()!=='amazon') continue;
+      const a=+r.x_ads||0, o=+r.x_other||0;
+      if(a||o) r.settled=(+r.settled||0)-a-o;
+    }
+    return rows;
+  }
   async function loadPay(){
     const w={mode:state.mode,days:state.days,mfrom:state.mfrom,mto:state.mto};
     const key="p:"+winKey(w);
@@ -302,7 +312,7 @@
     $("#tbodyP").innerHTML='<tr><td colspan="'+NCOLS_P+'" class="empty"><span class="spin"></span> loading…</td></tr>';
     try{
       const {data,error}=await sb.rpc("category_pnl_pay_json",argsForWin(w));
-      state.payRows=(!error&&Array.isArray(data))?data:[];
+      state.payRows=normalizePay((!error&&Array.isArray(data))?data:[]);
       if(!error) cache[key]=state.payRows;
     }catch(e){state.payRows=[];}
     try{ // settled rows whose NEFT / Transaction ID is not in the file yet (same window)
@@ -342,7 +352,9 @@
       +card("Ads",tot.x_ads,(um.x_ads?'₹'+IN(Math.round(-um.x_ads))+' not mapped to any SKU':'all mapped to SKUs'))
       +card("Other charges",tot.x_other,'fines, storage…'+(um.x_other?' · ₹'+IN(Math.round(-um.x_other))+' unmapped':''));
     const host=$("#costCards"); if(host) host.innerHTML=
-      card("Net payout",tot.net_payout,all,'prof pos')
+      (function(){ const wallet=(tot.net_payout||0)-((tot.settled||0)+(tot.x_ads||0)+(tot.x_other||0));
+        return '<div class="kpi"><div class="lbl">Net payout</div><div class="val prof pos">\u20b9'+IN(Math.round(tot.net_payout||0))+'</div><div class="lbl">'+all+'</div>'
+          +'<div class="lbl" style="margin-top:4px">= settlement \u2212 ads \u2212 other charges'+(Math.round(wallet)?' '+(wallet<0?'\u2212':'+')+' <b>\u20b9'+IN(Math.abs(Math.round(wallet)))+'</b> Flipkart ads wallet (topup vs used)':'')+'</div></div>'; })()
       +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · exact bank credits · click for list</div></div>'
 
       +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
