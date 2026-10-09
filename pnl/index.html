@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-10-09a: Settlement shown gross on Amazon (ads/other added back) so Settlement - Ads - Other = Net payout; Net payout card shows the Flipkart ads-wallet (topup vs used) reconciling item; "Settled, NEFT awaited" is row-level from payment_awaited_json (settled rows with blank NEFT/Transaction ID; Amazon released after last Transfer; FirstCry flagged no_ref); Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
+<!-- pnl build 2026-10-09b: FirstCry excluded from the NEFT-awaited total (shown as info only); Settlement shown gross on Amazon (ads/other added back) so Settlement - Ads - Other = Net payout; Net payout card shows the Flipkart ads-wallet (topup vs used) reconciling item; "Settled, NEFT awaited" is row-level from payment_awaited_json (settled rows with blank NEFT/Transaction ID; Amazon released after last Transfer; FirstCry flagged no_ref); Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -359,9 +359,9 @@
 
       +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
 
-      +(function(){ const aw=awaitedRows(); const awT=aw.reduce((a,r)=>a+(+r.amt||0),0), awN=aw.reduce((a,r)=>a+(+r.n||0),0), fc=aw.filter(r=>r.no_ref).reduce((a,r)=>a+(+r.amt||0),0);
+      +(function(){ const all_=awaitedRows(), aw=all_.filter(r=>!r.no_ref); const awT=aw.reduce((a,r)=>a+(+r.amt||0),0), awN=aw.reduce((a,r)=>a+(+r.n||0),0), fc=all_.filter(r=>r.no_ref).reduce((a,r)=>a+(+r.amt||0),0);
           return '<div class="kpi" data-x="awaited" style="cursor:pointer;border-color:'+(state.extraOpen==='awaited'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Settled, NEFT awaited '+(state.extraOpen==='awaited'?'\u25be':'\u25b8')+'</div><div class="val">\u20b9'+IN(Math.round(awT))+'</div><div class="lbl">'+IN(awN)+' lines \u00b7 settled but NEFT / Transaction ID not in file yet \u00b7 click</div>'
-            +(Math.round(fc)?'<div class="lbl" style="margin-top:4px">incl. FirstCry <b>\u20b9'+IN(Math.round(fc))+'</b> (file mein NEFT info nahi hoti)</div>':'')+'</div>'; })()
+            +(Math.round(fc)?'<div class="lbl" style="margin-top:4px">FirstCry <b>\u20b9'+IN(Math.round(fc))+'</b> not counted \u2014 advice file mein NEFT info nahi hoti</div>':'')+'</div>'; })()
       +card("Cost of product (COP)",-tot.cop,UU(tot.delivered_units)+' delivered')
       +card("Packaging",-tot.packaging,O(tot.ship_orders)+' shipped')
       +'<div class="kpi" style="border-color:'+((state.extraOpen==='itc'||state.extraOpen==='gst')?'#1f6feb':'#e5e7eb')+'"><div class="lbl">GST payable (net)</div><div class="val '+(gstNet>0?'prof neg':'prof pos')+'">₹'+IN(Math.round(-gstNet))+'</div>'
@@ -453,9 +453,9 @@
     const rows=awaitedRows();
     let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Platform</th><th>Company</th><th>Lines</th><th>Amount \u20b9</th><th>Payment dates</th><th>Kyun awaited</th></tr></thead><tbody>';
     if(!rows.length) h+='<tr><td colspan="6" class="empty">Is window mein kuch awaited nahi \u2014 har settled line ka NEFT / Transaction ID file mein hai.</td></tr>';
-    let T={n:0,amt:0};
+    let T={n:0,amt:0}, FC={n:0,amt:0};
     for(const r of rows){
-      T.n+=(+r.n||0); T.amt+=(+r.amt||0);
+      if(r.no_ref){ FC.n+=(+r.n||0); FC.amt+=(+r.amt||0); } else { T.n+=(+r.n||0); T.amt+=(+r.amt||0); }
       const pf=String(r.platform||'').toLowerCase();
       const note = r.no_ref ? 'FirstCry advice file mein NEFT/UTR column hota hi nahi \u2014 page nahi jaan sakta kab paisa aaya'
         : pf==='meesho' ? 'file mein "settled" hai par Transaction ID khali \u2014 Meesho ne NEFT abhi release nahi kiya'
@@ -464,7 +464,8 @@
         : '\u2014';
       h+='<tr><td>'+esc(pf)+'</td><td>'+esc(r.company||'')+'</td><td>'+IN(+r.n||0)+'</td>'+prof(Math.round(+r.amt||0))+'<td>'+esc(r.d1||'')+' \u2192 '+esc(r.d2||'')+'</td><td style="text-align:left">'+note+'</td></tr>';
     }
-    if(rows.length) h+='<tr style="font-weight:700;border-top:2px solid #1f6feb"><td>Total</td><td></td><td>'+IN(T.n)+'</td>'+prof(Math.round(T.amt))+'<td></td><td style="text-align:left">= Settled, NEFT awaited card</td></tr>';
+    if(rows.length) h+='<tr style="font-weight:700;border-top:2px solid #1f6feb"><td>Total</td><td></td><td>'+IN(T.n)+'</td>'+prof(Math.round(T.amt))+'<td></td><td style="text-align:left">= Settled, NEFT awaited card (FirstCry excluded)</td></tr>';
+    if(FC.n) h+='<tr style="font-weight:700"><td>FirstCry</td><td></td><td>'+IN(FC.n)+'</td>'+prof(Math.round(FC.amt))+'<td></td><td style="text-align:left">not counted \u2014 paid or not, file se pata nahi chalta</td></tr>';
     h+='</tbody></table></div>';
     return h;
   }
