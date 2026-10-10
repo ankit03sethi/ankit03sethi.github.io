@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-10a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-10b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -373,6 +373,12 @@
     .edcell .edin.set { background:#eff6ff; }
     .edcell .edin.dirty { background:#fef3c7 !important; border-color:#f59e0b; }
     .edcell .edin:not(.locked) { border-color:#93c5fd; box-shadow:0 0 0 2px #dbeafe; }
+    /* Priority: an always-open select that saves the moment you pick (no pencil, no Save). */
+    .edcell select.prio { font:inherit; padding:2px 4px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:inherit; text-align:center; cursor:pointer; }
+    .edcell select.prio.set { background:#eff6ff; }
+    .edcell select.prio.saving { opacity:.6; }
+    .edcell select.prio.saved { border-color:#16a34a; box-shadow:0 0 0 2px #dcfce7; }
+    .edcell select.prio.failed { border-color:#dc2626; box-shadow:0 0 0 2px #fee2e2; }
     .edpen { border:0; background:none; cursor:pointer; color:#94a3b8; padding:0 3px; font-size:13px; line-height:1; vertical-align:middle; }
     .edpen:hover { color:#1d4ed8; }
   </style>
@@ -1079,6 +1085,25 @@
   }
   tableWrapEl.addEventListener("input", (e) => { const ctl = e.target.closest(".edin"); if (ctl && ctl.tagName === "INPUT") noteEdit(ctl, false); });
   tableWrapEl.addEventListener("change", (e) => { const ctl = e.target.closest(".edin"); if (ctl) noteEdit(ctl, true); });
+  // Priority saves the moment it is picked - this row only, blank clears it.
+  tableWrapEl.addEventListener("change", async (e) => {
+    const sel = e.target.closest ? e.target.closest("select.prio") : null; if (!sel) return;
+    if (window.CA && CA.access && !CA.can("skuwise.sku_master", "edit")) { alert("No edit permission."); return; }
+    const id = sel.dataset.id, val = String(sel.value || "");
+    sel.classList.remove("saved", "failed"); sel.classList.add("saving");
+    try {
+      const { error } = await sb.rpc("sku_master_set_tag_scope", { p_id: Number(id), p_key: "Priority", p_value: val, p_scope: "single", p_platform: "all", p_company: "all", p_match: ["master"] });
+      if (error) throw error;
+      const r = state.rowsById.get(String(id));
+      if (r) { const ld = Object.assign({}, r.listing_data || {}); if (val === "") delete ld.Priority; else ld.Priority = val; r.listing_data = ld; }
+      sel.classList.toggle("set", !!val);
+      sel.classList.remove("saving"); sel.classList.add("saved");
+      setTimeout(() => sel.classList.remove("saved"), 1200);
+    } catch (err) {
+      sel.classList.remove("saving"); sel.classList.add("failed");
+      alert("Priority save failed: " + (err && err.message ? err.message : err));
+    }
+  });
   // Save asks the scope first. "This row only" writes just the edited listing.
   // "Bulk" writes every listing that matches the ticked dimensions (Master SKU,
   // Sub Category, Product, Color - one or more, taken from the edited row) within
@@ -3075,6 +3100,12 @@
       }
       // Row Color: filled by paintFocus once the row's colour class is known.
       if (c === "Row Color") return '<td style="font-weight:700;color:#64748b">White</td>';
+      // Priority: blank by default; picking a number saves at once (no pencil, no Save button).
+      if (c === "Priority") {
+        const cur = String((r.listing_data || {})[c] || "");
+        const o = [""].concat(TAG_COLS[c]).map(x => `<option value="${x}"${x === cur ? " selected" : ""}>${x || "\u2014"}</option>`).join("");
+        return `<td class="edcell"><select class="prio${cur ? " set" : ""}" data-col="Priority" data-id="${r.id}">${o}</select></td>`;
+      }
       // Return cost per order: the return charges the platform actually billed
       // over the last 90 days (RTO excluded), spread across Net sales (the units
       // that stayed sold = sold minus returned) - the same 90d Net sales figure
@@ -4894,7 +4925,7 @@
       if(!td){ for(k=0;k<n;k++) out.push(''); return out; }
       var wv=td.querySelectorAll('.wgrid > .wv');
       if(wv.length){ for(k=0;k<n;k++) out.push(wv[k]?num(txt(wv[k])):''); return out; }
-      var sel=td.querySelector('select.edin');
+      var sel=td.querySelector('select.edin, select.prio');
       if(sel){ var sv=String(sel.value||'').trim(); out.push(sv==='No'?'':sv); }
       else{
         var inp=td.querySelector('input.edin');
