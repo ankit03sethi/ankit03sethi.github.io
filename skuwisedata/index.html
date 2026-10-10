@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-08a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-10a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -689,7 +689,8 @@
   // The dropdown columns after Color. Each cell holds one of these or nothing.
   // 2026-09-25: Advertising - your own Yes / No mark per listing (after Focus).
   // Saved in listing_data like the other tags; filter it from the column header.
-  const TAG_COLS = { "Advertising": ["Yes", "No"] };   // MOQ moved to the typed columns (site value wins)
+  // 2026-10-10: Priority - your own 1..10 pick per listing (after Advertising). Same save/filter path.
+  const TAG_COLS = { "Advertising": ["Yes", "No"], "Priority": ["1","2","3","4","5","6","7","8","9","10"] };   // MOQ moved to the typed columns (site value wins)
   // 2026-09-26: these master text columns filter IN THE DATABASE. The dropdown
   // lists every value the account has (sku_master_col_values), not just the
   // rows already loaded, and picking one reloads the table with the matches.
@@ -2586,7 +2587,11 @@
       // rate. The cash block above answers all of it from money that actually
       // moved, so keeping both only invited reading the guess by mistake.
       "Focus",
-      "Advertising"
+      "Advertising",
+      // 2026-10-10: Priority (1-10 pick) and Row Color (the row's colour name in the
+      // active timeframe: Red / Green / Light Green / Orange / White - filled by paintFocus).
+      "Priority",
+      "Row Color"
   ];
 
   function renderTable(rows, startIndex, rowsOnly) {
@@ -3068,6 +3073,8 @@
         const on = state.focusedKeys && state.focusedKeys.has(wcKey(r.company_name, r.platform, r.seller_sku));
         return on ? '<td style="font-weight:700;color:#166534">Focused</td>' : "<td></td>";
       }
+      // Row Color: filled by paintFocus once the row's colour class is known.
+      if (c === "Row Color") return '<td style="font-weight:700;color:#64748b">White</td>';
       // Return cost per order: the return charges the platform actually billed
       // over the last 90 days (RTO excluded), spread across Net sales (the units
       // that stayed sold = sold minus returned) - the same 90d Net sales figure
@@ -3580,6 +3587,7 @@
       const floatOn = !!(ss && (ss.key === "d30" || ss.key === "d60" || ss.key === "d90"));
       const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col);
       const fi = heads.indexOf("Focus");
+      const rci = heads.indexOf("Row Color");
       for (const tr of table.tBodies[0].rows) {
         tr.classList.remove("row-green", "row-lgreen", "row-orange", "row-red");
         const r = state.rowsById.get(String(tr.dataset.id));
@@ -3608,6 +3616,15 @@
           const on = state.focusedKeys.has(key);   // Focus column stays permanent (green in any timeframe ever)
           tr.cells[fi].textContent = on ? "Focused" : "";
           tr.cells[fi].style.cssText = on ? "font-weight:700;color:#166534" : "";
+        }
+        if (rci >= 0 && tr.cells[rci]) {
+          // Row Color column = the colour this row carries in the active timeframe.
+          const nm = tr.classList.contains("row-red") ? ["Red", "#b91c1c"]
+                   : tr.classList.contains("row-lgreen") ? ["Green", "#15803d"]
+                   : tr.classList.contains("row-green") ? ["Light Green", "#16a34a"]
+                   : tr.classList.contains("row-orange") ? ["Orange", "#c2410c"] : ["White", "#64748b"];
+          tr.cells[rci].textContent = nm[0];
+          tr.cells[rci].style.cssText = "font-weight:700;color:" + nm[1];
         }
       }
     } catch (e) { /* best-effort, never block the table */ }
@@ -4224,6 +4241,8 @@
     "Link": "Opens the live listing.",
     "Focus": "Your own flag. Nothing is calculated from it.",
     "Advertising": "Your own Yes / No mark: is this listing being advertised? Click the pencil, pick, then Save. Filter the column from its header.",
+    "Priority": "Your own 1-10 pick per listing. Click the pencil, pick, then Save. Filter the column from its header.",
+    "Row Color": "The colour this row carries in the active timeframe (Sold sort 30/60/90): Red = green gone cold (0 in 3 days), Green = at threshold and trending up over 7 days, Light Green = at threshold, flat/down, Orange = focused before but below threshold now, White = none.",
 
     "Settle/unit": "Average money the platform has paid you per unit, across every paid order. Fees already taken out.",
     "Last 3 Settle": "Same thing but only the 3 most recent paid orders. Green means it meets Expected Settlement, red means short.",
