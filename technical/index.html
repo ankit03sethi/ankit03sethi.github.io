@@ -185,7 +185,7 @@ async function loadCustomers() {
   main.innerHTML = `<div class="loading">Loading customers…</div>`;
   whoBox.innerHTML = `Admin: <b>${esc(adminEmail)}</b> <button id="logoutBtn">Sign Out</button>`;
   document.getElementById("logoutBtn").addEventListener("click", async () => {
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: "local" });
     sessionStorage.removeItem("pd_admin_impersonation");
     sessionStorage.removeItem("pd_admin_backup_session");
     renderLogin();
@@ -200,7 +200,7 @@ async function loadCustomers() {
       const txt = await resp.text();
       if (resp.status === 403) {
         main.innerHTML = `<div class="login-card"><h1>⛔ Access Denied</h1><div class="sub">Your account (<b>${esc(adminEmail)}</b>) is not in the admin list. If this is wrong, contact the project owner.</div><button class="primary" id="logoutBtn2">Sign Out</button></div>`;
-        document.getElementById("logoutBtn2").addEventListener("click", async () => { await sb.auth.signOut(); renderLogin(); });
+        document.getElementById("logoutBtn2").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); renderLogin(); });
         return;
       }
       throw new Error(txt || "Failed to load customers");
