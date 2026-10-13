@@ -70,7 +70,7 @@ async function onLogin(e) {
 }
 
 async function onSignOut() {
-  await sb.auth.signOut();
+  await sb.auth.signOut({ scope: "local" });
   hide($("#dashView"));
   hide($("#denyView"));
   show($("#loginView"));
