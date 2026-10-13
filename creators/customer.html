@@ -197,7 +197,7 @@
     $("#emailChip").classList.remove("hidden");
     $("#emailChip").textContent = session.user.email;
     $("#signOutBtn").classList.remove("hidden");
-    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); });
 
     const { data: jobs } = await sb.from("cc_jobs").select("*, cc_job_lines(*)").order("created_at", { ascending: false });
     renderJobs(jobs);
