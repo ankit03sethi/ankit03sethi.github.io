@@ -4,20 +4,19 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>cursive &mdash; Balloons &amp; Party Décor by Cursive Private Limited</title>
-<meta name="description" content="Cursive Private Limited, New Delhi — foil balloons, latex balloons, balloon boxes and party decoration supplies. Sold under the cursive® brand on Flipkart, Amazon, Meesho, Myntra and FirstCry." />
+<meta name="description" content="Cursive Private Limited, New Delhi — foil balloons, latex balloons, balloon boxes and party decoration supplies, sold under the cursive® brand on Flipkart, Amazon, Meesho, Myntra and FirstCry." />
 <link rel="canonical" href="https://cursive.world/" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/><polyline points='42 18 54 18 54 30' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
-  :root { --ink:#1b2430; --muted:#5b6675; --line:#e6e9ee; --bg:#ffffff; --soft:#f6f8fb; --accent:#1f6feb; --accent-2:#e8457a; --gold:#d4a017; }
+  :root { --ink:#1b2430; --muted:#5b6675; --line:#e6e9ee; --bg:#ffffff; --soft:#f6f8fb; --accent:#1f6feb; --accent-2:#e8457a; }
   * { box-sizing:border-box; }
   html, body { margin:0; padding:0; }
   body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--ink); background:var(--bg); line-height:1.55; }
   a { color:inherit; }
   .container { max-width:1120px; margin:0 auto; padding:0 20px; }
-  /* nav */
   .nav { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px; flex-wrap:wrap; }
   .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
   .brand-box { width:44px; height:44px; border-radius:12px; background:var(--accent); display:grid; place-items:center; flex:0 0 auto; }
@@ -25,10 +24,9 @@
   .wordmark sup { font-family:Inter, sans-serif; font-size:12px; margin-left:2px; }
   .brand-sub { font-size:12px; color:var(--muted); margin-top:2px; letter-spacing:.02em; }
   .links { display:flex; gap:8px; flex-wrap:wrap; }
-  .btn { display:inline-block; padding:10px 16px; border-radius:10px; text-decoration:none; font-weight:600; font-size:14px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  .btn { display:inline-block; padding:10px 16px; border-radius:10px; text-decoration:none; font-weight:600; font-size:14px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
   .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
   .btn.pink { background:var(--accent-2); color:#fff; border-color:var(--accent-2); }
-  /* hero */
   .hero { padding:36px 0 28px; display:grid; grid-template-columns:1.1fr .9fr; gap:32px; align-items:center; }
   .eyebrow { font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-2); }
   h1 { font-size:44px; line-height:1.1; margin:10px 0 14px; letter-spacing:-.02em; text-wrap:balance; }
@@ -37,7 +35,6 @@
   .chip { font-size:13px; font-weight:600; padding:7px 12px; border-radius:999px; background:var(--soft); border:1px solid var(--line); }
   .hero-art { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
   .hero-art img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:16px; border:1px solid var(--line); background:var(--soft); }
-  /* sections */
   section { padding:34px 0; }
   .section-head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:18px; flex-wrap:wrap; }
   h2 { font-size:26px; margin:0; letter-spacing:-.01em; }
@@ -56,8 +53,6 @@
   .facts { display:grid; gap:10px; font-size:14px; }
   .facts div { background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
   .facts b { display:block; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
-  .services-strip { border:1px dashed var(--line); border-radius:16px; padding:18px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-  .services-strip p { margin:0; color:var(--muted); font-size:14px; max-width:70ch; }
   footer { border-top:1px solid var(--line); padding:26px 0 40px; margin-top:20px; font-size:13px; color:var(--muted); }
   footer .cols { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:18px; }
   footer a { color:var(--muted); }
@@ -73,9 +68,9 @@
 </style>
 </head>
 <body>
-<div class="container">
+<div class="container" id="top">
   <nav class="nav">
-    <a href="/" class="brand" aria-label="cursive home">
+    <a href="#top" class="brand" aria-label="cursive home">
       <div class="brand-box"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg></div>
       <div>
         <div class="wordmark">cursive<sup>&reg;</sup></div>
@@ -84,10 +79,8 @@
     </a>
     <div class="links">
       <a class="btn" href="#products">Products</a>
-      <a class="btn" href="#about">About us</a>
-      <a class="btn" href="/products/">B2B catalogue</a>
-      <a class="btn" href="/services/">Seller services</a>
-      <a class="btn primary" href="/home/">Sign in</a>
+      <a class="btn" href="#where">Where to buy</a>
+      <a class="btn primary" href="#about">About us</a>
     </div>
   </nav>
 
@@ -105,25 +98,25 @@
       </div>
     </div>
     <div class="hero-art" aria-hidden="true">
-      <img src="https://bttppihskbfmxwujyztj.supabase.co/storage/v1/object/public/catalog-images/product/1788000258748-gdttofgp.jpg" alt="Gold number foil balloons" loading="eager" />
-      <img src="https://i.postimg.cc/vmKpDQ6m/0-5.jpg" alt="Purple number foil balloon set with crown and bow" loading="lazy" />
-      <img src="https://i.postimg.cc/W4RM8DQD/image.jpg" alt="Red number foil balloon" loading="lazy" />
-      <img src="https://bttppihskbfmxwujyztj.supabase.co/storage/v1/object/public/catalog-images/product/1788003488315-pfj992yu.jpg" alt="Blue number foil balloon" loading="lazy" />
+      <img onerror="this.style.visibility='hidden'" src="https://bttppihskbfmxwujyztj.supabase.co/storage/v1/object/public/catalog-images/product/1788000258748-gdttofgp.jpg" alt="Gold number foil balloons" loading="eager" />
+      <img onerror="this.style.visibility='hidden'" src="https://i.postimg.cc/vmKpDQ6m/0-5.jpg" alt="Purple number foil balloon set with crown and bow" loading="lazy" />
+      <img onerror="this.style.visibility='hidden'" src="https://i.postimg.cc/W4RM8DQD/image.jpg" alt="Red number foil balloon" loading="lazy" />
+      <img onerror="this.style.visibility='hidden'" src="https://bttppihskbfmxwujyztj.supabase.co/storage/v1/object/public/catalog-images/product/1788003488315-pfj992yu.jpg" alt="Blue number foil balloon" loading="lazy" />
     </div>
   </section>
 
   <section id="products">
-    <div class="section-head"><h2>What we make and sell</h2><a class="btn" href="/products/">Full B2B catalogue &rarr;</a></div>
+    <div class="section-head"><h2>What we make and sell</h2></div>
     <div class="grid">
       <div class="card"><h3>Number &amp; letter foil balloons</h3><p>32-inch number balloons in gold, rose gold, silver, blue, pink, black, red, green, purple, white and multishade. Sets with crown &amp; bow.</p></div>
       <div class="card"><h3>Balloon boxes &amp; décor kits</h3><p>ONE / TWO / LOVE / BABY balloon boxes in white, pink and blue; birthday and baby-shower decoration combos packed per order.</p></div>
       <div class="card"><h3>Latex balloons &amp; accessories</h3><p>Pastel, metallic and chrome latex packs, balloon pumps, arch strips, glue dots, ribbons and confetti.</p></div>
     </div>
     <div class="products" style="margin-top:16px">
-      <div class="product"><img src="https://bttppihskbfmxwujyztj.supabase.co/storage/v1/object/public/catalog-images/product/1788000267423-hdlrfjcs.jpg" alt="Gold foil balloon" loading="lazy" /><div>Gold 32&Prime; number foil</div></div>
-      <div class="product"><img src="https://i.postimg.cc/tgL0kHbV/0-(3).jpg" alt="Green foil balloon" loading="lazy" /><div>Green 32&Prime; number foil</div></div>
-      <div class="product"><img src="https://i.postimg.cc/KkQYTjgn/23.jpg" alt="Black foil balloon" loading="lazy" /><div>Black 32&Prime; number foil</div></div>
-      <div class="product"><img src="https://i.postimg.cc/N0nWLgrT/0b.jpg" alt="Number balloon set with crown and bow" loading="lazy" /><div>Number set with crown &amp; bow</div></div>
+      <div class="product"><img onerror="this.closest('.product').style.display='none'" src="https://bttppihskbfmxwujyztj.supabase.co/storage/v1/object/public/catalog-images/product/1788000267423-hdlrfjcs.jpg" alt="Gold number foil balloon" loading="lazy" /><div>Gold 32&Prime; number foil</div></div>
+      <div class="product"><img onerror="this.closest('.product').style.display='none'" src="https://i.postimg.cc/N0nWLgrT/0b.jpg" alt="Purple number foil balloon set" loading="lazy" /><div>Number set with crown &amp; bow</div></div>
+      <div class="product"><img onerror="this.closest('.product').style.display='none'" src="https://i.postimg.cc/KkQYTjgn/23.jpg" alt="Black number foil balloon" loading="lazy" /><div>Black 32&Prime; number foil</div></div>
+      <div class="product"><img onerror="this.closest('.product').style.display='none'" src="https://i.postimg.cc/5tw8R4Vv/0b.jpg" alt="Red number foil balloon" loading="lazy" /><div>Red 32&Prime; number foil</div></div>
     </div>
   </section>
 
@@ -132,14 +125,14 @@
     <div class="marketplaces">
       <div class="mp">Flipkart</div><div class="mp">Amazon.in</div><div class="mp">Meesho</div><div class="mp">Myntra</div><div class="mp">FirstCry</div>
     </div>
-    <p style="color:var(--muted); font-size:14px; margin:12px 0 0">Search for <b>cursive</b> or <b>Shopperskart</b> balloons on any of these marketplaces. For bulk orders, event decorators and resellers, write to <a href="mailto:contact@cursive.world">contact@cursive.world</a>.</p>
+    <p style="color:var(--muted); font-size:14px; margin:12px 0 0">Search for <b>cursive</b> balloons on any of these marketplaces. For bulk orders, event decorators and resellers, write to <a href="mailto:contact@cursive.world">contact@cursive.world</a>.</p>
   </section>
 
   <section id="about">
     <div class="about">
       <div>
         <h2 style="margin-bottom:10px">About Cursive Private Limited</h2>
-        <p>We are a New Delhi based company that sells balloons and party decoration products online under the <b>cursive&reg;</b> brand (a registered trademark) and the Shopperskart storefront. Every order is packed at our own warehouse in Hari Nagar and handed to marketplace courier partners the same day.</p>
+        <p>We are a New Delhi based company that sells balloons and party decoration products online under the <b>cursive&reg;</b> brand, a registered trademark. Every order is packed at our own warehouse in Hari Nagar and handed to marketplace courier partners the same day.</p>
         <p>Our in-house team manages listings, stock, pricing and settlements for our own marketplace accounts using software we built for ourselves, so customers get accurate stock and fast dispatch.</p>
       </div>
       <div class="facts">
@@ -147,15 +140,8 @@
         <div><b>Based in</b>Hari Nagar, New Delhi 110064</div>
         <div><b>Email</b><a href="mailto:contact@cursive.world">contact@cursive.world</a></div>
         <div><b>Phone / WhatsApp</b><a href="tel:+919625737475">+91 96257 37475</a></div>
-        <div><b>Brand</b>cursive&reg; &middot; Shopperskart</div>
+        <div><b>Brand</b>cursive&reg;</div>
       </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="services-strip">
-      <p><b>Also from Cursive:</b> we help other Indian sellers get started &mdash; GST, trademark, Udyam, IEC, marketplace account opening, product imaging and listings.</p>
-      <a class="btn primary" href="/services/">Seller services &rarr;</a>
     </div>
   </section>
 </div>
@@ -171,14 +157,12 @@
       <div>
         <div><b>Shop</b></div>
         <div><a href="#products">Products</a></div>
-        <div><a href="/products/">B2B catalogue</a></div>
         <div><a href="#where">Where to buy</a></div>
       </div>
       <div>
         <div><b>Company</b></div>
         <div><a href="#about">About us</a></div>
-        <div><a href="/services/">Seller services</a></div>
-        <div><a href="/home/">Sign in</a></div>
+        <div><a href="mailto:contact@cursive.world">Contact</a></div>
       </div>
     </div>
     <div style="margin-top:16px">&copy; <span id="yr"></span> Cursive Private Limited. cursive&reg; is a registered trademark. All product names and images are our own.</div>
