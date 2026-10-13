@@ -409,7 +409,7 @@ function wireUI() {
     renderGrid();
   });
   $("#signOutBtn").addEventListener("click", async () => {
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: "local" });
     location.reload();
   });
   $("#loginForm").addEventListener("submit", async (e) => {
