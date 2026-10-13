@@ -560,8 +560,8 @@ $("#loginBtn").addEventListener("click", async () => {
 $("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
 $("#loginEmail").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginPass").focus(); });
 
-$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refresh(); });
-$("#noPermSignOut").addEventListener("click", async () => { await sb.auth.signOut(); await refresh(); });
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); await refresh(); });
+$("#noPermSignOut").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); await refresh(); });
 
 // Initial render of role/service checkbox groups
 renderRoleChecks($("#rolesBox"), []);
