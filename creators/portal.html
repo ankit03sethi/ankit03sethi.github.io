@@ -100,7 +100,7 @@
     $("#dash").classList.remove("hidden");
     $("#signOutBtn").classList.remove("hidden");
     $("#signOutBtn").addEventListener("click", async () => {
-      await sb.auth.signOut();
+      await sb.auth.signOut({ scope: "local" });
       window.location.href = "/creators/";
     });
 
