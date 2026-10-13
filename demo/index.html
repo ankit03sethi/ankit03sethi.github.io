@@ -68,7 +68,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSessio
   try {
     // Always sign out any existing session first so the customer sees a clean demo
     // (in case they were previously signed in with their own account)
-    try { await sb.auth.signOut(); } catch (e) {}
+    try { await sb.auth.signOut({ scope: "local" }); } catch (e) {}
 
     // Clear any leftover demo state from previous visits (per-browser localStorage)
     try { localStorage.removeItem("cw_demo_state_v1"); } catch (e) {}
