@@ -173,7 +173,7 @@ async function onSetPassword(e) {
 }
 
 async function onSignOut() {
-  await sb.auth.signOut();
+  await sb.auth.signOut({ scope: "local" });
   // onAuthStateChange routes us back to login
 }
 
