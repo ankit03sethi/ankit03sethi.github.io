@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Home &middot; Cursive</title><link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#1f6feb">
+  <title>Home &middot; Cursive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
@@ -102,7 +102,6 @@
     </div>
   </a>
   <div class="topbar-right">
-    <a id="employeesChip" href="/uploads/#employees" class="email-chip hidden" style="cursor:pointer;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;text-decoration:none;" title="Give your staff a login and choose what each may see or change">&#128101; Employees</a>
     <button id="cartChip" type="button" class="email-chip" style="cursor:pointer;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px;opacity:0.75;" title="View cart">
       &#128722; Cart <span id="cartCount" style="background:#92400e;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;min-width:18px;text-align:center;">0</span>
     </button>
@@ -577,12 +576,6 @@ async function showHome(session) {
     location.href = ret;
     return;
   }
-  // Employee logins (Cursive Analyst) go straight to the Analyst hub — the home dashboard is the owner's.
-  try {
-    const { data: acc } = await sb.rpc("my_access");
-    if (acc && acc.is_owner === false) { location.href = "/analyst/"; return; }
-    if (acc && acc.is_owner) show($("#employeesChip"));
-  } catch (_) { /* not an employee */ }
   hide($("#loginView")); show($("#homeView"));
   $("#emailChip").textContent = session.user.email;
   show($("#emailChip"));
@@ -692,7 +685,7 @@ $("#password").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.p
 $("#email").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doLogin(); } });
 
 async function doSignOut() {
-  await sb.auth.signOut();
+  await sb.auth.signOut({ scope: "local" });
   location.reload();
 }
 $("#topSignOutBtn")?.addEventListener("click", doSignOut);
