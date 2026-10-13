@@ -347,18 +347,6 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const fmt = p => "₹" + (p/100).toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "";
 
-// 2026-09-10: names and emails are stored in CAPITALS (policy 2026-08-21), but a
-// lead's email arrives in lowercase and the old guard only rejected it - so a
-// quote made from a website lead could never be saved. Now the field is simply
-// converted to capitals in place, at prefill, while typing and on save.
-function upcaseInput(input) {
-  if (!input) return;
-  const v = input.value || "";
-  if (!/[a-z]/.test(v)) return;
-  const a = input.selectionStart, b = input.selectionEnd;
-  input.value = v.toUpperCase();
-  try { if (a != null) input.setSelectionRange(a, b); } catch {}
-}
 function toast(msg, isErr) {
   const t = document.createElement("div");
   t.className = "toast" + (isErr ? " err" : "");
@@ -391,12 +379,9 @@ async function refreshSession() {
     $("#signOutBtn").classList.remove("hidden");
     // Fetch the signed-in user's employee identity so we can auto-fill #empCode
     // on any NEW quotation the user creates (and prevent hand-typed impersonation).
-    // 2026-09-10: the three loads used to run one after another (~4-5 s of
-    // edge-function round trips before the quote form could open). Now they
-    // run together, and when the page was opened from a lead's Send Quote
-    // button the list is not fetched at all - the Back button loads it.
-    const fromLead = new URLSearchParams(location.search).get("new") === "1";
-    await Promise.all([loadMyIdentity(), loadCatalogOptions(), fromLead ? Promise.resolve() : loadList()]);
+    await loadMyIdentity();
+    await loadList();
+    await loadCatalogOptions();
   } else {
     $("#loginPanel").classList.remove("hidden");
     $("#app").classList.add("hidden");
@@ -414,7 +399,7 @@ $("#loginBtn").addEventListener("click", async () => {
   $("#loginErr").style.display = "none";
   await refreshSession();
 });
-$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refreshSession(); });
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); await refreshSession(); });
 $("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
 
 // ============ WHOAMI (fetch signed-in user's employee identity) ============
@@ -438,9 +423,6 @@ async function loadMyIdentity() {
     _me = null;
     _meIsFallback = true;
   }
-  // A new-quote form opened from a lead may already be on screen: fill the
-  // employee code now that we know who is signed in.
-  if (!_currentQuote && !$("#builderView").classList.contains("hidden")) applyMyIdentityToEmpCode();
 }
 
 // Apply _me to the #empCode field (called by openBuilder for NEW quotes only).
@@ -767,7 +749,6 @@ async function openContactEditor(quoteId) {
     const saveAllBtn = document.getElementById("qcSaveAll");
     const msg = document.getElementById("qcMsg");
     const recompute = () => {
-      upcaseInput(input);
       const v = (input.value || "").trim();
       const bad = /[a-z]/.test(v);
       if (bad) {
@@ -838,9 +819,15 @@ async function openContactEditor(quoteId) {
 
   const doSave = async (id, btn) => {
     const input = document.getElementById(id + "Input");
-    if (id === "qcName" || id === "qcEmail") upcaseInput(input);
     const raw = (input.value || "").trim();
     if (!raw) return;
+    // Names AND emails must be typed in ALL CAPITAL letters (policy 2026-08-21).
+    if ((id === "qcName" || id === "qcEmail") && /[a-z]/.test(raw)) {
+      const msg = document.getElementById("qcMsg");
+      msg.style.color = "#dc2626";
+      msg.textContent = (id === "qcEmail" ? "Email" : "Name") + " must be in CAPITAL letters. Please retype in ALL CAPS.";
+      return;
+    }
     const nextCustomer = {
       name:  id === "qcName"  ? raw : (q.customer_name  || ""),
       email: id === "qcEmail" ? raw : (q.customer_email || ""), // preserve CAPS as typed
@@ -893,13 +880,15 @@ async function openContactEditor(quoteId) {
   document.getElementById("qcSaveAll").addEventListener("click", async () => {
     const msg = document.getElementById("qcMsg");
     msg.textContent = ""; msg.style.color = "";
-    upcaseInput(document.getElementById("qcNameInput"));
-    upcaseInput(document.getElementById("qcEmailInput"));
     const getVal = (id) => (document.getElementById(id + "Input")?.value || "").trim();
     const nameV = getVal("qcName");
     const emailV = getVal("qcEmail");
     const phoneV = getVal("qcPhone");
     const gstV = getVal("qcGst");
+    const errs = [];
+    if (nameV && /[a-z]/.test(nameV)) errs.push("Name must be in CAPITAL letters.");
+    if (emailV && /[a-z]/.test(emailV)) errs.push("Email must be in CAPITAL letters.");
+    if (errs.length) { msg.style.color = "#dc2626"; msg.textContent = errs.join(" "); return; }
     if (!nameV && !emailV && !phoneV && !gstV) {
       msg.style.color = "#64748b"; msg.textContent = "Nothing to save — type into at least one field."; return;
     }
@@ -1353,8 +1342,8 @@ function openBuilder(quote) {
     $("#qnumBadge").textContent = quote.quote_number;
     $("#qnumBadge").classList.remove("hidden");
     $("#statusHere").innerHTML = `<span class="status-badge st-${quote.status}">${quote.status}</span>`;
-    $("#custName").value = (quote.customer_name || "DEAR CUSTOMER").toUpperCase();
-    $("#custEmail").value = (quote.customer_email || "").toUpperCase();
+    $("#custName").value = quote.customer_name || "Dear customer";
+    $("#custEmail").value = quote.customer_email || "";
     $("#custPhone").value = quote.customer_phone || "";
     $("#custGst").value = quote.customer_gst || "";
     $("#custAddress").value = quote.customer_address || "";
@@ -1609,8 +1598,18 @@ $("#saveBtn").addEventListener("click", async () => {
   // Names AND emails must be in ALL CAPITAL letters — same rule as the contact
   // editor (policy 2026-08-21). Reject lowercase to keep history consistent
   // regardless of which form the edit came from.
-  upcaseInput($("#custName"));
-  upcaseInput($("#custEmail"));
+  const nameRaw = $("#custName").value.trim();
+  if (nameRaw && /[a-z]/.test(nameRaw) && nameRaw !== "Dear customer") {
+    toast("Name must be in CAPITAL letters. Please retype in ALL CAPS.", true);
+    $("#custName").focus();
+    return;
+  }
+  const emailRaw = $("#custEmail").value.trim();
+  if (emailRaw && /[a-z]/.test(emailRaw)) {
+    toast("Email must be in CAPITAL letters. Please retype in ALL CAPS.", true);
+    $("#custEmail").focus();
+    return;
+  }
   const phoneRaw = $("#custPhone").value.trim();
   const phoneDigits = phoneRaw.replace(/\D/g, "");
   if (phoneRaw && phoneDigits.length !== 10) {
@@ -1618,17 +1617,17 @@ $("#saveBtn").addEventListener("click", async () => {
     $("#custPhone").focus();
     return;
   }
-  // Name is optional now — backend defaults empty to "DEAR CUSTOMER" so we never write
+  // Name is optional now — backend defaults empty to "Dear customer" so we never write
   // a blank customer_name row. Reflect the fallback in the UI too if the user left it blank.
   if (!$("#custName").value.trim()) {
-    $("#custName").value = "DEAR CUSTOMER";
+    $("#custName").value = "Dear customer";
   }
   const validDays = Math.max(1, parseInt($("#validDays").value,10) || 1);
   const body = {
     op:"save",
     id: _currentQuote?.id || null,
     customer: {
-      name: $("#custName").value.trim() || "DEAR CUSTOMER",
+      name: $("#custName").value.trim() || "Dear customer",
       email: $("#custEmail").value.trim(),
       phone: $("#custPhone").value.trim(),
       gst: $("#custGst").value.trim(),
@@ -1896,35 +1895,27 @@ $("#recreateBtn").addEventListener("click", async () => {
 async function tryPrefillFromUrl() {
   const qp = new URLSearchParams(location.search);
   if (qp.get("new") !== "1") return;
-  const leadName = (qp.get("name") || "").trim().toUpperCase();
   const email = qp.get("email") || "";
   const mobile = qp.get("mobile") || "";
   const service = qp.get("service") || "";
   const customerKey = qp.get("customer_key") || "";
   if (!email && !mobile) return;
-  // Open the form as soon as the session is known - the catalog (needed only
-  // to add the service line) and the employee identity fill in when they land.
+  // Wait until app + catalog are ready
   await new Promise(r => {
-    const check = () => { if (_session) r(); else setTimeout(check, 100); };
+    const check = () => { if (_session && _catalog) r(); else setTimeout(check, 200); };
     check();
   });
   openBuilder(null);
   // When creating a quote from a lead that has no customer name captured yet,
-  // default to "DEAR CUSTOMER" so we never send a blank/awkward salutation.
+  // default to "Dear customer" so we never send a blank/awkward salutation.
   // (The lead prefill URL only carries email/mobile/service — no name.)
-  $("#custName").value = leadName || "DEAR CUSTOMER";
-  $("#custEmail").value = (email || "").toUpperCase();
+  $("#custName").value = "Dear customer";
+  $("#custEmail").value = email;
   $("#custPhone").value = mobile;
   // Remember for backend auto-move
   window._prefill_customer_key = customerKey;
   window._prefill_service_name = service;
   // If service tag matches a catalog service, auto-add it
-  if (service && !_catalog) {
-    await new Promise(r => {
-      const check = () => { if (_catalog) r(); else setTimeout(check, 100); };
-      check();
-    });
-  }
   if (service && _catalog) {
     const serviceKey = service.toLowerCase().replace(/[^a-z]/g, "");
     const svcMatch = (_catalog.services || []).find(s =>
@@ -2179,9 +2170,8 @@ $("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistor
   const guard = (input, label) => {
     if (!input) return;
     const recompute = () => {
-      upcaseInput(input);
       const v = (input.value || "").trim();
-      const bad = v && v !== "DEAR CUSTOMER" && /[a-z]/.test(v);
+      const bad = v && v !== "Dear customer" && /[a-z]/.test(v);
       if (bad) {
         input.style.border = "2px solid #dc2626";
         input.style.background = "#fef2f2";
@@ -2192,7 +2182,7 @@ $("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistor
         input.title = "";
       }
       // Disable Save Quotation if EITHER field has lowercase
-      const bothNameOk = !custName || !(custName.value || "").trim() || (custName.value || "").trim() === "DEAR CUSTOMER" || !/[a-z]/.test((custName.value || "").trim());
+      const bothNameOk = !custName || !(custName.value || "").trim() || (custName.value || "").trim() === "Dear customer" || !/[a-z]/.test((custName.value || "").trim());
       const bothEmailOk = !custEmail || !(custEmail.value || "").trim() || !/[a-z]/.test((custEmail.value || "").trim());
       if (saveBtn) {
         if (bothNameOk && bothEmailOk) {
@@ -2224,7 +2214,7 @@ $("#recreateBtn").addEventListener("click", () => { setTimeout(refreshLeadHistor
         custPhone.style.background = "";
         custPhone.title = "";
       }
-      const bothNameOk = !custName || !(custName.value || "").trim() || (custName.value || "").trim() === "DEAR CUSTOMER" || !/[a-z]/.test((custName.value || "").trim());
+      const bothNameOk = !custName || !(custName.value || "").trim() || (custName.value || "").trim() === "Dear customer" || !/[a-z]/.test((custName.value || "").trim());
       const bothEmailOk = !custEmail || !(custEmail.value || "").trim() || !/[a-z]/.test((custEmail.value || "").trim());
       const phoneOk = !raw || digits.length === 10;
       if (saveBtn) {
@@ -2248,9 +2238,8 @@ refreshSession()
     console.warn("refreshSession failed:", err);
     document.getElementById("loginPanel")?.classList.remove("hidden");
     document.getElementById("app")?.classList.add("hidden");
-  });
-// Runs alongside refreshSession, not after it: it waits for the session itself.
-tryPrefillFromUrl().catch(err => console.warn("tryPrefillFromUrl failed:", err));
+  })
+  .then(() => tryPrefillFromUrl().catch(err => console.warn("tryPrefillFromUrl failed:", err)));
 </script>
 
 <script src="/admin/admin-forgot-btn.js?v=2026082102" defer></script>
