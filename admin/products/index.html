@@ -1787,8 +1787,8 @@ async function deleteDesign(id) {
   else toast(j.error, true);
 }
 
-$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
-$("#notAdminSignOut").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); });
+$("#notAdminSignOut").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); });
 
 // Inline login handler
 async function doLogin() {
