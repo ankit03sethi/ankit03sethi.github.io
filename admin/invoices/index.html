@@ -135,7 +135,7 @@ $("#loginBtn").addEventListener("click", async () => {
   $("#loginErr").style.display = "none";
   await refresh();
 });
-$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); await refresh(); });
+$("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); await refresh(); });
 $("#loginPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
 
 async function callFn(name, body) {
