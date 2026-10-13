@@ -59,7 +59,7 @@ async function onLogin(e) {
 }
 
 async function onSignOut() {
-  await sb.auth.signOut();
+  await sb.auth.signOut({ scope: "local" });
   if (refreshTimer) clearInterval(refreshTimer);
   hide($("#dashView"));
   hide($("#denyView"));
