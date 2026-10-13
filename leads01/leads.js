@@ -423,7 +423,7 @@ async function onLogin(e) {
   }
 }
 async function onSignOut() {
-  await sb.auth.signOut();
+  await sb.auth.signOut({ scope: "local" });
   hide($("#dashView")); show($("#loginView"));
   hide($("#emailChip")); hide($("#signOutBtn"));
 }
@@ -2093,7 +2093,6 @@ function rowHtml(l, readOnly) {
   // Send Quote button - appears in Send Quote sub-tab; opens Quotations tab with prefilled data
   const quotePrefill = new URLSearchParams({
     new: "1",
-    name: latestName,
     email: l.email || "",
     mobile: l.mobile || "",
     service: l.service_name || l.service_type || "",
