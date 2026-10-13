@@ -313,7 +313,7 @@
     $("#emailChip").classList.remove("hidden");
     $("#emailChip").textContent = session.user.email;
     $("#signOutBtn").classList.remove("hidden");
-    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); });
 
     await Promise.all([loadJobs(), loadCreators()]);
   })();
