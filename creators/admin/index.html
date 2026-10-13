@@ -215,7 +215,7 @@
     location.reload();
   });
 
-  $("#blockSignOutBtn")?.addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+  $("#blockSignOutBtn")?.addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); });
 
   // TABS
   document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => {
@@ -349,7 +349,7 @@
     $("#emailChip").classList.remove("hidden");
     $("#emailChip").textContent = session.user.email;
     $("#signOutBtn").classList.remove("hidden");
-    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+    $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); });
     await Promise.all([loadJobs(), loadCreators()]);
   })();
 </script>
