@@ -158,6 +158,37 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageK
 
 const $ = (s) => document.querySelector(s);
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+// Supabase caps each RPC/response at ~1,000 rows. Reports like "received less than COP"
+// scan every paid order, so a 1,000-row slice silently hides real hits. rpcAll pages
+// through the whole result (exact count -> parallel ranges, with a sequential fallback).
+async function rpcAll(fn, args = {}) {
+  const PAGE = 1000, CONC = 6;
+  let first;
+  try { first = await sb.rpc(fn, args, { count: "exact" }).range(0, PAGE - 1); }
+  catch (e) { first = { error: e }; }
+  if (first.error) { first = await sb.rpc(fn, args).range(0, PAGE - 1); if (first.error) return { data: [], error: first.error }; }
+  let all = first.data || [];
+  if (all.length < PAGE) return { data: all, error: null };
+  const total = (typeof first.count === "number") ? first.count : null;
+  if (total == null) {
+    let from = PAGE;
+    for (;;) {
+      const r = await sb.rpc(fn, args).range(from, from + PAGE - 1);
+      if (r.error) return { data: all, error: r.error };
+      all = all.concat(r.data || []);
+      if (!r.data || r.data.length < PAGE) break;
+      from += PAGE;
+    }
+    return { data: all, error: null };
+  }
+  const offs = [];
+  for (let from = PAGE; from < total; from += PAGE) offs.push(from);
+  for (let i = 0; i < offs.length; i += CONC) {
+    const res = await Promise.all(offs.slice(i, i + CONC).map((from) => sb.rpc(fn, args).range(from, from + PAGE - 1)));
+    for (const r of res) { if (r.error) return { data: all, error: r.error }; all = all.concat(r.data || []); }
+  }
+  return { data: all, error: null };
+}
 const money = (v) => "₹" + num(v).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 const money2 = (v) => "₹" + num(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -403,9 +434,9 @@ async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
   const [a, b, c] = await Promise.all([
-    sb.rpc("seller_order_money_check", { _days: 45 }),
-    sb.rpc("seller_paid_profit"),
-    sb.rpc("seller_skus_missing_cost")
+    rpcAll("seller_order_money_check", { _days: 45 }),
+    rpcAll("seller_paid_profit"),
+    rpcAll("seller_skus_missing_cost")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
@@ -473,7 +504,7 @@ function buildCards() {
         if (pl) { pl.className = "pill hit"; pl.textContent = "reading…"; }
         $("#card_" + r.id).classList.remove("locked");
         b.innerHTML = r.note ? '<div class="note"><span class="spin"></span> ' + esc(r.note) + '</div>' : '<div class="note"><span class="spin"></span> reading every order… this one walks all 27,000 lines, so it takes a few seconds.</div>';
-        const { data, error } = await sb.rpc(r.rpc);
+        const { data, error } = await rpcAll(r.rpc);
         if (error) { console.error("all orders", error); b.innerHTML = '<div class="note">Could not read orders — ' + esc(error.message) + "</div>"; state.ui[r.id].loading = false; return; }
         state[r.lazy] = data || [];
         state.ui[r.id].loading = false;
