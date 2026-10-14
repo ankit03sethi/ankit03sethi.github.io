@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>P&amp;L — Cursive</title>
-<!-- pnl build 2026-10-09b: FirstCry excluded from the NEFT-awaited total (shown as info only); Settlement shown gross on Amazon (ads/other added back) so Settlement - Ads - Other = Net payout; Net payout card shows the Flipkart ads-wallet (topup vs used) reconciling item; "Settled, NEFT awaited" is row-level from payment_awaited_json (settled rows with blank NEFT/Transaction ID; Amazon released after last Transfer; FirstCry flagged no_ref); Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
+<!-- pnl build 2026-10-14a: Pending card status now uses a 7-day grace period — forecast dates within 7 days past show "processing" (normal settlement lag, neutral), only >7 days past show "overdue · chase" (red); card + detail show an Overdue (>7d) subtotal. Was flagging every 1-day lag as "date passed". --><!--old09b: FirstCry excluded from the NEFT-awaited total (shown as info only); Settlement shown gross on Amazon (ads/other added back) so Settlement - Ads - Other = Net payout; Net payout card shows the Flipkart ads-wallet (topup vs used) reconciling item; "Settled, NEFT awaited" is row-level from payment_awaited_json (settled rows with blank NEFT/Transaction ID; Amazon released after last Transfer; FirstCry flagged no_ref); Transferred-to-bank = exact bank credits (payment_extras_json_v2: amazon transfer row; flipkart NEFT gross + charges on that NEFT ID; meesho day payout + ads deducted that day); Net payout card shows "Settled, NEFT awaited" = net payout - transferred - pending; Transferred-to-bank deducts exactly what Net payout deducts (net_payout - settled); Amazon transfer row is already net of ads, so no second ads deduction -->
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231f6feb'/><polyline points='10 46 24 30 34 40 54 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 <style>
   *{box-sizing:border-box}
@@ -338,6 +338,7 @@
     const itc=extrasFilter(ex.itc||[]), itcGst=itc.reduce((a,r)=>a+(+r.gst||0),0), itcTaxable=itc.reduce((a,r)=>a+(+r.taxable||0),0);
     const tcsCr=Math.abs(tot.x_tcs||0), gstNet=(tot.tax||0)-itcGst-tcsCr, netProfit=(tot.net_profit||0)+itcGst+tcsCr;
     const pbSched=pbd.filter(r=>r.sched).reduce((a,r)=>a+(+r.amt||0),0), pbUnsch=pbd.filter(r=>!r.sched).reduce((a,r)=>a+(+r.amt||0),0);
+    const pbOver=pbd.filter(r=>r.sched&&(daysPast(r.dt)||0)>7).reduce((a,r)=>a+(+r.amt||0),0);
     $("#kpis").innerHTML=
       card("Sale (gross)",tot.gross_revenue,all+' · full sale value')
       +card("Sale returns",tot.x_ret,UU(tot.u_ret)+' · '+O(tot.n_ret)+' · sale reversed')
@@ -357,7 +358,7 @@
           +'<div class="lbl" style="margin-top:4px">= settlement \u2212 ads \u2212 other charges'+(Math.round(wallet)?' '+(wallet<0?'\u2212':'+')+' <b>\u20b9'+IN(Math.abs(Math.round(wallet)))+'</b> Flipkart ads wallet (topup vs used)':'')+'</div></div>'; })()
       +'<div class="kpi" data-x="transfer" style="cursor:pointer;border-color:'+(state.extraOpen==='transfer'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Transferred to bank '+(state.extraOpen==='transfer'?'▾':'▸')+'</div><div class="val prof pos">₹'+IN(Math.round(trAmt))+'</div><div class="lbl">'+O(trOrd)+' · '+IN(trs.length)+' transfers · exact bank credits · click for list</div></div>'
 
-      +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div></div>'
+      +'<div class="kpi" data-x="pending" style="cursor:pointer;border-color:'+(state.extraOpen==='pending'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Pending from platform '+(state.extraOpen==='pending'?'▾':'▸')+'</div><div class="val">₹'+IN(Math.round(tot.x_sched))+'</div><div class="lbl">'+UU(tot.u_sched)+' · '+O(tot.n_sched)+' · click for dates</div><div class="lbl" style="margin-top:4px">Scheduled <b>₹'+IN(Math.round(pbSched))+'</b></div><div class="lbl">Unscheduled <b>₹'+IN(Math.round(pbUnsch))+'</b></div>'+(Math.round(pbOver)?'<div class="lbl" style="color:#b45309">Overdue &gt;7d <b>₹'+IN(Math.round(pbOver))+'</b> — chase</div>':'')+'</div>'
 
       +(function(){ const all_=awaitedRows(), aw=all_.filter(r=>!r.no_ref); const awT=aw.reduce((a,r)=>a+(+r.amt||0),0), awN=aw.reduce((a,r)=>a+(+r.n||0),0), fc=all_.filter(r=>r.no_ref).reduce((a,r)=>a+(+r.amt||0),0);
           return '<div class="kpi" data-x="awaited" style="cursor:pointer;border-color:'+(state.extraOpen==='awaited'?'#1f6feb':'#e5e7eb')+'"><div class="lbl">Settled, NEFT awaited '+(state.extraOpen==='awaited'?'\u25be':'\u25b8')+'</div><div class="val">\u20b9'+IN(Math.round(awT))+'</div><div class="lbl">'+IN(awN)+' lines \u00b7 settled but NEFT / Transaction ID not in file yet \u00b7 click</div>'
@@ -469,6 +470,7 @@
     h+='</tbody></table></div>';
     return h;
   }
+  function daysPast(dt){ if(!dt) return null; var t=new Date(); var b=new Date(t.getFullYear(),t.getMonth(),t.getDate()); var a=new Date(dt+'T00:00:00'); return Math.round((b-a)/86400000); }
   function pendingDetailHtml(){
     const ex=state.extras||{};
     const rows=extrasFilter(ex.pending_by_day||[]);
@@ -480,14 +482,20 @@
     let h='<div class="wrap" style="margin:0 0 14px"><table class="data"><thead><tr><th>Payment date</th><th>Status</th><th>Orders</th><th>Gross ₹</th><th>Ads / charges ₹</th><th>Net to bank ₹</th><th>Platform</th><th>Company</th></tr></thead><tbody>';
     if(!rows.length) h+='<tr><td colspan="8" class="empty">Nothing pending in this window.</td></tr>';
     let sn=0,sa=0,sd=0, un=0,ua=0;
+    let on=0,oa=0;
     const seen={};
     for(const r of sched){
       const dk=dayKey(r); const ded=seen[dk]?0:(cbd[dk]||0); seen[dk]=1;
-      const st=(r.dt<today)?'<span class="up">due · date passed</span>':(r.dt===today?'<span class="up">due today</span>':'scheduled');
+      const dp=daysPast(r.dt);
+      const st = (dp===null||dp<0) ? 'scheduled'
+        : (dp<=7) ? '<span style="color:#6b7280">processing'+(dp>0?' · '+dp+'d lag':' · due today')+'</span>'
+        : '<span class="up">overdue · '+dp+'d · chase</span>';
       sn+=(+r.n||0); sa+=(+r.amt||0); sd+=ded;
+      if(dp!==null&&dp>7){ on+=(+r.n||0); oa+=(+r.amt||0); }
       h+='<tr><td>'+esc(r.dt||'—')+'</td><td>'+st+'</td><td>'+IN(+r.n||0)+'</td>'+prof(+r.amt||0)+prof(ded)+prof((+r.amt||0)+ded)+'<td>'+esc(r.platform||'')+'</td><td>'+esc(r.company||'')+'</td></tr>';
     }
     if(sched.length) h+='<tr style="font-weight:700"><td>Scheduled total</td><td></td><td>'+IN(sn)+'</td>'+prof(sa)+prof(sd)+prof(sa+sd)+'<td></td><td></td></tr>';
+    if(on) h+='<tr style="font-weight:700;color:#b45309"><td>└ Overdue (&gt;7 days) — chase</td><td></td><td>'+IN(on)+'</td>'+prof(oa)+'<td></td><td></td><td></td><td></td></tr>';
     for(const r of unsch){ un+=(+r.n||0); ua+=(+r.amt||0); }
     if(unsch.length){
       h+='<tr><td colspan="8" style="text-align:left;font-weight:600;background:#f9fafb">Not scheduled yet — platform ne abhi date nahi di (date column = order date)</td></tr>';
