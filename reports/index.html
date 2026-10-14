@@ -434,9 +434,9 @@ async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
   const [a, b, c] = await Promise.all([
-    rpcAll("seller_order_money_check", { _days: 45 }),
-    rpcAll("seller_paid_profit"),
-    rpcAll("seller_skus_missing_cost")
+    sb.rpc("seller_order_money_check", { _days: 45 }),
+    sb.rpc("seller_paid_profit_json"),
+    sb.rpc("seller_skus_missing_cost")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
@@ -504,7 +504,7 @@ function buildCards() {
         if (pl) { pl.className = "pill hit"; pl.textContent = "reading…"; }
         $("#card_" + r.id).classList.remove("locked");
         b.innerHTML = r.note ? '<div class="note"><span class="spin"></span> ' + esc(r.note) + '</div>' : '<div class="note"><span class="spin"></span> reading every order… this one walks all 27,000 lines, so it takes a few seconds.</div>';
-        const { data, error } = await rpcAll(r.rpc);
+        const { data, error } = await sb.rpc(r.rpc);
         if (error) { console.error("all orders", error); b.innerHTML = '<div class="note">Could not read orders — ' + esc(error.message) + "</div>"; state.ui[r.id].loading = false; return; }
         state[r.lazy] = data || [];
         state.ui[r.id].loading = false;
