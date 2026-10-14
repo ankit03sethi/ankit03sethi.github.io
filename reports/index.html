@@ -88,6 +88,14 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 @keyframes sp{to{transform:rotate(360deg)}}
 .body{display:none}
 .body.open{display:block}
+tr.grp{cursor:pointer}
+tr.grp:hover{background:#f3f6fb}
+td.caret,th.caret{width:22px;text-align:center;color:#1f6feb;font-weight:700}
+tr.gdetail>td{background:#f9fafb;padding:0}
+table.sub{width:100%;border-collapse:collapse;margin:2px 0 6px}
+table.sub th{font-size:11px;color:#6b7280;text-align:left;padding:4px 10px;border-bottom:1px solid #e5e7eb}
+table.sub td{padding:4px 10px;border-bottom:1px solid #f1f1f1;font-size:12px}
+table.sub th.num,table.sub td.num{text-align:right}
 </style>
 </head>
 <body>
@@ -214,6 +222,9 @@ const COL = {
   cop:    { k: "cop",          l: "COP",       t: "money" },
   profit: { k: "profit",       l: "Profit",    t: "moneysign" },
   mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  },
+  gcnt:   { k: "orders",       l: "Orders",    t: "int"  },
+  glast:  { k: "last_ref",     l: "Last order id", t: "txt" },
+  glastord:{ k: "last_ordered",l: "Last order", t: "date" },
   u30:    { k: "units_30d",    l: "Units 30d", t: "int"  },
   u90:    { k: "units_90d",    l: "Units 90d", t: "int"  },
   r90:    { k: "returns_90d",  l: "Returns 90d", t: "int" },
@@ -297,13 +308,18 @@ const REPORTS = [
     title: "Received less than COP",
     desc: "Money came in, but less than the item cost you to buy. Every one of these is a loss on the sale itself.",
     src: "profit", pick: (r) => r.cop_known && num(r.received) > 0 && num(r.received) < num(r.cop),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
-    sort: { k: "profit", dir: 1 },
-    kpis: (rows) => [
-      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" },
-      { l: "Total loss", n: money(sum(rows, "profit")), cls: "bad" },
-      { l: "Worst single", n: money(rows.length ? Math.min(...rows.map((r) => num(r.profit))) : 0), cls: "bad" }
-    ],
+    cols: [COL.plat, COL.co, COL.sku, COL.msku, COL.gcnt, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn, COL.glast, COL.glastord],
+    groupBy: { keys: ["platform", "company_name", "sku", "master_sku"], detail: [COL.ref, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn] },
+    sort: { k: "profit", dir: 1 }, unit: "SKU",
+    kpis: (rows) => {
+      const skus = new Set(rows.map((r) => [r.platform, r.company_name, r.sku].join("\u0001"))).size;
+      return [
+        { l: "SKUs", n: skus.toLocaleString("en-IN"), cls: skus ? "bad" : "" },
+        { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" },
+        { l: "Total loss", n: money(sum(rows, "profit")), cls: "bad" },
+        { l: "Worst single", n: money(rows.length ? Math.min(...rows.map((r) => num(r.profit))) : 0), cls: "bad" }
+      ];
+    },
     empty: "Nothing sold below cost."
   },
   {
@@ -408,10 +424,31 @@ const REPORTS = [
 ];
 
 function sum(rows, k) { let t = 0; for (const r of rows) t += num(r[k]); return t; }
+function groupRows(rows, g) {
+  const m = new Map();
+  for (const r of rows) {
+    const k = g.keys.map((x) => String(r[x] == null ? "" : r[x])).join("\u0001");
+    let o = m.get(k);
+    if (!o) { o = { _k: k, _orders: [] }; for (const x of g.keys) o[x] = r[x]; m.set(k, o); }
+    o._orders.push(r);
+  }
+  const out = [];
+  for (const o of m.values()) {
+    const a = o._orders;
+    o.orders = a.length; o.qty = sum(a, "qty"); o.received = sum(a, "received"); o.profit = sum(a, "profit");
+    o.cop = Math.max(0, ...a.map((r) => num(r.cop)));
+    o.margin_pct = o.received ? Math.round(1000 * o.profit / o.received) / 10 : 0;
+    let last = a[0];
+    for (const r of a) if (String(r.ordered_on || "") > String(last.ordered_on || "")) last = r;
+    o.last_ref = last.order_ref; o.last_ordered = last.ordered_on;
+    out.push(o);
+  }
+  return out;
+}
 
 /* ---------- state ------------------------------------------------------ */
 const state = { check: null, profit: null, nocost: null, orders: null, missing: null, plat: "", co: "", q: "", ui: {} };
-for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300, picks: {} };
+for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300, picks: {}, expanded: new Set() };
 
 /* ---------- boot ------------------------------------------------------- */
 (async function boot() {
@@ -620,6 +657,18 @@ function render(r) {
   }
   card.classList.remove("locked");
   const n = rows.length;
+  const grouped = !!r.groupBy && u.open;
+  let disp = rows;
+  if (grouped) {
+    disp = groupRows(rows, r.groupBy);
+    const s = u.sort;
+    disp = disp.slice().sort((x, y) => {
+      const a = x[s.k], b = y[s.k], na = Number(a), nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb) && a != null && b != null) return (na - nb) * s.dir;
+      return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
+    });
+  }
+  const dispN = grouped ? disp.length : n;
   const clean = r.id === "paid";
   pill.className = "pill " + (clean ? "ok" : n === 0 ? "ok" : r.sec === "Payments" && r.id === "unpaid" ? "bad" : "hit");
   const unit = r.unit || "order";
@@ -636,12 +685,35 @@ function render(r) {
   if (r.thr) h += "<label>" + esc(r.thr.label) + '</label><input type="number" step="' + r.thr.step + '" value="' + u.thr + '" id="thr_' + r.id + '" style="width:96px">' +
                  '<span class="muted" style="font-size:12px">' + r.thr.suffix + "</span>";
   h += '<button class="ghost" id="csv_' + r.id + '">Download CSV</button>';
-  if (n > u.limit) h += '<button class="ghost" id="more_' + r.id + '">Show all ' + n.toLocaleString("en-IN") + "</button>";
-  h += '<span class="muted" style="font-size:12px">' + (n > u.limit ? "showing first " + u.limit.toLocaleString("en-IN") : "showing all " + n.toLocaleString("en-IN")) + "</span>";
+  if (dispN > u.limit) h += '<button class="ghost" id="more_' + r.id + '">Show all ' + dispN.toLocaleString("en-IN") + (grouped ? " SKUs" : "") + "</button>";
+  h += '<span class="muted" style="font-size:12px">' + (dispN > u.limit ? "showing first " + u.limit.toLocaleString("en-IN") : "showing all " + dispN.toLocaleString("en-IN")) + (grouped ? " SKUs" : "") + "</span>";
   h += "</div>";
 
   if (n === 0) {
     h += '<div class="note">' + esc(r.empty) + "</div>";
+  } else if (grouped) {
+    h += '<div class="scroll"><table><thead><tr><th class="caret"></th>';
+    for (const c of r.cols) {
+      const on = u.sort.k === c.k;
+      const numy = ["int", "money", "moneyneg", "moneysign", "pct"].includes(c.t);
+      h += '<th class="' + (numy ? "num " : "") + (on ? "on" : "") + '" data-k="' + c.k + '">' + esc(c.l) +
+           ' <span class="a">' + (on ? (u.sort.dir === 1 ? "\u25b2" : "\u25bc") : "\u25c6") + "</span></th>";
+    }
+    h += "</tr></thead><tbody>";
+    for (const g of disp.slice(0, u.limit)) {
+      const isopen = u.expanded.has(g._k);
+      h += '<tr class="grp" data-gk="' + esc(g._k) + '"><td class="caret">' + (isopen ? "\u25be" : "\u25b8") + "</td>";
+      for (const c of r.cols) h += cell(g, c);
+      h += "</tr>";
+      if (isopen) {
+        h += '<tr class="gdetail"><td class="caret"></td><td colspan="' + r.cols.length + '"><table class="sub"><thead><tr>';
+        for (const c of r.groupBy.detail) { const ny = ["int","money","moneyneg","moneysign","pct"].includes(c.t); h += '<th class="' + (ny ? "num" : "") + '">' + esc(c.l) + "</th>"; }
+        h += "</tr></thead><tbody>";
+        for (const o of g._orders) { h += "<tr>"; for (const c of r.groupBy.detail) h += cell(o, c); h += "</tr>"; }
+        h += "</tbody></table></td></tr>";
+      }
+    }
+    h += "</tbody></table></div>";
   } else {
     h += '<div class="scroll"><table><thead><tr>';
     for (const c of r.cols) {
@@ -660,9 +732,16 @@ function render(r) {
   }
   body.innerHTML = h;
 
-  body.querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
-    const k = th.dataset.k;
+  body.querySelectorAll("thead th[data-k]").forEach((th) => th.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const k = th.dataset.k; if (!k) return;
     if (u.sort.k === k) u.sort.dir = -u.sort.dir; else { u.sort.k = k; u.sort.dir = -1; }
+    render(r);
+  }));
+  body.querySelectorAll("tr.grp").forEach((tr) => tr.addEventListener("click", (e) => {
+    if (e.target.closest("thead")) return;
+    const gk = tr.dataset.gk;
+    if (u.expanded.has(gk)) u.expanded.delete(gk); else u.expanded.add(gk);
     render(r);
   }));
   const thr = body.querySelector("#thr_" + r.id);
@@ -671,7 +750,7 @@ function render(r) {
   if (more) more.addEventListener("click", () => { u.limit = 1e9; render(r); });
   body.querySelector("#csv_" + r.id).addEventListener("click", () => csv(r, rows));
 
-  installColumnFilters(r, body);
+  if (!r.groupBy) installColumnFilters(r, body);
 }
 
 /* ---------- per-column value dropdowns ------------------------------- */
@@ -993,9 +1072,10 @@ function initPricing() {
 }
 
 function csv(r, rows) {
+  const cols = r.groupBy ? [COL.plat, COL.co, COL.sku, COL.msku].concat(r.groupBy.detail) : r.cols;
   const q = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const lines = [r.cols.map((c) => q(c.l)).join(",")];
-  for (const row of rows) lines.push(r.cols.map((c) => q(row[c.k])).join(","));
+  const lines = [cols.map((c) => q(c.l)).join(",")];
+  for (const row of rows) lines.push(cols.map((c) => q(row[c.k])).join(","));
   const url = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
