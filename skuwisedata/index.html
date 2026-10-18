@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18f</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18g</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -1253,6 +1253,8 @@
   // Reload re-reads the day counts too, so a fresh orders file shows up here
   // without a full page reload.
   document.getElementById("reloadBtn").addEventListener("click", async () => {
+    state.masterSummaries = new Map();   // Reload = fresh card numbers too, not the cached summary
+    _nimData = null;
     await loadWindowCounts();
     await refresh();
   });
@@ -2249,7 +2251,7 @@
     const latestStr = latestIso ? new Date(latestIso).toLocaleString("en-IN") : "—";
     if (state.view === "sku_master") {
       $("#kpis").innerHTML = `
-        <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total mappings</div><div class="value" id="kpiTotal">${total.toLocaleString("en-IN")}</div><div class="foot" id="kpiTotalFoot">${escapeHtml(kpiFilterLabel())}</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total listings</div><div class="value" id="kpiTotal">${total.toLocaleString("en-IN")}</div><div class="foot" id="kpiTotalFoot">${escapeHtml(kpiFilterLabel())}</div></div></div>
         ${statusKpi()}
         ${notInMasterKpi()}
         <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value" id="kpiPlat">${platforms.size}</div><div class="foot" id="kpiPlatFoot">${[...platforms].join(", ") || "—"}</div></div></div>
