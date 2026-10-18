@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2105,6 +2105,29 @@
          + item("#16a34a", "kpiStActive", "Active") + item("#94a3b8", "kpiStInactive", "Inactive") + '</div>'
          + '<div class="foot" id="kpiStFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
   }
+  // Orders per Sub Category (3d / 30d), top to low by 3d. Server-side (sku_subcat_order_counts_json)
+  // so it covers every order, not just the rows loaded on screen. Follows the company/platform filter.
+  function subcatKpi() {
+    return '<div class="kpi" style="grid-column:span 2;align-items:flex-start"><div class="tile" style="background:#8b5cf6;">&#128230;</div><div style="min-width:0;flex:1">'
+         + '<div class="label">Orders by sub category <span style="font-weight:500;color:#94a3b8">(3d &middot; 30d)</span></div>'
+         + '<div id="kpiSubcat" style="font-size:12px;line-height:1.35;margin-top:4px;max-height:96px;overflow:auto;padding-right:4px">\u2026</div>'
+         + '<div class="foot" id="kpiSubcatFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
+  }
+  let _subcatSeq = 0;
+  async function updateSubcatKpi() {
+    const box = document.getElementById("kpiSubcat"); if (!box) return;
+    const seq = ++_subcatSeq;
+    const { data, error } = await sb.rpc("sku_subcat_order_counts_json", { p_company: state.company || null, p_platform: state.platform || null });
+    if (seq !== _subcatSeq) return;
+    const b2 = document.getElementById("kpiSubcat"); if (!b2) return;
+    if (error || !Array.isArray(data)) { b2.textContent = "\u2014"; return; }
+    if (!data.length) { b2.textContent = "No orders in 30 days"; return; }
+    b2.innerHTML = '<table style="border-collapse:collapse;width:100%">' + data.map((r, i) =>
+      '<tr' + (i % 2 ? ' style="background:#f8fafc"' : '') + '><td style="padding:1px 6px 1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">' + escapeHtml(r.sub || "Others") + '</td>'
+      + '<td style="padding:1px 8px;text-align:right;font-weight:700;color:#0f172a">' + (Number(r.o3) || 0).toLocaleString("en-IN") + '</td>'
+      + '<td style="padding:1px 0 1px 8px;text-align:right;color:#64748b">' + (Number(r.o30) || 0).toLocaleString("en-IN") + '</td></tr>').join("") + '</table>';
+    const f = document.getElementById("kpiSubcatFoot"); if (f) f.textContent = kpiFilterLabel() + " \u00b7 orders, not units";
+  }
   // Fill the Total / Platforms / Latest / Sales / Status cards from the filtered summary once it arrives.
   let _kpiSeq = 0;
   async function updateKpiSummary() {
@@ -2170,9 +2193,11 @@
         ${colorCountsKpi()}
         ${salesKpi()}
         ${statusKpi()}
+        ${subcatKpi()}
       `;
       if (!updateKpiFromDom()) updateKpiSummary();
       updateColorWhite();
+      updateSubcatKpi();
     } else {
       $("#kpis").innerHTML = `
         <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128202;</div><div><div class="label">Total rows</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div></div>
