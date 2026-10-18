@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2122,11 +2122,16 @@
     const b2 = document.getElementById("kpiSubcat"); if (!b2) return;
     if (error || !Array.isArray(data)) { b2.textContent = "\u2014"; return; }
     if (!data.length) { b2.textContent = "No orders in 30 days"; return; }
-    b2.innerHTML = '<table style="border-collapse:collapse;width:100%">' + data.map((r, i) =>
+    const t3 = data.reduce((a, r) => a + (Number(r.o3) || 0), 0), t30 = data.reduce((a, r) => a + (Number(r.o30) || 0), 0);
+    b2.innerHTML = '<table style="border-collapse:collapse;width:100%">'
+      + '<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:1px 6px 2px 0;font-weight:700">Total</td>'
+      + '<td style="padding:1px 8px;text-align:right;font-weight:700">' + t3.toLocaleString("en-IN") + '</td>'
+      + '<td style="padding:1px 0 1px 8px;text-align:right;font-weight:700;color:#64748b">' + t30.toLocaleString("en-IN") + '</td></tr>'
+      + data.map((r, i) =>
       '<tr' + (i % 2 ? ' style="background:#f8fafc"' : '') + '><td style="padding:1px 6px 1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">' + escapeHtml(r.sub || "Others") + '</td>'
       + '<td style="padding:1px 8px;text-align:right;font-weight:700;color:#0f172a">' + (Number(r.o3) || 0).toLocaleString("en-IN") + '</td>'
       + '<td style="padding:1px 0 1px 8px;text-align:right;color:#64748b">' + (Number(r.o30) || 0).toLocaleString("en-IN") + '</td></tr>').join("") + '</table>';
-    const f = document.getElementById("kpiSubcatFoot"); if (f) f.textContent = kpiFilterLabel() + " \u00b7 orders, not units";
+    const f = document.getElementById("kpiSubcatFoot"); if (f) f.textContent = kpiFilterLabel() + " \u00b7 same rule as Sales card (lines, cancelled excluded)";
   }
   // Fill the Total / Platforms / Latest / Sales / Status cards from the filtered summary once it arrives.
   let _kpiSeq = 0;
