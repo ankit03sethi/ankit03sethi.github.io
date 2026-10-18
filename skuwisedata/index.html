@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18d</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18e</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -2105,6 +2105,63 @@
          + item("#16a34a", "kpiStActive", "Active") + item("#94a3b8", "kpiStInactive", "Inactive") + '</div>'
          + '<div class="foot" id="kpiStFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
   }
+  // Listings that are in the platform inventory files but NOT in the master SKU file.
+  // Count on the card; click opens the list (company, platform, FSN/ASIN, listing id, SKU, status, qty) with CSV download.
+  function notInMasterKpi() {
+    return '<div class="kpi" id="kpiNimCard" style="cursor:pointer" title="Click to see the list"><div class="tile" style="background:#ef4444;">&#10067;</div><div>'
+         + '<div class="label">In inventory, not in master</div>'
+         + '<div class="value" id="kpiNim">\u2026</div>'
+         + '<div class="foot" id="kpiNimFoot">' + escapeHtml(kpiFilterLabel()) + ' \u00b7 click for list</div></div></div>';
+  }
+  let _nimSeq = 0, _nimData = null;
+  async function fetchNotInMaster() {
+    const { data, error } = await sb.rpc("sku_stock_not_in_master_json", { p_company: state.company || null, p_platform: state.platform || null });
+    if (error || !data) return null;
+    return data;
+  }
+  async function updateNotInMasterKpi() {
+    const el = document.getElementById("kpiNim"); if (!el) return;
+    const seq = ++_nimSeq;
+    const d = await fetchNotInMaster();
+    if (seq !== _nimSeq) return;
+    const e2 = document.getElementById("kpiNim"); if (!e2) return;
+    if (!d) { e2.textContent = "\u2014"; return; }
+    _nimData = d;
+    e2.textContent = (Number(d.count) || 0).toLocaleString("en-IN");
+    const f = document.getElementById("kpiNimFoot"); if (f) f.textContent = kpiFilterLabel() + " \u00b7 click for list";
+  }
+  const NIM_COLS = [["company","Company"],["platform","Platform"],["platform_id","FSN / ASIN / Product ID"],["listing_id","Listing ID"],["sku","Seller SKU"],["listing_status","Status"],["qty","Qty"],["sell_price","Price"],["mrp","MRP"],["source_file","File"]];
+  function nimCsv(rows) {
+    const esc = v => { const s = v == null ? "" : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const lines = [NIM_COLS.map(c => esc(c[1])).join(",")];
+    for (const r of rows) lines.push(NIM_COLS.map(c => esc(r[c[0]])).join(","));
+    const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "not-in-master-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); setTimeout(() => { try { a.remove(); URL.revokeObjectURL(a.href); } catch (e) {} }, 600);
+  }
+  async function openNotInMaster() {
+    let d = _nimData; if (!d) d = await fetchNotInMaster(); if (!d) { alert("Could not load the list."); return; }
+    const rows = Array.isArray(d.rows) ? d.rows : [];
+    let box = document.getElementById("nimModal");
+    if (!box) {
+      box = document.createElement("div"); box.id = "nimModal";
+      box.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px";
+      box.addEventListener("click", e => { if (e.target === box) box.remove(); });
+      document.body.appendChild(box);
+    }
+    const th = NIM_COLS.map(c => '<th style="position:sticky;top:0;background:#f1f5f9;text-align:left;padding:6px 8px;font-size:11px;color:#475569;border-bottom:1px solid #e2e8f0;white-space:nowrap">' + escapeHtml(c[1]) + '</th>').join("");
+    const trs = rows.map((r, i) => '<tr' + (i % 2 ? ' style="background:#f8fafc"' : '') + '>' + NIM_COLS.map(c => '<td style="padding:4px 8px;font-size:12px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="' + escapeHtml(r[c[0]] == null ? "" : String(r[c[0]])) + '">' + escapeHtml(r[c[0]] == null ? "" : String(r[c[0]])) + '</td>').join("") + '</tr>').join("");
+    box.innerHTML = '<div style="background:#fff;border-radius:12px;width:min(1200px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+      + '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #e2e8f0">'
+      + '<b style="font-size:15px">In inventory files, not in master SKU file</b><span style="color:#64748b;font-size:13px">' + rows.length.toLocaleString("en-IN") + ' listings \u00b7 ' + escapeHtml(kpiFilterLabel()) + '</span>'
+      + '<span style="flex:1"></span><button class="btn" id="nimDl" type="button" style="font-size:12px;padding:5px 11px">&#11015; Download CSV</button>'
+      + '<button class="btn" id="nimClose" type="button" style="font-size:12px;padding:5px 11px">Close</button></div>'
+      + '<div style="overflow:auto;flex:1"><table style="border-collapse:collapse;width:100%"><thead><tr>' + th + '</tr></thead><tbody>' + (trs || '<tr><td colspan="' + NIM_COLS.length + '" style="padding:16px;color:#64748b">Nothing - every inventory listing is in the master file.</td></tr>') + '</tbody></table></div></div>';
+    box.querySelector("#nimClose").addEventListener("click", () => box.remove());
+    box.querySelector("#nimDl").addEventListener("click", () => nimCsv(rows));
+  }
+  document.addEventListener("click", e => { const c = e.target && e.target.closest ? e.target.closest("#kpiNimCard") : null; if (c) openNotInMaster(); });
   // Orders per Sub Category (3d / 30d), top to low by 3d. Server-side (sku_subcat_order_counts_json)
   // so it covers every order, not just the rows loaded on screen. Follows the company/platform filter.
   function subcatKpi() {
@@ -2198,10 +2255,12 @@
         <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;" id="kpiLatest">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
         ${colorCountsKpi()}
         ${salesKpi()}
+        ${notInMasterKpi()}
         ${subcatKpi()}
       `;
       if (!updateKpiFromDom()) updateKpiSummary();
       updateColorWhite();
+      _nimData = null; updateNotInMasterKpi();
       updateSubcatKpi();
     } else {
       $("#kpis").innerHTML = `
