@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-10b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-18a</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -763,6 +763,10 @@
     // Reprice preview = the exact settlement the reprice file drives to (k-ratio,
     // floored + capped). Prefer it so the page matches the file.
     if (st.rp_settle != null) return Number(st.rp_settle);
+    // No reprice preview (e.g. a new listing whose Flipkart file has no Bank
+    // Settlement yet). Unmapped = no competitor to chase, so the goal is simply
+    // the Expected Settlement - never the rough slope estimate.
+    if (!st.mapped) { const es0 = expSettleCalc(r); return (es0 && es0.val != null) ? es0.val : null; }
     // Fallback: older slope estimate when the preview is unavailable.
     if (st.sugg_price == null || st.file_price == null || st.file_settle == null || st.slope == null) return null;
     let v = Math.round(Number(st.file_settle) + (Number(st.sugg_price) - Number(st.file_price)) * Number(st.slope));
