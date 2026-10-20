@@ -1026,7 +1026,25 @@
     const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price"), iP = heads.indexOf("Expected Profit");
     const iA = heads.indexOf("Auto Settlement");
     const iNeed = heads.indexOf("5★ Needed");
-    if (iNeed >= 0 && tr.cells[iNeed]) tr.cells[iNeed].outerHTML = renderCell(r, iNeed, "5★ Needed");
+    if (iNeed >= 0 && tr.cells[iNeed]) {
+      const tdN = tr.cells[iNeed];
+      const stN = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+      const Rn = stN ? Number(stN.rating) : NaN, Nn = stN ? Number(stN.review_count) : NaN;
+      let Bn = parseFloat(((rr.listing_data) || {})["Rating Target"]);
+      if (Bn > 5) Bn = 5;
+      if (!isFinite(Bn) || Bn <= 0 || !isFinite(Rn) || !isFinite(Nn) || Nn <= 0) {
+        tdN.textContent = "—"; tdN.removeAttribute("title"); tdN.style.color = "#cbd5e1"; tdN.style.fontWeight = "";
+      } else if (Rn >= Bn) {
+        tdN.textContent = "0"; tdN.title = "Already at or above target " + Bn + " (now " + Rn + "★)."; tdN.style.color = "#16a34a"; tdN.style.fontWeight = "600";
+      } else if (Bn >= 5) {
+        tdN.textContent = "—"; tdN.title = "A 5.0 target is not reachable while any rating below 5★ exists."; tdN.style.color = "#cbd5e1"; tdN.style.fontWeight = "";
+      } else {
+        const needN = Math.ceil(Nn * (Bn - Rn) / (5 - Bn));
+        tdN.textContent = needN.toLocaleString("en-IN");
+        tdN.title = "Now " + Rn + "★ over " + Nn.toLocaleString("en-IN") + " ratings. Add " + needN.toLocaleString("en-IN") + " five-star ratings to reach " + Bn + "★.";
+        tdN.style.color = "#334155"; tdN.style.fontWeight = "600";
+      }
+    }
     if (iA >= 0 && tr.cells[iA]) {
       const a = autoSettleCalc(rr), td = tr.cells[iA];
       td.textContent = a.val == null ? "—" : String(a.val); td.title = a.why;
