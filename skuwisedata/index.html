@@ -1046,7 +1046,7 @@
       if (iR >= 0 && tr.cells[iR]) {
         const td = tr.cells[iR];
         if (!ok) { td.textContent = "—"; td.removeAttribute("title"); td.style.color = "#cbd5e1"; td.style.fontWeight = ""; }
-        else { td.textContent = (e.rc / e.c).toFixed(2); td.title = "Group " + g + " weighted avg over " + e.c.toLocaleString("en-IN") + " ratings (" + e.rows + " listings)."; td.style.color = "#334155"; td.style.fontWeight = "600"; }
+        else { td.textContent = (e.rc / e.c).toFixed(1); td.title = "Group " + g + " weighted avg over " + e.c.toLocaleString("en-IN") + " ratings (" + e.rows + " listings)."; td.style.color = "#334155"; td.style.fontWeight = "600"; }
       }
       if (iC >= 0 && tr.cells[iC]) {
         const td = tr.cells[iC];
@@ -3413,7 +3413,7 @@
         const e = g ? GROUP_AGG.get(g) : null;
         if (!g || !e || e.c <= 0) return '<td style="color:#cbd5e1">' + DASH + '</td>';
         if (c === "Group Count") return '<td title="Group ' + escapeHtml(g) + ': ' + e.rows + ' listings, total ' + e.c.toLocaleString("en-IN") + ' ratings." style="color:#334155;font-weight:600">' + e.c.toLocaleString("en-IN") + '</td>';
-        return '<td title="Group ' + escapeHtml(g) + ' weighted avg over ' + e.c.toLocaleString("en-IN") + ' ratings (' + e.rows + ' listings)." style="color:#334155;font-weight:600">' + (e.rc / e.c).toFixed(2) + '</td>';
+        return '<td title="Group ' + escapeHtml(g) + ' weighted avg over ' + e.c.toLocaleString("en-IN") + ' ratings (' + e.rows + ' listings)." style="color:#334155;font-weight:600">' + (e.rc / e.c).toFixed(1) + '</td>';
       }
       // 5★ Needed: more 5-star ratings to meet BOTH Count Target (min
       // total ratings) and Rating Target (stars). Shows max of the two needs.
