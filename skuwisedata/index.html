@@ -2475,7 +2475,7 @@
          "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
          "Tax per order","Pack per order","Profit per order"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
-    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
     if (["Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     return "Product";
@@ -2745,12 +2745,12 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","Grouping","Group Rating","Group Count","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Amazon Add Rs","Max Step %",
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link",
+      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
