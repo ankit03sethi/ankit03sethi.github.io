@@ -705,7 +705,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Rating Target": { def: "" }, "Margin": { def: "" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
+  const NUM_COLS = { "Count Target": { def: "" }, "Rating Target": { def: "" }, "Margin": { def: "" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -1029,20 +1029,27 @@
     if (iNeed >= 0 && tr.cells[iNeed]) {
       const tdN = tr.cells[iNeed];
       const stN = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
-      const Rn = stN ? Number(stN.rating) : NaN, Nn = stN ? Number(stN.review_count) : NaN;
-      let Bn = parseFloat(((rr.listing_data) || {})["Rating Target"]);
-      if (Bn > 5) Bn = 5;
-      if (!isFinite(Bn) || Bn <= 0 || !isFinite(Rn) || !isFinite(Nn) || Nn <= 0) {
+      const ldN = (rr.listing_data) || {};
+      const Ct = parseFloat(ldN["Count Target"]), Bt = parseFloat(ldN["Rating Target"]);
+      const hasC = isFinite(Ct) && Ct > 0, hasB = isFinite(Bt) && Bt > 0;
+      const scraped = !!stN && isFinite(Number(stN.review_count));
+      const Nc = scraped ? Number(stN.review_count) : 0;
+      const Rc = (stN && isFinite(Number(stN.rating))) ? Number(stN.rating) : 0;
+      if ((!hasC && !hasB) || (!scraped && !hasC)) {
         tdN.textContent = "—"; tdN.removeAttribute("title"); tdN.style.color = "#cbd5e1"; tdN.style.fontWeight = "";
-      } else if (Rn >= Bn) {
-        tdN.textContent = "0"; tdN.title = "Already at or above target " + Bn + " (now " + Rn + "★)."; tdN.style.color = "#16a34a"; tdN.style.fontWeight = "600";
-      } else if (Bn >= 5) {
-        tdN.textContent = "—"; tdN.title = "A 5.0 target is not reachable while any rating below 5★ exists."; tdN.style.color = "#cbd5e1"; tdN.style.fontWeight = "";
       } else {
-        const needN = Math.ceil(Nn * (Bn - Rn) / (5 - Bn));
-        tdN.textContent = needN.toLocaleString("en-IN");
-        tdN.title = "Now " + Rn + "★ over " + Nn.toLocaleString("en-IN") + " ratings. Add " + needN.toLocaleString("en-IN") + " five-star ratings to reach " + Bn + "★.";
-        tdN.style.color = "#334155"; tdN.style.fontWeight = "600";
+        const needCount = hasC ? Math.max(0, Math.ceil(Ct) - Nc) : 0;
+        let needRating = 0;
+        if (hasB && Bt < 5 && Nc > 0 && Rc < Bt) needRating = Math.ceil(Nc * (Bt - Rc) / (5 - Bt));
+        const need = Math.max(needCount, needRating);
+        const why = (hasC ? "count " + Nc.toLocaleString("en-IN") + "/" + Math.ceil(Ct) : "") + (hasC && hasB ? ", " : "") + (hasB ? "rating " + (scraped ? Rc : "—") + "★/" + Bt + "★" : "");
+        if (need <= 0) { tdN.textContent = "0"; tdN.title = "Target met (" + why + ")."; tdN.style.color = "#16a34a"; tdN.style.fontWeight = "600"; }
+        else {
+          const drv = needCount >= needRating ? "to reach count " + Math.ceil(Ct) : "to reach " + Bt + "★";
+          tdN.textContent = need.toLocaleString("en-IN");
+          tdN.title = "Now " + why + ". Add " + need.toLocaleString("en-IN") + " five-star ratings (" + drv + ").";
+          tdN.style.color = "#334155"; tdN.style.fontWeight = "600";
+        }
       }
     }
     if (iA >= 0 && tr.cells[iA]) {
@@ -2426,7 +2433,7 @@
          "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
          "Tax per order","Pack per order","Profit per order"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
-    if (["Site Price","Ratings","Count","Rating Target","5★ Needed","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
     if (["Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     return "Product";
@@ -2690,7 +2697,7 @@
     "Last Ret Charge": "value", "Last Ret Cost": "value",
     "Last 3 Ship": "value", "Ship/unit": "value", "Last Ship": "value",
     "Ret Ship/return": "value", "Last Ret Ship": "value",
-    "Ratings": "units", "Count": "units", "Rating Target": "units", "5★ Needed": "units",
+    "Ratings": "units", "Count": "units", "Count Target": "units", "Rating Target": "units", "5★ Needed": "units",
   };
   const colKind = (c) => (COMBO[c] ? COMBO[c].kind : FLAT_KIND[c] || null);
 
@@ -2701,7 +2708,7 @@
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Rating Target","5★ Needed","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link",
+      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -3358,22 +3365,27 @@
       }
       // Hand-picked marks per row: locked until the pencil is clicked, saved
       // only when Save is pressed. A blank first entry clears the mark.
-      // 5★ Needed: more 5-star ratings to hit the Rating Target you type.
-      // From current rating R over N ratings: x = ceil(N*(B-R)/(5-B)).
+      // 5★ Needed: more 5-star ratings to meet BOTH Count Target (min
+      // total ratings) and Rating Target (stars). Shows max of the two needs.
       if (c === "5★ Needed") {
         const st5 = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
-        const R5 = st5 ? Number(st5.rating) : NaN;
-        const N5 = st5 ? Number(st5.review_count) : NaN;
         const ld5 = (liveRow(r).listing_data) || {};
-        let B5 = parseFloat(ld5["Rating Target"]);
-        if (!isFinite(B5) || B5 <= 0) return '<td style="color:#cbd5e1">' + DASH + '</td>';
-        if (!isFinite(R5) || !isFinite(N5) || N5 <= 0) return '<td style="color:#cbd5e1">' + DASH + '</td>';
-        if (B5 > 5) B5 = 5;
-        if (R5 >= B5) return '<td title="Already at or above target ' + B5 + ' (now ' + R5 + '★)." style="color:#16a34a;font-weight:600">0</td>';
-        if (B5 >= 5) return '<td title="A 5.0 target is not reachable while any rating below 5★ exists." style="color:#cbd5e1">' + DASH + '</td>';
-        const need5 = Math.ceil(N5 * (B5 - R5) / (5 - B5));
-        const tip5 = 'Now ' + R5 + '★ over ' + N5.toLocaleString("en-IN") + ' ratings. Add ' + need5.toLocaleString("en-IN") + ' five-star ratings to reach ' + B5 + '★.';
-        return '<td title="' + escapeHtml(tip5) + '" style="color:#334155;font-weight:600">' + need5.toLocaleString("en-IN") + '</td>';
+        const C5 = parseFloat(ld5["Count Target"]);
+        const B5 = parseFloat(ld5["Rating Target"]);
+        const hasC = isFinite(C5) && C5 > 0, hasB = isFinite(B5) && B5 > 0;
+        const scraped = !!st5 && isFinite(Number(st5.review_count));
+        if ((!hasC && !hasB) || (!scraped && !hasC)) return '<td style="color:#cbd5e1">' + DASH + '</td>';
+        const Nc = scraped ? Number(st5.review_count) : 0;
+        const Rc = (st5 && isFinite(Number(st5.rating))) ? Number(st5.rating) : 0;
+        const needCount = hasC ? Math.max(0, Math.ceil(C5) - Nc) : 0;
+        let needRating = 0;
+        if (hasB && B5 < 5 && Nc > 0 && Rc < B5) needRating = Math.ceil(Nc * (B5 - Rc) / (5 - B5));
+        const need = Math.max(needCount, needRating);
+        const why = (hasC ? "count " + Nc.toLocaleString("en-IN") + "/" + Math.ceil(C5) : "") + (hasC && hasB ? ", " : "") + (hasB ? "rating " + (scraped ? Rc : "—") + "★/" + B5 + "★" : "");
+        if (need <= 0) return '<td title="Target met (' + escapeHtml(why) + ')." style="color:#16a34a;font-weight:600">0</td>';
+        const drv = needCount >= needRating ? "to reach count " + Math.ceil(C5) : "to reach " + B5 + "★";
+        const tip = "Now " + why + ". Add " + need.toLocaleString("en-IN") + " five-star ratings (" + drv + ").";
+        return '<td title="' + escapeHtml(tip) + '" style="color:#334155;font-weight:600">' + need.toLocaleString("en-IN") + '</td>';
       }
       if (TAG_COLS[c]) {
         const cur = String((r.listing_data || {})[c] || "");
@@ -4400,8 +4412,9 @@
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
     "Ratings": "Star rating on the live listing.",
     "Count": "Number of ratings on the live listing.",
+    "Count Target": "Minimum ratings count you want this listing to reach (e.g. 100). Type the value; blank = no count rule. Editable with pencil + scope, same as Rating Target.",
     "Rating Target": "Your desired average rating for this listing (type the value you want; blank = no calc). Edit with the pencil, then apply to this row or in bulk (Master SKU / Sub Category / Product / Color / All, per platform & company) — same as Manual Settlement.",
-    "5★ Needed": "How many more 5★ ratings this listing needs to reach the Rating Target, from the live rating and ratings count. 0 (green) = already at target; — = no target set, or not scraped / no ratings yet.",
+    "5★ Needed": "More 5★ ratings needed to meet BOTH targets: at least Count Target total ratings AND at least Rating Target stars. Shows the larger of the two. 0 (green) = both met; — = no target set (or rating-only with no scrape). Blank count counts as 0; a 5-star rating target has the rating rule off.",
     "Seller": "Seller name shown on the live listing.",
     "Link": "Opens the live listing.",
     "Focus": "Your own flag. Nothing is calculated from it.",
