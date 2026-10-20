@@ -705,7 +705,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Grouping": { def: "" }, "Count Target": { def: "" }, "Rating Target": { def: "" }, "Margin": { def: "" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
+  const NUM_COLS = { "Variation": { def: "" }, "Grouping": { def: "" }, "Count Target": { def: "" }, "Rating Target": { def: "" }, "Margin": { def: "" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -2739,13 +2739,13 @@
     "Last Ret Charge": "value", "Last Ret Cost": "value",
     "Last 3 Ship": "value", "Ship/unit": "value", "Last Ship": "value",
     "Ret Ship/return": "value", "Last Ret Ship": "value",
-    "Ratings": "units", "Count": "units", "Count Target": "units", "Rating Target": "units", "5★ Needed": "units", "Grouping": "units", "Group Rating": "units", "Group Count": "units",
+    "Ratings": "units", "Count": "units", "Count Target": "units", "Rating Target": "units", "5★ Needed": "units", "Grouping": "units", "Group Rating": "units", "Group Count": "units", "Variation": "units",
   };
   const colKind = (c) => (COMBO[c] ? COMBO[c].kind : FLAT_KIND[c] || null);
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","Variation","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Amazon Add Rs","Max Step %",
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -4427,6 +4427,7 @@
     "Grouping": "Type a group number (1, 2, 3 ...) on the rows you want to merge. Same number = one group. Editable with pencil + scope.",
     "Group Rating": "Weighted average rating the group would show if merged: sum(rating x count) / total count, across all loaded rows with the same Grouping number.",
     "Group Count": "Total ratings count of the group (sum of counts of all rows sharing the Grouping number) — what the merged listing would show.",
+    "Variation": "Your own variation number per listing. Type a number (edit with the pencil, then apply to this row or in bulk by Master SKU / Sub Category / Product / Color / All, per platform & company). Not linked to any other column — just a manual label.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
