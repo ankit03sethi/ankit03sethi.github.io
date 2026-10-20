@@ -705,7 +705,7 @@
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
-  const NUM_COLS = { "Margin": { def: "" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
+  const NUM_COLS = { "Rating Target": { def: "" }, "Margin": { def: "" }, "Auto Margin": { def: "50" }, "Auto %": { def: "" }, "Manual Margin": { def: "" }, "Manual Settlement": { def: "" }, "Max Step %": { def: "" }, "Amazon Add Rs": { def: "65" }, "Expected Settlement": { def: "" }, "MOQ": { def: "" }, "Packaging": { def: "" }, "Tax %": { def: "" }, "Promotion %": { def: "" } };
   const numOf = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
   // Expected Settlement, the one rule for Flipkart and Amazon: Manual Settlement
   // as typed; else COP + tax + packaging + Manual Margin; else the smaller of
@@ -1025,6 +1025,8 @@
     const tone = dirty ? "#b45309" : "#334155";
     const iE = heads.indexOf("Expected Settlement"), iS = heads.indexOf("Selling Price"), iP = heads.indexOf("Expected Profit");
     const iA = heads.indexOf("Auto Settlement");
+    const iNeed = heads.indexOf("5★ Needed");
+    if (iNeed >= 0 && tr.cells[iNeed]) tr.cells[iNeed].outerHTML = renderCell(r, iNeed, "5★ Needed");
     if (iA >= 0 && tr.cells[iA]) {
       const a = autoSettleCalc(rr), td = tr.cells[iA];
       td.textContent = a.val == null ? "—" : String(a.val); td.title = a.why;
@@ -2406,7 +2408,7 @@
          "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
          "Tax per order","Pack per order","Profit per order"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
-    if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Rating Target","5★ Needed","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
     if (["Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     return "Product";
@@ -2670,7 +2672,7 @@
     "Last Ret Charge": "value", "Last Ret Cost": "value",
     "Last 3 Ship": "value", "Ship/unit": "value", "Last Ship": "value",
     "Ret Ship/return": "value", "Last Ret Ship": "value",
-    "Ratings": "units", "Count": "units",
+    "Ratings": "units", "Count": "units", "Rating Target": "units", "5★ Needed": "units",
   };
   const colKind = (c) => (COMBO[c] ? COMBO[c].kind : FLAT_KIND[c] || null);
 
@@ -2681,7 +2683,7 @@
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link",
+      "Site Price","Ratings","Count","Rating Target","5★ Needed","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -3338,6 +3340,23 @@
       }
       // Hand-picked marks per row: locked until the pencil is clicked, saved
       // only when Save is pressed. A blank first entry clears the mark.
+      // 5★ Needed: more 5-star ratings to hit the Rating Target you type.
+      // From current rating R over N ratings: x = ceil(N*(B-R)/(5-B)).
+      if (c === "5★ Needed") {
+        const st5 = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const R5 = st5 ? Number(st5.rating) : NaN;
+        const N5 = st5 ? Number(st5.review_count) : NaN;
+        const ld5 = (liveRow(r).listing_data) || {};
+        let B5 = parseFloat(ld5["Rating Target"]);
+        if (!isFinite(B5) || B5 <= 0) return '<td style="color:#cbd5e1">' + DASH + '</td>';
+        if (!isFinite(R5) || !isFinite(N5) || N5 <= 0) return '<td style="color:#cbd5e1">' + DASH + '</td>';
+        if (B5 > 5) B5 = 5;
+        if (R5 >= B5) return '<td title="Already at or above target ' + B5 + ' (now ' + R5 + '★)." style="color:#16a34a;font-weight:600">0</td>';
+        if (B5 >= 5) return '<td title="A 5.0 target is not reachable while any rating below 5★ exists." style="color:#cbd5e1">' + DASH + '</td>';
+        const need5 = Math.ceil(N5 * (B5 - R5) / (5 - B5));
+        const tip5 = 'Now ' + R5 + '★ over ' + N5.toLocaleString("en-IN") + ' ratings. Add ' + need5.toLocaleString("en-IN") + ' five-star ratings to reach ' + B5 + '★.';
+        return '<td title="' + escapeHtml(tip5) + '" style="color:#334155;font-weight:600">' + need5.toLocaleString("en-IN") + '</td>';
+      }
       if (TAG_COLS[c]) {
         const cur = String((r.listing_data || {})[c] || "");
         return editCell("tagsel", c, r.id, cur, TAG_COLS[c]);
@@ -4363,6 +4382,8 @@
     "Last updated": "When the live listing was last checked. Pending = not checked yet.",
     "Ratings": "Star rating on the live listing.",
     "Count": "Number of ratings on the live listing.",
+    "Rating Target": "Your desired average rating for this listing (type the value you want; blank = no calc). Edit with the pencil, then apply to this row or in bulk (Master SKU / Sub Category / Product / Color / All, per platform & company) — same as Manual Settlement.",
+    "5★ Needed": "How many more 5★ ratings this listing needs to reach the Rating Target, from the live rating and ratings count. 0 (green) = already at target; — = no target set, or not scraped / no ratings yet.",
     "Seller": "Seller name shown on the live listing.",
     "Link": "Opens the live listing.",
     "Focus": "Your own flag. Nothing is calculated from it.",
