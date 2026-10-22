@@ -72,6 +72,7 @@
     </div>
     <div><h1>P&amp;L</h1><div class="sub">Payment-file based (payment date) · every line the platform shows, settled + scheduled till today · <span id="dLbl">last 30 days</span></div></div>
   </div>
+  <button id="refreshBtn" class="back-link" title="Naya data laao" style="cursor:pointer;border:1px solid #d0d7de;background:#fff;margin-right:8px">&#8635; Refresh</button>
   <a href="/analyst/" class="back-link">&larr; Back</a>
 </header>
 
@@ -566,6 +567,31 @@
     if(state.open.has(k))state.open.delete(k);else state.open.add(k);
     render();
   });
+  // ---- Auto-refresh --------------------------------------------------------
+  // The page caches every window in memory, so after new files land the numbers
+  // look stale until a reload. Instead: wipe the cache and re-pull whenever the
+  // tab is brought back into focus (debounced to 30s) and every 3 min while open,
+  // plus a manual Refresh button. Pure re-fetch of live RPCs - no reload, keeps
+  // the selected window/chips.
+  (function(){ try{ var st=document.createElement("style");
+    st.textContent="@keyframes caSpin{to{transform:rotate(360deg)}} #refreshBtn.spinning{animation:caSpin .8s linear infinite;display:inline-block}";
+    document.head.appendChild(st);}catch(e){} })();
+  let _lastRefresh = Date.now();
+  function refreshNow(){
+    try{ Object.keys(cache).forEach(k=>delete cache[k]); }catch(e){}
+    try{ state.orders = {}; }catch(e){}
+    _lastRefresh = Date.now();
+    const rb=document.getElementById("refreshBtn");
+    if(rb){ rb.classList.add("spinning"); setTimeout(()=>rb.classList.remove("spinning"),1200); }
+    try{ loadPay(); }catch(e){}
+    try{ loadExtras(); }catch(e){}
+  }
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.visibilityState==="visible" && Date.now()-_lastRefresh > 30000) refreshNow();
+  });
+  window.addEventListener("focus", ()=>{ if(Date.now()-_lastRefresh > 30000) refreshNow(); });
+  setInterval(()=>{ if(document.visibilityState==="visible") refreshNow(); }, 180000);
+  (function(){ const rb=document.getElementById("refreshBtn"); if(rb) rb.addEventListener("click", refreshNow); })();
 </script>
 </body>
 </html>
