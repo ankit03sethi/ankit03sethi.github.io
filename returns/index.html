@@ -153,6 +153,7 @@
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span><button id="recheckBtn" class="ghostbtn" style="margin-left:auto">&#8635; Recheck not-found</button><button id="delNfBtn" class="ghostbtn" style="margin-left:8px;color:#b91c1c">&#128465; Delete not-found</button></div>
     <div class="tabbar"><span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span><button class="ctab" data-c="Good" aria-selected="false">Good</button><button class="ctab" data-c="Damaged" aria-selected="false">Damaged</button><button class="ctab" data-c="Wrong" aria-selected="false">Wrong</button><button class="ctab" data-c="fault" aria-selected="false">Our Fault</button></div>
+    <div id="nfReasons" style="margin:8px 0;display:none"></div>
     <div class="scroll">
       <table>
         <thead><tr><th>Time</th><th>AWB</th><th>Order ID</th><th>Other ID</th><th>Status</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Condition</th></tr></thead>
@@ -218,6 +219,20 @@
     return "<select class='condsel "+esc(cur)+"' data-awb='"+esc(r.awb)+"' data-sku='"+esc(r.sku||"")+"'>"+opts+"</select>";
   }
 
+  let nfReason={}, nfCounts={}, nfReasonFilter="all";
+  async function loadNfReasons(){
+    try {
+      const {from,to}=dateRange();
+      const rc = await sb.rpc("return_notfound_json",{p_from:from,p_to:to});
+      const arr = Array.isArray(rc.data)?rc.data:[];
+      const NK=s=>String(s||"").trim().toUpperCase();
+      nfReason={}; nfCounts={CANCELLED:0,RETURN_FILE_MISSING:0,UNKNOWN:0};
+      arr.forEach(j=>{ const rs=j.reason||"UNKNOWN"; if(NK(j.awb)) nfReason[NK(j.awb)]=rs; if(NK(j.order_id)) nfReason["OID:"+NK(j.order_id)]=rs; nfCounts[rs]=(nfCounts[rs]||0)+1; });
+    } catch(e){ nfReason={}; nfCounts={CANCELLED:0,RETURN_FILE_MISSING:0,UNKNOWN:0}; }
+  }
+  function nfReasonOf(r){ const NK=s=>String(s||"").trim().toUpperCase(); return nfReason[NK(r.awb)] || nfReason["OID:"+NK(r.order_id)] || "UNKNOWN"; }
+  function nfTag(r){ const rs=nfReasonOf(r); const m={CANCELLED:["Cancelled","#dcfce7","#166534"],RETURN_FILE_MISSING:["Return file missing","#fef3c7","#92400e"],UNKNOWN:["Unknown","#fee2e2","#991b1b"]}; const d=m[rs]||m.UNKNOWN; return "<span style='background:"+d[1]+";color:"+d[2]+";padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700'>"+d[0]+"</span>"; }
+
   function rowHtml(r){
     const ok = r.status === "OK";
     const fault = isFault(r);
@@ -229,7 +244,7 @@
       "<td class='mono'>"+esc(r.sku||"-")+"</td>"+
       "<td>"+esc(r.platform||"-")+"</td>"+
       "<td>"+esc(r.company_name||"-")+"</td>"+
-      "<td class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</td>"+
+      "<td>"+(r.status==="OK"?("<span class='muted'>"+esc((r.return_reason||"").slice(0,40))+"</span>"):nfTag(r))+"</td>"+
       "<td>"+condCell(r)+"</td></tr>";
   }
 
@@ -383,7 +398,16 @@
     counts.total = counts.ok + counts.bad;
     counts.fault = base.filter(isFault).length;
     setCounts();
-    const rows = base.filter(statusMatch);
+    let rows = base.filter(statusMatch);
+    const nfBox = document.getElementById("nfReasons");
+    if (cardFilter==="notfound" && nfBox){
+      nfBox.style.display="block";
+      const total=(nfCounts.CANCELLED||0)+(nfCounts.RETURN_FILE_MISSING||0)+(nfCounts.UNKNOWN||0);
+      const chip=(k,lbl,n,col)=>"<button class='wlchip' data-nf='"+k+"' aria-selected='"+((nfReasonFilter===k)?"true":"false")+"'>"+lbl+" <b style='color:"+col+"'>"+n+"</b></button>";
+      nfBox.innerHTML="<b class='muted' style='margin-right:6px'>Reason:</b>"+chip("all","All",total,"#334155")+chip("CANCELLED","Cancelled",nfCounts.CANCELLED||0,"#166534")+chip("RETURN_FILE_MISSING","Return file missing",nfCounts.RETURN_FILE_MISSING||0,"#92400e")+chip("UNKNOWN","Unknown",nfCounts.UNKNOWN||0,"#991b1b");
+      nfBox.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ nfReasonFilter=b.dataset.nf; render(); }));
+      if (nfReasonFilter!=="all") rows = rows.filter(r=>nfReasonOf(r)===nfReasonFilter);
+    } else if (nfBox){ nfBox.style.display="none"; }
     $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("")
       : "<tr><td colspan='10' class='muted' style='padding:16px'>Is filter mein koi scan nahi.</td></tr>";
     $("#listNote").textContent = rows.length ? ("("+rows.length+" dikha rahe)") : "";
@@ -472,6 +496,7 @@
     // API caps a call at 1000 rows — page through so every scan is loaded, no 1000 lock.
     const rg = scanRange(); const { data, error } = await sb.rpc("return_scan_list_json", rg);
     allRows = (error || !Array.isArray(data)) ? [] : data;
+    await loadNfReasons();
     render();
     loadExpected();
   }
