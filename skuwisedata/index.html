@@ -1912,7 +1912,7 @@
     // platform means pulling all ~27,000 rows into the page, which froze the
     // browser. Ask for a company or a platform first; the rows already loaded
     // stay filtered as they are.
-    if (state.view === "sku_master" && !state.search && !state.company && !state.platform) {
+    if (state.view === "sku_master" && !state.search && !state.company && !state.platform && (state.grandTotal || state.total || 0) > 30000) {
       $("#rowCount").textContent = rowCountLabel() + " \u00b7 pick a company or platform to filter every row";
       return;
     }
