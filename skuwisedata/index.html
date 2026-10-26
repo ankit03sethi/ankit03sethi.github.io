@@ -1594,11 +1594,11 @@
     if (!table) return;
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
     const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller",
-                   "Our Price": "our_price", "Our Assured": "our_assured",
+                   "Our Price": "our_price", "Our Assured": "our_assured", "Suppressed": "suppressed",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
                    "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ AP": "moq_if", "Suggested Settlement": "sugg_price", "Suggested Profit": "sugg_price" };
-    const EXTRA = new Set(["Our Price", "Our Assured", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
+    const EXTRA = new Set(["Our Price", "Our Assured", "Suppressed", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -1668,6 +1668,7 @@
           continue;
         }
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
+        if (c === "Suppressed") v = v ? "Suppressed" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         if (c === "Mapped") v = st.mapped ? "Yes" : "";
         if (c === "Last updated") v = lastUpdatedText(st);
@@ -1795,6 +1796,13 @@
       const { data, error } = await sb.rpc("sku_listing_stats", { p_keys: slice });
       if (error) { console.warn("sku_listing_stats failed", error); continue; }   // keep going; what we have stays
       for (const r of (data || [])) state.listingStats.set(wcKey(r.company_name, r.platform, r.sku), r);
+      try {
+        const sp = await sb.rpc("sku_suppressed", { p_keys: slice });
+        if (!sp.error) for (const rr of (sp.data || [])) {
+          const stS = state.listingStats.get(wcKey(rr.company_name, rr.platform, rr.sku));
+          if (stS) stS.suppressed = true;
+        }
+      } catch (e) { /* suppressed optional */ }
       // Slope per SKU (for Suggested Settlement / Profit) - a light separate RPC.
       try {
         const sl = await sb.rpc("sku_slopes", { p_keys: slice });
@@ -2475,7 +2483,7 @@
          "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
          "Tax per order","Pack per order","Profit per order"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
-    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Our Price","Our Assured","Suppressed","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
     if (["Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     return "Product";
@@ -2750,7 +2758,7 @@
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Last updated","Link","Stop Selling",
+      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Suppressed","Last updated","Link","Stop Selling",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -2883,7 +2891,7 @@
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         return st ? lastUpdatedText(st) : "";
       }
-      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Mapped"].includes(col)) {
+      if (["Site Price","Ratings","Count","Seller","Our Price","Our Assured","Suppressed","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Mapped"].includes(col)) {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
           // Other Seller / Other Price: Flipkart's "See other sellers" list,
@@ -2894,6 +2902,7 @@
                   : col === "Count"         ? st.review_count
                   : col === "Our Price"     ? st.our_price
                   : col === "Our Assured"   ? (st.our_assured ? "F Assured" : "")
+                  : col === "Suppressed"    ? (st.suppressed ? "Suppressed" : "")
                   : col === "File Price"    ? st.file_price
                   : col === "Suggested Price" ? suggText(st)
                   : col === "Mapped"        ? (st.mapped ? "Yes" : "")
@@ -4433,6 +4442,7 @@
     "SKU": "The seller SKU this platform uses.",
     "Master Sku": "Your own code that ties the same product across platforms.",
     "Platform Seller": "Our own seller name on this company + platform (e.g. Shopperskart sells on Flipkart as 365available).",
+    "Suppressed": "Amazon/Flipkart only. Suppressed = scrape ki other-sellers list mein humara Platform Seller naam nahi mila - yani humara offer live nahi dikh raha (page headline pe naam ho tab bhi). Blank = naam list mein hai, ya list capture nahi hui / abhi check nahi hui. Meesho/FirstCry pe hamesha blank.",
     "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
     "Our Assured": "F Assured when our Platform Seller carries the Assured badge in that list.",
     "Margin": "Floor: the settlement never goes below COP + tax + packaging + this, whether or not a competitor is being priced against. Blank = 10. Type a number; it saves at once.",
