@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-27b</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-27c</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -705,7 +705,7 @@
   // 2026-09-25: Advertising - your own Yes / No mark per listing (after Focus).
   // Saved in listing_data like the other tags; filter it from the column header.
   // 2026-10-10: Priority - your own 1..10 pick per listing (after Advertising). Same save/filter path.
-  const TAG_COLS = { "Advertising": ["Yes", "No"], "Stop Selling": ["Yes"], "Priority": ["1","2","3","4","5","6","7","8","9","10"] };   // MOQ moved to the typed columns (site value wins)
+  const TAG_COLS = { "Advertising": ["Yes", "No"], "Stop Selling": ["Yes"], "Others": ["Plain", "Big"], "Priority": ["1","2","3","4","5","6","7","8","9","10"] };   // MOQ moved to the typed columns (site value wins)
   // 2026-09-26: these master text columns filter IN THE DATABASE. The dropdown
   // lists every value the account has (sku_master_col_values), not just the
   // rows already loaded, and picking one reloads the table with the matches.
@@ -2762,7 +2762,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Product","Color","Mapped","MOQ","MOQ AP","Variation","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Others","Product","Color","Mapped","MOQ","MOQ AP","Variation","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Amazon Add Rs","Max Step %",
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -3454,6 +3454,10 @@
         const drv = needCount >= needRating ? "to reach count " + Math.ceil(C5) : "to reach " + B5 + "★";
         const tip = "Now " + why + ". Add " + need.toLocaleString("en-IN") + " five-star ratings (" + drv + ").";
         return '<td title="' + escapeHtml(tip) + '" style="color:#334155;font-weight:600">' + need.toLocaleString("en-IN") + '</td>';
+      }
+      if (c === "Others") {
+        const sc0 = String(r.sub_category || (r.listing_data||{})["Sub Category"] || (r.raw_data||{})["Sub Category"] || "");
+        if (!/foil balloon 32.*number/i.test(sc0)) return "<td></td>";
       }
       if (TAG_COLS[c]) {
         const cur = String((r.listing_data || {})[c] || "");
@@ -4492,6 +4496,7 @@
     "Link": "Opens the live listing.",
     "Focus": "Your own flag. Nothing is calculated from it.",
     "Stop Selling": "Apna Yes / blank mark per listing. Yes = jab inventory/stock file banegi to is SKU ki qty 0 jayegi (godown mein stock available ho tab bhi); listing band/inactive nahi hoti. Blank karo to qty wapas Kit Qty pe aa jati hai. Pencil se edit, phir Save pe single row ya bulk (Master SKU / Sub Category / Product / Color / All, per platform & company). Teeno platforms pe lagta hai.",
+    "Others": "Sirf 32-inch foil number balloons ke liye: agar SKU mein big ya set likha ho to Big, warna Plain (master ke doosre rows ke SKU se bhi derive hota hai). Baaki products mein blank. Pencil se edit + bulk (Master SKU / Sub Category / Product / Color / All, per platform & company).",
     "Advertising": "Your own Yes / No mark: is this listing being advertised? Click the pencil, pick, then Save. Filter the column from its header.",
     "Priority": "Your own 1-10 pick per listing. Click the pencil, pick, then Save. Filter the column from its header.",
     "Row Color": "The colour this row carries in the active timeframe (Sold sort 30/60/90): Red = green gone cold (0 in 3 days), Green = at threshold and trending up over 7 days, Light Green = at threshold, flat/down, Orange = focused before but below threshold now, White = none.",
