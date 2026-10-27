@@ -335,7 +335,7 @@
     </div>
     <div>
       <div class="brand-wordmark">cursive<sup>&reg;</sup></div>
-      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-27a</div>
+      <div class="nav-sub">SKU Wise Data &middot; Cursive Analyst &middot; build 2026-10-27b</div>
     </div>
   </a>
   <div class="topbar-right">
@@ -618,12 +618,21 @@
     // Platform stock, off the newest inventory export per company + platform.
     // A SKU missing from an export that exists is Inactive; a company +
     // platform with no export at all shows a dash, not a false Inactive.
-    const sm = new Map(), have = new Set();
+    const sm = new Map(), have = new Set(), sidm = new Map();
     for (const r of st) {
       sm.set(wcKey(r.company_name, r.platform, r.sku), r);
       have.add(wcKey(r.company_name, r.platform, ""));
+      // ID-first matching: also key the stock by the platform's own id (FSN / ASIN / FC id ...).
+      if (r.platform_id != null && String(r.platform_id).trim() !== "") sidm.set(wcKey(r.company_name, r.platform, r.platform_id), r);
     }
-    state.stockMap = sm; state.stockHave = have;
+    state.stockMap = sm; state.stockHave = have; state.stockIdMap = sidm;
+    // Each listing's own platform id (FSN/ASIN/...), so stock is matched by id first and SKU only as a fallback.
+    try {
+      const { data: li } = await sb.rpc("sku_listing_id_map_json");
+      const idm = new Map();
+      for (const r of (Array.isArray(li) ? li : [])) if (r && r.platform_id) idm.set(wcKey(r.company_name, r.platform, r.sku), r.platform_id);
+      state.listingIdMap = idm;
+    } catch (e) { state.listingIdMap = state.listingIdMap || new Map(); }
   }
 
   // ---- 1. Companies dropdown ----
@@ -856,7 +865,7 @@
     const spKey = wcKey(r.company_name, r.platform, r.seller_sku);
     const stp = state.listingStats && state.listingStats.get(spKey);
     const wcp = state.windowCounts && state.windowCounts.get(spKey);
-    const stk = state.stockMap && state.stockMap.get(spKey);
+    const stk = stockFor(r);
     // Every selling-price source with its date - scrape, last order, and (mainly
     // Flipkart) the inventory file. The freshest one wins.
     const cand = [];
@@ -908,7 +917,7 @@
     const wc = state.windowCounts && state.windowCounts.get(key);
     const st = state.listingStats && state.listingStats.get(key);
     const rd0 = r.raw_data || {}, ld0 = r.listing_data || {};
-    const stk = state.stockMap && state.stockMap.get(key);
+    const stk = stockFor(r);
     const su = wc ? Number(wc.settle_unit) : NaN;
     // Flipkart observed price: the price/inventory-file price. It is in the stock
     // map (loaded before the table paints) and in listing stats (loaded a few
@@ -2144,7 +2153,7 @@
       const key = wcKey(r.company_name, r.platform, r.seller_sku);
       const wc = state.windowCounts.get(key);
       if (wc) for (const k in sales) sales[k] += Number(wc[k]) || 0;
-      const st = state.stockMap && state.stockMap.get(key);
+      const st = stockFor(r);
       if (!st || ["INACTIVE","REJECTED"].includes(String(st.listing_status || "").toUpperCase())) inactive++;
       else active++;
     }
@@ -3391,7 +3400,7 @@
       // platform's seller SKU) = Active (any qty, including 0); not in the file =
       // Inactive. No dash. Qty is the raw number from that export.
       if (c === "P Qty" || c === "Qty") {
-        const st = state.stockMap.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const st = stockFor(r);
         if (c === "Qty") {
           if (!st) return `<td style="color:#cbd5e1">${DASH}</td>`;
           const qn = Number(st.qty);
@@ -4662,6 +4671,19 @@
   const wcKey = (co, plat, sku) =>
     [String(co || "").replace(/\s+/g, "").toLowerCase(), String(plat || "").replace(/\s+/g, "").toLowerCase(),
      String(sku || "").replace(/\s+/g, "").toLowerCase()].join("|");
+
+  // Stock row for a listing: match by the platform's own id (FSN/ASIN/FC id) first,
+  // SKU only as a fallback - so a SKU-code drift never shows a live listing as Inactive.
+  const stockFor = (r) => {
+    if (!r) return undefined;
+    const key = wcKey(r.company_name, r.platform, r.seller_sku);
+    const lid = state.listingIdMap && state.listingIdMap.get(key);
+    if (lid && state.stockIdMap) {
+      const byId = state.stockIdMap.get(wcKey(r.company_name, r.platform, lid));
+      if (byId) return byId;
+    }
+    return state.stockMap && state.stockMap.get(key);
+  };
 
   // Company + platform key for the seller-name map. The server hands the
   // company back as its space-free key, so spaces are dropped here too.
