@@ -1567,7 +1567,7 @@
     // A search's remaining pages load as you scroll (smooth); an active column
     // filter pulls its full set only when you actually change it, not on every
     // reload - so returning to the page never re-streams the whole table.
-    if (state.search) loadAllForFilter();
+    if (state.search || (state.view === "sku_master" && (state.platform || state.company))) loadAllForFilter();
   }
 
   // Three independent lookups, run together rather than in a chain, once the
@@ -1914,7 +1914,7 @@
   // applied as rows arrive, until the full set is loaded.
   async function loadAllForFilter() {
     if (state.view === "uploads") return;
-    if (!state.search && !filtersActive() && !colorFilterActive()) return;
+    if (!state.search && !filtersActive() && !colorFilterActive() && !(state.view === "sku_master" && (state.platform || state.company))) return;
     if (state.loadingAll) return;
     // 2026-09-25: a column / colour filter over every company AND every
     // platform means pulling all ~27,000 rows into the page, which froze the
