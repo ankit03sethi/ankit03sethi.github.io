@@ -104,6 +104,14 @@ tr.rowred td{background:#ffecec}
 .pstile .pb{font-size:26px;font-weight:800;margin:4px 0 2px;color:#0f172a}
 .pstile .pb.warn{color:#b45309}.pstile .pb.bad{color:#b91c1c}.pstile .pb.ok{color:#047857}
 .pstile .ps{font-size:12px;color:#6b7280;font-weight:600}
+.card-head{align-items:flex-start}
+.ch-main{flex:1;min-width:0}
+.ch-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
+.headstats{display:flex;gap:18px;flex-wrap:wrap;justify-content:flex-end}
+.hstat{text-align:right}
+.hstat .hv{font-size:20px;font-weight:800;color:#0f172a;line-height:1.1}
+.hstat .hv.warn{color:#b45309}.hstat .hv.bad{color:#b91c1c}.hstat .hv.ok{color:#047857}
+.hstat .hl{font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
 </style>
 </head>
 <body>
@@ -124,6 +132,7 @@ tr.rowred td{background:#ffecec}
   </div>
   <div class="chips" id="platChips"></div>
   <div class="chips" id="coChips" style="margin-bottom:10px"></div>
+  <div class="chips" id="dateChips" style="margin-bottom:10px;align-items:center"></div>
   <div class="chips" id="repTabs" style="margin-bottom:18px;font-weight:800;font-size:13px"></div>
 
   <section class="section" id="secOrders" data-perm="reports.orders">
@@ -133,7 +142,6 @@ tr.rowred td{background:#ffecec}
 
   <section class="section" id="secPayments" data-perm="reports.payments">
     <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
-    <div class="paysum" id="paySum"></div>
     <div id="wrapPayments"></div>
   </section>
 
@@ -285,6 +293,10 @@ const REPORTS = [
   {
     id: "unpaid", sec: "Payments",
     title: "Payment not received",
+    headStats: (rows) => [
+      { l: "Orders", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" },
+      { l: "At stake", v: money(sum(rows, "value")), cls: rows.length ? "bad" : "" }
+    ],
     desc: "Orders placed 45 or more days ago that are not cancelled, are not sitting in a returns file, and have no money against them in any payment file.",
     src: "check", pick: (r) => r.bucket === "payment not received",
     dateRange: true,
@@ -300,6 +312,15 @@ const REPORTS = [
   {
     id: "belowexp", sec: "Payments",
     title: "Receiving less than Expected",
+    headStats: (rows) => {
+      const red = rows.filter((x) => x.cop_known && num(x.profit) < 0);
+      const sh = Math.round(rows.reduce((t, x) => t + (num(x.expected) - num(x.received)), 0));
+      return [
+        { l: "SKUs", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+        { l: "Below COP", v: red.length.toLocaleString("en-IN"), cls: red.length ? "bad" : "" },
+        { l: "Shortfall", v: money(sh), cls: "warn" }
+      ];
+    },
     desc: "Each SKU's latest paid order where the money received (settled + upcoming) is less than its Suggested Settlement \u2014 the competitor-driven target the next price update drives to. Rows in light red received less than COP, an outright loss.",
     src: "profit", latestPerSku: true,
     dateRange: true,
@@ -322,6 +343,18 @@ const REPORTS = [
   {
     id: "paid", sec: "Payments",
     title: "Orders paid successfully",
+    headStats: (rows) => {
+      const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
+      const sku = (a) => new Set(a.map((x) => [x.platform, x.company_name, x.sku].join("\u0001"))).size;
+      const corr = rows.filter((x) => hx(x) && num(x.received) >= num(x.expected));
+      const less = rows.filter((x) => hx(x) && num(x.received) < num(x.expected));
+      const loss = rows.filter((x) => x.cop_known && num(x.profit) < 0);
+      return [
+        { l: "Correct", v: sku(corr).toLocaleString("en-IN"), cls: "ok" },
+        { l: "Received less", v: sku(less).toLocaleString("en-IN"), cls: "warn" },
+        { l: "Below COP", v: sku(loss).toLocaleString("en-IN"), cls: loss.length ? "bad" : "" }
+      ];
+    },
     desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
     src: "profit", pick: (r) => num(r.received) > 0,
     expFilters: true,
@@ -448,7 +481,7 @@ function latestPerSku(rows) {
 }
 
 /* ---------- state ------------------------------------------------------ */
-const state = { check: null, profit: null, nocost: null, orders: null, missing: null, plat: "", co: "", q: "", ui: {} };
+const state = { check: null, profit: null, nocost: null, orders: null, missing: null, plat: "", co: "", q: "", dFrom: null, dTo: null, dPreset: null, ui: {} };
 for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300, picks: {}, expanded: new Set() };
 
 /* ---------- boot ------------------------------------------------------- */
@@ -461,6 +494,7 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   CA.apply();
   buildCards();
   buildTabs();
+  buildDateChips();
   $("#gc").style.display = "flex";
   $("#refresh").addEventListener("click", () => load(true));
   $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
@@ -517,6 +551,40 @@ async function load(force) {
 }
 
 /* ---------- chips ------------------------------------------------------ */
+function buildDateChips() {
+  const host = $("#dateChips");
+  if (!host) return;
+  host.innerHTML = "";
+  const iso = (dt) => dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+  const lbl = document.createElement("span");
+  lbl.className = "muted"; lbl.style.cssText = "font-size:12px;font-weight:700;margin-right:4px"; lbl.textContent = "Order date:";
+  host.appendChild(lbl);
+  const mk = (text, active, onClick) => {
+    const c = document.createElement("span");
+    c.className = "chip" + (active ? " active" : "");
+    c.textContent = text;
+    c.addEventListener("click", onClick);
+    host.appendChild(c);
+  };
+  mk("All time", !state.dFrom && !state.dTo && state.dPreset == null, () => { state.dFrom = null; state.dTo = null; state.dPreset = null; buildDateChips(); renderAll(); });
+  for (const n of [7, 15, 30, 60, 90]) {
+    mk(n + "d", state.dPreset === n, () => {
+      const from = new Date(); from.setDate(from.getDate() - (n - 1));
+      state.dFrom = iso(from); state.dTo = iso(new Date()); state.dPreset = n; buildDateChips(); renderAll();
+    });
+  }
+  mk("Custom", state.dPreset === "custom", () => { state.dPreset = "custom"; buildDateChips(); renderAll(); });
+  if (state.dPreset === "custom") {
+    const wrap = document.createElement("span");
+    wrap.style.cssText = "display:inline-flex;gap:6px;align-items:center;margin-left:6px";
+    wrap.innerHTML = '<input type="date" id="gdf" value="' + (state.dFrom || "") + '" style="padding:4px 6px"> <span class="muted" style="font-size:12px">to</span> <input type="date" id="gdt" value="' + (state.dTo || "") + '" style="padding:4px 6px">';
+    host.appendChild(wrap);
+    const gdf = $("#gdf"), gdt = $("#gdt");
+    gdf.addEventListener("change", () => { state.dFrom = gdf.value || null; renderAll(); });
+    gdt.addEventListener("change", () => { state.dTo = gdt.value || null; renderAll(); });
+  }
+}
+
 function buildChips() {
   const all = [...(state.check || []), ...(state.profit || []), ...(state.nocost || []), ...(state.orders || [])];
   const plats = [...new Set(all.map((r) => r.platform).filter(Boolean))].sort();
@@ -547,8 +615,8 @@ function buildCards() {
     card.id = "card_" + r.id;
     card.innerHTML =
       '<div class="card-head" data-id="' + r.id + '">' +
-        "<div><h3>" + esc(r.title) + '</h3><p class="desc">' + esc(r.desc) + "</p></div>" +
-        '<span class="pill need" id="pill_' + r.id + '">…</span>' +
+        '<div class="ch-main"><h3>' + esc(r.title) + '</h3><p class="desc">' + esc(r.desc) + "</p></div>" +
+        '<div class="ch-right"><span class="pill need" id="pill_' + r.id + '">…</span><div class="headstats" id="hs_' + r.id + '"></div></div>' +
       "</div>" +
       '<div class="body" id="body_' + r.id + '"></div>';
     card.querySelector(".card-head").addEventListener("click", async () => {
@@ -603,12 +671,12 @@ function rowsFor(r, skipCol) {
       String(row.order_ref || "").toLowerCase().includes(q) ||
       String(row.master_sku || "").toLowerCase().includes(q));
   }
-  if (r.dateRange && (u.dFrom || u.dTo)) {
+  if (state.dFrom || state.dTo) {
     out = out.filter((row) => {
       const d = String(row.ordered_on || "");
-      if (!d) return false;
-      if (u.dFrom && d < u.dFrom) return false;
-      if (u.dTo && d > u.dTo) return false;
+      if (!d) return true;
+      if (state.dFrom && d < state.dFrom) return false;
+      if (state.dTo && d > state.dTo) return false;
       return true;
     });
   }
@@ -704,6 +772,8 @@ function render(r) {
     return;
   }
   card.classList.remove("locked");
+  { const hsEl = document.getElementById("hs_" + r.id);
+    if (hsEl) hsEl.innerHTML = r.headStats ? r.headStats(rows).map((st) => '<div class="hstat"><div class="hv ' + (st.cls || "") + '">' + esc(String(st.v)) + '</div><div class="hl">' + esc(st.l) + '</div></div>').join("") : ""; }
   const n = rows.length;
   const grouped = !!r.groupBy && u.open;
   let disp = rows;
@@ -737,13 +807,6 @@ function render(r) {
   h += "</div>";
 
   h += '<div class="controls">';
-  if (r.dateRange) {
-    h += '<label style="font-size:12px">Order date</label>';
-    h += '<input type="date" id="df_' + r.id + '" value="' + (u.dFrom || "") + '" style="width:140px">';
-    h += '<span class="muted" style="font-size:12px">to</span>';
-    h += '<input type="date" id="dt_' + r.id + '" value="' + (u.dTo || "") + '" style="width:140px">';
-    if (u.dFrom || u.dTo) h += '<button class="ghost" id="dclr_' + r.id + '">Clear</button>';
-  }
   if (r.expFilters) {
     const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
     const corr = (x) => hx(x) && num(x.received) >= num(x.expected);
@@ -817,12 +880,6 @@ function render(r) {
     const fab = $("#fab_" + r.id), fbl = $("#fbl_" + r.id);
     if (fab) fab.addEventListener("click", (e) => { e.stopPropagation(); u.expFilter = u.expFilter === "above" ? null : "above"; render(r); });
     if (fbl) fbl.addEventListener("click", (e) => { e.stopPropagation(); u.expFilter = u.expFilter === "below" ? null : "below"; render(r); });
-  }
-  if (r.dateRange) {
-    const df = $("#df_" + r.id), dt = $("#dt_" + r.id), dc = $("#dclr_" + r.id);
-    if (df) df.addEventListener("change", (e) => { e.stopPropagation(); u.dFrom = df.value || null; render(r); });
-    if (dt) dt.addEventListener("change", (e) => { e.stopPropagation(); u.dTo = dt.value || null; render(r); });
-    if (dc) dc.addEventListener("click", (e) => { e.stopPropagation(); u.dFrom = null; u.dTo = null; render(r); });
   }
   body.querySelectorAll("tr.grp").forEach((tr) => tr.addEventListener("click", (e) => {
     if (e.target.closest("thead")) return;
@@ -957,27 +1014,6 @@ function openFPanel(r, btn) {
   window.addEventListener("resize", closeFPanel, { once: true });
 }
 
-function renderPaySummary() {
-  const host = document.getElementById("paySum");
-  if (!host) return;
-  const ck = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
-  const chip = (row) => (!state.plat || row.platform === state.plat) && (!state.co || ck(row.company_name) === ck(state.co));
-  const paid = (state.profit || []).filter((r) => num(r.received) > 0 && chip(r));
-  const hx = (r) => r.expected != null && num(r.expected) > 0 && r.cop_known;
-  const less = paid.filter((r) => hx(r) && num(r.received) < num(r.expected));
-  const corr = paid.filter((r) => hx(r) && num(r.received) >= num(r.expected));
-  const loss = paid.filter((r) => r.cop_known && num(r.profit) < 0);
-  const unp = (state.check || []).filter((r) => r.bucket === "payment not received" && chip(r));
-  const skuN = (arr) => new Set(arr.map((r) => [r.platform, r.company_name, r.sku].join("\u0001"))).size;
-  const tile = (label, big, sub, cls) => '<div class="pstile"><div class="pl">' + esc(label) + '</div><div class="pb ' + (cls || "") + '">' + esc(big) + '</div><div class="ps">' + esc(sub) + '</div></div>';
-  host.innerHTML =
-    tile("Paid orders", paid.length.toLocaleString("en-IN"), money(sum(paid, "received")) + " received", "") +
-    tile("Received less than expected", skuN(less).toLocaleString("en-IN") + " SKUs", less.length.toLocaleString("en-IN") + " orders \u00b7 " + money(Math.round(sum(less, "expected") - sum(less, "received"))) + " short", "warn") +
-    tile("At / above expected", skuN(corr).toLocaleString("en-IN") + " SKUs", corr.length.toLocaleString("en-IN") + " orders \u00b7 " + money(sum(corr, "received")) + " received", "ok") +
-    tile("Below COP \u2014 loss", skuN(loss).toLocaleString("en-IN") + " SKUs", loss.length.toLocaleString("en-IN") + " orders \u00b7 " + money(sum(loss, "profit")) + " loss", "bad") +
-    tile("Payment not received", unp.length.toLocaleString("en-IN") + " orders", money(sum(unp, "value")) + " at stake", "bad");
-}
-
 function renderAll() {
   for (const r of REPORTS) render(r);
   for (const sec of ["Orders", "Payments", "Returns", "Missings"]) {
@@ -985,7 +1021,6 @@ function renderAll() {
     const live = list.filter((r) => { const x = rowsFor(r); return x && x.length; }).length;
     $("#cnt" + sec) && ($("#cnt" + sec).textContent = list.length + (list.length === 1 ? " report" : " reports") + (live ? " · " + live + " with hits" : ""));
   }
-  try { renderPaySummary(); } catch (e) {}
 }
 
 /* ---------- csv -------------------------------------------------------- */
