@@ -212,6 +212,7 @@ const COL = {
   co:     { k: "company_name", l: "Company",   t: "txt"  },
   ref:    { k: "order_ref",    l: "Order ref", t: "txt"  },
   sku:    { k: "sku",          l: "SKU",       t: "txt"  },
+  skuL:   { k: "sku",          l: "SKU",       t: "skulink" },
   msku:   { k: "master_sku",   l: "Master SKU",t: "txt"  },
   ord:    { k: "ordered_on",   l: "Ordered",   t: "date" },
   age:    { k: "age_days",     l: "Days old",  t: "int"  },
@@ -277,7 +278,7 @@ const REPORTS = [
     title: "Payment not received",
     desc: "Orders placed 45 or more days ago that are not cancelled, are not sitting in a returns file, and have no money against them in any payment file.",
     src: "check", pick: (r) => r.bucket === "payment not received",
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.age, COL.stat, COL.val],
+    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.ord, COL.age, COL.stat, COL.val],
     sort: { k: "age_days", dir: -1 },
     kpis: (rows) => [
       { l: "Orders", n: rows.length, cls: rows.length ? "bad" : "" },
@@ -291,7 +292,7 @@ const REPORTS = [
     title: "Orders paid successfully",
     desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
     src: "profit", pick: (r) => num(r.received) > 0,
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
     sort: { k: "received", dir: -1 },
     kpis: (rows) => {
       const p = rows.filter((r) => r.cop_known);
@@ -312,7 +313,7 @@ const REPORTS = [
     src: "profit", latestPerSku: true,
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0 && num(r.received) < num(r.expected),
     rowRed: (r) => r.cop_known && num(r.profit) < 0,
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
     sort: { k: "profit", dir: 1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => r.cop_known && num(r.profit) < 0);
@@ -456,11 +457,12 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
 async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
-  const [a, b, c, sg] = await Promise.all([
+  const [a, b, c, sg, lk] = await Promise.all([
     sb.rpc("seller_order_money_check", { _days: 45 }),
     sb.rpc("seller_paid_profit_json"),
     sb.rpc("seller_skus_missing_cost"),
-    sb.rpc("sku_suggested_settle_map_json")
+    sb.rpc("sku_suggested_settle_map_json"),
+    sb.rpc("sku_product_link_map_json")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
@@ -476,6 +478,19 @@ async function load(force) {
     for (const r of state.profit) {
       const su = sm.get(skn(r.company_name) + "|" + skn(r.platform) + "|" + String(r.sku || ""));
       if (su != null && isFinite(su)) { r.suggested = su; r.expected = Math.round(su * num(r.qty)); }
+    }
+  }
+  // Product link per SKU (marketplace listing URL), attached to the paid and
+  // unpaid rows so the SKU in the Payments reports links to its live product page.
+  { const lm = new Map();
+    if (!lk.error) for (const e of (lk.data || [])) lm.set(e.key, e.url);
+    const skn2 = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
+    for (const list of [state.profit, state.check]) {
+      if (!list) continue;
+      for (const r of list) {
+        const u = lm.get(skn2(r.company_name) + "|" + skn2(r.platform) + "|" + skn2(r.sku));
+        if (u) r.product_url = u;
+      }
     }
   }
   state.nocost = c.error ? [] : (c.data || []);
@@ -634,6 +649,13 @@ function cell(row, c) {
       const u = t.toUpperCase();
       const cls = /LOST|DAMAG|F$/.test(u) ? " bad" : /RTO|RETURN|PEND/.test(u) ? " warn" : "";
       return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
+    }
+    case "skulink": {
+      if (!v) return '<td><span class="muted">—</span></td>';
+      const txt = esc(String(v));
+      return row.product_url
+        ? '<td><a href="' + esc(row.product_url) + '" target="_blank" rel="noopener noreferrer">' + txt + "</a></td>"
+        : "<td>" + txt + "</td>";
     }
     default: return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
   }
