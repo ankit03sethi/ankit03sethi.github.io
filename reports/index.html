@@ -97,6 +97,7 @@ table.sub th{font-size:11px;color:#6b7280;text-align:left;padding:4px 10px;borde
 table.sub td{padding:4px 10px;border-bottom:1px solid #f1f1f1;font-size:12px}
 table.sub th.num,table.sub td.num{text-align:right}
 tr.rowred td{background:#ffecec}
+.ghost.on{background:#1f6feb;color:#fff;border-color:#1f6feb}
 </style>
 </head>
 <body>
@@ -288,25 +289,6 @@ const REPORTS = [
     empty: "Nothing outstanding. Every order older than 45 days has either been paid, cancelled, or is accounted for as a return."
   },
   {
-    id: "paid", sec: "Payments",
-    title: "Orders paid successfully",
-    desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
-    src: "profit", pick: (r) => num(r.received) > 0,
-    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
-    sort: { k: "received", dir: -1 },
-    kpis: (rows) => {
-      const p = rows.filter((r) => r.cop_known);
-      return [
-        { l: "Orders paid", n: rows.length.toLocaleString("en-IN") },
-        { l: "Received", n: money(sum(rows, "received")) },
-        { l: "Cost of goods", n: money(sum(p, "cop")) },
-        { l: "Profit", n: money(sum(p, "profit")), cls: sum(p, "profit") < 0 ? "bad" : "" },
-        { l: "Costed", n: p.length ? Math.round((p.length / rows.length) * 100) + "%" : "0%" }
-      ];
-    },
-    empty: "No settled payments loaded yet."
-  },
-  {
     id: "belowexp", sec: "Payments",
     title: "Receiving less than Expected",
     desc: "Each SKU's latest paid order where the money received (settled + upcoming) is less than its Suggested Settlement \u2014 the competitor-driven target the next price update drives to. Rows in light red received less than COP, an outright loss.",
@@ -326,6 +308,26 @@ const REPORTS = [
       ];
     },
     empty: "Every SKU's latest order is settling at or above its suggested target."
+  },
+  {
+    id: "paid", sec: "Payments",
+    title: "Orders paid successfully",
+    desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
+    src: "profit", pick: (r) => num(r.received) > 0,
+    expFilters: true,
+    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "received", dir: -1 },
+    kpis: (rows) => {
+      const p = rows.filter((r) => r.cop_known);
+      return [
+        { l: "Orders paid", n: rows.length.toLocaleString("en-IN") },
+        { l: "Received", n: money(sum(rows, "received")) },
+        { l: "Cost of goods", n: money(sum(p, "cop")) },
+        { l: "Profit", n: money(sum(p, "profit")), cls: sum(p, "profit") < 0 ? "bad" : "" },
+        { l: "Costed", n: p.length ? Math.round((p.length / rows.length) * 100) + "%" : "0%" }
+      ];
+    },
+    empty: "No settled payments loaded yet."
   },
   {
     id: "retlost", sec: "Returns",
@@ -689,7 +691,14 @@ function render(r) {
       return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
     });
   }
-  const dispN = grouped ? disp.length : n;
+  let displayRows = rows;
+  if (r.expFilters && u.expFilter && !grouped) {
+    const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
+    displayRows = rows.filter(u.expFilter === "above"
+      ? (x) => hx(x) && num(x.received) >= num(x.expected)
+      : (x) => hx(x) && num(x.received) < num(x.expected));
+  }
+  const dispN = grouped ? disp.length : displayRows.length;
   const clean = r.id === "paid";
   pill.className = "pill " + (clean ? "ok" : n === 0 ? "ok" : r.sec === "Payments" && r.id === "unpaid" ? "bad" : "hit");
   const unit = r.unit || "order";
@@ -703,6 +712,19 @@ function render(r) {
   h += "</div>";
 
   h += '<div class="controls">';
+  if (r.expFilters) {
+    const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
+    const corr = (x) => hx(x) && num(x.received) >= num(x.expected);
+    const less = (x) => hx(x) && num(x.received) < num(x.expected);
+    const skus = (f) => new Set(rows.filter(f).map((x) => [x.platform, x.company_name, x.sku].join("\u0001"))).size;
+    h += '<button class="ghost' + (u.expFilter === "above" ? " on" : "") + '" id="fab_' + r.id + '">Correct \u00b7 ' + rows.filter(corr).length.toLocaleString("en-IN") + '</button>';
+    h += '<button class="ghost' + (u.expFilter === "below" ? " on" : "") + '" id="fbl_' + r.id + '">Received less \u00b7 ' + rows.filter(less).length.toLocaleString("en-IN") + '</button>';
+    if (u.expFilter) {
+      const f = u.expFilter === "above" ? corr : less;
+      const bag = rows.filter(f);
+      h += '<span class="muted" style="font-size:12px;font-weight:700">' + skus(f).toLocaleString("en-IN") + ' SKUs \u00b7 ' + bag.length.toLocaleString("en-IN") + ' orders \u00b7 ' + (u.expFilter === "below" ? money(Math.round(sum(bag, "expected") - sum(bag, "received"))) + ' short' : money(Math.round(sum(bag, "received"))) + ' received') + '</span>';
+    }
+  }
   if (r.thr) h += "<label>" + esc(r.thr.label) + '</label><input type="number" step="' + r.thr.step + '" value="' + u.thr + '" id="thr_' + r.id + '" style="width:96px">' +
                  '<span class="muted" style="font-size:12px">' + r.thr.suffix + "</span>";
   h += '<button class="ghost" id="csv_' + r.id + '">Download CSV</button>';
@@ -744,7 +766,7 @@ function render(r) {
            ' <span class="a">' + (on ? (u.sort.dir === 1 ? "▲" : "▼") : "◆") + "</span></th>";
     }
     h += "</tr></thead><tbody>";
-    for (const row of rows.slice(0, u.limit)) {
+    for (const row of displayRows.slice(0, u.limit)) {
       h += (r.rowRed && r.rowRed(row)) ? '<tr class="rowred">' : "<tr>";
       for (const c of r.cols) h += cell(row, c);
       h += "</tr>";
@@ -759,6 +781,11 @@ function render(r) {
     if (u.sort.k === k) u.sort.dir = -u.sort.dir; else { u.sort.k = k; u.sort.dir = -1; }
     render(r);
   }));
+  if (r.expFilters) {
+    const fab = $("#fab_" + r.id), fbl = $("#fbl_" + r.id);
+    if (fab) fab.addEventListener("click", (e) => { e.stopPropagation(); u.expFilter = u.expFilter === "above" ? null : "above"; render(r); });
+    if (fbl) fbl.addEventListener("click", (e) => { e.stopPropagation(); u.expFilter = u.expFilter === "below" ? null : "below"; render(r); });
+  }
   body.querySelectorAll("tr.grp").forEach((tr) => tr.addEventListener("click", (e) => {
     if (e.target.closest("thead")) return;
     const gk = tr.dataset.gk;
