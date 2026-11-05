@@ -297,6 +297,28 @@ const REPORTS = [
     empty: "No orders loaded yet."
   },
   {
+    id: "notinfile", sec: "Orders",
+    title: "Orders not in Order file",
+    desc: "Orders that came in the CSV File upload but are missing from the Orders File upload (same platform) \u2014 a record that never made it into the detailed orders file. Read-only match; nothing is uploaded or changed.",
+    src: "omatch", pick: (r) => r.bucket === "not_in_file",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord],
+    sort: { k: "ordered_on", dir: -1 },
+    headStats: (rows) => [{ l: "Orders", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" }],
+    kpis: (rows) => [{ l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" }],
+    empty: "Every CSV order is also in the Orders file."
+  },
+  {
+    id: "notincsv", sec: "Orders",
+    title: "Orders not in CSV",
+    desc: "Orders that are in the Orders File upload but missing from the CSV File upload (same platform). Read-only match; nothing is uploaded or changed.",
+    src: "omatch", pick: (r) => r.bucket === "not_in_csv",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord],
+    sort: { k: "ordered_on", dir: -1 },
+    headStats: (rows) => [{ l: "Orders", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" }],
+    kpis: (rows) => [{ l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" }],
+    empty: "Every Orders-file order is also in the CSV."
+  },
+  {
     id: "unpaid", sec: "Payments",
     title: "Payment not received",
     headStats: (rows) => [
@@ -491,7 +513,7 @@ function latestPerSku(rows) {
 }
 
 /* ---------- state ------------------------------------------------------ */
-const state = { check: null, profit: null, nocost: null, orders: null, missing: null, plat: "", co: "", q: "", dFrom: null, dTo: null, dPreset: null, ui: {} };
+const state = { check: null, profit: null, nocost: null, orders: null, missing: null, omatch: null, plat: "", co: "", q: "", dFrom: null, dTo: null, dPreset: null, ui: {} };
 for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, thr: r.thr ? r.thr.def : null, limit: 300, picks: {}, expanded: new Set() };
 
 /* ---------- boot ------------------------------------------------------- */
@@ -518,18 +540,20 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
 async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
-  const [a, b, c, sg, lk] = await Promise.all([
+  const [a, b, c, sg, lk, om] = await Promise.all([
     sb.rpc("seller_order_money_check", { _days: 45 }),
     sb.rpc("seller_paid_profit_json"),
     sb.rpc("seller_skus_missing_cost"),
     sb.rpc("sku_suggested_settle_map_json"),
-    sb.rpc("sku_product_link_map_json")
+    sb.rpc("sku_product_link_map_json"),
+    sb.rpc("seller_orders_match_json")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
   if (c.error) console.error("missing cost", c.error);
   state.check = a.error ? [] : (a.data || []);
   state.profit = b.error ? [] : (b.data || []);
+  state.omatch = om.error ? [] : (om.data || []);
   // Suggested Settlement (competitor-driven reprice target) per SKU, attached to
   // each paid row so the "Receiving less than Expected" report can compare it to
   // received+upcoming. key = company|platform|sku, all normalised (sku_key form).
