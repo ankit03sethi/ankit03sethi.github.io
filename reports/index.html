@@ -503,9 +503,9 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   CA.apply();
   buildCards();
   buildTabs();
-  { const d0 = new Date(); d0.setDate(d0.getDate() - 29);
+  { const d0 = new Date(); d0.setDate(d0.getDate() - 89);
     const iso0 = (dt) => dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
-    state.dPreset = 30; state.dFrom = iso0(d0); state.dTo = iso0(new Date()); }
+    state.dPreset = 90; state.dFrom = iso0(d0); state.dTo = iso0(new Date()); }
   buildDateChips();
   $("#gc").style.display = "flex";
   $("#refresh").addEventListener("click", () => load(true));
