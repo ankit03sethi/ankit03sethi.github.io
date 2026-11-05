@@ -300,7 +300,7 @@ const REPORTS = [
     id: "notinfile", sec: "Orders",
     title: "Orders not in Order file",
     desc: "Orders present in the CSV File upload (everything we packed) but missing from the Orders File upload for the same platform \u2014 usually an order cancelled before pickup. Orders already scanned in the daily return scanner are treated as accounted-for and excluded, so only the unexplained ones that still need checking appear here. Read-only match; nothing is uploaded or changed.",
-    src: "omatch", pick: (r) => r.bucket === "not_in_file",
+    src: "omatch", pick: (r) => r.bucket === "not_in_file", noDateFilter: true,
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord],
     sort: { k: "ordered_on", dir: -1 },
     headStats: (rows) => [{ l: "Orders", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" }],
@@ -311,7 +311,7 @@ const REPORTS = [
     id: "notincsv", sec: "Orders",
     title: "Orders not in CSV",
     desc: "Orders that are in the Orders File upload but missing from the CSV File upload (same platform). Read-only match; nothing is uploaded or changed.",
-    src: "omatch", pick: (r) => r.bucket === "not_in_csv",
+    src: "omatch", pick: (r) => r.bucket === "not_in_csv", noDateFilter: true,
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord],
     sort: { k: "ordered_on", dir: -1 },
     headStats: (rows) => [{ l: "Orders", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" }],
@@ -708,7 +708,7 @@ function rowsFor(r, skipCol) {
       String(row.order_ref || "").toLowerCase().includes(q) ||
       String(row.master_sku || "").toLowerCase().includes(q));
   }
-  if (state.dFrom || state.dTo) {
+  if ((state.dFrom || state.dTo) && !r.noDateFilter) {
     out = out.filter((row) => {
       const d = String(row.ordered_on || "");
       if (!d) return true;
