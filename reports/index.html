@@ -306,10 +306,11 @@ const REPORTS = [
   {
     id: "belowcop", sec: "Payments",
     title: "Received less than COP",
-    desc: "Money came in, but less than the item cost you to buy. Every one of these is a loss on the sale itself.",
-    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0 && num(r.received) < num(r.cop),
-    cols: [COL.plat, COL.co, COL.sku, COL.msku, COL.gcnt, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn, COL.glast, COL.glastord],
-    groupBy: { keys: ["platform", "company_name", "sku", "master_sku"], detail: [COL.ref, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn] },
+    desc: "Each SKU's latest paid order: money came in, but less than the item cost you to buy. Judged on the most recent order only, so a loss you have since repriced away drops off.",
+    src: "profit", latestPerSku: true,
+    pick: (r) => r.cop_known && num(r.received) > 0,
+    filt: (r) => num(r.received) < num(r.cop),
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
     sort: { k: "profit", dir: 1 }, unit: "SKU",
     kpis: (rows) => {
       const skus = new Set(rows.map((r) => [r.platform, r.company_name, r.sku].join("\u0001"))).size;
@@ -325,8 +326,8 @@ const REPORTS = [
   {
     id: "belowpct", sec: "Payments",
     title: "Received less than a % margin",
-    desc: "Orders whose margin fell under the percentage you set. Type the number you want to hold the line at.",
-    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0,
+    desc: "Each SKU's latest paid order whose margin fell under the percentage you set. Type the number you want to hold the line at \u2014 judged on the most recent order only.",
+    src: "profit", latestPerSku: true, pick: (r) => r.cop_known && num(r.received) > 0,
     thr: { id: "pct", label: "Margin below", suffix: "%", def: 10, step: "0.5" },
     filt: (r, v) => num(r.margin_pct) < v,
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
@@ -341,8 +342,8 @@ const REPORTS = [
   {
     id: "belowamt", sec: "Payments",
     title: "Received less than a profit amount",
-    desc: "Orders that left you with less rupees of profit than the figure you set, whatever the percentage says.",
-    src: "profit", pick: (r) => r.cop_known && num(r.received) > 0,
+    desc: "Each SKU's latest paid order that left you with less rupees of profit than the figure you set, whatever the percentage says \u2014 judged on the most recent order only.",
+    src: "profit", latestPerSku: true, pick: (r) => r.cop_known && num(r.received) > 0,
     thr: { id: "amt", label: "Profit below", suffix: "₹", def: 50, step: "10" },
     filt: (r, v) => num(r.profit) < v,
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
@@ -444,6 +445,20 @@ function groupRows(rows, g) {
     out.push(o);
   }
   return out;
+}
+
+// For the paid-loss reports: collapse every paid order down to one row per
+// SKU (platform + company + sku) \u2014 its most recent order. The loss test then
+// runs on that latest order alone, not on the whole history, so a SKU you have
+// already repriced out of a loss stops showing up.
+function latestPerSku(rows) {
+  const m = new Map();
+  for (const r of rows) {
+    const k = [r.platform, r.company_name, r.sku].join("\u0001");
+    const cur = m.get(k);
+    if (!cur || String(r.ordered_on || "") > String(cur.ordered_on || "")) m.set(k, r);
+  }
+  return [...m.values()];
 }
 
 /* ---------- state ------------------------------------------------------ */
@@ -565,6 +580,7 @@ function rowsFor(r, skipCol) {
   if (!src) return null;
   const u = state.ui[r.id];
   let out = src.filter(r.pick);
+  if (r.latestPerSku) out = latestPerSku(out);
   if (r.filt) out = out.filter((row) => r.filt(row, num(u.thr)));
   if (state.plat) out = out.filter((row) => row.platform === state.plat);
   if (state.co) { const ck = String(state.co).toLowerCase().replace(/\s+/g, ""); out = out.filter((row) => String(row.company_name || "").toLowerCase().replace(/\s+/g, "") === ck); }
