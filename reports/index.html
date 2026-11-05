@@ -98,6 +98,12 @@ table.sub td{padding:4px 10px;border-bottom:1px solid #f1f1f1;font-size:12px}
 table.sub th.num,table.sub td.num{text-align:right}
 tr.rowred td{background:#ffecec}
 .ghost.on{background:#1f6feb;color:#fff;border-color:#1f6feb}
+.paysum{display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 18px}
+.pstile{flex:1;min-width:150px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px}
+.pstile .pl{font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.pstile .pb{font-size:26px;font-weight:800;margin:4px 0 2px;color:#0f172a}
+.pstile .pb.warn{color:#b45309}.pstile .pb.bad{color:#b91c1c}.pstile .pb.ok{color:#047857}
+.pstile .ps{font-size:12px;color:#6b7280;font-weight:600}
 </style>
 </head>
 <body>
@@ -127,6 +133,7 @@ tr.rowred td{background:#ffecec}
 
   <section class="section" id="secPayments" data-perm="reports.payments">
     <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
+    <div class="paysum" id="paySum"></div>
     <div id="wrapPayments"></div>
   </section>
 
@@ -214,6 +221,7 @@ const COL = {
   ref:    { k: "order_ref",    l: "Order ref", t: "txt"  },
   sku:    { k: "sku",          l: "SKU",       t: "txt"  },
   skuL:   { k: "sku",          l: "SKU",       t: "skulink" },
+  link:   { k: "product_url", l: "Link",      t: "link" },
   msku:   { k: "master_sku",   l: "Master SKU",t: "txt"  },
   ord:    { k: "ordered_on",   l: "Ordered",   t: "date" },
   age:    { k: "age_days",     l: "Days old",  t: "int"  },
@@ -279,8 +287,9 @@ const REPORTS = [
     title: "Payment not received",
     desc: "Orders placed 45 or more days ago that are not cancelled, are not sitting in a returns file, and have no money against them in any payment file.",
     src: "check", pick: (r) => r.bucket === "payment not received",
-    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.ord, COL.age, COL.stat, COL.val],
-    sort: { k: "age_days", dir: -1 },
+    dateRange: true,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.ord, COL.age, COL.stat, COL.val],
+    sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => [
       { l: "Orders", n: rows.length, cls: rows.length ? "bad" : "" },
       { l: "Value at stake", n: money(sum(rows, "value")), cls: rows.length ? "bad" : "" },
@@ -293,10 +302,11 @@ const REPORTS = [
     title: "Receiving less than Expected",
     desc: "Each SKU's latest paid order where the money received (settled + upcoming) is less than its Suggested Settlement \u2014 the competitor-driven target the next price update drives to. Rows in light red received less than COP, an outright loss.",
     src: "profit", latestPerSku: true,
+    dateRange: true,
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0 && num(r.received) < num(r.expected),
     rowRed: (r) => r.cop_known && num(r.profit) < 0,
-    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
-    sort: { k: "profit", dir: 1 }, unit: "SKU",
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => r.cop_known && num(r.profit) < 0);
       const short = rows.reduce((t, r) => t + (num(r.expected) - num(r.received)), 0);
@@ -315,8 +325,10 @@ const REPORTS = [
     desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
     src: "profit", pick: (r) => num(r.received) > 0,
     expFilters: true,
-    cols: [COL.plat, COL.co, COL.ref, COL.skuL, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
-    sort: { k: "received", dir: -1 },
+    dateRange: true,
+    rowRed: (r) => r.cop_known && num(r.profit) < 0,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => {
       const p = rows.filter((r) => r.cop_known);
       return [
@@ -591,6 +603,15 @@ function rowsFor(r, skipCol) {
       String(row.order_ref || "").toLowerCase().includes(q) ||
       String(row.master_sku || "").toLowerCase().includes(q));
   }
+  if (r.dateRange && (u.dFrom || u.dTo)) {
+    out = out.filter((row) => {
+      const d = String(row.ordered_on || "");
+      if (!d) return false;
+      if (u.dFrom && d < u.dFrom) return false;
+      if (u.dTo && d > u.dTo) return false;
+      return true;
+    });
+  }
   // Values ticked in a column's dropdown. A column with nothing ticked does not
   // filter; skipCol is left out so its own panel can still list every value.
   for (const k of Object.keys(u.picks || {})) {
@@ -605,6 +626,7 @@ function rowsFor(r, skipCol) {
     if (Number.isFinite(na) && Number.isFinite(nb) && a !== null && b !== null) return (na - nb) * s.dir;
     return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
   });
+  if (r.rowRed) out.sort((x, y) => (r.rowRed(x) ? 0 : 1) - (r.rowRed(y) ? 0 : 1));
   return out;
 }
 
@@ -651,6 +673,9 @@ function cell(row, c) {
       const u = t.toUpperCase();
       const cls = /LOST|DAMAG|F$/.test(u) ? " bad" : /RTO|RETURN|PEND/.test(u) ? " warn" : "";
       return '<td><span class="st' + cls + '">' + esc(t) + "</span></td>";
+    }
+    case "link": {
+      return v ? '<td><a href="' + esc(String(v)) + '" target="_blank" rel="noopener noreferrer">Open ↗</a></td>' : '<td><span class="muted">—</span></td>';
     }
     case "skulink": {
       if (!v) return '<td><span class="muted">—</span></td>';
@@ -712,6 +737,13 @@ function render(r) {
   h += "</div>";
 
   h += '<div class="controls">';
+  if (r.dateRange) {
+    h += '<label style="font-size:12px">Order date</label>';
+    h += '<input type="date" id="df_' + r.id + '" value="' + (u.dFrom || "") + '" style="width:140px">';
+    h += '<span class="muted" style="font-size:12px">to</span>';
+    h += '<input type="date" id="dt_' + r.id + '" value="' + (u.dTo || "") + '" style="width:140px">';
+    if (u.dFrom || u.dTo) h += '<button class="ghost" id="dclr_' + r.id + '">Clear</button>';
+  }
   if (r.expFilters) {
     const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
     const corr = (x) => hx(x) && num(x.received) >= num(x.expected);
@@ -785,6 +817,12 @@ function render(r) {
     const fab = $("#fab_" + r.id), fbl = $("#fbl_" + r.id);
     if (fab) fab.addEventListener("click", (e) => { e.stopPropagation(); u.expFilter = u.expFilter === "above" ? null : "above"; render(r); });
     if (fbl) fbl.addEventListener("click", (e) => { e.stopPropagation(); u.expFilter = u.expFilter === "below" ? null : "below"; render(r); });
+  }
+  if (r.dateRange) {
+    const df = $("#df_" + r.id), dt = $("#dt_" + r.id), dc = $("#dclr_" + r.id);
+    if (df) df.addEventListener("change", (e) => { e.stopPropagation(); u.dFrom = df.value || null; render(r); });
+    if (dt) dt.addEventListener("change", (e) => { e.stopPropagation(); u.dTo = dt.value || null; render(r); });
+    if (dc) dc.addEventListener("click", (e) => { e.stopPropagation(); u.dFrom = null; u.dTo = null; render(r); });
   }
   body.querySelectorAll("tr.grp").forEach((tr) => tr.addEventListener("click", (e) => {
     if (e.target.closest("thead")) return;
@@ -919,6 +957,27 @@ function openFPanel(r, btn) {
   window.addEventListener("resize", closeFPanel, { once: true });
 }
 
+function renderPaySummary() {
+  const host = document.getElementById("paySum");
+  if (!host) return;
+  const ck = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
+  const chip = (row) => (!state.plat || row.platform === state.plat) && (!state.co || ck(row.company_name) === ck(state.co));
+  const paid = (state.profit || []).filter((r) => num(r.received) > 0 && chip(r));
+  const hx = (r) => r.expected != null && num(r.expected) > 0 && r.cop_known;
+  const less = paid.filter((r) => hx(r) && num(r.received) < num(r.expected));
+  const corr = paid.filter((r) => hx(r) && num(r.received) >= num(r.expected));
+  const loss = paid.filter((r) => r.cop_known && num(r.profit) < 0);
+  const unp = (state.check || []).filter((r) => r.bucket === "payment not received" && chip(r));
+  const skuN = (arr) => new Set(arr.map((r) => [r.platform, r.company_name, r.sku].join("\u0001"))).size;
+  const tile = (label, big, sub, cls) => '<div class="pstile"><div class="pl">' + esc(label) + '</div><div class="pb ' + (cls || "") + '">' + esc(big) + '</div><div class="ps">' + esc(sub) + '</div></div>';
+  host.innerHTML =
+    tile("Paid orders", paid.length.toLocaleString("en-IN"), money(sum(paid, "received")) + " received", "") +
+    tile("Received less than expected", skuN(less).toLocaleString("en-IN") + " SKUs", less.length.toLocaleString("en-IN") + " orders \u00b7 " + money(Math.round(sum(less, "expected") - sum(less, "received"))) + " short", "warn") +
+    tile("At / above expected", skuN(corr).toLocaleString("en-IN") + " SKUs", corr.length.toLocaleString("en-IN") + " orders \u00b7 " + money(sum(corr, "received")) + " received", "ok") +
+    tile("Below COP \u2014 loss", skuN(loss).toLocaleString("en-IN") + " SKUs", loss.length.toLocaleString("en-IN") + " orders \u00b7 " + money(sum(loss, "profit")) + " loss", "bad") +
+    tile("Payment not received", unp.length.toLocaleString("en-IN") + " orders", money(sum(unp, "value")) + " at stake", "bad");
+}
+
 function renderAll() {
   for (const r of REPORTS) render(r);
   for (const sec of ["Orders", "Payments", "Returns", "Missings"]) {
@@ -926,6 +985,7 @@ function renderAll() {
     const live = list.filter((r) => { const x = rowsFor(r); return x && x.length; }).length;
     $("#cnt" + sec) && ($("#cnt" + sec).textContent = list.length + (list.length === 1 ? " report" : " reports") + (live ? " · " + live + " with hits" : ""));
   }
+  try { renderPaySummary(); } catch (e) {}
 }
 
 /* ---------- csv -------------------------------------------------------- */
