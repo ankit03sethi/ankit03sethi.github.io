@@ -109,9 +109,10 @@ tr.rowred td{background:#ffecec}
 .ch-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
 .headstats{display:flex;gap:18px;flex-wrap:wrap;justify-content:flex-end}
 .hstat{text-align:right}
-.hstat .hv{font-size:20px;font-weight:800;color:#0f172a;line-height:1.1}
+.hstat .hv{font-size:18px;font-weight:800;color:#0f172a;line-height:1.15}
 .hstat .hv.warn{color:#b45309}.hstat .hv.bad{color:#b91c1c}.hstat .hv.ok{color:#047857}
-.hstat .hl{font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.hstat .hsub{font-size:11px;color:#6b7280;font-weight:700;margin-top:1px}
+.hstat .hl{font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
 </style>
 </head>
 <body>
@@ -349,10 +350,13 @@ const REPORTS = [
       const corr = rows.filter((x) => hx(x) && num(x.received) >= num(x.expected));
       const less = rows.filter((x) => hx(x) && num(x.received) < num(x.expected));
       const loss = rows.filter((x) => x.cop_known && num(x.profit) < 0);
+      const over = Math.round(corr.reduce((t, x) => t + (num(x.received) - num(x.expected)), 0));
+      const short = Math.round(less.reduce((t, x) => t + (num(x.expected) - num(x.received)), 0));
+      const lsum = Math.round(loss.reduce((t, x) => t + num(x.profit), 0));
       return [
-        { l: "Correct", v: sku(corr).toLocaleString("en-IN"), cls: "ok" },
-        { l: "Received less", v: sku(less).toLocaleString("en-IN"), cls: "warn" },
-        { l: "Below COP", v: sku(loss).toLocaleString("en-IN"), cls: loss.length ? "bad" : "" }
+        { l: "Correct", v: sku(corr).toLocaleString("en-IN") + " SKUs", sub: corr.length.toLocaleString("en-IN") + " orders \u00b7 " + money(over) + " over", cls: "ok" },
+        { l: "Received less", v: sku(less).toLocaleString("en-IN") + " SKUs", sub: less.length.toLocaleString("en-IN") + " orders \u00b7 " + money(short) + " short", cls: "warn" },
+        { l: "Below COP", v: sku(loss).toLocaleString("en-IN") + " SKUs", sub: loss.length.toLocaleString("en-IN") + " orders \u00b7 " + money(lsum) + " loss", cls: loss.length ? "bad" : "" }
       ];
     },
     desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
@@ -773,7 +777,7 @@ function render(r) {
   }
   card.classList.remove("locked");
   { const hsEl = document.getElementById("hs_" + r.id);
-    if (hsEl) hsEl.innerHTML = r.headStats ? r.headStats(rows).map((st) => '<div class="hstat"><div class="hv ' + (st.cls || "") + '">' + esc(String(st.v)) + '</div><div class="hl">' + esc(st.l) + '</div></div>').join("") : ""; }
+    if (hsEl) hsEl.innerHTML = r.headStats ? r.headStats(rows).map((st) => '<div class="hstat"><div class="hv ' + (st.cls || "") + '">' + esc(String(st.v)) + '</div>' + (st.sub ? '<div class="hsub">' + esc(st.sub) + '</div>' : "") + '<div class="hl">' + esc(st.l) + '</div></div>').join("") : ""; }
   const n = rows.length;
   const grouped = !!r.groupBy && u.open;
   let disp = rows;
