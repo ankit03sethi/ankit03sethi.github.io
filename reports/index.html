@@ -299,7 +299,7 @@ const REPORTS = [
   {
     id: "notinfile", sec: "Orders",
     title: "Orders not in Order file",
-    desc: "Orders that came in the CSV File upload but are missing from the Orders File upload (same platform) \u2014 a record that never made it into the detailed orders file. Read-only match; nothing is uploaded or changed.",
+    desc: "Orders present in the CSV File upload (everything we packed) but missing from the Orders File upload for the same platform \u2014 usually an order cancelled before pickup. Orders already scanned in the daily return scanner are treated as accounted-for and excluded, so only the unexplained ones that still need checking appear here. Read-only match; nothing is uploaded or changed.",
     src: "omatch", pick: (r) => r.bucket === "not_in_file",
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord],
     sort: { k: "ordered_on", dir: -1 },
