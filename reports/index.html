@@ -270,33 +270,6 @@ const COL = {
 
 const REPORTS = [
   {
-    id: "allorders", sec: "Orders", lazy: "orders", rpc: "seller_all_orders",
-    title: "All orders",
-    desc: "Every order line and what finally happened to it. Status is the outcome, not the raw word in the order file. Money the platform has only scheduled is shown in amber and marked Scheduled — it has not reached you, and on a return in progress it may never.",
-    src: "orders", pick: () => true,
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.ord, COL.qty, COL.fstat,
-           COL.famt, COL.mstate, COL.amton, COL.age, COL.ostat, COL.val],
-    sort: { k: "ordered_on", dir: -1 },
-    kpis: (rows) => {
-      const by = (st) => rows.filter((r) => r.status === st);
-      const settled = rows.filter((r) => r.money_state === "Settled" && r.status === "Paid");
-      const sched = rows.filter((r) => String(r.money_state || "").indexOf("Sched") === 0);
-      const back = by("Coming back to you");
-      const ret = rows.filter((r) => String(r.status).startsWith("Return"));
-      const up = by("Upcoming");
-      return [
-        { l: "Orders", n: rows.length.toLocaleString("en-IN") },
-        { l: "Money received", n: money(sum(settled, "final_amount")) },
-        { l: "Only scheduled", n: money(sum(sched, "final_amount")), cls: sched.length ? "warn" : "" },
-        { l: "Lost to returns", n: money(sum(ret, "final_amount")), cls: sum(ret, "final_amount") < 0 ? "bad" : "" },
-        { l: "Coming back", n: back.length.toLocaleString("en-IN"), cls: back.length ? "warn" : "" },
-        { l: "No payment yet", n: up.length.toLocaleString("en-IN") },
-        { l: "Cancelled", n: by("Cancelled").length.toLocaleString("en-IN") }
-      ];
-    },
-    empty: "No orders loaded yet."
-  },
-  {
     id: "notinfile", sec: "Orders",
     title: "Orders not in Order file",
     desc: "Orders present in the CSV File upload (everything we packed) but missing from the Orders File upload for the same platform \u2014 usually an order cancelled before pickup. Orders already scanned in the daily return scanner are treated as accounted-for and excluded, so only the unexplained ones that still need checking appear here. Read-only match; nothing is uploaded or changed.",
