@@ -96,6 +96,7 @@ table.sub{width:100%;border-collapse:collapse;margin:2px 0 6px}
 table.sub th{font-size:11px;color:#6b7280;text-align:left;padding:4px 10px;border-bottom:1px solid #e5e7eb}
 table.sub td{padding:4px 10px;border-bottom:1px solid #f1f1f1;font-size:12px}
 table.sub th.num,table.sub td.num{text-align:right}
+tr.rowred td{background:#ffecec}
 </style>
 </head>
 <body>
@@ -222,6 +223,7 @@ const COL = {
   cop:    { k: "cop",          l: "COP",       t: "money" },
   profit: { k: "profit",       l: "Profit",    t: "moneysign" },
   mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  },
+  exp:    { k: "expected",    l: "Expected",  t: "money" },
   gcnt:   { k: "orders",       l: "Orders",    t: "int"  },
   glast:  { k: "last_ref",     l: "Last order id", t: "txt" },
   glastord:{ k: "last_ordered",l: "Last order", t: "date" },
@@ -304,56 +306,25 @@ const REPORTS = [
     empty: "No settled payments loaded yet."
   },
   {
-    id: "belowcop", sec: "Payments",
-    title: "Received less than COP",
-    desc: "Each SKU's latest paid order: money came in, but less than the item cost you to buy. Judged on the most recent order only, so a loss you have since repriced away drops off.",
+    id: "belowexp", sec: "Payments",
+    title: "Receiving less than Expected",
+    desc: "Each SKU's latest paid order where the money received (settled + upcoming) is less than its Suggested Settlement \u2014 the competitor-driven target the next price update drives to. Rows in light red received less than COP, an outright loss.",
     src: "profit", latestPerSku: true,
-    pick: (r) => r.cop_known && num(r.received) > 0,
-    filt: (r) => num(r.received) < num(r.cop),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0 && num(r.received) < num(r.expected),
+    rowRed: (r) => r.cop_known && num(r.profit) < 0,
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
     sort: { k: "profit", dir: 1 }, unit: "SKU",
     kpis: (rows) => {
-      const skus = new Set(rows.map((r) => [r.platform, r.company_name, r.sku].join("\u0001"))).size;
+      const red = rows.filter((r) => r.cop_known && num(r.profit) < 0);
+      const short = rows.reduce((t, r) => t + (num(r.expected) - num(r.received)), 0);
       return [
-        { l: "SKUs", n: skus.toLocaleString("en-IN"), cls: skus ? "bad" : "" },
-        { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "bad" : "" },
-        { l: "Total loss", n: money(sum(rows, "profit")), cls: "bad" },
-        { l: "Worst single", n: money(rows.length ? Math.min(...rows.map((r) => num(r.profit))) : 0), cls: "bad" }
+        { l: "SKUs under target", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
+        { l: "Below COP (loss)", n: red.length.toLocaleString("en-IN"), cls: red.length ? "bad" : "" },
+        { l: "Total shortfall", n: money(Math.round(short)), cls: rows.length ? "warn" : "" },
+        { l: "Worst loss", n: money(red.length ? Math.min(...red.map((r) => num(r.profit))) : 0), cls: red.length ? "bad" : "" }
       ];
     },
-    empty: "Nothing sold below cost."
-  },
-  {
-    id: "belowpct", sec: "Payments",
-    title: "Received less than a % margin",
-    desc: "Each SKU's latest paid order whose margin fell under the percentage you set. Type the number you want to hold the line at \u2014 judged on the most recent order only.",
-    src: "profit", latestPerSku: true, pick: (r) => r.cop_known && num(r.received) > 0,
-    thr: { id: "pct", label: "Margin below", suffix: "%", def: 10, step: "0.5" },
-    filt: (r, v) => num(r.margin_pct) < v,
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
-    sort: { k: "margin_pct", dir: 1 },
-    kpis: (rows) => [
-      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
-      { l: "Profit on them", n: money(sum(rows, "profit")), cls: sum(rows, "profit") < 0 ? "bad" : "warn" },
-      { l: "Received", n: money(sum(rows, "received")) }
-    ],
-    empty: "No paid order falls under that margin."
-  },
-  {
-    id: "belowamt", sec: "Payments",
-    title: "Received less than a profit amount",
-    desc: "Each SKU's latest paid order that left you with less rupees of profit than the figure you set, whatever the percentage says \u2014 judged on the most recent order only.",
-    src: "profit", latestPerSku: true, pick: (r) => r.cop_known && num(r.received) > 0,
-    thr: { id: "amt", label: "Profit below", suffix: "₹", def: 50, step: "10" },
-    filt: (r, v) => num(r.profit) < v,
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
-    sort: { k: "profit", dir: 1 },
-    kpis: (rows) => [
-      { l: "Orders", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
-      { l: "Profit on them", n: money(sum(rows, "profit")), cls: sum(rows, "profit") < 0 ? "bad" : "warn" },
-      { l: "Received", n: money(sum(rows, "received")) }
-    ],
-    empty: "No paid order falls under that amount."
+    empty: "Every SKU's latest order is settling at or above its suggested target."
   },
   {
     id: "retlost", sec: "Returns",
@@ -485,16 +456,28 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
 async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, sg] = await Promise.all([
     sb.rpc("seller_order_money_check", { _days: 45 }),
     sb.rpc("seller_paid_profit_json"),
-    sb.rpc("seller_skus_missing_cost")
+    sb.rpc("seller_skus_missing_cost"),
+    sb.rpc("sku_suggested_settle_map_json")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
   if (c.error) console.error("missing cost", c.error);
   state.check = a.error ? [] : (a.data || []);
   state.profit = b.error ? [] : (b.data || []);
+  // Suggested Settlement (competitor-driven reprice target) per SKU, attached to
+  // each paid row so the "Receiving less than Expected" report can compare it to
+  // received+upcoming. key = company|platform|sku, all normalised (sku_key form).
+  { const sm = new Map();
+    if (!sg.error) for (const e of (sg.data || [])) sm.set(e.key, Number(e.suggested));
+    const skn = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
+    for (const r of state.profit) {
+      const su = sm.get(skn(r.company_name) + "|" + skn(r.platform) + "|" + String(r.sku || ""));
+      if (su != null && isFinite(su)) { r.suggested = su; r.expected = Math.round(su * num(r.qty)); }
+    }
+  }
   state.nocost = c.error ? [] : (c.data || []);
   const bad = [a.error, b.error, c.error].filter(Boolean);
   $("#status").textContent = bad.length
@@ -740,7 +723,7 @@ function render(r) {
     }
     h += "</tr></thead><tbody>";
     for (const row of rows.slice(0, u.limit)) {
-      h += "<tr>";
+      h += (r.rowRed && r.rowRed(row)) ? '<tr class="rowred">' : "<tr>";
       for (const c of r.cols) h += cell(row, c);
       h += "</tr>";
     }
