@@ -319,7 +319,7 @@ const REPORTS = [
     id: "belowexp", sec: "Payments",
     title: "Receiving less than Expected",
     headStats: (rows) => {
-      const red = rows.filter((x) => belowCop(x) && isFinal(x));
+      const red = rows.filter((x) => belowCop(x));
       const sh = Math.round(rows.reduce((t, x) => t + (num(x.expected) - num(x.received)), 0));
       return [
         { l: "SKUs", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
@@ -330,13 +330,13 @@ const REPORTS = [
     desc: "Each SKU's latest paid order where the money received (settled + upcoming) is less than its Suggested Settlement \u2014 the competitor-driven target the next price update drives to. Rows in light red received less than COP, an outright loss.",
     src: "profit", latestPerSku: true,
     dateRange: true,
-    pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0 && isFinal(r),
+    pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0,
     filt: (r) => num(r.received) < num(r.expected),
-    rowRed: (r) => belowCop(r) && isFinal(r),
+    rowRed: (r) => belowCop(r),
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
-      const red = rows.filter((r) => belowCop(r) && isFinal(r));
+      const red = rows.filter((r) => belowCop(r));
       const short = rows.reduce((t, r) => t + (num(r.expected) - num(r.received)), 0);
       return [
         { l: "SKUs under target", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
