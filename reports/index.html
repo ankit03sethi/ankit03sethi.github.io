@@ -370,7 +370,7 @@ const REPORTS = [
     expFilters: true,
     dateRange: true,
     rowRed: (r) => belowCop(r) && isFinal(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop],
     sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => {
       const p = rows.filter((r) => r.cop_known);
@@ -836,8 +836,7 @@ function render(r) {
   if (r.thr) h += "<label>" + esc(r.thr.label) + '</label><input type="number" step="' + r.thr.step + '" value="' + u.thr + '" id="thr_' + r.id + '" style="width:96px">' +
                  '<span class="muted" style="font-size:12px">' + r.thr.suffix + "</span>";
   h += '<button class="ghost" id="csv_' + r.id + '">Download CSV</button>';
-  if (dispN > u.limit) h += '<button class="ghost" id="more_' + r.id + '">Show all ' + dispN.toLocaleString("en-IN") + (grouped ? " SKUs" : "") + "</button>";
-  h += '<span class="muted" style="font-size:12px">' + (dispN > u.limit ? "showing first " + u.limit.toLocaleString("en-IN") : "showing all " + dispN.toLocaleString("en-IN")) + (grouped ? " SKUs" : "") + "</span>";
+  h += '<span class="muted" style="font-size:12px">showing all ' + dispN.toLocaleString("en-IN") + (grouped ? " SKUs" : "") + "</span>";
   h += "</div>";
 
   if (n === 0) {
@@ -851,7 +850,7 @@ function render(r) {
            ' <span class="a">' + (on ? (u.sort.dir === 1 ? "\u25b2" : "\u25bc") : "\u25c6") + "</span></th>";
     }
     h += "</tr></thead><tbody>";
-    for (const g of disp.slice(0, u.limit)) {
+    for (const g of disp) {
       const isopen = u.expanded.has(g._k);
       h += '<tr class="grp" data-gk="' + esc(g._k) + '"><td class="caret">' + (isopen ? "\u25be" : "\u25b8") + "</td>";
       for (const c of r.cols) h += cell(g, c);
@@ -874,7 +873,7 @@ function render(r) {
            ' <span class="a">' + (on ? (u.sort.dir === 1 ? "▲" : "▼") : "◆") + "</span></th>";
     }
     h += "</tr></thead><tbody>";
-    for (const row of displayRows.slice(0, u.limit)) {
+    for (const row of displayRows) {
       h += (r.rowRed && r.rowRed(row)) ? '<tr class="rowred">' : "<tr>";
       for (const c of r.cols) h += cell(row, c);
       h += "</tr>";
