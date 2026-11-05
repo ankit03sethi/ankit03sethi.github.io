@@ -184,6 +184,11 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, storageK
 
 const $ = (s) => document.querySelector(s);
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+// Settlement is only final ~45 days after the order; recent orders are still
+// settling, so they are never judged short / over / below-cost until then.
+const SETTLE_CUTOFF = (() => { const d = new Date(); d.setDate(d.getDate() - 45); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
+const isFinal = (r) => { const d = String(r.ordered_on || ""); return d !== "" && d <= SETTLE_CUTOFF; };
+const belowCop = (r) => r.cop_known && num(r.received) < num(r.cop) * num(r.qty);
 // Supabase caps each RPC/response at ~1,000 rows. Reports like "received less than COP"
 // scan every paid order, so a 1,000-row slice silently hides real hits. rpcAll pages
 // through the whole result (exact count -> parallel ranges, with a sequential fallback).
@@ -314,7 +319,7 @@ const REPORTS = [
     id: "belowexp", sec: "Payments",
     title: "Receiving less than Expected",
     headStats: (rows) => {
-      const red = rows.filter((x) => x.cop_known && num(x.profit) < 0);
+      const red = rows.filter((x) => belowCop(x) && isFinal(x));
       const sh = Math.round(rows.reduce((t, x) => t + (num(x.expected) - num(x.received)), 0));
       return [
         { l: "SKUs", v: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
@@ -325,12 +330,12 @@ const REPORTS = [
     desc: "Each SKU's latest paid order where the money received (settled + upcoming) is less than its Suggested Settlement \u2014 the competitor-driven target the next price update drives to. Rows in light red received less than COP, an outright loss.",
     src: "profit", latestPerSku: true,
     dateRange: true,
-    pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0 && num(r.received) < num(r.expected),
-    rowRed: (r) => r.cop_known && num(r.profit) < 0,
+    pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0 && num(r.received) < num(r.expected) && isFinal(r),
+    rowRed: (r) => belowCop(r) && isFinal(r),
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
-      const red = rows.filter((r) => r.cop_known && num(r.profit) < 0);
+      const red = rows.filter((r) => belowCop(r) && isFinal(r));
       const short = rows.reduce((t, r) => t + (num(r.expected) - num(r.received)), 0);
       return [
         { l: "SKUs under target", n: rows.length.toLocaleString("en-IN"), cls: rows.length ? "warn" : "" },
@@ -347,12 +352,12 @@ const REPORTS = [
     headStats: (rows) => {
       const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
       const sku = (a) => new Set(a.map((x) => [x.platform, x.company_name, x.sku].join("\u0001"))).size;
-      const corr = rows.filter((x) => hx(x) && num(x.received) >= num(x.expected));
-      const less = rows.filter((x) => hx(x) && num(x.received) < num(x.expected));
-      const loss = rows.filter((x) => x.cop_known && num(x.profit) < 0);
+      const corr = rows.filter((x) => hx(x) && num(x.received) >= num(x.expected) && isFinal(x));
+      const less = rows.filter((x) => hx(x) && num(x.received) < num(x.expected) && isFinal(x));
+      const loss = rows.filter((x) => belowCop(x) && isFinal(x));
       const over = Math.round(corr.reduce((t, x) => t + (num(x.received) - num(x.expected)), 0));
       const short = Math.round(less.reduce((t, x) => t + (num(x.expected) - num(x.received)), 0));
-      const lsum = Math.round(loss.reduce((t, x) => t + num(x.profit), 0));
+      const lsum = Math.round(loss.reduce((t, x) => t + (num(x.received) - num(x.cop) * num(x.qty)), 0));
       return [
         { l: "Correct", v: sku(corr).toLocaleString("en-IN") + " SKUs", sub: corr.length.toLocaleString("en-IN") + " orders \u00b7 " + money(over) + " over", cls: "ok" },
         { l: "Received less", v: sku(less).toLocaleString("en-IN") + " SKUs", sub: less.length.toLocaleString("en-IN") + " orders \u00b7 " + money(short) + " short", cls: "warn" },
@@ -363,7 +368,7 @@ const REPORTS = [
     src: "profit", pick: (r) => num(r.received) > 0,
     expFilters: true,
     dateRange: true,
-    rowRed: (r) => r.cop_known && num(r.profit) < 0,
+    rowRed: (r) => belowCop(r) && isFinal(r),
     cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => {
@@ -498,6 +503,9 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   CA.apply();
   buildCards();
   buildTabs();
+  { const d0 = new Date(); d0.setDate(d0.getDate() - 29);
+    const iso0 = (dt) => dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+    state.dPreset = 30; state.dFrom = iso0(d0); state.dTo = iso0(new Date()); }
   buildDateChips();
   $("#gc").style.display = "flex";
   $("#refresh").addEventListener("click", () => load(true));
@@ -794,8 +802,8 @@ function render(r) {
   if (r.expFilters && u.expFilter && !grouped) {
     const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
     displayRows = rows.filter(u.expFilter === "above"
-      ? (x) => hx(x) && num(x.received) >= num(x.expected)
-      : (x) => hx(x) && num(x.received) < num(x.expected));
+      ? (x) => hx(x) && num(x.received) >= num(x.expected) && isFinal(x)
+      : (x) => hx(x) && num(x.received) < num(x.expected) && isFinal(x));
   }
   const dispN = grouped ? disp.length : displayRows.length;
   const clean = r.id === "paid";
@@ -813,8 +821,8 @@ function render(r) {
   h += '<div class="controls">';
   if (r.expFilters) {
     const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
-    const corr = (x) => hx(x) && num(x.received) >= num(x.expected);
-    const less = (x) => hx(x) && num(x.received) < num(x.expected);
+    const corr = (x) => hx(x) && num(x.received) >= num(x.expected) && isFinal(x);
+    const less = (x) => hx(x) && num(x.received) < num(x.expected) && isFinal(x);
     const skus = (f) => new Set(rows.filter(f).map((x) => [x.platform, x.company_name, x.sku].join("\u0001"))).size;
     h += '<button class="ghost' + (u.expFilter === "above" ? " on" : "") + '" id="fab_' + r.id + '">Correct \u00b7 ' + rows.filter(corr).length.toLocaleString("en-IN") + '</button>';
     h += '<button class="ghost' + (u.expFilter === "below" ? " on" : "") + '" id="fbl_' + r.id + '">Received less \u00b7 ' + rows.filter(less).length.toLocaleString("en-IN") + '</button>';
