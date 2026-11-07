@@ -2868,6 +2868,16 @@
   // prefix is the 25-pulls count, NOT the pack count, so it is stripped first.
   const _WIPE_CODES = { AC:"Aloe Cucumber", FL:"French Lavender", LM:"Lemon Mint", CL:"Cool Water", CW:"Cedarwood" };
   function titleCase(s){ return String(s||"").replace(/\w\S*/g, function(t){ return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase(); }); }
+  // Strip Flipkart-title text that leaked into some product values (Balloon Pump rows):
+  // "<name> Balloon Pump - Buy <name> ... Online at Best Prices in India - X" -> "<name> Balloon Pump".
+  function cleanProductText(p){
+    let s=String(p||"");
+    s=s.replace(/\s*-\s*Buy\s[\s\S]*$/i,"");
+    s=s.replace(/\s*\|\s*Flipkart\.com.*$/i,"");
+    s=s.replace(/\s*Online\s+(?:in India|at Best Price)[\s\S]*$/i,"");
+    s=s.replace(/\s*Price in India\b[\s\S]*$/i,"");
+    return s.replace(/\s+/g," ").trim();
+  }
   function deriveWipes(r){
     const sub=String(r.sub_category||"").toLowerCase(), prod=String(r.product||"");
     if(!/wipe/i.test(sub) && !/wipe/i.test(prod)) return { box:"", color:"" };
@@ -2915,6 +2925,11 @@
         if (!_d.box && !_d.color) _d = deriveWipes(r);
         if (col === "Product" && _d.box)   return _d.box;
         if (col === "Color"   && _d.color) return _d.color;
+      }
+      if (col === "Product") {
+        const _rawP = !blank(rd["Product"]) ? String(rd["Product"]) : String(r.product || "");
+        const _clP = cleanProductText(_rawP);
+        if (_clP && _clP !== _rawP) return _clP;
       }
       // S.NO is where the row sits in this table, 1 upward. The uploaded master
       // file has its own S.NO column carrying numbers from wherever that sheet
