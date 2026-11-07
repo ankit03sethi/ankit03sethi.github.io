@@ -2839,6 +2839,65 @@
     return `<table class="data"><thead>${th}</thead><tbody>${tr}</tbody></table>`;
   }
 
+  // ---- Number foil balloon: derive box number + colour from SKU -> master -> title ----
+  // The master sheet often leaves Product ("Birthday Combo") and Colour blank for number
+  // foil balloons, but the SKU encodes both (BAL-FOIL-17-GOLDEN-03 = GOLDEN, number 3;
+  // BB-S310 -BLUE-NUM-FOIL-SET-2 = BLUE, number 2; 32GF-10 = number 10). Computed on the
+  // fly so the Product column shows the number word (ONE, TWO...) and the Colour column the
+  // colour, without touching stored master data. Colour keeps the master value when present.
+  const _BAL_ONES = ["ZERO","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE","TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN"];
+  const _BAL_TENS = ["","","TWENTY","THIRTY","FORTY","FIFTY","SIXTY","SEVENTY","EIGHTY","NINETY"];
+  function balNumWord(n) {
+    if (!isFinite(n) || n < 0) return "";
+    if (n < 20) return _BAL_ONES[n];
+    if (n < 100) { const o = n % 10; return o ? _BAL_TENS[(n / 10) | 0] + " " + _BAL_ONES[o] : _BAL_TENS[(n / 10) | 0]; }
+    if (n === 100) return "HUNDRED";
+    return String(n);
+  }
+  const _BAL_COLORS = ["ROSE GOLD","ROSEGOLD","ROSGOLD","GOLD BLUE","SILVER BLUE","MULTISHADE","MULTICOLOUR","MULTICOLOR","GOLDEN","GOLD","SILVER","WHITE","BLUE","PINK","RED","BLACK","PURPLE","GREEN","YELLOW","ORANGE","BEIGE","CREAM","MAROON","CHAMPAGNE","CHAMPAIGN","NAVY","TEAL","RAINBOW","PASTEL"];
+  function balNormColor(c) {
+    c = String(c || "").toUpperCase().replace(/\s+/g, " ").trim();
+    if (c === "ROSEGOLD" || c === "ROSGOLD") return "ROSE GOLD";
+    if (c === "CHAMPAIGN") return "CHAMPAGNE";
+    if (c === "MULTICOLOUR") return "MULTICOLOR";
+    return c;
+  }
+  function balColorFromText(s) {
+    if (!s) return "";
+    const u = String(s).toUpperCase();
+    for (const col of _BAL_COLORS) { if (u.indexOf(col) >= 0) return balNormColor(col); }
+    return "";
+  }
+  function deriveBalloon(r) {
+    const sku = String(r.seller_sku || "");
+    const sub = String(r.sub_category || "").toLowerCase();
+    const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+    const title = st && st.title ? String(st.title) : "";
+    const isNum = /\bnumber\b/.test(sub)
+      || /num[-\s]?foil|led[-\s]?num|^\s*\d{2}gf-|^\s*bal-foil-\d+-[a-z]+-\d+\b/i.test(sku)
+      || (/\bnumber\b/i.test(title) && /foil|balloon/i.test(title));
+    const balloonish = isNum || /foil|balloon/i.test(sku) || /foil|balloon/i.test(sub) || /foil|balloon/i.test(title);
+    let box = "";
+    if (isNum) {
+      const nums = sku.match(/\d+/g);
+      if (nums && nums.length) { const n = parseInt(nums[nums.length - 1], 10); if (isFinite(n) && n <= 100) box = balNumWord(n); }
+      if (!box && title) {
+        const tm = title.match(/\b(\d{1,3})\s*(?:st|nd|rd|th)?\s*numbers?\b/i) || title.match(/\bnumbers?\s*(\d{1,3})\b/i);
+        if (tm) { const n = parseInt(tm[1], 10); if (isFinite(n) && n <= 100) box = balNumWord(n); }
+      }
+    }
+    let color = "";
+    if (r.color && String(r.color).trim()) color = String(r.color).trim();
+    else if (balloonish) {
+      let m = sku.match(/[-\s]([A-Za-z][A-Za-z ]*?)[-\s]*NUM[-\s]?FOIL/i);
+      if (m) color = balNormColor(m[1]);
+      if (!color) { m = sku.match(/BAL-FOIL-\d+-([A-Za-z]+)-\d+/i); if (m) color = balNormColor(m[1]); }
+      if (!color) color = balColorFromText(sku);
+      if (!color) color = balColorFromText(title);
+    }
+    return { box: box, color: color };
+  }
+
   function renderSkuMasterTable(rows, startIndex, rowsOnly) {
     startIndex = startIndex || 0;
     // Columns in the EXACT same order and with the EXACT same headers as the Master SKU sample file
@@ -2963,8 +3022,8 @@
         case "Brand":             return r.brand || "—";
         case "Category":          return r.category || "—";
         case "Sub Category":      return r.sub_category || "—";
-        case "Product":           return r.product || "—";
-        case "Color":             return r.color || "—";
+        case "Product":           { const _b = deriveBalloon(r); return _b.box || r.product || "—"; }
+        case "Color":             { const _b = deriveBalloon(r); return _b.color || "—"; }
         case "ASIN":              return r.asin || "—";
         case "SKU":               return r.seller_sku || "—";
         case "Master Sku":        return r.master_sku || "—";
