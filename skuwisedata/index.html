@@ -1602,12 +1602,12 @@
     const table = document.querySelector("#tableWrap table.data");
     if (!table) return;
     const heads = [...table.querySelectorAll("thead tr:first-child th")].map(h => h.dataset.col || h.textContent.trim());
-    const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller", "Title": "title",
+    const want = { "Site Price": "price", "Ratings": "rating", "Count": "review_count", "Seller": "seller", "Title": "title", "Images": "image_count", "Video": "has_video", "Variations": "has_variation",
                    "Our Price": "our_price", "Our Assured": "our_assured", "Suppressed": "suppressed",
                    "Other Seller": "alt_seller", "Other Price": "alt_price", "Other Assured": "alt_assured",
                    "Return Type": "return_type", "File Price": "file_price", "Suggested Price": "sugg_price", "Mapped": "mapped",
                    "Last updated": "last_checked_at", "Selling Price": "file_price", "MOQ": "moq", "MOQ AP": "moq_if", "Suggested Settlement": "sugg_price", "Suggested Profit": "sugg_price" };
-    const EXTRA = new Set(["Title", "Our Price", "Our Assured", "Suppressed", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
+    const EXTRA = new Set(["Title", "Images", "Video", "Variations", "Our Price", "Our Assured", "Suppressed", "Other Seller", "Other Price", "Other Assured", "File Price", "Suggested Price", "Mapped", "Last updated", "Selling Price"]);
     const idx = Object.keys(want).map(c => [c, heads.indexOf(c)]).filter(([, i]) => i >= 0);
     if (!idx.length) return;
     const blank = v => v == null || String(v).trim() === "";
@@ -1676,6 +1676,8 @@
           }
           continue;
         }
+        if (c === "Video" || c === "Variations") v = v ? "Yes" : "";
+        if (c === "Images") v = (v == null || v === "") ? "" : String(v);
         if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
         if (c === "Suppressed") v = v ? "Suppressed" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
@@ -1832,10 +1834,10 @@
       } catch (e) { /* preview optional */ }
       // Scraped product title per SKU (all platforms) — light companion RPC.
       try {
-        const tt = await sb.rpc("sku_listing_titles", { p_keys: slice });
+        const tt = await sb.rpc("sku_listing_extras", { p_keys: slice });
         if (!tt.error) for (const rr of (tt.data || [])) {
           const stT = state.listingStats.get(wcKey(rr.company_name, rr.platform, rr.sku));
-          if (stT) stT.title = rr.title;
+          if (stT) { stT.title = rr.title; stT.has_variation = rr.has_variation; stT.image_count = rr.image_count; stT.has_video = rr.has_video; }
         }
       } catch (e) { /* title optional */ }
     }
@@ -2500,7 +2502,7 @@
          "Rev per order","Courier per order","Settled per order","Last Settled Order","Return per order","Last Return Order",
          "Tax per order","Pack per order","Profit per order"].includes(c)) return "Cash";
     if (/Courier/.test(c) || /Ship/.test(c)) return "Courier";
-    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Title","Our Price","Our Assured","Suppressed","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
+    if (["Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Title","Images","Video","Variations","Our Price","Our Assured","Suppressed","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Last updated","Link"].includes(c)) return "Listing";
     if (/^Last /.test(c)) return "Latest";
     if (["Settle/unit","Margin/unit","Margin %COP"].includes(c)) return "Money";
     return "Product";
@@ -2775,7 +2777,7 @@
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
-      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Title","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Suppressed","Last updated","Link","Stop Selling",
+      "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Title","Images","Video","Variations","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Suppressed","Last updated","Link","Stop Selling",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -2908,7 +2910,7 @@
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         return st ? lastUpdatedText(st) : "";
       }
-      if (["Site Price","Ratings","Count","Seller","Title","Our Price","Our Assured","Suppressed","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Mapped"].includes(col)) {
+      if (["Site Price","Ratings","Count","Seller","Title","Images","Video","Variations","Our Price","Our Assured","Suppressed","Other Seller","Other Price","Other Assured","File Price","Suggested Price","Mapped"].includes(col)) {
         const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
         if (st) {
           // Other Seller / Other Price: Flipkart's "See other sellers" list,
@@ -2926,6 +2928,9 @@
                   : col === "Other Seller"  ? st.alt_seller
                   : col === "Other Price"   ? st.alt_price
                   : col === "Other Assured" ? (st.alt_assured ? "F Assured" : "")
+                  : col === "Images"       ? (st.image_count != null ? String(st.image_count) : "")
+                  : col === "Video"        ? (st.has_video ? "Yes" : "")
+                  : col === "Variations"   ? (st.has_variation ? "Yes" : "")
                   : col === "Title"        ? (st.title || "")
                   :                           st.seller;
           if (col !== "Site Price" && col !== "Ratings" && col !== "Count" && col !== "Seller") return blank(v) ? "" : String(v);
@@ -4446,6 +4451,9 @@
     "Platform": "Which marketplace this row is for.",
     "Brand": "Brand name from the master sheet.",
     "Title": "Product ka live title jo abhi listing page pe dikh raha hai — har platform (Amazon/Flipkart/Meesho/Myntra/FirstCry) se scrape hota hai.",
+    "Images": "Product page pe kitni images hain, scrape se. Meesho search-page pe blank.",
+    "Video": "Yes agar product page pe video hai (scrape se), warna blank.",
+    "Variations": "Yes agar product ke variations/options page pe dikhte hain (scrape se), warna blank. Purani manual Variation column isse alag hai.",
     "Vertical": "Your own grouping from the master sheet.",
     "Return Type": "The return / replacement line on the product page, in the marketplace's own words (7-Day Return, No Returns...). Falls back to the master sheet's Non Returnable column until the page has been checked.",
     "Type": "Product type from the master sheet.",
