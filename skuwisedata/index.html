@@ -2879,6 +2879,14 @@
     const cell = (r, i, col) => {
       const rd = r.raw_data || {};
       const blank = v => v == null || String(v).trim() === "";
+      // "Balloon Box" rows: the derived box type (ONE, TWO...) and colour must win over
+      // the uploaded Product/Colour text ("White One balloon box"), so intercept here —
+      // before the raw_data lookup. deriveBalloon returns blank for every other product.
+      if (col === "Product" || col === "Color") {
+        const _bb = deriveBalloon(r);
+        if (col === "Product" && _bb.box)   return _bb.box;
+        if (col === "Color"   && _bb.color) return _bb.color;
+      }
       // S.NO is where the row sits in this table, 1 upward. The uploaded master
       // file has its own S.NO column carrying numbers from wherever that sheet
       // was cut (12307, 12308, ...), which read as nonsense against a list that
