@@ -2862,6 +2862,34 @@
     return { box: box, color: color };
   }
 
+  // ---- Wet-wipes products: Product column shows the PACK COUNT (1,2,3...) and Colour the
+  // fragrance/variant (Lemon Mint, Cool Water, French Lavender, Aloe Cucumber, Cedarwood,
+  // Baby, Face Mix). Scoped to wipes (sub_category/product contains "wipe"). The CWP25
+  // prefix is the 25-pulls count, NOT the pack count, so it is stripped first.
+  const _WIPE_CODES = { AC:"Aloe Cucumber", FL:"French Lavender", LM:"Lemon Mint", CL:"Cool Water", CW:"Cedarwood" };
+  function titleCase(s){ return String(s||"").replace(/\w\S*/g, function(t){ return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase(); }); }
+  function deriveWipes(r){
+    const sub=String(r.sub_category||"").toLowerCase(), prod=String(r.product||"");
+    if(!/wipe/i.test(sub) && !/wipe/i.test(prod)) return { box:"", color:"" };
+    const sku=String(r.seller_sku||"");
+    // pack count from SKU, ignoring the CWPnn pulls prefix and any "<n> pulls/pcs"
+    let t=sku.replace(/\bCWP\s*\d+/ig,"").replace(/\b\d+\s*(?:pulls?|pcs?)\b/ig,"");
+    let cnt="";
+    let m=t.match(/pack\s*of\s*(\d+)/i) || t.match(/\b[PC]\s*0*(\d+)\b/);
+    if(m) cnt=String(parseInt(m[1],10));
+    if(!cnt){ const nums=t.match(/\d+/g); if(nums&&nums.length) cnt=String(parseInt(nums[nums.length-1],10)); }
+    if(!cnt) cnt="1";
+    // variant from product text, else SKU codes
+    let color=prod.replace(/\bwipes?\b/ig,"").replace(/[-_]/g," ").replace(/\s+/g," ").trim();
+    color=color.replace(/\bAleo\b/i,"Aloe");
+    if(!color){
+      const found=[]; const parts=sku.toUpperCase().split(/[^A-Z]+/);
+      for(const pp of parts){ if(_WIPE_CODES[pp] && found.indexOf(_WIPE_CODES[pp])<0) found.push(_WIPE_CODES[pp]); }
+      if(found.length===1) color=found[0]; else if(found.length>1) color="Face Mix";
+    }
+    return { box:cnt, color:titleCase(color) };
+  }
+
   function renderSkuMasterTable(rows, startIndex, rowsOnly) {
     startIndex = startIndex || 0;
     // Columns in the EXACT same order and with the EXACT same headers as the Master SKU sample file
@@ -2879,13 +2907,14 @@
     const cell = (r, i, col) => {
       const rd = r.raw_data || {};
       const blank = v => v == null || String(v).trim() === "";
-      // "Balloon Box" rows: the derived box type (ONE, TWO...) and colour must win over
-      // the uploaded Product/Colour text ("White One balloon box"), so intercept here —
-      // before the raw_data lookup. deriveBalloon returns blank for every other product.
+      // "Balloon Box" and wipes rows: the derived value (box type / pack count and
+      // colour / variant) must win over the uploaded Product/Colour text, so intercept
+      // here, before the raw_data lookup. Both helpers return blank for other products.
       if (col === "Product" || col === "Color") {
-        const _bb = deriveBalloon(r);
-        if (col === "Product" && _bb.box)   return _bb.box;
-        if (col === "Color"   && _bb.color) return _bb.color;
+        let _d = deriveBalloon(r);
+        if (!_d.box && !_d.color) _d = deriveWipes(r);
+        if (col === "Product" && _d.box)   return _d.box;
+        if (col === "Color"   && _d.color) return _d.color;
       }
       // S.NO is where the row sits in this table, 1 upward. The uploaded master
       // file has its own S.NO column carrying numbers from wherever that sheet
