@@ -273,7 +273,7 @@
     .fpanel .fbulk span { color:#1f6feb; cursor:pointer; }
     .fpanel .fbulk span:hover { text-decoration:underline; }
     .fpanel .fbulk .cnt { margin-left:auto; color:#94a3b8; font-weight:600; cursor:default; }
-    .fpanel .flist { max-height:280px; overflow:auto; padding:4px 0; }
+    .fpanel .flist { max-height:min(65vh,600px); overflow:auto; overscroll-behavior:contain; padding:4px 0; }
     .fpanel .flist label { display:flex; align-items:center; gap:8px; padding:5px 10px; cursor:pointer; }
     .fpanel .flist label:hover { background:#f1f5f9; }
     .fpanel .flist label span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -4181,12 +4181,11 @@
       const rows = q ? values.filter(o => String(o.v).toLowerCase().includes(q)) : values;
       cnt.textContent = chosen.size ? chosen.size + " picked" : rows.length + " values";
       if (!rows.length) { list.innerHTML = '<div class="none">Nothing matches.</div>'; return; }
-      list.innerHTML = rows.slice(0, 600).map(o =>
+      list.innerHTML = rows.map(o =>
         `<label><input type="checkbox" ${chosen.has(o.v) ? "checked" : ""} ` +
         `value="${escapeHtml(o.v)}"><span>${o.v === "" ? "<i>(blank)</i>" : escapeHtml(o.v)}</span>` +
         `<span style="margin-left:auto;color:#94a3b8;font-size:11px">${o.n}</span></label>`
-      ).join("") + (rows.length > 600
-        ? '<div class="none">Showing the first 600 \u2014 type to narrow.</div>' : "");
+      ).join("");
     }
 
     function commit() {
