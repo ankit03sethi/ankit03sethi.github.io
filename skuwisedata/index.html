@@ -4205,19 +4205,18 @@
       if (!cb || cb.type !== "checkbox") return;
       if (cb.checked) chosen.add(cb.value); else chosen.delete(cb.value);
       cnt.textContent = chosen.size ? chosen.size + " picked" : "";
-      commit();
     });
     search.addEventListener("input", draw);
     panel.querySelector("[data-all]").addEventListener("click", () => {
       const q = search.value.trim().toLowerCase();
       (q ? values.filter(o => String(o.v).toLowerCase().includes(q)) : values)
         .forEach(o => chosen.add(o.v));
-      draw(); commit();
+      draw();
     });
     panel.querySelector("[data-none]").addEventListener("click", () => {
-      chosen.clear(); draw(); commit();
+      chosen.clear(); draw();
     });
-    panel.querySelector(".ffoot button").addEventListener("click", closeFilterPanel);
+    panel.querySelector(".ffoot button").addEventListener("click", () => { commit(); closeFilterPanel(); });
 
     draw();
 
