@@ -1528,7 +1528,7 @@
     }
     // "Is there another page" cannot come from the total when the total is
     // unknown: a full page back means keep going, a short one means the end.
-    state.hasMore = (state.view === "sku_master" && (ss || state.search || tagsS))
+    state.hasMore = (state.view === "sku_master" && (ss || state.search || tagsS || colsS))
       ? (data || []).length >= 1000
       : state.loaded < state.total;
     // The day counts, the platform ids and the scraped listing values are NOT
@@ -1580,7 +1580,7 @@
     // A search's remaining pages load as you scroll (smooth); an active column
     // filter pulls its full set only when you actually change it, not on every
     // reload - so returning to the page never re-streams the whole table.
-    if (state.search || (state.view === "sku_master" && (state.platform || state.company))) loadAllForFilter();
+    if (state.search || (state.view === "sku_master" && (state.platform || state.company || colPicksForServer() || tagPicksForServer()))) loadAllForFilter();
   }
 
   // Three independent lookups, run together rather than in a chain, once the
@@ -1960,6 +1960,9 @@
       applyTableTools();   // one final sort + renumber over the whole set
     } finally {
       state.loadingAll = false;
+      // A column/tag filter (e.g. Sub Category = Balloon Box) has no cheap server count, so once every
+      // matching row is loaded the loaded set IS the true total - correct the label/KPI from it.
+      if (state.view === "sku_master" && !state.search && !state.company && !state.platform) { state.total = state.grandTotal = state.loaded; }
       $("#rowCount").textContent = rowCountLabel();
       // every matching row is in now: the cards count the final on-screen set
       if (state.view === "sku_master") { try { renderKpis([...state.rowsById.values()], state.grandTotal || state.total || 0); } catch (e) {} }
@@ -2851,27 +2854,28 @@
   const _BB_COLORS = ["ROSE GOLD","ROSEGOLD","ROSGOLD","GOLDEN","GOLD","SILVER","WHITE","BLUE","PINK","RED","BLACK","PURPLE","GREEN","YELLOW","ORANGE","MULTICOLOUR","MULTICOLOR","MAROON"];
   function bbNormColor(c){ c=String(c||"").toUpperCase().replace(/\s+/g," ").trim(); if(c==="ROSEGOLD"||c==="ROSGOLD")return"ROSE GOLD"; if(c==="GOLDEN")return"GOLD"; if(c==="MULTICOLOUR")return"MULTICOLOR"; return c; }
   function bbColorFromText(s){ if(!s)return""; const u=String(s).toUpperCase(); for(const col of _BB_COLORS){ if(u.indexOf(col)>=0) return bbNormColor(col); } return ""; }
-  let _bbBoxByMaster = null;
-  // Build master_sku -> box word (ONE/TWO...) from every loaded Balloon Box row, so a row that
-  // itself only says "Balloon Box" can inherit the box type from a SIBLING listing (same master_sku,
-  // a different platform) whose product/SKU/title DOES name it. Assigned only when every sibling that
-  // names a box agrees - an ambiguous master_sku is left blank rather than guessing.
-  function buildBbBoxByMaster(){
+  let _bbBoxByMaster = null, _bbColorByMaster = null;
+  // Build master_sku -> box word (ONE/TWO...) AND master_sku -> colour from every loaded Balloon Box
+  // row, so a row that itself only says "Balloon Box" can inherit the box type / colour from a SIBLING
+  // listing (same master_sku, another platform) that DOES name it. Assigned only when all siblings that
+  // name one agree - an ambiguous master_sku is left blank rather than guessing.
+  function buildBbMasterMaps(){
     const boxRe = /\b(ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|BABY|LOVE)\b/i;
-    const seen = {};
+    const seenBox = {}, seenCol = {};
     if (state.rowsById) state.rowsById.forEach(function(r){
       if (String(r.sub_category||"").toLowerCase().trim() !== "balloon box") return;
       const mk = String(r.master_sku||"").toUpperCase().trim(); if (!mk) return;
       const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
       const title = st && st.title ? String(st.title) : "";
-      let w = "";
-      for (const src of [String(r.product||""), String(r.seller_sku||""), title]) { const m = src.match(boxRe); if (m) { w = m[1].toUpperCase(); break; } }
-      if (!w) return;
-      (seen[mk] || (seen[mk] = new Set())).add(w);
+      const prod = String(r.product||""), sku = String(r.seller_sku||"");
+      let w = ""; for (const src of [prod, sku, title]) { const m = src.match(boxRe); if (m) { w = m[1].toUpperCase(); break; } }
+      if (w) (seenBox[mk] || (seenBox[mk] = new Set())).add(w);
+      let c = ""; for (const src of [prod, sku, title]) { const x = bbColorFromText(src); if (x) { c = x; break; } }
+      if (!c) { const bm = sku.match(/\bBB([BWPRGS])\b/i); if (bm) { const cm = {B:"BLUE",W:"WHITE",P:"PINK",R:"RED",G:"GOLD",S:"SILVER"}; c = cm[bm[1].toUpperCase()] || ""; } }
+      if (c) (seenCol[mk] || (seenCol[mk] = new Set())).add(c);
     });
-    const map = {};
-    for (const k in seen) { if (seen[k].size === 1) map[k] = [...seen[k]][0]; }
-    return map;
+    _bbBoxByMaster = {};   for (const k in seenBox) { if (seenBox[k].size === 1) _bbBoxByMaster[k] = [...seenBox[k]][0]; }
+    _bbColorByMaster = {}; for (const k in seenCol) { if (seenCol[k].size === 1) _bbColorByMaster[k] = [...seenCol[k]][0]; }
   }
   function deriveBalloon(r){
     if (String(r.sub_category||"").toLowerCase().trim() !== "balloon box") return { box:"", color:"" };
@@ -2886,6 +2890,7 @@
     let color = "";
     for (const src of [prod, sku, title]) { const c = bbColorFromText(src); if (c) { color = c; break; } }
     if (!color) { const bm = sku.match(/\bBB([BWPRGS])\b/i); if (bm) { const map = {B:"BLUE",W:"WHITE",P:"PINK",R:"RED",G:"GOLD",S:"SILVER"}; color = map[bm[1].toUpperCase()] || ""; } }
+    if (!color) { const mk = String(r.master_sku||"").toUpperCase().trim(); if (mk && _bbColorByMaster && _bbColorByMaster[mk]) color = _bbColorByMaster[mk]; }
     if (!color && r.color && String(r.color).trim()) color = String(r.color).trim().toUpperCase();
     return { box: box, color: color };
   }
@@ -2937,7 +2942,7 @@
     // update instead of rebuilding 1,000 rows - that rebuild was the lag.
     const COLS = orderedCols();
     computeGroupAgg();
-    _bbBoxByMaster = buildBbBoxByMaster();   // master_sku -> box word, for Balloon Box rows that only say "Balloon Box"
+    buildBbMasterMaps();   // master_sku -> box word + colour, for Balloon Box rows that only say "Balloon Box"
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
     // Uploaded headers are matched case- and spacing-insensitively, so "1 Day",
