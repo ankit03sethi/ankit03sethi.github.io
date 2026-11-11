@@ -2926,6 +2926,8 @@
         if (col === "Product" && _d.box)   return _d.box;
         if (col === "Color"   && _d.color) return _d.color;
       }
+      // Balloon Box = single number balloons -> Type column shows "Single" (not the uploaded "Combo")
+      if (col === "Type" && String(r.sub_category || "").toLowerCase().trim() === "balloon box") return "Single";
       if (col === "Product") {
         const _rawP = !blank(rd["Product"]) ? String(rd["Product"]) : String(r.product || "");
         const _clP = cleanProductText(_rawP);
