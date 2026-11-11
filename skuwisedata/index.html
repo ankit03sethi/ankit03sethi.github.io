@@ -2962,6 +2962,8 @@
       }
       // Balloon Box = single number balloons -> Type column shows "Single" (not the uploaded "Combo")
       if (col === "Type" && String(r.sub_category || "").toLowerCase().trim() === "balloon box") return "Single";
+      // Listed By: default to the owner (Ankit) wherever the master sheet left it blank - every platform, survives re-upload.
+      if (col === "Listed By") { const _lb = rd["Listed By"]; return (_lb != null && String(_lb).trim() !== "") ? safeCell(_lb) : "Ankit"; }
       if (col === "Product") {
         const _rawP = !blank(rd["Product"]) ? String(rd["Product"]) : String(r.product || "");
         const _clP = cleanProductText(_rawP);
