@@ -2847,6 +2847,28 @@
   const _BB_COLORS = ["ROSE GOLD","ROSEGOLD","ROSGOLD","GOLDEN","GOLD","SILVER","WHITE","BLUE","PINK","RED","BLACK","PURPLE","GREEN","YELLOW","ORANGE","MULTICOLOUR","MULTICOLOR","MAROON"];
   function bbNormColor(c){ c=String(c||"").toUpperCase().replace(/\s+/g," ").trim(); if(c==="ROSEGOLD"||c==="ROSGOLD")return"ROSE GOLD"; if(c==="GOLDEN")return"GOLD"; if(c==="MULTICOLOUR")return"MULTICOLOR"; return c; }
   function bbColorFromText(s){ if(!s)return""; const u=String(s).toUpperCase(); for(const col of _BB_COLORS){ if(u.indexOf(col)>=0) return bbNormColor(col); } return ""; }
+  let _bbBoxByMaster = null;
+  // Build master_sku -> box word (ONE/TWO...) from every loaded Balloon Box row, so a row that
+  // itself only says "Balloon Box" can inherit the box type from a SIBLING listing (same master_sku,
+  // a different platform) whose product/SKU/title DOES name it. Assigned only when every sibling that
+  // names a box agrees - an ambiguous master_sku is left blank rather than guessing.
+  function buildBbBoxByMaster(){
+    const boxRe = /\b(ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|BABY|LOVE)\b/i;
+    const seen = {};
+    if (state.rowsById) state.rowsById.forEach(function(r){
+      if (String(r.sub_category||"").toLowerCase().trim() !== "balloon box") return;
+      const mk = String(r.master_sku||"").toUpperCase().trim(); if (!mk) return;
+      const st = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
+      const title = st && st.title ? String(st.title) : "";
+      let w = "";
+      for (const src of [String(r.product||""), String(r.seller_sku||""), title]) { const m = src.match(boxRe); if (m) { w = m[1].toUpperCase(); break; } }
+      if (!w) return;
+      (seen[mk] || (seen[mk] = new Set())).add(w);
+    });
+    const map = {};
+    for (const k in seen) { if (seen[k].size === 1) map[k] = [...seen[k]][0]; }
+    return map;
+  }
   function deriveBalloon(r){
     if (String(r.sub_category||"").toLowerCase().trim() !== "balloon box") return { box:"", color:"" };
     const sku = String(r.seller_sku||""), prod = String(r.product||"");
@@ -2855,6 +2877,8 @@
     const boxRe = /\b(ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|BABY|LOVE)\b/i;
     let box = "";
     for (const src of [prod, sku, title]) { const m = src.match(boxRe); if (m) { box = m[1].toUpperCase(); break; } }
+    // Sibling fallback: same master_sku, another platform's listing may name the box though this row only says "Balloon Box".
+    if (!box) { const mk = String(r.master_sku||"").toUpperCase().trim(); if (mk && _bbBoxByMaster && _bbBoxByMaster[mk]) box = _bbBoxByMaster[mk]; }
     let color = "";
     for (const src of [prod, sku, title]) { const c = bbColorFromText(src); if (c) { color = c; break; } }
     if (!color) { const bm = sku.match(/\bBB([BWPRGS])\b/i); if (bm) { const map = {B:"BLUE",W:"WHITE",P:"PINK",R:"RED",G:"GOLD",S:"SILVER"}; color = map[bm[1].toUpperCase()] || ""; } }
@@ -2909,6 +2933,7 @@
     // update instead of rebuilding 1,000 rows - that rebuild was the lag.
     const COLS = orderedCols();
     computeGroupAgg();
+    _bbBoxByMaster = buildBbBoxByMaster();   // master_sku -> box word, for Balloon Box rows that only say "Balloon Box"
     // For each column, decide where the value comes from — DB column, raw_data key, or computed
     const th = "<tr>" + COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr>";
     // Uploaded headers are matched case- and spacing-insensitively, so "1 Day",
