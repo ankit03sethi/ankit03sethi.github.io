@@ -714,7 +714,7 @@
   // Product & Color are DISPLAYED as frontend-derived values (Balloon Box box type / Wipes pack count
   // & colour), not the raw stored text. So their filter dropdown and filtering must run CLIENT-SIDE on
   // the shown cell text - NOT server-side on the raw column (which would list the old raw names).
-  const DERIVED_COLS = { "Product":1, "Color":1 };
+  const DERIVED_COLS = { "Product":1, "Color":1, "Type":1 };
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
