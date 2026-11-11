@@ -278,9 +278,9 @@
     .fpanel .flist label:hover { background:#f1f5f9; }
     .fpanel .flist label span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .fpanel .flist .none { padding:10px; color:#94a3b8; }
-    .fpanel .ffoot { padding:7px 10px; border-top:1px solid #eef2f7; text-align:right; }
+    .fpanel .ffoot { padding:7px 10px; border-bottom:1px solid #eef2f7; text-align:right; }
     .fpanel .ffoot button { font:inherit; font-size:12px; font-weight:700; padding:4px 12px;
-                            border:1px solid #cbd5e1; border-radius:7px; background:#fff; cursor:pointer; }
+                            border:1px solid #1f6feb; border-radius:7px; background:#1f6feb; color:#fff; cursor:pointer; }
     .muted { color:#94a3b8; font-style:italic; }
     .empty { padding:36px 20px; text-align:center; color:#64748b; }
     .empty h3 { margin:0 0 8px; color:#0f172a; }
@@ -4145,11 +4145,11 @@
     panel.className = "fpanel";
     panel.dataset.col = name;
     panel.innerHTML =
+      `<div class="ffoot"><button type="button">Done</button></div>` +
       `<div class="fhead"><input type="search" placeholder="Search ${escapeHtml(colLabel(name))}"></div>` +
       `<div class="fbulk"><span data-all="1">Select all</span><span data-none="1">Clear</span>` +
         `<span class="cnt"></span></div>` +
-      `<div class="flist"></div>` +
-      `<div class="ffoot"><button type="button">Done</button></div>`;
+      `<div class="flist"></div>`;
     // Numeric / % columns get High-to-low and Low-to-high on top, before the values.
     const nonBlank = values.filter(o => String(o.v).trim() !== "");
     const isNum = nonBlank.length > 0 && nonBlank.filter(o => /^[₹$]?\s*-?[\d,]*\.?\d+\s*%?$/.test(String(o.v).trim())).length >= nonBlank.length * 0.6;
