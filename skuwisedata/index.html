@@ -4226,9 +4226,14 @@
     // database, once it answers (the local list only knew the loaded rows).
     if (state.view === "sku_master" && SERVER_COLS[name]) {
       const others = colPicksForServer();
+      // Scope this dropdown to the OTHER filters already applied (e.g. Sub Category = Balloon Box),
+      // so the list shows only values present within the current filter - not every value in the account.
+      // The RPC drops this column's own picks (p_cols - p_col), so a column never hides its own options.
+      const hasOther = others && Object.keys(others).some(k => k !== name);
+      if (hasOther) { values = []; list.innerHTML = '<div class="none">Loading\u2026</div>'; cnt.textContent = ""; }
       sb.rpc("sku_master_col_values", {
         p_col: name, p_company: state.company || null, p_platform: state.platform || null,
-        p_search: state.search || null, p_cols: null,   // show EVERY value for this column, not scoped by other active filters
+        p_search: state.search || null, p_cols: others,   // scope to other active filters
       }).then(res => {
         if (res.error || !Array.isArray(res.data) || openPanel !== panel) return;
         values = res.data.map(o => ({ v: o.v == null ? "" : String(o.v), n: Number(o.n) || 0 }));
