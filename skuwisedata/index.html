@@ -4227,7 +4227,7 @@
       const others = colPicksForServer();
       sb.rpc("sku_master_col_values", {
         p_col: name, p_company: state.company || null, p_platform: state.platform || null,
-        p_search: state.search || null, p_cols: others,
+        p_search: state.search || null, p_cols: null,   // show EVERY value for this column, not scoped by other active filters
       }).then(res => {
         if (res.error || !Array.isArray(res.data) || openPanel !== panel) return;
         values = res.data.map(o => ({ v: o.v == null ? "" : String(o.v), n: Number(o.n) || 0 }));
