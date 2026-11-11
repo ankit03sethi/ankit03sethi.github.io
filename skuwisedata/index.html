@@ -711,6 +711,10 @@
   // rows already loaded, and picking one reloads the table with the matches.
   const SERVER_COLS = { "Company":1, "Platform":1, "Brand":1, "Category":1, "Sub Category":1, "Product":1, "Color":1,
                         "Master Sku":1, "HSN":1, "Type":1, "Listed By":1, "Vertical":1, "Return Type":1 };
+  // Product & Color are DISPLAYED as frontend-derived values (Balloon Box box type / Wipes pack count
+  // & colour), not the raw stored text. So their filter dropdown and filtering must run CLIENT-SIDE on
+  // the shown cell text - NOT server-side on the raw column (which would list the old raw names).
+  const DERIVED_COLS = { "Product":1, "Color":1 };
   // Typed-number columns saved the same way. Margin defaults to 10 when blank
   // (the rupees over cost that the Suggested Price must leave in the settlement);
   // Stock Qty is what the Flipkart price/stock file will carry.
@@ -1905,7 +1909,7 @@
     const p = (t && t.picks) || {};
     // Dropdown-tag columns (Advertising) are filtered in the database, so they
     // never start the "load every row" loop below.
-    return Object.keys(p).some(k => p[k] && p[k].size && !(state.view === "sku_master" && (TAG_COLS[k] || SERVER_COLS[k])));
+    return Object.keys(p).some(k => p[k] && p[k].size && !(state.view === "sku_master" && (TAG_COLS[k] || (SERVER_COLS[k] && !DERIVED_COLS[k]))));
   }
   // 2026-09-25: tag-column picks (Advertising: Yes / No / blank) go to the server
   // as {col: [values]} so only the matching listings are fetched - a filter over
@@ -1922,7 +1926,7 @@
     if (state.view !== "sku_master") return null;
     const t = toolsFor("sku_master"); const p = (t && t.picks) || {};
     const o = {}; let any = false;
-    for (const k of Object.keys(SERVER_COLS)) if (p[k] && p[k].size) { o[k] = [...p[k]]; any = true; }
+    for (const k of Object.keys(SERVER_COLS)) { if (DERIVED_COLS[k]) continue; if (p[k] && p[k].size) { o[k] = [...p[k]]; any = true; } }   // Product/Color filter client-side on derived text, never server WHERE
     return any ? o : null;
   }
 
@@ -3829,7 +3833,7 @@
     const body = table.querySelector("tbody");
     if (!body) return;
     const picks = picksFor(t);
-    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size && !(state.view === "sku_master" && SERVER_COLS[n]));
+    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size && !(state.view === "sku_master" && SERVER_COLS[n] && !DERIVED_COLS[n]));
     for (const tr of body.rows) {
       const ok = activeCols.every(([n, i]) => picks[n].has(cellText(tr.cells[i]))) && colorOK(tr);
       tr.style.display = ok ? "" : "none";
@@ -4008,7 +4012,7 @@
     // row has to carry one of the values chosen in that column's dropdown. The
     // colour filter, when set, also has to pass.
     const picks = picksFor(t);
-    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size && !(state.view === "sku_master" && SERVER_COLS[n]));
+    const activeCols = heads.map((n, i) => [n, i]).filter(([n]) => picks[n] && picks[n].size && !(state.view === "sku_master" && SERVER_COLS[n] && !DERIVED_COLS[n]));
     // Nothing to filter and nothing to sort on the client, and the table was
     // not touched by an earlier filter/sort: leave the DOM alone. Walking every
     // one of 20,000+ rows on each 1,000-row page load was the stutter.
@@ -4220,7 +4224,7 @@
       paintFilterButton(btn, t);
       // Tag columns (Advertising) filter in the database: reload the table so
       // only the matching listings come back, instead of scanning every row here.
-      if (state.view === "sku_master" && (TAG_COLS[name] || SERVER_COLS[name])) { saveFilters(); refresh(); return; }
+      if (state.view === "sku_master" && (TAG_COLS[name] || (SERVER_COLS[name] && !DERIVED_COLS[name]))) { saveFilters(); refresh(); return; }
       applyTableTools();
       // A newly applied filter must see every matching row, not just the page
       // that happens to be loaded - fetch the rest in the background.
@@ -4249,7 +4253,7 @@
 
     // Master text columns: swap in every value the account has, from the
     // database, once it answers (the local list only knew the loaded rows).
-    if (state.view === "sku_master" && SERVER_COLS[name]) {
+    if (state.view === "sku_master" && SERVER_COLS[name] && !DERIVED_COLS[name]) {
       const others = colPicksForServer();
       // Scope this dropdown to the OTHER filters already applied (e.g. Sub Category = Balloon Box),
       // so the list shows only values present within the current filter - not every value in the account.
