@@ -2414,6 +2414,30 @@
          + '<div class="foot">' + activeTf() + 'd &middot; ' + escapeHtml(scope) + '</div></div></div>';
   }
 
+  function lossKpi() {
+    const mini = (id,lab) => '<span style="display:inline-flex;flex-direction:column;align-items:center;margin-right:12px;line-height:1.15">'
+      + '<b id="'+id+'" style="font-size:15px">…</b>'
+      + '<span style="font-size:10px;color:#94a3b8;font-weight:600">'+lab+'</span></span>';
+    return '<div class="kpi"><div class="tile" style="background:#ef4444;">&#128201;</div><div>'
+      + '<div class="label">Lost orders / day</div>'
+      + '<div class="value" style="font-size:15px;display:flex;flex-wrap:wrap;align-items:flex-end;margin-top:4px">'
+      + mini("kpiLossInact","Inactive") + mini("kpiLossOOS","Out of stock") + mini("kpiLossSupp","Suppressed") + mini("kpiLossTot","Total")
+      + '</div>'
+      + '<div class="foot" id="kpiLossFoot">90-day avg · all listings</div></div></div>';
+  }
+  async function updateLossKpi() {
+    try {
+      const { data, error } = await sb.rpc("skuwise_loss_card_json");
+      if (error || !data) return;
+      const g = id => document.getElementById(id);
+      const put = (id,v) => { const e=g(id); if(e) e.textContent = (v==null?0:Number(v)).toLocaleString("en-IN"); };
+      put("kpiLossInact", data.inactive && data.inactive.daily_lost);
+      put("kpiLossOOS", data.oos && data.oos.daily_lost);
+      put("kpiLossSupp", data.suppressed && data.suppressed.daily_lost);
+      put("kpiLossTot", data.total_daily_lost);
+    } catch (e) {}
+  }
+
   function renderKpis(rows, total) {
     const dc = DATE_COL[state.view];
     const companies = new Set(rows.map(r => r.company_name).filter(Boolean));
@@ -2431,11 +2455,13 @@
         ${colorCountsKpi()}
         ${salesKpi()}
         ${subcatKpi()}
+        ${lossKpi()}
       `;
       if (!updateKpiFromDom()) updateKpiSummary();
       updateColorWhite();
       _nimData = null; updateNotInMasterKpi(); _supData = null; updateSuppressedKpi();
       updateSubcatKpi();
+      updateLossKpi();
     } else {
       $("#kpis").innerHTML = `
         <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128202;</div><div><div class="label">Total rows</div><div class="value">${total.toLocaleString("en-IN")}</div><div class="foot">All time</div></div></div>
