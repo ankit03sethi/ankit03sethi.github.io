@@ -2418,13 +2418,18 @@
   }
 
   function lossKpi() {
-    const mini = (id,lab) => '<span style="display:inline-flex;flex-direction:column;align-items:center;margin-right:12px;line-height:1.15">'
-      + '<b id="'+id+'" style="font-size:15px">…</b>'
-      + '<span style="font-size:10px;color:#94a3b8;font-weight:600">'+lab+'</span></span>';
-    return '<div class="kpi"><div class="tile" style="background:#ef4444;">&#128201;</div><div>'
+    const row = (id,lab) =>
+      '<div style="display:flex;align-items:center;gap:8px;line-height:1.55">'
+      + '<span style="font-size:12px;color:#475569;white-space:nowrap">'+lab+'</span>'
+      + '<span style="margin-left:auto;font-size:11px;color:#94a3b8"><b id="'+id+'_n">0</b> sku</span>'
+      + '<b id="'+id+'_d" style="font-size:14px;min-width:38px;text-align:right">0</b></div>';
+    return '<div class="kpi"><div class="tile" style="background:#ef4444;">&#128201;</div><div style="min-width:190px">'
       + '<div class="label">Lost orders / day</div>'
-      + '<div class="value" style="font-size:15px;display:flex;flex-wrap:wrap;align-items:flex-end;margin-top:4px">'
-      + mini("kpiLossInact","Inactive") + mini("kpiLossOOS","Out of stock") + mini("kpiLossSupp","Suppressed") + mini("kpiLossTot","Total")
+      + '<div class="value" style="font-size:14px;display:block;margin-top:3px">'
+      + row("kpiLossInact","Inactive") + row("kpiLossOOS","Out of stock") + row("kpiLossSupp","Suppressed")
+      + '<div style="display:flex;align-items:center;gap:8px;border-top:1px solid #e2e8f0;margin-top:3px;padding-top:3px">'
+      + '<span style="font-size:12px;font-weight:700;color:#334155">Total</span>'
+      + '<b id="kpiLossTot_d" style="margin-left:auto;font-size:15px;color:#ef4444">0</b></div>'
       + '</div>'
       + '<div class="foot" id="kpiLossFoot">90-day avg · all listings</div></div></div>';
   }
@@ -2433,14 +2438,14 @@
       const { data, error } = await sb.rpc("skuwise_loss_card_json");
       if (error || !data) return;
       const g = id => document.getElementById(id);
-      const put = (id,v) => { const e=g(id); if(e) e.textContent = (v==null?0:Number(v)).toLocaleString("en-IN"); };
-      put("kpiLossInact", data.inactive && data.inactive.daily_lost);
-      put("kpiLossOOS", data.oos && data.oos.daily_lost);
-      put("kpiLossSupp", data.suppressed && data.suppressed.daily_lost);
-      put("kpiLossTot", data.total_daily_lost);
+      const num = v => (v==null?0:Number(v)).toLocaleString("en-IN");
+      const fill = (id,o) => { const n=g(id+"_n"), d=g(id+"_d"); if(n) n.textContent = num(o&&o.skus); if(d) d.textContent = num(o&&o.daily_lost); };
+      fill("kpiLossInact", data.inactive);
+      fill("kpiLossOOS", data.oos);
+      fill("kpiLossSupp", data.suppressed);
+      const td=g("kpiLossTot_d"); if(td) td.textContent = num(data.total_daily_lost);
     } catch (e) {}
   }
-
   function renderKpis(rows, total) {
     const dc = DATE_COL[state.view];
     const companies = new Set(rows.map(r => r.company_name).filter(Boolean));
