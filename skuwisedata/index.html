@@ -2423,7 +2423,7 @@
       + '<span style="font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lab+'</span>'
       + '<span style="font-size:10px;color:#94a3b8;white-space:nowrap"><b id="'+id+'_n">0</b> sku</span>'
       + '<b id="'+id+'_d" style="font-size:14px;color:#ef4444;text-align:right">0</b></div>';
-    return '<div class="kpi"><div class="tile" style="background:#ef4444;">&#128201;</div><div style="min-width:0;flex:1;overflow:hidden">'
+    return '<div class="kpi" style="grid-column:span 2;align-items:flex-start"><div class="tile" style="background:#ef4444;">&#128201;</div><div style="min-width:0;flex:1;overflow:hidden">'
       + '<div class="label">Lost orders / day</div>'
       + '<div class="value" style="font-size:14px;display:block;margin-top:3px">'
       + row("kpiLossInact","Inactive") + row("kpiLossOOS","Out of stock") + row("kpiLossSupp","Suppressed")
