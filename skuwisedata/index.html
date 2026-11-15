@@ -2419,24 +2419,31 @@
 
   function lossKpi() {
     const row = (id,lab) =>
-      '<div style="display:flex;align-items:baseline;gap:6px;line-height:1.5;white-space:nowrap">'
-      + '<span style="font-size:12px;color:#475569">'+lab+'</span>'
-      + '<span style="margin-left:auto;font-size:10px;color:#94a3b8"><b id="'+id+'_n">0</b> sku</span>'
-      + '<b id="'+id+'_d" style="font-size:14px;width:40px;text-align:right;color:#ef4444">0</b></div>';
-    return '<div class="kpi"><div class="tile" style="background:#ef4444;">&#128201;</div><div style="min-width:0;flex:1">'
+      '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:baseline;line-height:1.5">'
+      + '<span style="font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lab+'</span>'
+      + '<span style="font-size:10px;color:#94a3b8;white-space:nowrap"><b id="'+id+'_n">0</b> sku</span>'
+      + '<b id="'+id+'_d" style="font-size:14px;color:#ef4444;text-align:right">0</b></div>';
+    return '<div class="kpi"><div class="tile" style="background:#ef4444;">&#128201;</div><div style="min-width:0;flex:1;overflow:hidden">'
       + '<div class="label">Lost orders / day</div>'
-      + '<div class="value" style="font-size:14px;display:block;margin-top:3px;overflow:hidden">'
+      + '<div class="value" style="font-size:14px;display:block;margin-top:3px">'
       + row("kpiLossInact","Inactive") + row("kpiLossOOS","Out of stock") + row("kpiLossSupp","Suppressed")
-      + '<div style="display:flex;align-items:baseline;gap:6px;border-top:1px solid #e2e8f0;margin-top:3px;padding-top:3px;white-space:nowrap">'
+      + '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:baseline;border-top:1px solid #e2e8f0;margin-top:3px;padding-top:3px">'
       + '<span style="font-size:12px;font-weight:700;color:#334155">Total</span>'
-      + '<b id="kpiLossTot_d" style="margin-left:auto;font-size:15px;color:#ef4444">0</b></div>'
+      + '<b id="kpiLossTot_d" style="font-size:15px;color:#ef4444;text-align:right">0</b></div>'
       + '</div>'
       + '<div class="foot" id="kpiLossFoot">90-day avg</div></div></div>';
   }
   async function updateLossKpi() {
     try {
-      const { data, error } = await sb.rpc("skuwise_loss_card_json", { p_company: state.company || null, p_platform: state.platform || null, p_search: state.search || null, p_tags: tagPicksForServer(), p_cols: colPicksForServer() });
-      if (error || !data) return;
+      const sig = (typeof kpiFilterSig === "function") ? kpiFilterSig() : (String(state.company)+"|"+String(state.platform)+"|"+String(state.search));
+      if (!state._lossCache) state._lossCache = new Map();
+      let data = state._lossCache.get(sig);
+      if (data === undefined) {
+        const r = await sb.rpc("skuwise_loss_card_json", { p_company: state.company || null, p_platform: state.platform || null, p_search: state.search || null, p_tags: tagPicksForServer(), p_cols: colPicksForServer() });
+        if (r.error) return;
+        data = r.data; state._lossCache.set(sig, data);
+      }
+      if (!data) return;
       const g = id => document.getElementById(id);
       const num = v => (v==null?0:Number(v)).toLocaleString("en-IN");
       const fill = (id,o) => { const n=g(id+"_n"), d=g(id+"_d"); if(n) n.textContent = num(o&&o.skus); if(d) d.textContent = num(o&&o.daily_lost); };
