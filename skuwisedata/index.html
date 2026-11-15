@@ -2435,7 +2435,7 @@
   }
   async function updateLossKpi() {
     try {
-      const { data, error } = await sb.rpc("skuwise_loss_card_json");
+      const { data, error } = await sb.rpc("skuwise_loss_card_json", { p_company: state.company || null, p_platform: state.platform || null });
       if (error || !data) return;
       const g = id => document.getElementById(id);
       const num = v => (v==null?0:Number(v)).toLocaleString("en-IN");
