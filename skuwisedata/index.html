@@ -2162,7 +2162,7 @@
     if (!vis) return false;
     _kpiSeq++;   // a server summary still in flight must not overwrite these
     const el = id => document.getElementById(id);
-    const plats = new Set(); let latest = null, active = 0, inactive = 0, none = 0;
+    const plats = new Set(); let latest = null, active = 0, inactive = 0, oos = 0, none = 0;
     const sales = { d1:0, d3:0, d7:0, d15:0, d30:0, d60:0, d90:0 };
     for (const r of vis) {
       if (r.platform) plats.add(String(r.platform).toLowerCase());
@@ -2172,6 +2172,7 @@
       if (wc) for (const k in sales) sales[k] += Number(wc[k]) || 0;
       const st = stockFor(r);
       if (!st || ["INACTIVE","REJECTED"].includes(String(st.listing_status || "").toUpperCase())) inactive++;
+      else if (Number(st.qty) === 0) oos++;
       else active++;
     }
     const foot = "Shown rows" + (state.hasMore ? " (loaded so far)" : "");
@@ -2184,6 +2185,7 @@
     if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = foot;
     if (el("kpiStActive")) el("kpiStActive").textContent = active.toLocaleString("en-IN");
     if (el("kpiStInactive")) el("kpiStInactive").textContent = inactive.toLocaleString("en-IN");
+    if (el("kpiStOOS")) el("kpiStOOS").textContent = oos.toLocaleString("en-IN");
     if (el("kpiStFoot")) el("kpiStFoot").textContent = foot;
     return true;
   }
@@ -2207,7 +2209,7 @@
     return '<div class="kpi"><div class="tile" style="background:#16a34a;">&#9989;</div><div>'
          + '<div class="label">Active / Inactive</div>'
          + '<div class="value" style="font-size:16px;display:flex;flex-wrap:wrap;align-items:center;line-height:1.5">'
-         + item("#16a34a", "kpiStActive", "Active") + item("#94a3b8", "kpiStInactive", "Inactive") + '</div>'
+         + item("#16a34a", "kpiStActive", "Active") + item("#f59e0b", "kpiStOOS", "Out of stock") + item("#94a3b8", "kpiStInactive", "Inactive") + '</div>'
          + '<div class="foot" id="kpiStFoot">' + escapeHtml(kpiFilterLabel()) + '</div></div></div>';
   }
   // Suppressed listings (same data as the Suppressed column): our seller name is missing from the
@@ -2383,6 +2385,7 @@
     if (el("kpiSalesFoot")) el("kpiSalesFoot").textContent = kpiFilterLabel();
     const st = s.status || {};
     if (el("kpiStActive")) el("kpiStActive").textContent = (Number(st.active) || 0).toLocaleString("en-IN");
+    if (el("kpiStOOS")) el("kpiStOOS").textContent = (Number(st.oos) || 0).toLocaleString("en-IN");
     if (el("kpiStInactive")) el("kpiStInactive").textContent = ((Number(st.inactive) || 0) + (Number(st.none) || 0)).toLocaleString("en-IN");
     if (el("kpiStFoot")) el("kpiStFoot").textContent = kpiFilterLabel();
   }
@@ -2874,7 +2877,7 @@
 
   const SKU_COLS = [
       "S.NO","Date","Listed By","Company","Platform","Platform Seller","Brand","Vertical","Return Type","Type",
-      "Category","Sub Category","Others","Product","Color","Mapped","MOQ","MOQ AP","Variation","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
+      "Category","Sub Category","Others","Product","Color","Mapped","Parent/Child","MOQ","MOQ AP","Variation","ASIN","Other Listing Id","SKU","Master Sku","W Qty","P Qty","Qty",
       "COP","HSN","Margin","Auto Margin","Auto %","Return Cost/Order","Packaging","Tax %","Promotion %","Auto Settlement","Manual Settlement","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Amazon Add Rs","Max Step %",
       "Selling Price","Suggested Price",
       // Listing-health columns. They fill in from the uploaded master file when it
@@ -3059,6 +3062,7 @@
       if (col === "Type" && String(r.sub_category || "").toLowerCase().trim() === "balloon box") return "Single";
       // Listed By: default to the owner (Ankit) wherever the master sheet left it blank - every platform, survives re-upload.
       if (col === "Listed By") { const _lb = rd["Listed By"]; return (_lb != null && String(_lb).trim() !== "") ? safeCell(_lb) : "Ankit"; }
+      if (col === "Parent/Child") { const _ld = r.listing_data || {}; const _v = (_ld["Parent/Child"] != null ? _ld["Parent/Child"] : rd["Parent/Child"]); return (_v != null && String(_v).trim() !== "") ? safeCell(_v) : ""; }
       if (col === "Product") {
         const _rawP = !blank(rd["Product"]) ? String(rd["Product"]) : String(r.product || "");
         const _clP = cleanProductText(_rawP);
