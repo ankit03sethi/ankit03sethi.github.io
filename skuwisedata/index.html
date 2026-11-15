@@ -2418,15 +2418,15 @@
   }
 
   function lossKpi() {
-    const row = (id,lab) =>
-      '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:baseline;line-height:1.5">'
+    const row = (id,lab,bkt) =>
+      '<div class="loss-row" data-lossbucket="'+bkt+'" title="Click for '+lab+' items (highest loss first)" style="cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:baseline;line-height:1.6">'
       + '<span style="font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lab+'</span>'
       + '<span style="font-size:10px;color:#94a3b8;white-space:nowrap"><b id="'+id+'_n">0</b> sku</span>'
       + '<b id="'+id+'_d" style="font-size:14px;color:#ef4444;text-align:right">0</b></div>';
     return '<div class="kpi" style="grid-column:span 2;align-items:flex-start"><div class="tile" style="background:#ef4444;">&#128201;</div><div style="min-width:0;flex:1;overflow:hidden">'
-      + '<div class="label">Lost orders / day</div>'
+      + '<div class="label">Lost orders / day <span style="font-weight:500;color:#94a3b8;text-transform:none">· click a row</span></div>'
       + '<div class="value" style="font-size:14px;display:block;margin-top:3px">'
-      + row("kpiLossInact","Inactive") + row("kpiLossOOS","Out of stock") + row("kpiLossSupp","Suppressed")
+      + row("kpiLossInact","Inactive","inactive") + row("kpiLossOOS","Out of stock","oos") + row("kpiLossSupp","Suppressed","suppressed")
       + '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:baseline;border-top:1px solid #e2e8f0;margin-top:3px;padding-top:3px">'
       + '<span style="font-size:12px;font-weight:700;color:#334155">Total</span>'
       + '<b id="kpiLossTot_d" style="font-size:15px;color:#ef4444;text-align:right">0</b></div>'
@@ -2453,6 +2453,33 @@
       const td=g("kpiLossTot_d"); if(td) td.textContent = num(data.total_daily_lost);
     } catch (e) {}
   }
+  const LOSS_ITEM_COLS = [["company","Company"],["platform","Platform"],["seller_sku","Seller SKU"],["master_sku","Master SKU"],["product","Product"],["sub_category","Sub Category"],["qty","Qty"],["orders_90d","Lost orders (90d)"],["per_day","Per day"]];
+  function lossCsv(rows) {
+    const esc = v => { const x = v==null?"":String(v); return /[",\r\n]/.test(x) ? '"'+x.replace(/"/g,'""')+'"' : x; };
+    const head = LOSS_ITEM_COLS.map(c=>esc(c[1])).join(",");
+    const body = rows.map(r=>LOSS_ITEM_COLS.map(c=>esc(r[c[0]])).join(",")).join("\n");
+    const blob = new Blob([head+"\n"+body], {type:"text/csv"});
+    const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="loss-items.csv"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }
+  async function openLossList(bucket) {
+    const lab = bucket==="oos"?"Out of stock":bucket==="inactive"?"Inactive":"Suppressed";
+    let d;
+    try { const r = await sb.rpc("skuwise_loss_items_json", { p_bucket: bucket, p_company: state.company || null, p_platform: state.platform || null, p_search: state.search || null, p_tags: tagPicksForServer(), p_cols: colPicksForServer() }); if (r.error) { alert("Could not load the list."); return; } d = r.data; } catch(e) { alert("Could not load the list."); return; }
+    const rows = (d && Array.isArray(d.rows)) ? d.rows : [];
+    let box = document.getElementById("lossModal");
+    if (!box) { box = document.createElement("div"); box.id="lossModal"; box.style.cssText="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px"; box.addEventListener("click", e=>{ if(e.target===box) box.remove(); }); document.body.appendChild(box); }
+    const th = LOSS_ITEM_COLS.map(c=>'<th style="position:sticky;top:0;background:#f1f5f9;padding:6px 8px;text-align:left;font-size:11px;border-bottom:1px solid #e2e8f0;white-space:nowrap">'+c[1]+'</th>').join("");
+    const trs = rows.map(r=>'<tr>'+LOSS_ITEM_COLS.map(c=>'<td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;white-space:nowrap">'+(r[c[0]]==null?"":String(r[c[0]]).replace(/</g,"&lt;"))+'</td>').join("")+'</tr>').join("");
+    box.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:1000px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0">'
+      + '<b style="font-size:15px">'+lab+' — lost orders (highest first) · '+rows.length+' items</b>'
+      + '<div><button id="lossCsvBtn" style="margin-right:8px;padding:5px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer">Download CSV</button>'
+      + '<button id="lossCloseBtn" style="padding:5px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer">Close</button></div></div>'
+      + '<div style="overflow:auto"><table style="border-collapse:collapse;width:100%"><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div></div>';
+    document.getElementById("lossCloseBtn").addEventListener("click", ()=>box.remove());
+    document.getElementById("lossCsvBtn").addEventListener("click", ()=>lossCsv(rows));
+  }
+  document.addEventListener("click", e => { const c = e.target && e.target.closest ? e.target.closest(".loss-row") : null; if (c && c.dataset.lossbucket) openLossList(c.dataset.lossbucket); });
   function renderKpis(rows, total) {
     const dc = DATE_COL[state.view];
     const companies = new Set(rows.map(r => r.company_name).filter(Boolean));
