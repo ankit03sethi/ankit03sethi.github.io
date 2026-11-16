@@ -2527,7 +2527,9 @@
   // itself is never reordered.
   function orderedCols() {
     return SKU_COLS
-      .map((c, i) => ({ c, i, n: state.colOrder.has(c) ? Number(state.colOrder.get(c)) : null }))
+      .map((c, i) => ({ c, i, n: state.colOrder.has(c) ? Number(state.colOrder.get(c))
+                         : (c === "Peak 30d" && state.colOrder.has("Stop Selling")) ? Number(state.colOrder.get("Stop Selling")) + 0.5
+                         : null }))
       .sort((a, b) => {
         const ka = a.n === null ? 1e6 + a.i : a.n;
         const kb = b.n === null ? 1e6 + b.i : b.n;
@@ -2923,6 +2925,9 @@
       // Listing-health columns. They fill in from the uploaded master file when it
       // carries these headers, and show a dash until then.
       "Site Price","Ratings","Count","Count Target","Rating Target","5★ Needed","Grouping","Group Rating","Group Count","Seller","Title","Images","Video","Variations","Other Price","Other Seller","Other Assured","Our Price","Our Assured","Suppressed","Last updated","Link","Stop Selling",
+      // Lifetime high-water mark of the 30-day Sold count (orders). Kept in the
+      // database (seller_sku_windows.peak30) and only ever ratchets upward.
+      "Peak 30d",
       "Sold",
       // Net sold sits right beside Sold - units ordered less the ones that came
       // back - so the first number you read is what actually stayed sold.
@@ -3540,6 +3545,19 @@
     const DASH = "\u2014";
 
     function renderCell(r, i, c) {
+      // Peak 30d: the highest 30-day Sold (orders) this listing has ever reached.
+      // Never below the current 30-day figure; green when today IS the peak.
+      if (c === "Peak 30d") {
+        const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
+        const cur = wc ? (Number(wc.d30) || 0) : 0;
+        const pk  = wc ? Math.max(Number(wc.peak30) || 0, cur) : 0;
+        if (!pk) return `<td style="color:#cbd5e1">${DASH}</td>`;
+        const atPeak = cur >= pk;
+        const tip = "Lifetime highest 30-day sales: " + pk.toLocaleString("en-IN")
+          + " orders. Abhi 30 din: " + cur.toLocaleString("en-IN")
+          + (atPeak ? " (abhi peak par hai)." : " (peak ka " + Math.round(cur * 100 / pk) + "%).");
+        return `<td title="${escapeHtml(tip)}" style="font-weight:700;color:${atPeak ? "#166534" : "#334155"}">${pk.toLocaleString("en-IN")}</td>`;
+      }
       // Focus: auto-filled. "Focused" for any SKU that has ever hit the green
       // threshold; blank otherwise. Set once, never cleared (paintFocus keeps it
       // in sync live; this is the value on first render / re-render).
@@ -4768,6 +4786,7 @@
     "Seller": "Seller name shown on the live listing.",
     "Link": "Opens the live listing.",
     "Focus": "Your own flag. Nothing is calculated from it.",
+    "Peak 30d": "Is listing ki ab tak ki sabse zyada 30-din ki sale (orders). Jab bhi current 30day isse upar jata hai, ye apne aap naya high ban jata hai; neeche kabhi nahi aata. Hara = abhi peak par hai.",
     "Stop Selling": "Apna Yes / blank mark per listing. Yes = jab inventory/stock file banegi to is SKU ki qty 0 jayegi (godown mein stock available ho tab bhi); listing band/inactive nahi hoti. Blank karo to qty wapas Kit Qty pe aa jati hai. Pencil se edit, phir Save pe single row ya bulk (Master SKU / Sub Category / Product / Color / All, per platform & company). Teeno platforms pe lagta hai.",
     "Others": "Sirf 32-inch foil number balloons ke liye: agar SKU mein big ya set likha ho to Big, warna Plain (master ke doosre rows ke SKU se bhi derive hota hai). Baaki products mein blank. Pencil se edit + bulk (Master SKU / Sub Category / Product / Color / All, per platform & company).",
     "Advertising": "Your own Yes / No mark: is this listing being advertised? Click the pencil, pick, then Save. Filter the column from its header.",
