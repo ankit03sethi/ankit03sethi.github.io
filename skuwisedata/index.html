@@ -633,6 +633,18 @@
       for (const r of (Array.isArray(li) ? li : [])) if (r && r.platform_id) idm.set(wcKey(r.company_name, r.platform, r.sku), r.platform_id);
       state.listingIdMap = idm;
     } catch (e) { state.listingIdMap = state.listingIdMap || new Map(); }
+    // Lifetime 30-day peaks (Peak 30d column). A small call of its own, made after
+    // the heavy loads have finished: it returns only the SKUs whose peak is above
+    // today's 30-day count - for every other SKU the peak IS the current count.
+    try {
+      const { data: pk, error: pkErr } = await sb.rpc("sku_peak30_json");
+      if (pkErr) throw pkErr;
+      for (const p of (Array.isArray(pk) ? pk : [])) {
+        const w = state.windowCounts.get(wcKey(p[0], p[1], p[2]));
+        if (w) w.peak30 = Number(p[3]) || 0;
+      }
+      state.peakLoaded = Array.isArray(pk);
+    } catch (e) { state.peakLoaded = false; console.warn("sku_peak30_json failed", e); }
   }
 
   // ---- 1. Companies dropdown ----
@@ -3550,6 +3562,9 @@
       if (c === "Peak 30d") {
         const wc = state.windowCounts.get(wcKey(r.company_name, r.platform, r.seller_sku));
         const cur = wc ? (Number(wc.d30) || 0) : 0;
+        // Peaks not in yet (or their call failed): say so rather than show today's
+        // count as if it were the lifetime high.
+        if (!state.peakLoaded) return `<td title="Peak abhi load nahi hua" style="color:#cbd5e1">\u2026</td>`;
         const pk  = wc ? Math.max(Number(wc.peak30) || 0, cur) : 0;
         if (!pk) return `<td style="color:#cbd5e1">${DASH}</td>`;
         const atPeak = cur >= pk;
