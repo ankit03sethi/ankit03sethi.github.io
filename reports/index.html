@@ -56,6 +56,7 @@ td.num,th.num{text-align:right}
 .st.bad{background:#fee2e2;color:#991b1b}
 .st.warn{background:#fef3c7;color:#92400e}
 .neg{color:#991b1b;font-weight:700}
+.posg{color:#047857;font-weight:700}
 .fbtn{font:inherit;font-size:10.5px;width:100%;min-width:64px;padding:2px 5px;cursor:pointer;border:1px solid #e5e7eb;border-radius:5px;background:#fff;color:#475569;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:3px}
 .fbtn:hover{border-color:#cbd5e1;background:#f8fafc}
 .fbtn.on{border-color:#1f6feb;background:#eff6ff;color:#1f6feb}
@@ -773,7 +774,7 @@ function cell(row, c) {
     case "int": return '<td class="num">' + (v == null ? "" : num(v).toLocaleString("en-IN")) + "</td>";
     case "money": return '<td class="num">' + money2(v) + "</td>";
     case "moneyopt": return '<td class="num"' + (row.plat_price != null ? ' title="Current platform settlement for ' + esc(String(row.qty || 1)) + ' pc at selling price ' + esc(money(row.plat_price)) + '"' : "") + '>' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
-    case "gap": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
+    case "gap": return '<td class="num' + (v == null ? "" : num(v) < 0 ? " neg" : num(v) > 0 ? " posg" : "") + '">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
     case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
     case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
     case "pct": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + num(v).toFixed(1) + "%</td>";
