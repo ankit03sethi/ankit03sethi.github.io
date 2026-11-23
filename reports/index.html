@@ -576,8 +576,8 @@ async function load(force) {
     for (const r of state.profit) {
       const su = sm.get(skn(r.company_name) + "|" + skn(r.platform) + "|" + String(r.sku || ""));
       if (su != null && isFinite(su)) { r.suggested = su; r.expected = Math.round(su * num(r.qty)); }
-      // Gap = Expected - Received (positive = received less than expected).
-      r.gap = r.expected != null ? Math.round((num(r.expected) - num(r.received)) * 100) / 100 : null;
+      // Gap = Received - Expected (negative = received less than expected).
+      r.gap = r.expected != null ? Math.round((num(r.received) - num(r.expected)) * 100) / 100 : null;
     }
   }
   // Platform Price: settlement the platform shows right now for this listing (newest
@@ -770,7 +770,7 @@ function cell(row, c) {
     case "int": return '<td class="num">' + (v == null ? "" : num(v).toLocaleString("en-IN")) + "</td>";
     case "money": return '<td class="num">' + money2(v) + "</td>";
     case "moneyopt": return '<td class="num"' + (row.plat_price != null ? ' title="Current platform settlement for ' + esc(String(row.qty || 1)) + ' pc at selling price ' + esc(money(row.plat_price)) + '"' : "") + '>' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
-    case "gap": return '<td class="num' + (num(v) > 0 ? " neg" : "") + '">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
+    case "gap": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
     case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
     case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
     case "pct": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + num(v).toFixed(1) + "%</td>";

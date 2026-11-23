@@ -1,2 +1,2 @@
-1795447437
-2026-11-23n gap-and-platform-price-cols
+1795447550
+2026-11-23n gap-received-minus-expected
