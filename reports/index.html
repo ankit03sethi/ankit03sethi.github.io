@@ -287,6 +287,7 @@ const COL = {
   typ:    { k: "typ",         l: "Typical",   t: "money" },
   gap:    { k: "gap",         l: "Gap",       t: "gap" },
   platp:  { k: "plat_settle", l: "Platform Price", t: "moneyopt" },
+  pgap:   { k: "plat_gap",    l: "Platform Gap",   t: "gap" },
   gcnt:   { k: "orders",       l: "Orders",    t: "int"  },
   glast:  { k: "last_ref",     l: "Last order id", t: "txt" },
   glastord:{ k: "last_ordered",l: "Last order", t: "date" },
@@ -367,7 +368,7 @@ const REPORTS = [
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0,
     filt: (r) => num(r.received) < num(r.expected),
     rowRed: (r) => belowCop(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.pgap, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => belowCop(r));
@@ -589,6 +590,8 @@ async function load(force) {
       const e = pm.get(skn3(r.company_name) + "|" + skn3(r.platform) + "|" + String(r.sku || ""));
       r.plat_settle = e ? Math.round(num(e.settle) * Math.max(1, num(r.qty)) * 100) / 100 : null;
       r.plat_price = e ? num(e.price) : null;
+      // Platform Gap = Platform Price - Expected (negative = platform pays below expected).
+      r.plat_gap = (r.plat_settle != null && r.expected != null) ? Math.round((r.plat_settle - num(r.expected)) * 100) / 100 : null;
     }
   }
   // Product link per SKU (marketplace listing URL), attached to the paid and
