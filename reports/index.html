@@ -293,6 +293,13 @@ const COL = {
   gap:    { k: "gap",         l: "Gap",       t: "gap" },
   platp:  { k: "plat_settle", l: "Platform Price", t: "moneyopt" },
   pgap:   { k: "plat_gap",    l: "Platform Gap",   t: "gap" },
+  // per-piece views (order money / qty) - match the SKU-wise page; COP is already per piece
+  recdPc: { k: "recd_pc",     l: "Received / pc",  t: "money" },
+  expPc:  { k: "exp_pc",      l: "Expected / pc",  t: "moneyopt0" },
+  gapPc:  { k: "gap_pc",      l: "Gap / pc",       t: "gap" },
+  platPc: { k: "plat_pc",     l: "Platform Price / pc", t: "moneyopt" },
+  pgapPc: { k: "pgap_pc",     l: "Platform Gap / pc",   t: "gap" },
+  profPc: { k: "profit_pc",   l: "Profit / pc",    t: "moneysign" },
   gcnt:   { k: "orders",       l: "Orders",    t: "int"  },
   glast:  { k: "last_ref",     l: "Last order id", t: "txt" },
   glastord:{ k: "last_ordered",l: "Last order", t: "date" },
@@ -373,7 +380,7 @@ const REPORTS = [
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0,
     filt: (r) => num(r.received) < num(r.expected),
     rowRed: (r) => belowCop(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.pgap, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gapPc, COL.recdPc, COL.expPc, COL.platPc, COL.pgapPc, COL.cop, COL.profPc, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => belowCop(r));
@@ -597,6 +604,13 @@ async function load(force) {
       r.plat_price = e ? num(e.price) : null;
       // Platform Gap = Platform Price - Expected (negative = platform pays below expected).
       r.plat_gap = (r.plat_settle != null && r.expected != null) ? Math.round((r.plat_settle - num(r.expected)) * 100) / 100 : null;
+      const q = Math.max(1, num(r.qty)), r2 = (x) => Math.round(x * 100) / 100;
+      r.recd_pc = r2(num(r.received) / q);
+      r.exp_pc = r.suggested != null ? r2(num(r.suggested)) : null;
+      r.gap_pc = r.exp_pc != null ? r2(r.recd_pc - r.exp_pc) : null;
+      r.plat_pc = e ? r2(num(e.settle)) : null;
+      r.pgap_pc = (r.plat_pc != null && r.exp_pc != null) ? r2(r.plat_pc - r.exp_pc) : null;
+      r.profit_pc = r.profit != null ? r2(num(r.profit) / q) : null;
     }
   }
   // Product link per SKU (marketplace listing URL), attached to the paid and
@@ -779,7 +793,8 @@ function cell(row, c) {
     case "date": return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
     case "int": return '<td class="num">' + (v == null ? "" : num(v).toLocaleString("en-IN")) + "</td>";
     case "money": return '<td class="num">' + money2(v) + "</td>";
-    case "moneyopt": return '<td class="num"' + (row.plat_price != null ? ' title="Current platform settlement for ' + esc(String(row.qty || 1)) + ' pc at selling price ' + esc(money(row.plat_price)) + '"' : "") + '>' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
+    case "moneyopt": return '<td class="num"' + (row.plat_price != null ? ' title="Current platform settlement per piece at selling price ' + esc(money(row.plat_price)) + '"' : "") + '>' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
+    case "moneyopt0": return '<td class="num">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
     case "gap": return '<td class="num' + (v == null ? "" : num(v) < 0 ? " neg" : num(v) > 0 ? " posg" : "") + '">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
     case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
     case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
