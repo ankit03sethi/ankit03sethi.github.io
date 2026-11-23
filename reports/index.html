@@ -275,6 +275,7 @@ const COL = {
   co:     { k: "company_name", l: "Company",   t: "txt"  },
   ref:    { k: "order_ref",    l: "Order ref", t: "txt"  },
   sku:    { k: "sku",          l: "SKU",       t: "txt"  },
+  asin:   { k: "asin",         l: "ASIN",      t: "txt"  },
   skuL:   { k: "sku",          l: "SKU",       t: "skulink" },
   link:   { k: "product_url", l: "Link",      t: "link" },
   msku:   { k: "master_sku",   l: "Master SKU",t: "txt"  },
@@ -353,7 +354,7 @@ const REPORTS = [
     desc: "Orders placed 45 or more days ago that are not cancelled, are not sitting in a returns file, and have no money against them in any payment file.",
     src: "check", pick: (r) => r.bucket === "payment not received",
     dateRange: true,
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.ord, COL.age, COL.stat, COL.val],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.asin, COL.link, COL.ord, COL.age, COL.stat, COL.val],
     sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => [
       { l: "Orders", n: rows.length, cls: rows.length ? "bad" : "" },
@@ -380,7 +381,7 @@ const REPORTS = [
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0,
     filt: (r) => num(r.received) < num(r.expected),
     rowRed: (r) => belowCop(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.pgap, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.asin, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.pgap, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => belowCop(r));
@@ -416,7 +417,7 @@ const REPORTS = [
     expFilters: true,
     dateRange: true,
     rowRed: (r) => belowCop(r) && isFinal(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.typ, COL.cop],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.asin, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.typ, COL.cop],
     sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => {
       const p = rows.filter((r) => r.cop_known);
@@ -624,13 +625,16 @@ async function load(force) {
   // Product link per SKU (marketplace listing URL), attached to the paid and
   // unpaid rows so the SKU in the Payments reports links to its live product page.
   { const lm = new Map();
-    if (!lk.error) for (const e of (lk.data || [])) lm.set(e.key, e.url);
+    if (!lk.error) for (const e of (lk.data || [])) lm.set(e.key, e);
     const skn2 = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
     for (const list of [state.profit, state.check]) {
       if (!list) continue;
       for (const r of list) {
-        const u = lm.get(skn2(r.company_name) + "|" + skn2(r.platform) + "|" + skn2(r.sku));
-        if (u) r.product_url = u;
+        const le = lm.get(skn2(r.company_name) + "|" + skn2(r.platform) + "|" + skn2(r.sku));
+        if (le && le.url) r.product_url = le.url;
+        // ASIN column: the listing id from the master sheet's ASIN field
+        // (Amazon ASIN, Flipkart FSN, Myntra style id, ...).
+        r.asin = le && le.asin ? String(le.asin) : "";
       }
     }
   }
