@@ -761,6 +761,8 @@ function rowsFor(r, skipCol) {
   const s = u.sort;
   out = out.slice().sort((x, y) => {
     const a = x[s.k], b = y[s.k];
+    const ea = a == null || a === "", eb = b == null || b === "";
+    if (ea || eb) return ea && eb ? 0 : ea ? 1 : -1;   // blanks always last
     const na = Number(a), nb = Number(b);
     if (Number.isFinite(na) && Number.isFinite(nb) && a !== null && b !== null) return (na - nb) * s.dir;
     return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
@@ -855,6 +857,8 @@ function render(r) {
     const s = u.sort;
     disp = disp.slice().sort((x, y) => {
       const a = x[s.k], b = y[s.k], na = Number(a), nb = Number(b);
+      const ea = a == null || a === "", eb = b == null || b === "";
+      if (ea || eb) return ea && eb ? 0 : ea ? 1 : -1;   // blanks always last
       if (Number.isFinite(na) && Number.isFinite(nb) && a != null && b != null) return (na - nb) * s.dir;
       return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b)) * s.dir;
     });
