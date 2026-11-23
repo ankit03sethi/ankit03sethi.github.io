@@ -1,2 +1,2 @@
-1795434645
-2026-11-23n paid-card-typical-settlement
+1795447437
+2026-11-23n gap-and-platform-price-cols

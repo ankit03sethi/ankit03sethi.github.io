@@ -285,6 +285,8 @@ const COL = {
   mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  },
   exp:    { k: "expected",    l: "Expected",  t: "money" },
   typ:    { k: "typ",         l: "Typical",   t: "money" },
+  gap:    { k: "gap",         l: "Gap",       t: "gap" },
+  platp:  { k: "plat_settle", l: "Platform Price", t: "moneyopt" },
   gcnt:   { k: "orders",       l: "Orders",    t: "int"  },
   glast:  { k: "last_ref",     l: "Last order id", t: "txt" },
   glastord:{ k: "last_ordered",l: "Last order", t: "date" },
@@ -365,7 +367,7 @@ const REPORTS = [
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0,
     filt: (r) => num(r.received) < num(r.expected),
     rowRed: (r) => belowCop(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.exp, COL.cop, COL.profit, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => belowCop(r));
@@ -549,13 +551,14 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
 async function load(force) {
   $("#status").innerHTML = '<span class="spin"></span> reading your data…';
   const t0 = Date.now();
-  const [a, b, c, sg, lk, om] = await Promise.all([
+  const [a, b, c, sg, lk, om, ps] = await Promise.all([
     sb.rpc("seller_order_money_check", { _days: 45 }),
     sb.rpc("seller_paid_profit_json"),
     sb.rpc("seller_skus_missing_cost"),
     sb.rpc("sku_suggested_settle_map_json"),
     sb.rpc("sku_product_link_map_json"),
-    sb.rpc("seller_orders_match_json")
+    sb.rpc("seller_orders_match_json"),
+    sb.rpc("sku_platform_settle_map_json")
   ]);
   if (a.error) console.error("money check", a.error);
   if (b.error) console.error("paid profit", b.error);
@@ -573,6 +576,19 @@ async function load(force) {
     for (const r of state.profit) {
       const su = sm.get(skn(r.company_name) + "|" + skn(r.platform) + "|" + String(r.sku || ""));
       if (su != null && isFinite(su)) { r.suggested = su; r.expected = Math.round(su * num(r.qty)); }
+      // Gap = Expected - Received (positive = received less than expected).
+      r.gap = r.expected != null ? Math.round((num(r.expected) - num(r.received)) * 100) / 100 : null;
+    }
+  }
+  // Platform Price: settlement the platform shows right now for this listing (newest
+  // listing/inventory file - Flipkart only), for this order's qty.
+  { const pm = new Map();
+    if (ps && !ps.error) for (const e of (ps.data || [])) pm.set(e.key, e);
+    const skn3 = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
+    for (const r of state.profit) {
+      const e = pm.get(skn3(r.company_name) + "|" + skn3(r.platform) + "|" + String(r.sku || ""));
+      r.plat_settle = e ? Math.round(num(e.settle) * Math.max(1, num(r.qty)) * 100) / 100 : null;
+      r.plat_price = e ? num(e.price) : null;
     }
   }
   // Product link per SKU (marketplace listing URL), attached to the paid and
@@ -753,6 +769,8 @@ function cell(row, c) {
     case "date": return "<td>" + (v ? esc(String(v)) : '<span class="muted">—</span>') + "</td>";
     case "int": return '<td class="num">' + (v == null ? "" : num(v).toLocaleString("en-IN")) + "</td>";
     case "money": return '<td class="num">' + money2(v) + "</td>";
+    case "moneyopt": return '<td class="num"' + (row.plat_price != null ? ' title="Current platform settlement for ' + esc(String(row.qty || 1)) + ' pc at selling price ' + esc(money(row.plat_price)) + '"' : "") + '>' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
+    case "gap": return '<td class="num' + (num(v) > 0 ? " neg" : "") + '">' + (v == null ? '<span class="muted">\u2014</span>' : money2(v)) + "</td>";
     case "moneyneg": return '<td class="num' + (num(v) ? " neg" : "") + '">' + money2(v) + "</td>";
     case "moneysign": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + money2(v) + "</td>";
     case "pct": return '<td class="num' + (num(v) < 0 ? " neg" : "") + '">' + num(v).toFixed(1) + "%</td>";
