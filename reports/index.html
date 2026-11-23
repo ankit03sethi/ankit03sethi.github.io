@@ -71,6 +71,10 @@ tr.filter-row th{position:sticky;top:26px;z-index:2;background:#f8fafc;padding:3
 .fpanel .fbulk span{color:#1f6feb;cursor:pointer}
 .fpanel .fbulk span:hover{text-decoration:underline}
 .fpanel .fbulk .cnt{margin-left:auto;color:#94a3b8;font-weight:600;cursor:default}
+.fpanel .fsort{display:flex;gap:6px;padding:6px 10px;border-bottom:1px solid #eef2f7}
+.fpanel .fsort button{flex:1;font:inherit;font-size:12px;font-weight:700;padding:5px 6px;border:1px solid #d8dee8;border-radius:6px;background:#fff;color:#334155;cursor:pointer}
+.fpanel .fsort button:hover{border-color:#1f6feb;color:#1f6feb}
+.fpanel .fsort button.on{background:#1f6feb;border-color:#1f6feb;color:#fff}
 .fpanel .flist{max-height:270px;overflow:auto;padding:4px 0}
 .fpanel .flist label{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer}
 .fpanel .flist label:hover{background:#f1f5f9}
@@ -1020,6 +1024,8 @@ function openFPanel(r, btn) {
   panel.dataset.k = key; panel.dataset.rid = r.id;
   panel.innerHTML =
     '<div class="fhead"><input type="search" placeholder="Search ' + esc(col ? col.l : key) + '"></div>' +
+    '<div class="fsort"><button type="button" data-dir="1"' + (u.sort.k === key && u.sort.dir === 1 ? ' class="on"' : '') + '>\u2191 Low to High</button>' +
+    '<button type="button" data-dir="-1"' + (u.sort.k === key && u.sort.dir === -1 ? ' class="on"' : '') + '>\u2193 High to Low</button></div>' +
     '<div class="fbulk"><span data-all="1">Select all</span><span data-none="1">Clear</span><span class="cnt"></span></div>' +
     '<div class="flist"></div><div class="ffoot"><button type="button">Done</button></div>';
   document.body.appendChild(panel);
@@ -1056,6 +1062,12 @@ function openFPanel(r, btn) {
     commit();
   });
   search.addEventListener("input", draw);
+  panel.querySelectorAll(".fsort button").forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    u.sort = { k: key, dir: Number(b.dataset.dir) };
+    closeFPanel();
+    render(r);
+  }));
   panel.querySelector("[data-all]").addEventListener("click", () => {
     const q = search.value.trim().toLowerCase();
     (q ? values.filter((o) => String(o.v).toLowerCase().includes(q)) : values).forEach((o) => chosen.add(o.v));
