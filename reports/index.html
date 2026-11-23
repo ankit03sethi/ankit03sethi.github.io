@@ -380,7 +380,7 @@ const REPORTS = [
     pick: (r) => r.expected != null && num(r.expected) > 0 && num(r.received) > 0,
     filt: (r) => num(r.received) < num(r.expected),
     rowRed: (r) => belowCop(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gapPc, COL.recdPc, COL.expPc, COL.platPc, COL.pgapPc, COL.cop, COL.profPc, COL.mgn],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.gap, COL.recd, COL.exp, COL.platp, COL.pgap, COL.cop, COL.profit, COL.mgn],
     sort: { k: "ordered_on", dir: -1 }, unit: "SKU",
     kpis: (rows) => {
       const red = rows.filter((r) => belowCop(r));
@@ -584,11 +584,19 @@ async function load(force) {
   // each paid row so the "Receiving less than Expected" report can compare it to
   // received+upcoming. key = company|platform|sku, all normalised (sku_key form).
   { const sm = new Map();
-    if (!sg.error) for (const e of (sg.data || [])) sm.set(e.key, Number(e.suggested));
+    if (!sg.error) for (const e of (sg.data || [])) sm.set(e.key, e);
     const skn = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
     for (const r of state.profit) {
-      const su = sm.get(skn(r.company_name) + "|" + skn(r.platform) + "|" + String(r.sku || ""));
-      if (su != null && isFinite(su)) { r.suggested = su; r.expected = Math.round(su * num(r.qty)); }
+      const se = sm.get(skn(r.company_name) + "|" + skn(r.platform) + "|" + String(r.sku || ""));
+      const su = se ? Number(se.suggested) : null;
+      if (su != null && isFinite(su)) {
+        // Suggested is per piece and carries margin+packing+return spread over one
+        // order's MOQ pieces. An order of qty pieces pays those once, so pieces
+        // beyond the MOQ add only their COP share: suggested*qty - ovh*(qty-moq).
+        const q = Math.max(1, num(r.qty)), mq = Math.max(1, num(se.moq) || 1), ovh = num(se.ovh);
+        r.suggested = su;
+        r.expected = Math.round((su * q - ovh * Math.max(0, q - mq)) * 100) / 100;
+      }
       // Gap = Received - Expected (negative = received less than expected).
       r.gap = r.expected != null ? Math.round((num(r.received) - num(r.expected)) * 100) / 100 : null;
     }
