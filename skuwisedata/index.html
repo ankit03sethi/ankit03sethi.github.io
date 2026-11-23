@@ -849,7 +849,12 @@
     const _pfU = String(r.platform || "").toLowerCase();
     const _stU = state.listingStats && state.listingStats.get(wcKey(r.company_name, r.platform, r.seller_sku));
     const moqU = Math.max(1, Number(_pfU === "flipkart" ? (_stU && _stU.moq_if) : _pfU === "amazon" ? (_stU && _stU.moq) : 1) || 1);
-    const mg = mm != null ? mm
+    // Margin = the row's Margin column, a per-ORDER figure (Manual Margin overrides it),
+    // spread over the MOQ pieces of one order. Auto Margin is not added on top.
+    // Same rule as the database (refresh_sku_money / repricers), 2026-11-23.
+    const fm = numOf(ld0["Margin"]) ?? numOf(rd0["Margin"]);
+    const mg = mm != null ? mm / moqU
+             : fm != null ? fm / moqU
              : (am != null && ap != null) ? Math.min(am / moqU, cop * ap / 100)
              : am != null ? am / moqU
              : ap != null ? cop * ap / 100
