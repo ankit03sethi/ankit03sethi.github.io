@@ -189,6 +189,42 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const SETTLE_CUTOFF = (() => { const d = new Date(); d.setDate(d.getDate() - 45); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
 const isFinal = (r) => { const d = String(r.ordered_on || ""); return d !== "" && d <= SETTLE_CUTOFF; };
 const belowCop = (r) => r.cop_known && num(r.received) < num(r.cop) * num(r.qty);
+// "Typical" = what the platform normally paid for this SKU at that time: the median
+// per-unit settlement of the same company+platform+SKU's other orders placed within
+// +/-7 days, times this order's qty (needs 3+ such orders). An order is "received less"
+// only when it got more than max(Rs 5, 5%) below that - i.e. the platform actually paid
+// it short (claims, recovery, extra fees), not just below our own price target.
+const TYP_DAYS = 7, TYP_MIN_PEERS = 3;
+const hasTyp = (x) => x.typ != null && num(x.typ) > 0 && x.cop_known;
+const isLessTyp = (x) => hasTyp(x) && isFinal(x) && (num(x.typ) - num(x.received)) > Math.max(5, num(x.typ) * 0.05);
+const isCorrTyp = (x) => hasTyp(x) && isFinal(x) && !isLessTyp(x);
+function attachTypical(rows) {
+  const day = (s) => Math.floor(Date.parse(String(s).slice(0, 10) + "T00:00:00Z") / 864e5);
+  const groups = new Map();
+  for (const r of rows) {
+    r.typ = null; r.typ_unit = null;
+    if (!r.ordered_on || !(num(r.qty) > 0) || !(num(r.received) > 0)) continue;
+    const k = [r.platform, r.company_name, r.sku].join("\u0001");
+    let g = groups.get(k); if (!g) groups.set(k, g = []);
+    g.push({ r, d: day(r.ordered_on), u: num(r.received) / num(r.qty) });
+  }
+  for (const g of groups.values()) {
+    if (g.length <= TYP_MIN_PEERS) continue;
+    g.sort((a, b) => a.d - b.d);
+    let lo = 0, hi = 0;
+    for (let i = 0; i < g.length; i++) {
+      while (g[lo].d < g[i].d - TYP_DAYS) lo++;
+      while (hi < g.length && g[hi].d <= g[i].d + TYP_DAYS) hi++;
+      if (hi - lo - 1 < TYP_MIN_PEERS) continue;
+      const v = [];
+      for (let j = lo; j < hi; j++) if (j !== i) v.push(g[j].u);
+      v.sort((a, b) => a - b);
+      const m = v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+      g[i].r.typ_unit = Math.round(m * 100) / 100;
+      g[i].r.typ = Math.round(m * num(g[i].r.qty) * 100) / 100;
+    }
+  }
+}
 // Supabase caps each RPC/response at ~1,000 rows. Reports like "received less than COP"
 // scan every paid order, so a 1,000-row slice silently hides real hits. rpcAll pages
 // through the whole result (exact count -> parallel ranges, with a sequential fallback).
@@ -248,6 +284,7 @@ const COL = {
   profit: { k: "profit",       l: "Profit",    t: "moneysign" },
   mgn:    { k: "margin_pct",   l: "Margin %",  t: "pct"  },
   exp:    { k: "expected",    l: "Expected",  t: "money" },
+  typ:    { k: "typ",         l: "Typical",   t: "money" },
   gcnt:   { k: "orders",       l: "Orders",    t: "int"  },
   glast:  { k: "last_ref",     l: "Last order id", t: "txt" },
   glastord:{ k: "last_ordered",l: "Last order", t: "date" },
@@ -346,13 +383,12 @@ const REPORTS = [
     id: "paid", sec: "Payments",
     title: "Orders paid successfully",
     headStats: (rows) => {
-      const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
       const sku = (a) => new Set(a.map((x) => [x.platform, x.company_name, x.sku].join("\u0001"))).size;
-      const corr = rows.filter((x) => hx(x) && num(x.received) >= num(x.expected) && isFinal(x));
-      const less = rows.filter((x) => hx(x) && num(x.received) < num(x.expected) && isFinal(x));
+      const corr = rows.filter(isCorrTyp);
+      const less = rows.filter(isLessTyp);
       const loss = rows.filter((x) => belowCop(x) && isFinal(x));
-      const over = Math.round(corr.reduce((t, x) => t + (num(x.received) - num(x.expected)), 0));
-      const short = Math.round(less.reduce((t, x) => t + (num(x.expected) - num(x.received)), 0));
+      const over = Math.round(corr.reduce((t, x) => t + Math.max(0, num(x.received) - num(x.typ)), 0));
+      const short = Math.round(less.reduce((t, x) => t + (num(x.typ) - num(x.received)), 0));
       const lsum = Math.round(loss.reduce((t, x) => t + (num(x.received) - num(x.cop) * num(x.qty)), 0));
       return [
         { l: "Correct", v: sku(corr).toLocaleString("en-IN") + " SKUs", sub: corr.length.toLocaleString("en-IN") + " orders \u00b7 " + money(over) + " over", cls: "ok" },
@@ -360,12 +396,12 @@ const REPORTS = [
         { l: "Below COP", v: sku(loss).toLocaleString("en-IN") + " SKUs", sub: loss.length.toLocaleString("en-IN") + " orders \u00b7 " + money(lsum) + " loss", cls: loss.length ? "bad" : "" }
       ];
     },
-    desc: "Every order that money actually arrived for, with what it cost you and what you kept.",
+    desc: "Every order that money actually arrived for, with what it cost you and what you kept. Received less = paid more than \u20b95 / 5% below what the same SKU typically settled for in the same week (claims, recoveries, extra fees). Judged only after 45 days.",
     src: "profit", pick: (r) => num(r.received) > 0,
     expFilters: true,
     dateRange: true,
     rowRed: (r) => belowCop(r) && isFinal(r),
-    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.cop],
+    cols: [COL.plat, COL.co, COL.ref, COL.sku, COL.link, COL.msku, COL.ord, COL.qty, COL.recd, COL.typ, COL.cop],
     sort: { k: "ordered_on", dir: -1 },
     kpis: (rows) => {
       const p = rows.filter((r) => r.cop_known);
@@ -527,6 +563,7 @@ async function load(force) {
   state.check = a.error ? [] : (a.data || []);
   state.profit = b.error ? [] : (b.data || []);
   state.omatch = om.error ? [] : (om.data || []);
+  attachTypical(state.profit);
   // Suggested Settlement (competitor-driven reprice target) per SKU, attached to
   // each paid row so the "Receiving less than Expected" report can compare it to
   // received+upcoming. key = company|platform|sku, all normalised (sku_key form).
@@ -798,10 +835,7 @@ function render(r) {
   }
   let displayRows = rows;
   if (r.expFilters && u.expFilter && !grouped) {
-    const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
-    displayRows = rows.filter(u.expFilter === "above"
-      ? (x) => hx(x) && num(x.received) >= num(x.expected) && isFinal(x)
-      : (x) => hx(x) && num(x.received) < num(x.expected) && isFinal(x));
+    displayRows = rows.filter(u.expFilter === "above" ? isCorrTyp : isLessTyp);
   }
   const dispN = grouped ? disp.length : displayRows.length;
   const clean = r.id === "paid";
@@ -818,16 +852,15 @@ function render(r) {
 
   h += '<div class="controls">';
   if (r.expFilters) {
-    const hx = (x) => x.expected != null && num(x.expected) > 0 && x.cop_known;
-    const corr = (x) => hx(x) && num(x.received) >= num(x.expected) && isFinal(x);
-    const less = (x) => hx(x) && num(x.received) < num(x.expected) && isFinal(x);
+    const corr = isCorrTyp;
+    const less = isLessTyp;
     const skus = (f) => new Set(rows.filter(f).map((x) => [x.platform, x.company_name, x.sku].join("\u0001"))).size;
     h += '<button class="ghost' + (u.expFilter === "above" ? " on" : "") + '" id="fab_' + r.id + '">Correct \u00b7 ' + rows.filter(corr).length.toLocaleString("en-IN") + '</button>';
     h += '<button class="ghost' + (u.expFilter === "below" ? " on" : "") + '" id="fbl_' + r.id + '">Received less \u00b7 ' + rows.filter(less).length.toLocaleString("en-IN") + '</button>';
     if (u.expFilter) {
       const f = u.expFilter === "above" ? corr : less;
       const bag = rows.filter(f);
-      h += '<span class="muted" style="font-size:12px;font-weight:700">' + skus(f).toLocaleString("en-IN") + ' SKUs \u00b7 ' + bag.length.toLocaleString("en-IN") + ' orders \u00b7 ' + (u.expFilter === "below" ? money(Math.round(sum(bag, "expected") - sum(bag, "received"))) + ' short' : money(Math.round(sum(bag, "received"))) + ' received') + '</span>';
+      h += '<span class="muted" style="font-size:12px;font-weight:700">' + skus(f).toLocaleString("en-IN") + ' SKUs \u00b7 ' + bag.length.toLocaleString("en-IN") + ' orders \u00b7 ' + (u.expFilter === "below" ? money(Math.round(sum(bag, "typ") - sum(bag, "received"))) + ' short' : money(Math.round(sum(bag, "received"))) + ' received') + '</span>';
     }
   }
   if (r.thr) h += "<label>" + esc(r.thr.label) + '</label><input type="number" step="' + r.thr.step + '" value="' + u.thr + '" id="thr_' + r.id + '" style="width:96px">' +
