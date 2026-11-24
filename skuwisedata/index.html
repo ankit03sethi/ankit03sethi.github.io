@@ -3378,7 +3378,7 @@
         case "Sub Category":      return r.sub_category || "—";
         case "Product":           { const _b = deriveBalloon(r); return _b.box || r.product || "—"; }
         case "Color":             { const _b = deriveBalloon(r); return _b.color || r.color || "—"; }
-        case "Fulfilled by":      return (stockFor(r) || {}).fulfilled_by || "—";
+        case "Fulfilled by":      return fulfilledBy(r) || "—";
         case "ASIN":              return r.asin || "—";
         case "SKU":               return r.seller_sku || "—";
         case "Master Sku":        return r.master_sku || "—";
@@ -3967,7 +3967,7 @@
       // (AMAZON_IN = FBA, DEFAULT = FBM); Flipkart "Fulfillment By" (Seller = FBM,
       // Flipkart = FBF, both = FBF + FBM). Other platforms' files have no such field.
       if (c === "Fulfilled by") {
-        const fb = (stockFor(r) || {}).fulfilled_by;
+        const fb = fulfilledBy(r);
         if (!fb) return '<td style="color:#cbd5e1">' + DASH + "</td>";
         const col = fb === "FBM" ? "#475569" : "#1d4ed8";
         return '<td title="From the latest inventory file" style="color:' + col + ';font-weight:600">' + escapeHtml(fb) + "</td>";
@@ -4918,7 +4918,7 @@
     "Group Rating": "Weighted average rating the group would show if merged: sum(rating x count) / total count, across all loaded rows with the same Grouping number.",
     "Group Count": "Total ratings count of the group (sum of counts of all rows sharing the Grouping number) — what the merged listing would show.",
     "Variation": "Your own variation number per listing. Type a number (edit with the pencil, then apply to this row or in bulk by Master SKU / Sub Category / Product / Color / All, per platform & company). Not linked to any other column — just a manual label.",
-    "Fulfilled by": "Who ships the order, from the latest inventory file: FBM = you ship, FBA = Amazon ships, FBF = Flipkart ships. Updates on every new file. Dash = this platform's file has no such field.",
+    "Fulfilled by": "Who ships the order, from the latest inventory file: FBM = you ship, FBA = Amazon ships, FBF = Flipkart ships. Updates on every new file. Meesho, FirstCry and Myntra are always FBM.",
     "ASIN": "Amazon's product code.",
     "Other Listing Id": "The listing id on platforms other than Amazon.",
     "SKU": "The seller SKU this platform uses.",
@@ -5149,6 +5149,14 @@
 
   // Stock row for a listing: match by the platform's own id (FSN/ASIN/FC id) first,
   // SKU only as a fallback - so a SKU-code drift never shows a live listing as Inactive.
+  // Fulfilled by: file value (Amazon / Flipkart). Meesho, FirstCry and Myntra
+  // files have no such field and are always shipped by the seller -> FBM.
+  const fulfilledBy = (r) => {
+    const fb = (stockFor(r) || {}).fulfilled_by;
+    if (fb) return fb;
+    const pf = String((r && r.platform) || "").toLowerCase();
+    return (pf === "meesho" || pf === "firstcry" || pf === "myntra") ? "FBM" : "";
+  };
   const stockFor = (r) => {
     if (!r) return undefined;
     const key = wcKey(r.company_name, r.platform, r.seller_sku);
