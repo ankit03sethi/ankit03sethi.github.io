@@ -114,7 +114,7 @@
       { key: "skuwise.col.Other Seller", label: "BJ \u00b7 Other Seller", levels: ["view"] },
       { key: "skuwise.col.Other Assured", label: "BK \u00b7 Other Assured", levels: ["view"] },
       { key: "skuwise.col.Our Price", label: "BL \u00b7 Our Price", levels: ["view"] },
-      { key: "skuwise.col.Our Assured", label: "BM \u00b7 Our Assured", levels: ["view"] },
+      { key: "skuwise.col.Our Assured", label: "BM \u00b7 Tags (Our Assured)", levels: ["view"] },
       { key: "skuwise.col.Suppressed", label: "BN \u00b7 Suppressed", levels: ["view"] },
       { key: "skuwise.col.Last updated", label: "BO \u00b7 Last updated", levels: ["view"] },
       { key: "skuwise.col.Link", label: "BP \u00b7 Link", levels: ["view"] },

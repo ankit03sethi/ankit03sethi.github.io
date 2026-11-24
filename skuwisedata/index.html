@@ -480,7 +480,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=23"></script>
+<script src="/analyst-access.js?v=24"></script>
 <script src="/app-download.js?v=1"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -1097,7 +1097,7 @@
     const ordersAfter = cnt >= 3 && Number.isFinite(oldest) && Number.isFinite(chkAt) && oldest > chkAt;
     if (checked && !ordersAfter) {
       const v = st.moq != null ? Number(st.moq) : null;
-      return { src: "page", val: v, tip: v != null ? "Min order quantity on the Flipkart page: " + v + " (checked " + lastUpdatedText(st) + "). Stays until 3 new orders or the next check." : "Flipkart page checked " + lastUpdatedText(st) + ": no MOQ line - normal listing. Stays until 3 new orders or the next check." };
+      return { src: "page", val: v, tip: v != null ? "Min order quantity on the product page: " + v + " (checked " + lastUpdatedText(st) + "). Stays until 3 new orders or the next check." : "Product page checked " + lastUpdatedText(st) + ": no MOQ line - normal listing. Stays until 3 new orders or the next check." };
     }
     if (cnt > 0) {
       const mq = Number(wc.moq_o);
@@ -1817,7 +1817,8 @@
         }
         if (c === "Video" || c === "Variations") v = v ? "Yes" : "";
         if (c === "Images") v = (v == null || v === "") ? "" : String(v);
-        if (c === "Our Assured" || c === "Other Assured") v = v ? "F Assured" : "";
+        if (c === "Our Assured") v = tagsText(r, st);
+        else if (c === "Other Assured") v = v ? "F Assured" : "";
         if (c === "Suppressed") v = v ? "Suppressed" : "";
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         if (c === "Mapped") v = st.mapped ? "Yes" : "";
@@ -3333,7 +3334,7 @@
                   : col === "Ratings"       ? st.rating
                   : col === "Count"         ? st.review_count
                   : col === "Our Price"     ? st.our_price
-                  : col === "Our Assured"   ? (st.our_assured ? "F Assured" : "")
+                  : col === "Our Assured"   ? tagsText(r, st)
                   : col === "Suppressed"    ? (st.suppressed ? "Suppressed" : "")
                   : col === "File Price"    ? st.file_price
                   : col === "Suggested Price" ? suggText(st)
@@ -4633,6 +4634,7 @@
   // about making the row readable. Anything not listed shows its own name.
   const COL_LABEL = {
     "Seller": "Current Seller",
+    "Our Assured": "Tags",
     "Margin": "Floor Margin",
     "Settle/unit": "Settled /unit", "Last 3 Settle": "Settled avg (3)",
     "Last Settle": "Settled last",
@@ -4927,7 +4929,7 @@
     "Platform Seller": "Our own seller name on this company + platform (e.g. Shopperskart sells on Flipkart as 365available).",
     "Suppressed": "Amazon/Flipkart only. Suppressed = scrape ki other-sellers list mein humara Platform Seller naam nahi mila - yani humara offer live nahi dikh raha (page headline pe naam ho tab bhi). Blank = naam list mein hai, ya list capture nahi hui / abhi check nahi hui. Meesho/FirstCry pe hamesha blank. Inactive, out of stock (qty 0) ya inventory mein na hone wale SKU suppressed nahi gine jaate.",
     "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
-    "Our Assured": "F Assured when our Platform Seller carries the Assured badge in that list.",
+    "Our Assured": "Tags. Amazon: the badge on the product page (Amazon's Choice, #1 Best Seller). Flipkart: F Assured when our Platform Seller carries the Assured badge.",
     "Margin": "Floor: the settlement never goes below COP + tax + packaging + this, whether or not a competitor is being priced against. Blank = 10. Type a number; it saves at once.",
     "Auto Margin": "Rupees over COP + tax + packaging that Expected Settlement targets. Typed here it applies as is; with Auto % also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
     "Auto %": "Same target as a percent of COP. Typed here it applies as is; with Auto Margin also typed the smaller of the two; both blank = the smaller of 50 and the COP itself (Auto % 100).",
@@ -5157,6 +5159,14 @@
     if (fb) return fb;
     const pf = String((r && r.platform) || "").toLowerCase();
     return (pf === "meesho" || pf === "firstcry" || pf === "myntra") ? "FBM" : "";
+  };
+  // Tags (column "Our Assured" in the data): Amazon badges from the page (Amazon's Choice,
+  // #N Best Seller); Flipkart: F Assured when our seller carries the Assured tick.
+  const tagsText = (r, st) => {
+    if (!st) return "";
+    const pf = String((r && r.platform) || "").toLowerCase();
+    if (pf === "amazon") return st.tags || "";
+    return st.our_assured ? "F Assured" : "";
   };
   const stockFor = (r) => {
     if (!r) return undefined;
