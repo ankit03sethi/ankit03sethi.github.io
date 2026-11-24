@@ -697,6 +697,13 @@
         + " (" + pct + "%)" + (r.failed ? ' · <span style="color:#b91c1c">' + r.failed + " failed</span>" : "") + tail
         + (r.status === "running" && (r.mine || (window.CA && CA.access && CA.access.is_owner)) ? ' <a href="#" data-stopscrape="' + r.id + '" style="color:#b91c1c;font-weight:700">Stop</a>' : "")
         + "</div>";
+      // last row scraped successfully: its row number (S.NO) in the table, and its SKU
+      if (r.last_sku) {
+        let rowNo = "";
+        const tr = r.last_id != null ? document.querySelector('#tableWrap table.data tbody tr[data-id="' + r.last_id + '"]') : null;
+        if (tr && tr.cells[0]) rowNo = String(tr.cells[0].textContent || "").trim();
+        h += '<div style="color:#047857">Last: ' + (rowNo ? "Row " + escapeHtml(rowNo) + " · " : "") + escapeHtml(r.last_sku) + "</div>";
+      }
     }
     box.innerHTML = h;
   }
