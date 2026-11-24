@@ -352,11 +352,11 @@
 
 <div class="tabs" id="mainTabs">
   <div class="tab active" data-view="sku_master" id="skuMasterTab">SKU Master</div>
-  <div class="tab" data-view="orders" data-perm="skuwise.orders">Orders</div>
-  <div class="tab" data-view="returns" data-perm="skuwise.returns">Returns</div>
-  <div class="tab" data-view="payments" data-perm="skuwise.payments">Payments</div>
-  <div class="tab" data-view="stock" data-perm="skuwise.stock">Stock</div>
-  <div class="tab" data-view="uploads" data-perm="skuwise.uploads">Uploads</div>
+  <div class="tab" data-view="orders" data-owner-only>Orders</div>
+  <div class="tab" data-view="returns" data-owner-only>Returns</div>
+  <div class="tab" data-view="payments" data-owner-only>Payments</div>
+  <div class="tab" data-view="stock" data-owner-only>Stock</div>
+  <div class="tab" data-view="uploads" data-owner-only>Uploads</div>
 </div>
 
 <!-- Data view (orders/returns/payments/stock/sku_master) -->
@@ -480,7 +480,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=15"></script>
+<script src="/analyst-access.js?v=16"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -2667,7 +2667,8 @@
   // (listing work needs them); cost, margin, settlement, revenue and profit do not.
   const FIN_KEEP = new Set(["Selling Price","Site Price","Other Price","Our Price","File Price","Suggested Price"]);
   const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
-  const canFin = () => !window.CA || !CA.access || CA.can("skuwise.financial", "view");
+  // Money on the other tabs is owner-only; SKU Master columns are set one by one per employee.
+  const canFin = () => !window.CA || !CA.access || CA.access.is_owner;
   // Per-column employee permission (Uploads > Employees > SKU-wise data · columns).
   // An explicit None hides the column, View / Edit shows it even if it is a money
   // column; a column never set keeps the old rule (Financial data).

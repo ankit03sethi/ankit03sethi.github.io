@@ -36,14 +36,6 @@
       { key: "reports.returns",  label: "Returns",  levels: ["view"] },
       { key: "reports.missings", label: "Missings", levels: ["view"] },
     ]},
-    { page: "skuwise", label: "SKU-wise data", items: [
-      { key: "skuwise.orders",   label: "Orders",   levels: ["view"] },
-      { key: "skuwise.returns",  label: "Returns",  levels: ["view"] },
-      { key: "skuwise.payments", label: "Payments", levels: ["view"] },
-      { key: "skuwise.stock",    label: "Stock", levels: ["view"] },
-      { key: "skuwise.financial", label: "Financial data on the Orders / Returns / Payments tabs (SKU Master columns are set one by one below)", levels: ["view"] },
-      { key: "skuwise.uploads",  label: "Uploads tab", levels: ["view"] },
-    ]},
     // Every column of the SKU-wise page (SKU Master view), one by one. A column left
     // blank (nothing ticked) follows the rules above, exactly as before: visible with
     // SKU Master view, financial ones only with Financial data. Ticking None / View /
@@ -212,6 +204,8 @@
   function anyOn(page) {
     if (!access) return false;
     if (access.is_owner) return true;
+    // SKU-wise page: opens when any SKU Master column is View / Edit
+    if (page === "skuwise") return anyCol();
     const g = CATALOG.find(x => x.page === page);
     if (!g) return can(page, "view");
     if (g.items.some(it => can(it.key, "view"))) return true;
