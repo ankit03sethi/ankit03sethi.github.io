@@ -74,8 +74,8 @@
       { key: "skuwise.col.Other Listing Id", label: "V \u00b7 Other Listing Id", levels: ["view"] },
       { key: "skuwise.col.SKU", label: "W \u00b7 SKU", levels: ["view"] },
       { key: "skuwise.col.Master Sku", label: "X \u00b7 Master Sku", levels: ["view"] },
-      { key: "skuwise.col.W Qty", label: "Y \u00b7 W Qty", levels: ["view"] },
-      { key: "skuwise.col.P Qty", label: "Z \u00b7 P Qty", levels: ["view"] },
+      { key: "skuwise.col.W Qty", label: "Y \u00b7 Warehouse Qty (W Qty)", levels: ["view"] },
+      { key: "skuwise.col.P Qty", label: "Z \u00b7 Platform Qty (P Qty)", levels: ["view"] },
       { key: "skuwise.col.Qty", label: "AA \u00b7 Qty", levels: ["view"] },
       { key: "skuwise.col.COP", label: "AB \u00b7 COP", levels: ["view"] },
       { key: "skuwise.col.HSN", label: "AC \u00b7 HSN", levels: ["view"] },
@@ -92,7 +92,7 @@
       { key: "skuwise.col.Suggested Settlement", label: "AN \u00b7 Suggested Settlement", levels: ["view"] },
       { key: "skuwise.col.Expected Profit", label: "AO \u00b7 Expected Profit", levels: ["view"] },
       { key: "skuwise.col.Suggested Profit", label: "AP \u00b7 Suggested Profit", levels: ["view"] },
-      { key: "skuwise.col.Amazon Add Rs", label: "AQ \u00b7 Amazon Add Rs", levels: ["view", "edit"] },
+      { key: "skuwise.col.Amazon Add Rs", label: "AQ \u00b7 Courier Add On (Amazon Add Rs)", levels: ["view", "edit"] },
       { key: "skuwise.col.Max Step %", label: "AR \u00b7 Max Step %", levels: ["view", "edit"] },
       { key: "skuwise.col.Selling Price", label: "AS \u00b7 Selling Price", levels: ["view"] },
       { key: "skuwise.col.Suggested Price", label: "AT \u00b7 Suggested Price", levels: ["view"] },
@@ -149,7 +149,7 @@
       { key: "skuwise.col.Profit per order", label: "CS \u00b7 Profit per order", levels: ["view"] },
       { key: "skuwise.col.Focus", label: "CT \u00b7 Focus", levels: ["view"] },
       { key: "skuwise.col.Advertising", label: "CU \u00b7 Advertising", levels: ["view", "edit"] },
-      { key: "skuwise.col.Priority", label: "CV \u00b7 Priority", levels: ["view", "edit"] },
+      { key: "skuwise.col.Priority", label: "CV \u00b7 Ad Sets (Priority)", levels: ["view", "edit"] },
       { key: "skuwise.col.Row Color", label: "CW \u00b7 Row Color", levels: ["view"] }
     ]},
     { page: "settings", label: "Settings", items: [
