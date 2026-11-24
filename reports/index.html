@@ -141,22 +141,22 @@ tr.rowred td{background:#ffecec}
   <div class="chips" id="dateChips" style="margin-bottom:10px;align-items:center"></div>
   <div class="chips" id="repTabs" style="margin-bottom:18px;font-weight:800;font-size:13px"></div>
 
-  <section class="section" id="secOrders" data-perm="reports.orders">
+  <section class="section" id="secOrders">
     <div class="section-head"><h2>Orders</h2><div class="rule"></div><span class="cnt" id="cntOrders"></span></div>
     <div id="wrapOrders"></div>
   </section>
 
-  <section class="section" id="secPayments" data-perm="reports.payments">
+  <section class="section" id="secPayments">
     <div class="section-head"><h2>Payments</h2><div class="rule"></div><span class="cnt" id="cntPayments"></span></div>
     <div id="wrapPayments"></div>
   </section>
 
-  <section class="section" id="secReturns" data-perm="reports.returns">
+  <section class="section" id="secReturns">
     <div class="section-head"><h2>Returns</h2><div class="rule"></div><span class="cnt" id="cntReturns"></span></div>
     <div id="wrapReturns"></div>
   </section>
 
-  <section class="section missings" id="secMissings" data-perm="reports.missings">
+  <section class="section missings" id="secMissings">
     <div class="section-head"><h2>Missings</h2><div class="rule"></div><span class="cnt" id="cntMissings"></span></div>
     <div id="wrapMissings"></div>
   </section>
@@ -178,7 +178,7 @@ tr.rowred td{background:#ffecec}
   </section>
 </main>
 
-<script src="/analyst-access.js?v=16"></script>
+<script src="/analyst-access.js?v=17"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module">
@@ -549,6 +549,10 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   if (!CA.access.active) { $("#status").textContent = "Cursive Analyst subscription required."; return; }
   if (!CA.anyOn("reports")) { $("#status").textContent = "You do not have access to Reports. Ask the account owner."; document.querySelectorAll("main .section").forEach(s => s.style.display = "none"); return; }
   CA.apply();
+  // Employees: keep only the report cards ticked for them (Uploads > Employees > Reports)
+  if (!CA.access.is_owner) {
+    for (let i = REPORTS.length - 1; i >= 0; i--) if (!CA.can("reports.r." + REPORTS[i].id, "view")) REPORTS.splice(i, 1);
+  }
   buildCards();
   buildTabs();
   { const d0 = new Date(); d0.setDate(d0.getDate() - 89);
@@ -1132,11 +1136,11 @@ function renderAll() {
 
 /* ---------- csv -------------------------------------------------------- */
 const REPORT_TABS = [
-  { id: "secOrders", label: "Orders", perm: "reports.orders" },
-  { id: "secPayments", label: "Payments", perm: "reports.payments" },
-  { id: "secReturns", label: "Returns", perm: "reports.returns" },
-  { id: "secMissings", label: "Missings", perm: "reports.missings" },
-  { id: "secPricing", label: "Pricing", perm: null }
+  { id: "secOrders", label: "Orders", sec: "Orders" },
+  { id: "secPayments", label: "Payments", sec: "Payments" },
+  { id: "secReturns", label: "Returns", sec: "Returns" },
+  { id: "secMissings", label: "Missings", sec: "Missings" },
+  { id: "secPricing", label: "Pricing", perm: "reports.pricing" }
 ];
 function showTab(id) {
   document.querySelectorAll("main > section.section").forEach((el) => { el.style.display = "none"; });
@@ -1149,7 +1153,9 @@ function showTab(id) {
 function buildTabs() {
   const host = document.querySelector("#repTabs");
   if (!host) return;
-  const avail = REPORT_TABS.filter((t) => document.getElementById(t.id) && (!t.perm || (window.CA && CA.can(t.perm, "view"))));
+  // a section tab shows when the employee may see at least one of its reports
+  const avail = REPORT_TABS.filter((t) => document.getElementById(t.id)
+    && (t.sec ? REPORTS.some((r) => r.sec === t.sec) : (window.CA && CA.can(t.perm, "view"))));
   host.innerHTML = "";
   avail.forEach((t, i) => {
     const c = document.createElement("span");

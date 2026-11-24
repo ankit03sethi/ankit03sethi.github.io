@@ -31,10 +31,17 @@
       { key: "scanner", label: "Scanner (edit = can scan)" },
     ]},
     { page: "reports", label: "Reports", items: [
-      { key: "reports.orders",   label: "Orders",   levels: ["view"] },
-      { key: "reports.payments", label: "Payments", levels: ["view"] },
-      { key: "reports.returns",  label: "Returns",  levels: ["view"] },
-      { key: "reports.missings", label: "Missings", levels: ["view"] },
+      // one row per report card (reports/index.html REPORTS ids) + the Pricing section
+      { key: "reports.r.notinfile", label: "Orders · Orders not in Order file", levels: ["view"] },
+      { key: "reports.r.notincsv",  label: "Orders · Orders not in CSV", levels: ["view"] },
+      { key: "reports.r.unpaid",    label: "Payments · Payment not received", levels: ["view"] },
+      { key: "reports.r.belowexp",  label: "Payments · Receiving less than Expected", levels: ["view"] },
+      { key: "reports.r.paid",      label: "Payments · Orders paid successfully", levels: ["view"] },
+      { key: "reports.r.retlost",   label: "Returns · Returned, goods never arrived", levels: ["view"] },
+      { key: "reports.r.missing",   label: "Missings · Missing data (Master SKU file, inventory files, A07)", levels: ["view"] },
+      { key: "reports.r.skunocop",  label: "Missings · Selling with no cost price", levels: ["view"] },
+      { key: "reports.r.nocop",     label: "Missings · Cost price not available", levels: ["view"] },
+      { key: "reports.pricing",     label: "Pricing · Price update file", levels: ["view"] },
     ]},
     // Every column of the SKU-wise page (SKU Master view), one by one. A column left
     // blank (nothing ticked) follows the rules above, exactly as before: visible with
