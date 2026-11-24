@@ -662,7 +662,7 @@
   })();
 </script>
 
-<script src="/analyst-access.js?v=14"></script>
+<script src="/analyst-access.js?v=15"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -676,6 +676,9 @@
   let OWNER_ID = null;   // whose data this page works on: the owner for employees
 
   const PLATFORMS = ["amazon","flipkart","meesho","myntra","firstcry"];
+  // Employee limited to some platforms (Employees > Platforms): only those show
+  // in the upload pickers and filters. Company setup keeps the full list.
+  const pfOk = (p) => { const a = window.CA && CA.access; if (!a || a.is_owner || !Array.isArray(a.platforms) || !a.platforms.length) return true; return a.platforms.map(x => String(x).toLowerCase()).includes(String(p || "").toLowerCase()); };
   const PLAT_LABEL = { amazon:"Amazon", flipkart:"Flipkart", meesho:"Meesho", myntra:"Myntra", firstcry:"FirstCry" };
   let companies = []; // [{ id, name, platforms:[] }]
 
@@ -694,6 +697,7 @@
     if (location.hash === "#master") setTimeout(() => { const el = document.getElementById("masterRow"); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 600);
     if (!(CA.anyOn("uploads") || CA.anyOn("master") || CA.can("uploads.master", "view"))) { setStatus("You do not have access to Uploads. Ask the account owner.", true); $("#uploadsPanel").style.display = "none"; document.querySelector(".top-actions").style.display = "none"; return; }
     CA.apply();
+    { const sel = document.getElementById("swPlatformSel"); if (sel) [...sel.options].forEach(o => { if (o.value && !pfOk(o.value)) o.remove(); }); }
     // Master SKU: 1 download (view) · 2 upload · 3 delete old · 4 edit old · 5 add new
     if (!CA.can("uploads.master.upload", "edit") || !(CA.can("uploads.master.replace", "edit") || CA.can("uploads.master.update", "edit") || CA.can("uploads.master.append", "edit"))) {
       const b = $("#masterUploadBtn"); b.disabled = true; b.style.opacity = ".45"; b.title = "No upload permission";
@@ -981,7 +985,7 @@
     // the union, not whichever list the button happened to carry.
     const kindPlats = [...new Set(pickerKinds.flatMap(k => KIND_CFG[k].platforms || PLATFORMS))];
     const uniqPlats = new Set();
-    list.forEach(c => (c.platforms || []).forEach(p => { if (kindPlats.includes(p)) uniqPlats.add(p); }));
+    list.forEach(c => (c.platforms || []).forEach(p => { if (kindPlats.includes(p) && pfOk(p)) uniqPlats.add(p); }));
     // Company dropdown
     const cSel = $("#companyFilterSel");
     cSel.innerHTML = `<option value="">All companies</option>` +
@@ -1009,6 +1013,7 @@
       if (ordersFilterCompany && c.name !== ordersFilterCompany) return;
       (c.platforms || []).forEach(p => {
         if (ordersFilterPlatform && p !== ordersFilterPlatform) return;
+        if (!pfOk(p)) return;
         pickerKinds.forEach(k => {
           const kindPlats = KIND_CFG[k].platforms || PLATFORMS;
           if (!kindPlats.includes(p)) return;
@@ -2686,7 +2691,7 @@
       $("#empList").innerHTML = members.map(m => {
         const perms = m.perms || {}; const cos = m.companies || []; const pfs = (m.platforms || []).map(x => String(x).toLowerCase());
         const rows = CA.CATALOG.map(g => {
-          const head = `<tr class="grp"><td colspan="4">${esc(g.label)}<span class="quick" data-quick="view" data-page="${g.page}">all view</span><span class="quick" data-quick="edit" data-page="${g.page}">all edit</span><span class="quick" data-quick="none" data-page="${g.page}">none</span>${g.inherit ? `<span class="quick" data-quick="default" data-page="${g.page}">clear (as before)</span><div style="font-weight:400;font-size:12px;color:#64748b;margin-top:4px;text-transform:none;letter-spacing:0">Nothing ticked on a column = as before (shown with SKU Master view, money columns only with Financial data; no editing). Edit appears only on columns you can type into.</div>` : ""}</td></tr>`;
+          const head = `<tr class="grp"><td colspan="4">${esc(g.label)}<span class="quick" data-quick="view" data-page="${g.page}">all view</span><span class="quick" data-quick="edit" data-page="${g.page}">all edit</span><span class="quick" data-quick="none" data-page="${g.page}">none</span>${g.inherit ? `<div style="font-weight:400;font-size:12px;color:#64748b;margin-top:4px;text-transform:none;letter-spacing:0">The SKU-wise page (SKU Master tab) opens for the employee when at least one column is View or Edit. Edit appears only on columns you can type into.</div>` : ""}</td></tr>`;
           const items = g.items.map(it => {
             const lv = levelsOf(it);
             // per-column rows: a key never saved stays unticked (= as before), so

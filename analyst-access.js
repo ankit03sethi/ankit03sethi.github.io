@@ -37,12 +37,11 @@
       { key: "reports.missings", label: "Missings", levels: ["view"] },
     ]},
     { page: "skuwise", label: "SKU-wise data", items: [
-      { key: "skuwise.sku_master", label: "SKU Master (view = see page; edit = change cells)", levels: ["view", "edit"] },
       { key: "skuwise.orders",   label: "Orders",   levels: ["view"] },
       { key: "skuwise.returns",  label: "Returns",  levels: ["view"] },
       { key: "skuwise.payments", label: "Payments", levels: ["view"] },
       { key: "skuwise.stock",    label: "Stock", levels: ["view"] },
-      { key: "skuwise.financial", label: "Financial data (cost, margin, revenue, settlement, profit columns; Payments tab)", levels: ["view"] },
+      { key: "skuwise.financial", label: "Financial data on the Orders / Returns / Payments tabs (SKU Master columns are set one by one below)", levels: ["view"] },
       { key: "skuwise.uploads",  label: "Uploads tab", levels: ["view"] },
     ]},
     // Every column of the SKU-wise page (SKU Master view), one by one. A column left
@@ -51,7 +50,7 @@
     // Edit overrides that for the column. Edit is offered only on typed columns.
     // Keep in step with SKU_COLS in skuwisedata/index.html (a column missing here
     // simply keeps the default rule).
-    { page: "skuwise_cols", label: "SKU-wise data · columns (blank = as before)", inherit: true, items: [
+    { page: "skuwise_cols", label: "SKU-wise data · SKU Master columns", inherit: true, items: [
       { key: "skuwise.col.S.NO", label: "A \u00b7 S.NO", levels: ["view"] },
       { key: "skuwise.col.Date", label: "B \u00b7 Date", levels: ["view"] },
       { key: "skuwise.col.Listed By", label: "C \u00b7 Listed By", levels: ["view"] },
@@ -201,6 +200,14 @@
     const p = access.perms || {}, k = "skuwise.col." + col;
     return Object.prototype.hasOwnProperty.call(p, k) ? (p[k] || "") : null;
   }
+  // Any SKU Master column the employee may see? (opens the SKU Master tab / page)
+  function anyCol() {
+    if (!access) return false;
+    if (access.is_owner) return true;
+    const p = access.perms || {};
+    if (Object.keys(p).some(k => k.startsWith("skuwise.col.") && (p[k] === "view" || p[k] === "edit"))) return true;
+    return p["skuwise.sku_master"] === "view" || p["skuwise.sku_master"] === "edit";   // employees saved before 2026-11-24
+  }
   // Does the employee have any access at all on a page?
   function anyOn(page) {
     if (!access) return false;
@@ -208,6 +215,7 @@
     const g = CATALOG.find(x => x.page === page);
     if (!g) return can(page, "view");
     if (g.items.some(it => can(it.key, "view"))) return true;
+    if (page === "skuwise" && anyCol()) return true;
     // the Master SKU file lives on the Uploads page
     return page === "uploads" ? anyOn("master") : false;
   }
@@ -247,5 +255,5 @@
     return access.is_owner ? (access.email || "") : `${access.email || ""} · employee of ${access.owner_email || "owner"}`;
   }
 
-  window.CA = { CATALOG, load, can, levelOf, anyOn, apply, who, colPerm, get access() { return access; }, ownerId: () => (access ? access.owner_id : null) };
+  window.CA = { CATALOG, load, can, levelOf, anyOn, apply, who, colPerm, anyCol, get access() { return access; }, ownerId: () => (access ? access.owner_id : null) };
 })();
