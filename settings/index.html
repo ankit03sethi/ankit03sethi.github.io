@@ -149,7 +149,7 @@
 
     <section class="pane" data-tab="pricing" hidden>
       <h2>Price setting</h2>
-      <p class="help">Controls what the desktop app writes into the platform files (Flipkart listing file, Amazon Price &amp; Quantity template) when they are processed.</p>
+      <p class="help">Controls how prices are worked out and what the desktop app writes into the platform files (Flipkart listing file, Amazon Price &amp; Quantity template) when they are processed.</p>
       <div class="toggle-row">
         <div>
           <div class="t-title">Automate pricing</div>
@@ -157,6 +157,14 @@
           <div class="t-state" id="autoState"></div>
         </div>
         <label class="switch"><input type="checkbox" id="autoPricing" checked><span class="knob"></span></label>
+      </div>
+      <div class="toggle-row" style="margin-top:12px">
+        <div>
+          <div class="t-title">Add returns cost</div>
+          <div class="t-help"><b>ON</b> &mdash; the average return cost per order (SKU-wise page, column AG &ldquo;Return Cost/Order&rdquo;) is added into Auto / Expected Settlement and every price sent to the platform files (as now).<br><b>OFF</b> &mdash; it is not added to the settlement or price. Column AG still shows the value, and Expected / Suggested Profit still deduct it. A typed Manual Settlement is never changed.</div>
+          <div class="t-state" id="retState"></div>
+        </div>
+        <label class="switch"><input type="checkbox" id="addRetCost" checked><span class="knob"></span></label>
       </div>
       <div class="actions">
         <button class="btn" id="priceSaveBtn" disabled>Save</button>
@@ -293,32 +301,41 @@
   const priceSaveBtn = document.getElementById("priceSaveBtn");
   const priceMsg = document.getElementById("priceMsg");
   const sayP = (text, color) => { priceMsg.textContent = text; priceMsg.style.color = color || "#64748b"; };
+  const retBox = document.getElementById("addRetCost");
+  const retState = document.getElementById("retState");
   const showAuto = () => {
     autoState.textContent = autoBox.checked ? "ON — price + stock are updated" : "OFF — only stock is updated, prices untouched";
     autoState.style.color = autoBox.checked ? "#16a34a" : "#b45309";
+    retState.textContent = retBox.checked ? "ON — return cost is added into the price" : "OFF — return cost is NOT added into the price (still shown in column AG)";
+    retState.style.color = retBox.checked ? "#16a34a" : "#b45309";
   };
   autoBox.addEventListener("change", () => { showAuto(); sayP("Not saved yet — click Save.", "#b45309"); });
+  retBox.addEventListener("change", () => { showAuto(); sayP("Not saved yet — click Save.", "#b45309"); });
   async function loadPricing(canEdit) {
     try {
       const { data, error } = await sb.rpc("pricing_config", {});
       if (error) throw error;
       autoBox.checked = !(data && data.auto_pricing === false);   // missing = ON
+      retBox.checked = !(data && data.add_ret_cost === false);    // missing = ON
       showAuto(); sayP("");
     } catch (e) { showAuto(); sayP("Could not load: " + (e.message || e), "#b91c1c"); }
     // the view-only lock above disables every button in main - keep the menu usable
     for (const b of tabBtns) b.disabled = false;
     autoBox.disabled = !canEdit;
+    retBox.disabled = !canEdit;
     priceSaveBtn.disabled = !canEdit;
     if (!canEdit) { priceSaveBtn.title = "View only"; sayP("View only — ask the account owner for edit access.", "#b45309"); }
   }
   priceSaveBtn.addEventListener("click", async () => {
     priceSaveBtn.disabled = true; sayP("Saving…");
     try {
-      const { data, error } = await sb.rpc("pricing_set", { p_cfg: { auto_pricing: autoBox.checked } });
+      const { data, error } = await sb.rpc("pricing_set", { p_cfg: { auto_pricing: autoBox.checked, add_ret_cost: retBox.checked } });
       if (error) throw error;
       autoBox.checked = !(data && data.auto_pricing === false);
+      retBox.checked = !(data && data.add_ret_cost === false);
       showAuto();
-      sayP("Saved: Automate pricing " + (autoBox.checked ? "ON" : "OFF") + " — the app uses this on the next platform file.", "#16a34a");
+      sayP("Saved: Automate pricing " + (autoBox.checked ? "ON" : "OFF") + ", Add returns cost " + (retBox.checked ? "ON" : "OFF")
+        + " — used on the next platform file; reload the SKU-wise page to see it.", "#16a34a");
     } catch (e) { sayP("Could not save: " + (e.message || e), "#b91c1c"); }
     priceSaveBtn.disabled = false;
   });
