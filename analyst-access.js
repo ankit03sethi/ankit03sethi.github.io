@@ -105,7 +105,7 @@
       { key: "skuwise.col.Grouping", label: "BA \u00b7 Grouping", levels: ["view", "edit"] },
       { key: "skuwise.col.Group Rating", label: "BB \u00b7 Group Rating", levels: ["view"] },
       { key: "skuwise.col.Group Count", label: "BC \u00b7 Group Count", levels: ["view"] },
-      { key: "skuwise.col.Seller", label: "BD \u00b7 Seller", levels: ["view"] },
+      { key: "skuwise.col.Seller", label: "BD \u00b7 Current Seller (Seller)", levels: ["view"] },
       { key: "skuwise.col.Title", label: "BE \u00b7 Title", levels: ["view"] },
       { key: "skuwise.col.Images", label: "BF \u00b7 Images", levels: ["view"] },
       { key: "skuwise.col.Video", label: "BG \u00b7 Video", levels: ["view"] },

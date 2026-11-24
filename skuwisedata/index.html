@@ -480,7 +480,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=22"></script>
+<script src="/analyst-access.js?v=23"></script>
 <script src="/app-download.js?v=1"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -4632,6 +4632,7 @@
   // filtering and the column picker all still key on it - so this is purely
   // about making the row readable. Anything not listed shows its own name.
   const COL_LABEL = {
+    "Seller": "Current Seller",
     "Margin": "Floor Margin",
     "Settle/unit": "Settled /unit", "Last 3 Settle": "Settled avg (3)",
     "Last Settle": "Settled last",
