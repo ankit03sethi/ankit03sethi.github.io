@@ -1819,7 +1819,7 @@
         if (c === "Images") v = (v == null || v === "") ? "" : String(v);
         if (c === "Our Assured") v = tagsText(r, st);
         else if (c === "Other Assured") v = v ? "F Assured" : "";
-        if (c === "Suppressed") v = v ? "Suppressed" : "";
+        if (c === "Suppressed") v = st.not_featured ? "Not Featured" : (v ? "Suppressed" : "");
         if (c === "Suggested Price") { v = suggText(st); td.style.color = suggColor(st); }
         if (c === "Mapped") v = st.mapped ? "Yes" : "";
         if (c === "Last updated") v = lastUpdatedText(st);
@@ -1951,7 +1951,7 @@
         const sp = await sb.rpc("sku_suppressed", { p_keys: slice });
         if (!sp.error) for (const rr of (sp.data || [])) {
           const stS = state.listingStats.get(wcKey(rr.company_name, rr.platform, rr.sku));
-          if (stS) stS.suppressed = true;
+          if (stS) { stS.suppressed = rr.suppressed !== false; stS.not_featured = rr.not_featured === true; }
         }
       } catch (e) { /* suppressed optional */ }
       // Slope per SKU (for Suggested Settlement / Profit) - a light separate RPC.
@@ -2357,6 +2357,31 @@
          + '<div class="foot" id="kpiSupFoot">' + escapeHtml(kpiFilterLabel()) + ' · click for list</div></div></div>';
   }
   let _supSeq = 0, _supData = null;
+  // Not Featured (Amazon): no seller shown outside (No featured offer), but our Platform Seller is
+  // inside See All Buying Options. Same list / CSV as Suppressed.
+  function notFeaturedKpi() {
+    return '<div class="kpi" id="kpiNfCard" style="cursor:pointer" title="Click to see the list"><div class="tile" style="background:#8b5cf6;">&#9888;</div><div>'
+         + '<div class="label">Not Featured</div>'
+         + '<div class="value" id="kpiNf">\u2026</div>'
+         + '<div class="foot" id="kpiNfFoot">' + escapeHtml(kpiFilterLabel()) + ' \u00b7 click for list</div></div></div>';
+  }
+  let _nfSeq = 0, _nfData = null;
+  async function fetchNotFeatured() {
+    const { data, error } = await sb.rpc("sku_not_featured_json", { p_company: state.company || null, p_platform: state.platform || null });
+    if (error || !data) return null;
+    return data;
+  }
+  async function updateNotFeaturedKpi() {
+    const el = document.getElementById("kpiNf"); if (!el) return;
+    const seq = ++_nfSeq;
+    const d = await fetchNotFeatured();
+    if (seq !== _nfSeq) return;
+    const e2 = document.getElementById("kpiNf"); if (!e2) return;
+    if (!d) { e2.textContent = "\u2014"; return; }
+    _nfData = d;
+    e2.textContent = (Number(d.count) || 0).toLocaleString("en-IN");
+    const f = document.getElementById("kpiNfFoot"); if (f) f.textContent = kpiFilterLabel() + " \u00b7 click for list";
+  }
   async function fetchSuppressed() {
     const { data, error } = await sb.rpc("sku_suppressed_json", { p_company: state.company || null, p_platform: state.platform || null });
     if (error || !data) return null;
@@ -2380,17 +2405,18 @@
     if (k === "last_checked_at") { const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString("en-IN"); }
     return String(v);
   }
-  function supCsv(rows) {
+  function supCsv(rows, name) {
     const esc = v => { const s = v == null ? "" : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const lines = [SUP_COLS.map(c => esc(c[1])).join(",")];
     for (const r of rows) lines.push(SUP_COLS.map(c => esc(supCell(r, c[0]))).join(","));
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = "suppressed-" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.download = (name || "suppressed") + "-" + new Date().toISOString().slice(0, 10) + ".csv";
     document.body.appendChild(a); a.click(); setTimeout(() => { try { a.remove(); URL.revokeObjectURL(a.href); } catch (e) {} }, 600);
   }
-  async function openSuppressed() {
-    let d = _supData; if (!d) d = await fetchSuppressed(); if (!d) { alert("Could not load the list."); return; }
+  async function openSuppressed(kind) {
+    const nf = kind === "nf";
+    let d = nf ? _nfData : _supData; if (!d) d = nf ? await fetchNotFeatured() : await fetchSuppressed(); if (!d) { alert("Could not load the list."); return; }
     const rows = Array.isArray(d.rows) ? d.rows : [];
     let box = document.getElementById("supModal");
     if (!box) {
@@ -2408,14 +2434,15 @@
     const trs = rows.map((r, i) => '<tr' + (i % 2 ? ' style="background:#f8fafc"' : '') + '>' + SUP_COLS.map(c => td(r, c[0])).join("") + '</tr>').join("");
     box.innerHTML = '<div style="background:#fff;border-radius:12px;width:min(1300px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
       + '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #e2e8f0">'
-      + '<b style="font-size:15px">Suppressed listings</b><span style="color:#64748b;font-size:13px">' + rows.length.toLocaleString("en-IN") + ' listings · ' + escapeHtml(kpiFilterLabel()) + ' · live and in stock only</span>'
+      + '<b style="font-size:15px">' + (nf ? 'Not Featured listings' : 'Suppressed listings') + '</b><span style="color:#64748b;font-size:13px">' + rows.length.toLocaleString("en-IN") + ' listings · ' + escapeHtml(kpiFilterLabel()) + ' · live and in stock only</span>'
       + '<span style="flex:1"></span><button class="btn" id="supDl" type="button" style="font-size:12px;padding:5px 11px">&#11015; Download CSV</button>'
       + '<button class="btn" id="supClose" type="button" style="font-size:12px;padding:5px 11px">Close</button></div>'
-      + '<div style="overflow:auto;flex:1"><table style="border-collapse:collapse;width:100%"><thead><tr>' + th + '</tr></thead><tbody>' + (trs || '<tr><td colspan="' + SUP_COLS.length + '" style="padding:16px;color:#64748b">Nothing suppressed - our seller name is on every live, in-stock listing.</td></tr>') + '</tbody></table></div></div>';
+      + '<div style="overflow:auto;flex:1"><table style="border-collapse:collapse;width:100%"><thead><tr>' + th + '</tr></thead><tbody>' + (trs || '<tr><td colspan="' + SUP_COLS.length + '" style="padding:16px;color:#64748b">' + (nf ? 'Nothing here - every live, in-stock listing has a featured offer.' : 'Nothing suppressed - our seller name is on every live, in-stock listing.') + '</td></tr>') + '</tbody></table></div></div>';
     box.querySelector("#supClose").addEventListener("click", () => box.remove());
-    box.querySelector("#supDl").addEventListener("click", () => supCsv(rows));
+    box.querySelector("#supDl").addEventListener("click", () => supCsv(rows, nf ? "not-featured" : "suppressed"));
   }
-  document.addEventListener("click", e => { const c = e.target && e.target.closest ? e.target.closest("#kpiSupCard") : null; if (c) openSuppressed(); });
+  document.addEventListener("click", e => { const c = e.target && e.target.closest ? e.target.closest("#kpiSupCard") : null; if (c) openSuppressed("sup"); });
+  document.addEventListener("click", e => { const c = e.target && e.target.closest ? e.target.closest("#kpiNfCard") : null; if (c) openSuppressed("nf"); });
   // Listings that are in the platform inventory files but NOT in the master SKU file.
   // Count on the card; click opens the list (company, platform, FSN/ASIN, listing id, SKU, status, qty) with CSV download.
   function notInMasterKpi() {
@@ -2627,6 +2654,7 @@
       $("#kpis").innerHTML = `
         <div class="kpi"><div class="tile" style="background:#1f6feb;">&#128200;</div><div><div class="label">Total listings</div><div class="value" id="kpiTotal">${total.toLocaleString("en-IN")}</div><div class="foot" id="kpiTotalFoot">${escapeHtml(kpiFilterLabel())}</div></div></div>
         ${statusKpi()}
+        ${notFeaturedKpi()}
         ${suppressedKpi()}
         ${notInMasterKpi()}
         <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value" id="kpiPlat">${platforms.size}</div><div class="foot" id="kpiPlatFoot">${[...platforms].join(", ") || "—"}</div></div></div>
@@ -2639,7 +2667,7 @@
       if (!updateKpiFromDom()) updateKpiSummary();
       renderScrapeBox();
       updateColorWhite();
-      _nimData = null; updateNotInMasterKpi(); _supData = null; updateSuppressedKpi();
+      _nimData = null; updateNotInMasterKpi(); _supData = null; updateSuppressedKpi(); _nfData = null; updateNotFeaturedKpi();
       updateSubcatKpi();
       updateLossKpi();
     } else {
@@ -3337,7 +3365,7 @@
                   : col === "Count"         ? st.review_count
                   : col === "Our Price"     ? st.our_price
                   : col === "Our Assured"   ? tagsText(r, st)
-                  : col === "Suppressed"    ? (st.suppressed ? "Suppressed" : "")
+                  : col === "Suppressed"    ? (st.not_featured ? "Not Featured" : (st.suppressed ? "Suppressed" : ""))
                   : col === "File Price"    ? st.file_price
                   : col === "Suggested Price" ? suggText(st)
                   : col === "Mapped"        ? (st.mapped ? "Yes" : "")
@@ -4930,7 +4958,7 @@
     "SKU": "The seller SKU this platform uses.",
     "Master Sku": "Your own code that ties the same product across platforms.",
     "Platform Seller": "Our own seller name on this company + platform (e.g. Shopperskart sells on Flipkart as 365available).",
-    "Suppressed": "Amazon/Flipkart only. Suppressed = scrape ki other-sellers list mein humara Platform Seller naam nahi mila - yani humara offer live nahi dikh raha (page headline pe naam ho tab bhi). Blank = naam list mein hai, ya list capture nahi hui / abhi check nahi hui. Meesho/FirstCry pe hamesha blank. Inactive, out of stock (qty 0) ya inventory mein na hone wale SKU suppressed nahi gine jaate.",
+    "Suppressed": "Not Featured (Amazon): no seller shown outside (No featured offer) but our Platform Seller name is inside See All Buying Options. Suppressed: Amazon/Flipkart only. Suppressed = scrape ki other-sellers list mein humara Platform Seller naam nahi mila - yani humara offer live nahi dikh raha (page headline pe naam ho tab bhi). Blank = naam list mein hai, ya list capture nahi hui / abhi check nahi hui. Meesho/FirstCry pe hamesha blank. Inactive, out of stock (qty 0) ya inventory mein na hone wale SKU suppressed nahi gine jaate.",
     "Our Price": "Flipkart only: our Platform Seller's price in the 'See other sellers' list.",
     "Our Assured": "Tags. Amazon: the badge on the product page (Amazon's Choice, #1 Best Seller). Flipkart: F Assured when our Platform Seller carries the Assured badge.",
     "Margin": "Floor: the settlement never goes below COP + tax + packaging + this, whether or not a competitor is being priced against. Blank = 10. Type a number; it saves at once.",
