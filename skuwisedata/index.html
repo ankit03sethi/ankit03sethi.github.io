@@ -480,7 +480,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=18"></script>
+<script src="/analyst-access.js?v=19"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -4536,8 +4536,8 @@
     "Return per order": "Cost per return",
     // 2026-11-24 renames (display only - data keys stay the same)
     "Amazon Add Rs": "Courier Add On",
-    "W Qty": "Warehouse Qty",
-    "P Qty": "Platform Qty",
+    "W Qty": "Warehouse Stock Status",
+    "P Qty": "Platform Status",
     "Priority": "Ad Sets",
   };
   for (const w of [1, 3, 7, 15, 30, 60, 90]) COL_LABEL[w + "day"] = w + "d Sold";
