@@ -151,6 +151,9 @@
       { key: "skuwise.col.Priority", label: "CU \u00b7 Ad Sets (Priority)", levels: ["view", "edit"] },
       { key: "skuwise.col.Row Color", label: "CV \u00b7 Row Color", levels: ["view"] }
     ]},
+    { page: "skuwise_tools", label: "SKU-wise data · actions", items: [
+      { key: "skuwise.scrape", label: "Update Now (scrape the filtered rows on the running apps)", levels: ["edit"] },
+    ]},
     { page: "settings", label: "Settings", items: [
       { key: "settings", label: "Print sorting settings" },
     ]},

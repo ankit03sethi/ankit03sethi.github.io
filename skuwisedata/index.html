@@ -480,7 +480,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=20"></script>
+<script src="/analyst-access.js?v=21"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -556,6 +556,7 @@
     if (firstTab && !firstTab.classList.contains("active")) { document.querySelectorAll(".tab[data-view]").forEach(t => t.classList.toggle("active", t === firstTab)); state.view = firstTab.dataset.view; }
     await loadCompanies();
     restoreFilters();
+    setTimeout(pollScrape, 1500);
     startScrapeBar();
     refreshMasterStamp();          // not awaited: the stamp is decoration, the table is not
     // The rolling day counts are loaded ONCE here, before the first table is
@@ -658,6 +659,95 @@
       state.peakLoaded = Array.isArray(pk);
     } catch (e) { state.peakLoaded = false; console.warn("sku_peak30_json failed", e); }
   }
+
+  // ---- Update Now: scrape the filtered rows on every running Analyst app ----
+  // The server queues one job per listing, ahead of the normal background
+  // checks; when several people press it their jobs are handed out in turns,
+  // so every running app (any employee's PC) works on all of them together.
+  // Failed checks (captcha / block) are retried up to 3 times by the server.
+  const scrapeState = { list: [], timer: null, wasRunning: new Set(), ping: null };
+  function canScrapeNow() { return !window.CA || !CA.access || CA.access.is_owner || CA.can("skuwise.scrape", "edit"); }
+  function scrapeFilterIds() {
+    // Search / column / colour filters live in the page: take exactly the rows showing.
+    const clientFilter = !!state.search || filtersActive() || colorFilterActive() || !!tagPicksForServer() || !!colPicksForServer();
+    if (!clientFilter) return { ids: null, n: state.grandTotal || state.total || 0 };
+    if ((state.loaded || 0) < (state.total || 0)) return { loading: true };
+    const table = document.querySelector("#tableWrap table.data");
+    const ids = table ? [...table.querySelectorAll("tbody tr")].filter(tr => tr.style.display !== "none" && tr.dataset.id).map(tr => Number(tr.dataset.id)).filter(Number.isFinite) : [];
+    return { ids, n: ids.length };
+  }
+  function fmtMin(m) { if (!isFinite(m) || m <= 0) return ""; if (m < 1) return "under 1 min"; if (m < 60) return "~" + Math.round(m) + " min"; return "~" + (m / 60).toFixed(1) + " h"; }
+  function renderScrapeBox() {
+    const box = document.getElementById("scrapeBox"); if (!box) return;
+    const running = scrapeState.list.filter(r => r.status === "running");
+    const recentMine = scrapeState.list.filter(r => r.mine && r.status !== "running").slice(0, 1);
+    const rows = [...running, ...recentMine];
+    let h = "";
+    if (running.length && scrapeState.ping && Date.now() - scrapeState.ping > 3 * 60 * 1000)
+      h += '<div style="color:#b45309;font-weight:700">No Analyst app online - updates start when one opens.</div>';
+    for (const r of rows) {
+      const who = r.mine ? "You" : escapeHtml(r.requester || "Someone");
+      const left = Math.max(0, r.total - r.checked);
+      const eta = r.status === "running" && r.per_min > 0 ? fmtMin(left / r.per_min) : "";
+      const pct = r.total ? Math.round(r.checked * 100 / r.total) : 0;
+      const tail = r.status === "running"
+        ? (r.checked ? (eta ? " · " + eta + " left" : "") : " · starting…")
+        : (r.status === "cancelled" ? " · stopped" : " · done");
+      h += '<div style="margin-top:3px"><b style="color:#0f172a">' + who + ':</b> ' + r.checked.toLocaleString("en-IN") + " / " + r.total.toLocaleString("en-IN")
+        + " (" + pct + "%)" + (r.failed ? ' · <span style="color:#b91c1c">' + r.failed + " failed</span>" : "") + tail
+        + (r.status === "running" && (r.mine || (window.CA && CA.access && CA.access.is_owner)) ? ' <a href="#" data-stopscrape="' + r.id + '" style="color:#b91c1c;font-weight:700">Stop</a>' : "")
+        + "</div>";
+    }
+    box.innerHTML = h;
+  }
+  async function pollScrape() {
+    try {
+      const [{ data }, prog] = await Promise.all([sb.rpc("scrape_requests_status"), sb.rpc("seller_listing_progress")]);
+      scrapeState.list = Array.isArray(data) ? data : [];
+      const p0 = prog && Array.isArray(prog.data) ? prog.data[0] : null;
+      scrapeState.ping = p0 && p0.worker_ping_at ? Date.parse(p0.worker_ping_at) : null;
+    } catch (e) { /* keep last */ }
+    const running = new Set(scrapeState.list.filter(r => r.status === "running").map(r => r.id));
+    // one of mine just finished: pull the fresh scrape values into the table
+    const finished = [...scrapeState.wasRunning].filter(id => !running.has(id));
+    scrapeState.wasRunning = running;
+    // fresh values into the table: when an update finishes, and every minute while one runs
+    scrapeState.tick = (scrapeState.tick || 0) + 1;
+    if (finished.length || (running.size && scrapeState.tick % 4 === 0)) {
+      try { await loadListingStats([...state.rowsById.values()], true); paintListingCells(); } catch (e) {}
+    }
+    renderScrapeBox();
+    clearTimeout(scrapeState.timer);
+    if (running.size) scrapeState.timer = setTimeout(pollScrape, 15000);
+  }
+  document.addEventListener("click", async (e) => {
+    const stop = e.target.closest && e.target.closest("[data-stopscrape]");
+    if (stop) {
+      e.preventDefault();
+      if (!confirm("Stop this update? Rows already checked keep their new data.")) return;
+      const { error } = await sb.rpc("scrape_request_cancel", { p_id: Number(stop.dataset.stopscrape) });
+      if (error) { alert("Could not stop: " + error.message); return; }
+      pollScrape(); return;
+    }
+    const btn = e.target.closest && e.target.closest("#scrapeNowBtn");
+    if (!btn) return;
+    if (state.view !== "sku_master") { alert("Open the SKU Master tab first."); return; }
+    const f = scrapeFilterIds();
+    if (f.loading) { alert("The filtered rows are still loading - try again in a moment."); return; }
+    if (!f.n) { alert("No rows are showing."); return; }
+    const scope = f.ids ? "the " + f.n.toLocaleString("en-IN") + " filtered rows"
+      : (f.n.toLocaleString("en-IN") + " rows (" + (state.company || "all companies") + " · " + (state.platform || "all platforms") + ")");
+    if (!confirm("Update Now: scrape " + scope + "?\n\nEvery running Cursive Analyst app starts on them right away, taking turns with anyone else's update. Failed checks are retried automatically. Progress shows on this card.")) return;
+    btn.disabled = true; btn.textContent = "Queuing…";
+    try {
+      const { data, error } = await sb.rpc("scrape_now", { p_ids: f.ids, p_company: f.ids ? null : (state.company || null), p_platform: f.ids ? null : (state.platform || null) });
+      if (error) throw error;
+      if (!data || !data.total) alert("Nothing to scrape - these rows have no product link yet" + (data && data.no_url ? " (" + data.no_url + " without a link)." : "."));
+      else if (data.no_url) alert(data.total.toLocaleString("en-IN") + " rows queued. " + data.no_url + " skipped - no product link yet.");
+    } catch (err) { alert("Could not start: " + (err.message || err)); }
+    btn.disabled = false; btn.innerHTML = "&#8635; Update Now";
+    pollScrape();
+  });
 
   // ---- 1. Companies dropdown ----
   async function loadCompanies() {
@@ -2531,13 +2621,14 @@
         ${suppressedKpi()}
         ${notInMasterKpi()}
         <div class="kpi"><div class="tile" style="background:#10b981;">&#127970;</div><div><div class="label">Platforms mapped</div><div class="value" id="kpiPlat">${platforms.size}</div><div class="foot" id="kpiPlatFoot">${[...platforms].join(", ") || "—"}</div></div></div>
-        <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;" id="kpiLatest">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div></div></div>
+        <div class="kpi"><div class="tile" style="background:#f59e0b;">&#128337;</div><div><div class="label">Latest update</div><div class="value" style="font-size:15px;" id="kpiLatest">${escapeHtml(latestStr)}</div><div class="foot">Most recent row</div>${canScrapeNow() ? '<button type="button" class="btn" id="scrapeNowBtn" style="margin-top:8px;padding:6px 12px;font-size:12px;font-weight:700;background:#1d4ed8;color:#fff;border-color:#1d4ed8">&#8635; Update Now</button>' : ""}<div id="scrapeBox" style="margin-top:6px;font-size:11.5px;line-height:1.5;color:#475569"></div></div></div>
         ${colorCountsKpi()}
         ${salesKpi()}
         ${subcatKpi()}
         ${lossKpi()}
       `;
       if (!updateKpiFromDom()) updateKpiSummary();
+      renderScrapeBox();
       updateColorWhite();
       _nimData = null; updateNotInMasterKpi(); _supData = null; updateSuppressedKpi();
       updateSubcatKpi();
