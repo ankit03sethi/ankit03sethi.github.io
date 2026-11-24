@@ -3254,6 +3254,8 @@
       // "Balloon Box" and wipes rows: the derived value (box type / pack count and
       // colour / variant) must win over the uploaded Product/Colour text, so intercept
       // here, before the raw_data lookup. Both helpers return blank for other products.
+      // Parent rows (Parent/Child = Parent) carry no Product.
+      if (col === "Product" && isParentRow(r)) return "";
       if (col === "Product" || col === "Color") {
         let _d = deriveBalloon(r);
         if (!_d.box && !_d.color) _d = deriveWipes(r);
@@ -3680,6 +3682,7 @@
     // saved in listing_data by the earlier editable version still take priority
     // so nothing already entered disappears.
     const shownVal = (r, i, col) => {
+      if (col === "Product" && isParentRow(r)) return "";
       // Same rule as in cell(): these two platforms have no second listing id,
       // so nothing saved earlier should resurrect one.
       if (col === "Other Listing Id") {
@@ -5167,6 +5170,12 @@
     const pf = String((r && r.platform) || "").toLowerCase();
     if (pf === "amazon") return st.tags || "";
     return st.our_assured ? "F Assured" : "";
+  };
+  const isParentRow = (r) => {
+    if (!r) return false;
+    const ld = r.listing_data || {}, rd = r.raw_data || {};
+    const v = ld["Parent/Child"] != null && String(ld["Parent/Child"]).trim() !== "" ? ld["Parent/Child"] : rd["Parent/Child"];
+    return String(v || "").trim().toLowerCase() === "parent";
   };
   const stockFor = (r) => {
     if (!r) return undefined;
