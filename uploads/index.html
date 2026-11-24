@@ -264,6 +264,7 @@
     .emp-body { padding:12px 14px; display:none; }
     .emp-card.open .emp-body { display:block; }
     .emp-cos { display:flex; flex-wrap:wrap; gap:6px 10px; margin:6px 0 12px; }
+    .emp-cos label.all { background:#eff6ff; border-color:#bfdbfe; font-weight:700; color:#1e40af; }
     .emp-cos label { font-size:12px; display:inline-flex; gap:5px; align-items:center; border:1px solid #e5e7eb; border-radius:999px; padding:3px 10px; background:#f8fafc; }
     .emp-grid { width:100%; border-collapse:collapse; font-size:13px; }
     .emp-grid th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; padding:6px 8px; border-bottom:1px solid #e5e7eb; }
@@ -661,7 +662,7 @@
   })();
 </script>
 
-<script src="/analyst-access.js?v=12"></script>
+<script src="/analyst-access.js?v=13"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -2677,15 +2678,20 @@
       render();
     }
     const levelsOf = (it) => it.levels || ["view", "edit"];
+    const PLATFORMS = [["amazon", "Amazon"], ["flipkart", "Flipkart"], ["meesho", "Meesho"], ["firstcry", "FirstCry"], ["myntra", "Myntra"]];
+    const pfText = (p) => (p && p.length) ? "Platforms: " + p.map(k => (PLATFORMS.find(x => x[0] === k) || [k, k])[1]).join(", ") : "All platforms";
     function render() {
       $("#empHead").textContent = members.length ? `(${members.length})` : "";
       if (!members.length) { $("#empList").innerHTML = `<p style="color:#64748b; font-size:13px;">No employees yet. Click <b>+ Add employee</b>.</p>`; return; }
       $("#empList").innerHTML = members.map(m => {
-        const perms = m.perms || {}; const cos = m.companies || [];
+        const perms = m.perms || {}; const cos = m.companies || []; const pfs = (m.platforms || []).map(x => String(x).toLowerCase());
         const rows = CA.CATALOG.map(g => {
-          const head = `<tr class="grp"><td colspan="4">${esc(g.label)}<span class="quick" data-quick="view" data-page="${g.page}">all view</span><span class="quick" data-quick="edit" data-page="${g.page}">all edit</span><span class="quick" data-quick="none" data-page="${g.page}">none</span></td></tr>`;
+          const head = `<tr class="grp"><td colspan="4">${esc(g.label)}<span class="quick" data-quick="view" data-page="${g.page}">all view</span><span class="quick" data-quick="edit" data-page="${g.page}">all edit</span><span class="quick" data-quick="none" data-page="${g.page}">none</span>${g.inherit ? `<span class="quick" data-quick="default" data-page="${g.page}">clear (as before)</span><div style="font-weight:400;font-size:12px;color:#64748b;margin-top:4px;text-transform:none;letter-spacing:0">Nothing ticked on a column = as before (shown with SKU Master view, money columns only with Financial data; no editing). Edit appears only on columns you can type into.</div>` : ""}</td></tr>`;
           const items = g.items.map(it => {
-            const lv = levelsOf(it); const cur = perms[it.key] || "";
+            const lv = levelsOf(it);
+            // per-column rows: a key never saved stays unticked (= as before), so
+            // saving does not turn every column into an explicit "None"
+            const cur = (g.inherit && !Object.prototype.hasOwnProperty.call(perms, it.key)) ? null : (perms[it.key] || "");
             const cell = (level) => lv.includes(level)
               ? `<td class="c"><input type="radio" name="p_${m.id}_${it.key}" value="${level}" data-key="${it.key}" ${cur === level ? "checked" : ""}></td>`
               : `<td class="c" style="color:#cbd5e1;">—</td>`;
@@ -2697,11 +2703,13 @@
           <div class="emp-top" data-toggle="${m.id}">
             <b>${esc(m.name || m.email)}</b><span class="em">${esc(m.email)}</span>
             <span class="emp-badge ${m.status === "active" ? "" : "off"}">${m.status === "active" ? "active" : "disabled"}</span>
-            <span class="em" style="margin-left:auto;">${cos.length ? "Companies: " + esc(cos.join(", ")) : "All companies"} · ${Object.values(perms).filter(v => v === "edit").length} edit / ${Object.values(perms).filter(v => v === "view").length} view</span>
+            <span class="em" style="margin-left:auto;">${cos.length ? "Companies: " + esc(cos.join(", ")) : "All companies"} · ${esc(pfText(pfs))} · ${Object.values(perms).filter(v => v === "edit").length} edit / ${Object.values(perms).filter(v => v === "view").length} view</span>
           </div>
           <div class="emp-body">
             <div class="emp-lbl">Companies this employee may see (none ticked = all)</div>
-            <div class="emp-cos">${cosAll.map(n => `<label><input type="checkbox" data-co="${esc(n)}" ${cos.includes(n) ? "checked" : ""}>${esc(n)}</label>`).join("") || "<span style='color:#94a3b8; font-size:12px;'>No companies added yet.</span>"}</div>
+            <div class="emp-cos" data-row="co"><label class="all"><input type="checkbox" data-all="co" ${cosAll.length && cosAll.every(n => cos.includes(n)) ? "checked" : ""}>All</label>${cosAll.map(n => `<label><input type="checkbox" data-co="${esc(n)}" ${cos.includes(n) ? "checked" : ""}>${esc(n)}</label>`).join("") || "<span style='color:#94a3b8; font-size:12px;'>No companies added yet.</span>"}</div>
+            <div class="emp-lbl">Platforms this employee may see (none ticked = all)</div>
+            <div class="emp-cos" data-row="pf"><label class="all"><input type="checkbox" data-all="pf" ${PLATFORMS.every(([k]) => pfs.includes(k)) ? "checked" : ""}>All</label>${PLATFORMS.map(([k, n]) => `<label><input type="checkbox" data-pf="${k}" ${pfs.includes(k) ? "checked" : ""}>${n}</label>`).join("")}</div>
             <table class="emp-grid"><thead><tr><th>What</th><th class="c">None</th><th class="c">View</th><th class="c">Edit</th></tr></thead><tbody>${rows}</tbody></table>
             <div class="emp-actions">
               <button class="btn primary" data-save="${m.id}">Save permissions</button>
@@ -2725,10 +2733,18 @@
       // the Master SKU file lives on the Uploads page, so its access counts as Uploads access too
       if (perms.master && !perms.uploads) perms.uploads = "view";
       const companies = [...card.querySelectorAll("input[type=checkbox][data-co]:checked")].map(c => c.dataset.co);
-      return { perms, companies: companies.length ? companies : null };
+      const platforms = [...card.querySelectorAll("input[type=checkbox][data-pf]:checked")].map(c => c.dataset.pf);
+      return { perms, companies: companies.length ? companies : null, platforms: platforms.length ? platforms : null };
     }
     const msg = (id, t, c) => { const el = document.querySelector(`[data-msg="${id}"]`); if (el) { el.textContent = t; el.style.color = c || "#64748b"; } };
 
+    $("#empList").addEventListener("change", (e) => {
+      const t = e.target; if (!t || t.type !== "checkbox") return;
+      const row = t.closest(".emp-cos[data-row]"); if (!row) return;
+      const k = row.dataset.row, boxes = [...row.querySelectorAll(`input[data-${k}]`)], all = row.querySelector("input[data-all]");
+      if (t === all) boxes.forEach(b => { b.checked = all.checked; });
+      else if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked);
+    });
     $("#empList").addEventListener("click", async (e) => {
       const t = e.target;
       const top = t.closest("[data-toggle]");
@@ -2739,6 +2755,7 @@
         const g = CA.CATALOG.find(x => x.page === page);
         for (const it of g.items) {
           const lv = levelsOf(it);
+          if (mode === "default") { card.querySelectorAll(`input[type=radio][data-key="${it.key}"]`).forEach(x => { x.checked = false; }); continue; }
           const want = mode === "none" ? "" : lv.includes(mode) ? mode : lv[lv.length - 1];
           const r = card.querySelector(`input[type=radio][data-key="${it.key}"][value="${want}"]`); if (r) r.checked = true;
         }
@@ -2747,13 +2764,13 @@
       const card = t.closest(".emp-card"); if (!card) return;
       const id = Number(card.dataset.id);
       if (t.dataset.save) {
-        const { perms, companies } = collect(card);
+        const { perms, companies, platforms } = collect(card);
         msg(id, "Saving…");
-        const { error } = await sbE.from("analyst_members").update({ perms, companies }).eq("id", id);
+        const { error } = await sbE.from("analyst_members").update({ perms, companies, platforms }).eq("id", id);
         if (error) { msg(id, "Could not save: " + error.message, "#b91c1c"); return; }
         msg(id, "Saved — takes effect on the employee's next page load.", "#16a34a");
-        const m = members.find(x => x.id === id); if (m) { m.perms = perms; m.companies = companies; }
-        card.querySelector(".emp-top .em:last-child").textContent = `${companies ? "Companies: " + companies.join(", ") : "All companies"} · ${Object.values(perms).filter(v => v === "edit").length} edit / ${Object.values(perms).filter(v => v === "view").length} view`;
+        const m = members.find(x => x.id === id); if (m) { m.perms = perms; m.companies = companies; m.platforms = platforms; }
+        card.querySelector(".emp-top .em:last-child").textContent = `${companies ? "Companies: " + companies.join(", ") : "All companies"} · ${pfText(platforms)} · ${Object.values(perms).filter(v => v === "edit").length} edit / ${Object.values(perms).filter(v => v === "view").length} view`;
       } else if (t.dataset.toggleStatus) {
         const m = members.find(x => x.id === id); const next = m.status === "active" ? "disabled" : "active";
         const { error } = await sbE.from("analyst_members").update({ status: next }).eq("id", id);

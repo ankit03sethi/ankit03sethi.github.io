@@ -45,6 +45,115 @@
       { key: "skuwise.financial", label: "Financial data (cost, margin, revenue, settlement, profit columns; Payments tab)", levels: ["view"] },
       { key: "skuwise.uploads",  label: "Uploads tab", levels: ["view"] },
     ]},
+    // Every column of the SKU-wise page (SKU Master view), one by one. A column left
+    // blank (nothing ticked) follows the rules above, exactly as before: visible with
+    // SKU Master view, financial ones only with Financial data. Ticking None / View /
+    // Edit overrides that for the column. Edit is offered only on typed columns.
+    // Keep in step with SKU_COLS in skuwisedata/index.html (a column missing here
+    // simply keeps the default rule).
+    { page: "skuwise_cols", label: "SKU-wise data · columns (blank = as before)", inherit: true, items: [
+      { key: "skuwise.col.S.NO", label: "S.NO", levels: ["view"] },
+      { key: "skuwise.col.Date", label: "Date", levels: ["view"] },
+      { key: "skuwise.col.Listed By", label: "Listed By", levels: ["view"] },
+      { key: "skuwise.col.Company", label: "Company", levels: ["view"] },
+      { key: "skuwise.col.Platform", label: "Platform", levels: ["view"] },
+      { key: "skuwise.col.Platform Seller", label: "Platform Seller", levels: ["view"] },
+      { key: "skuwise.col.Brand", label: "Brand", levels: ["view"] },
+      { key: "skuwise.col.Vertical", label: "Vertical", levels: ["view"] },
+      { key: "skuwise.col.Return Type", label: "Return Type", levels: ["view"] },
+      { key: "skuwise.col.Type", label: "Type", levels: ["view"] },
+      { key: "skuwise.col.Category", label: "Category", levels: ["view"] },
+      { key: "skuwise.col.Sub Category", label: "Sub Category", levels: ["view"] },
+      { key: "skuwise.col.Others", label: "Others", levels: ["view", "edit"] },
+      { key: "skuwise.col.Product", label: "Product", levels: ["view"] },
+      { key: "skuwise.col.Color", label: "Color", levels: ["view"] },
+      { key: "skuwise.col.Mapped", label: "Mapped", levels: ["view"] },
+      { key: "skuwise.col.Parent/Child", label: "Parent/Child", levels: ["view"] },
+      { key: "skuwise.col.MOQ", label: "MOQ", levels: ["view", "edit"] },
+      { key: "skuwise.col.MOQ AP", label: "MOQ AP", levels: ["view"] },
+      { key: "skuwise.col.Variation", label: "Variation", levels: ["view", "edit"] },
+      { key: "skuwise.col.ASIN", label: "ASIN", levels: ["view"] },
+      { key: "skuwise.col.Other Listing Id", label: "Other Listing Id", levels: ["view"] },
+      { key: "skuwise.col.SKU", label: "SKU", levels: ["view"] },
+      { key: "skuwise.col.Master Sku", label: "Master Sku", levels: ["view"] },
+      { key: "skuwise.col.W Qty", label: "W Qty", levels: ["view"] },
+      { key: "skuwise.col.P Qty", label: "P Qty", levels: ["view"] },
+      { key: "skuwise.col.Qty", label: "Qty", levels: ["view"] },
+      { key: "skuwise.col.COP", label: "COP", levels: ["view"] },
+      { key: "skuwise.col.HSN", label: "HSN", levels: ["view"] },
+      { key: "skuwise.col.Margin", label: "Margin", levels: ["view", "edit"] },
+      { key: "skuwise.col.Auto Margin", label: "Auto Margin", levels: ["view", "edit"] },
+      { key: "skuwise.col.Auto %", label: "Auto %", levels: ["view", "edit"] },
+      { key: "skuwise.col.Return Cost/Order", label: "Return Cost/Order", levels: ["view"] },
+      { key: "skuwise.col.Packaging", label: "Packaging", levels: ["view", "edit"] },
+      { key: "skuwise.col.Tax %", label: "Tax %", levels: ["view", "edit"] },
+      { key: "skuwise.col.Promotion %", label: "Promotion %", levels: ["view", "edit"] },
+      { key: "skuwise.col.Auto Settlement", label: "Auto Settlement", levels: ["view"] },
+      { key: "skuwise.col.Manual Settlement", label: "Manual Settlement", levels: ["view", "edit"] },
+      { key: "skuwise.col.Expected Settlement", label: "Expected Settlement", levels: ["view", "edit"] },
+      { key: "skuwise.col.Suggested Settlement", label: "Suggested Settlement", levels: ["view"] },
+      { key: "skuwise.col.Expected Profit", label: "Expected Profit", levels: ["view"] },
+      { key: "skuwise.col.Suggested Profit", label: "Suggested Profit", levels: ["view"] },
+      { key: "skuwise.col.Amazon Add Rs", label: "Amazon Add Rs", levels: ["view", "edit"] },
+      { key: "skuwise.col.Max Step %", label: "Max Step %", levels: ["view", "edit"] },
+      { key: "skuwise.col.Selling Price", label: "Selling Price", levels: ["view"] },
+      { key: "skuwise.col.Suggested Price", label: "Suggested Price", levels: ["view"] },
+      { key: "skuwise.col.Site Price", label: "Site Price", levels: ["view"] },
+      { key: "skuwise.col.Ratings", label: "Ratings", levels: ["view"] },
+      { key: "skuwise.col.Count", label: "Count", levels: ["view"] },
+      { key: "skuwise.col.Count Target", label: "Count Target", levels: ["view", "edit"] },
+      { key: "skuwise.col.Rating Target", label: "Rating Target", levels: ["view", "edit"] },
+      { key: "skuwise.col.5\u2605 Needed", label: "5\u2605 Needed", levels: ["view"] },
+      { key: "skuwise.col.Grouping", label: "Grouping", levels: ["view", "edit"] },
+      { key: "skuwise.col.Group Rating", label: "Group Rating", levels: ["view"] },
+      { key: "skuwise.col.Group Count", label: "Group Count", levels: ["view"] },
+      { key: "skuwise.col.Seller", label: "Seller", levels: ["view"] },
+      { key: "skuwise.col.Title", label: "Title", levels: ["view"] },
+      { key: "skuwise.col.Images", label: "Images", levels: ["view"] },
+      { key: "skuwise.col.Video", label: "Video", levels: ["view"] },
+      { key: "skuwise.col.Variations", label: "Variations", levels: ["view"] },
+      { key: "skuwise.col.Other Price", label: "Other Price", levels: ["view"] },
+      { key: "skuwise.col.Other Seller", label: "Other Seller", levels: ["view"] },
+      { key: "skuwise.col.Other Assured", label: "Other Assured", levels: ["view"] },
+      { key: "skuwise.col.Our Price", label: "Our Price", levels: ["view"] },
+      { key: "skuwise.col.Our Assured", label: "Our Assured", levels: ["view"] },
+      { key: "skuwise.col.Suppressed", label: "Suppressed", levels: ["view"] },
+      { key: "skuwise.col.Last updated", label: "Last updated", levels: ["view"] },
+      { key: "skuwise.col.Link", label: "Link", levels: ["view"] },
+      { key: "skuwise.col.Stop Selling", label: "Stop Selling", levels: ["view", "edit"] },
+      { key: "skuwise.col.Peak 30d", label: "Peak 30d", levels: ["view"] },
+      { key: "skuwise.col.Sold", label: "Sold", levels: ["view"] },
+      { key: "skuwise.col.Units kept", label: "Units kept", levels: ["view"] },
+      { key: "skuwise.col.Returns", label: "Returns", levels: ["view"] },
+      { key: "skuwise.col.Return %", label: "Return %", levels: ["view"] },
+      { key: "skuwise.col.RTO", label: "RTO", levels: ["view"] },
+      { key: "skuwise.col.RTO %", label: "RTO %", levels: ["view"] },
+      { key: "skuwise.col.Buyer returns", label: "Buyer returns", levels: ["view"] },
+      { key: "skuwise.col.Buyer return %", label: "Buyer return %", levels: ["view"] },
+      { key: "skuwise.col.Total revenue", label: "Total revenue", levels: ["view"] },
+      { key: "skuwise.col.Courier total", label: "Courier total", levels: ["view"] },
+      { key: "skuwise.col.Settlement", label: "Settlement", levels: ["view"] },
+      { key: "skuwise.col.Return cost", label: "Return cost", levels: ["view"] },
+      { key: "skuwise.col.Tax paid", label: "Tax paid", levels: ["view"] },
+      { key: "skuwise.col.Packaging cost", label: "Packaging cost", levels: ["view"] },
+      { key: "skuwise.col.Product cost", label: "Product cost", levels: ["view"] },
+      { key: "skuwise.col.Net profit", label: "Net profit", levels: ["view"] },
+      { key: "skuwise.col.Profit % rev", label: "Profit % rev", levels: ["view"] },
+      { key: "skuwise.col.Profit % cost", label: "Profit % cost", levels: ["view"] },
+      { key: "skuwise.col.Rev per order", label: "Rev per order", levels: ["view"] },
+      { key: "skuwise.col.Courier per order", label: "Courier per order", levels: ["view"] },
+      { key: "skuwise.col.Settled per order", label: "Settled per order", levels: ["view"] },
+      { key: "skuwise.col.Last Settled Order", label: "Last Settled Order", levels: ["view"] },
+      { key: "skuwise.col.Return per order", label: "Return per order", levels: ["view"] },
+      { key: "skuwise.col.Last Return Order", label: "Last Return Order", levels: ["view"] },
+      { key: "skuwise.col.Tax per order", label: "Tax per order", levels: ["view"] },
+      { key: "skuwise.col.Pack per order", label: "Pack per order", levels: ["view"] },
+      { key: "skuwise.col.Profit per order", label: "Profit per order", levels: ["view"] },
+      { key: "skuwise.col.Focus", label: "Focus", levels: ["view"] },
+      { key: "skuwise.col.Advertising", label: "Advertising", levels: ["view", "edit"] },
+      { key: "skuwise.col.Priority", label: "Priority", levels: ["view", "edit"] },
+      { key: "skuwise.col.Row Color", label: "Row Color", levels: ["view"] }
+    ]},
     { page: "settings", label: "Settings", items: [
       { key: "settings", label: "Print sorting settings" },
     ]},
@@ -83,6 +192,14 @@
     if (level === "edit") return (access.perms || {})[key] === "edit";
     const l = levelOf(key);
     return l === "view" || l === "edit";
+  }
+  // SKU-wise column permission: "edit" for owners; for employees the explicit
+  // choice ("", "view", "edit") or null when the owner never set that column.
+  function colPerm(col) {
+    if (!access) return null;
+    if (access.is_owner) return "edit";
+    const p = access.perms || {}, k = "skuwise.col." + col;
+    return Object.prototype.hasOwnProperty.call(p, k) ? (p[k] || "") : null;
   }
   // Does the employee have any access at all on a page?
   function anyOn(page) {
@@ -130,5 +247,5 @@
     return access.is_owner ? (access.email || "") : `${access.email || ""} · employee of ${access.owner_email || "owner"}`;
   }
 
-  window.CA = { CATALOG, load, can, levelOf, anyOn, apply, who, get access() { return access; }, ownerId: () => (access ? access.owner_id : null) };
+  window.CA = { CATALOG, load, can, levelOf, anyOn, apply, who, colPerm, get access() { return access; }, ownerId: () => (access ? access.owner_id : null) };
 })();

@@ -480,7 +480,7 @@
   </div>
 </div>
 
-<script src="/analyst-access.js?v=12"></script>
+<script src="/analyst-access.js?v=13"></script>
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SB_URL = "https://bttppihskbfmxwujyztj.supabase.co";
@@ -541,9 +541,8 @@
     $("#emailChip").textContent = CA.who();
     if (!CA.access.active) { $("#locker").classList.add("show"); return; }
     if (!CA.anyOn("skuwise")) { alert("You do not have access to SKU Wise Data. Ask the account owner."); location.href = "/analyst/"; return; }
-    if (window.CA && CA.access && !CA.can("skuwise.sku_master", "edit")) { const s = document.createElement("style"); s.textContent = ".edpen{display:none!important}#editBar{display:none!important}"; document.head.appendChild(s); }
     CA.apply();
-    if (!CA.access.is_owner) { document.body.classList.add("ca-emp"); const st = document.createElement("style"); st.textContent = ".ca-emp .tagsel, .ca-emp .tagnum { pointer-events:none; background:#f8fafc !important; color:#64748b; } .ca-emp #scrapeResetBtn { display:none !important; } .ca-emp .edpen { display:none !important; }"; document.head.appendChild(st); }
+    if (!CA.access.is_owner) { document.body.classList.add("ca-emp"); const st = document.createElement("style"); st.textContent = ".ca-emp #scrapeResetBtn { display:none !important; }"; document.head.appendChild(st); }
     if (!canFin()) { const pt = document.querySelector('.tab[data-view="payments"]'); if (pt) pt.style.display = "none"; }
     // start on the first tab the employee may see
     const firstTab = [...document.querySelectorAll(".tab[data-view]")].find(t => t.style.display !== "none");
@@ -1048,7 +1047,8 @@
     } else {
       ctl = `<input class="${cls}" type="text" inputmode="decimal" autocomplete="off" data-col="${escapeHtml(c)}" data-id="${id}" data-orig="${escapeHtml(cur)}" value="${escapeHtml(shown)}" placeholder="${escapeHtml(ph != null ? ph : ((NUM_COLS[c] || {}).def || ""))}">`;
     }
-    return `<td class="edcell"${tip ? ' title="' + escapeHtml(tip) + '"' : ""}>${ctl}<button type="button" class="edpen" title="Edit">&#9998;</button></td>`;
+    const pen = canEditCol(c) ? '<button type="button" class="edpen" title="Edit">&#9998;</button>' : "";
+    return `<td class="edcell"${tip ? ' title="' + escapeHtml(tip) + '"' : ""}>${ctl}${pen}</td>`;
   }
   // Expected Settlement and Selling Price are computed from the pricing cells,
   // so they follow every edit at once - amber while the edit is still unsaved,
@@ -1164,8 +1164,8 @@
   const tableWrapEl = document.getElementById("tableWrap");
   tableWrapEl.addEventListener("click", (e) => {
     const pen = e.target.closest("button.edpen"); if (!pen) return;
-    if (window.CA && CA.access && !CA.can("skuwise.sku_master", "edit")) return;
     const ctl = pen.parentElement.querySelector(".edin"); if (!ctl) return;
+    if (!canEditCol(ctl.dataset.col)) return;
     ctl.classList.remove("locked");
     ctl.focus();
     if (ctl.tagName === "INPUT") ctl.select();
@@ -1203,7 +1203,7 @@
   // Priority saves the moment it is picked - this row only, blank clears it.
   tableWrapEl.addEventListener("change", async (e) => {
     const sel = e.target.closest ? e.target.closest("select.prio") : null; if (!sel) return;
-    if (window.CA && CA.access && !CA.can("skuwise.sku_master", "edit")) { alert("No edit permission."); return; }
+    if (!canEditCol("Priority")) { alert("No edit permission."); return; }
     const id = sel.dataset.id, val = String(sel.value || "");
     sel.classList.remove("saved", "failed"); sel.classList.add("saving");
     try {
@@ -2661,7 +2661,24 @@
   const FIN_KEEP = new Set(["Selling Price","Site Price","Other Price","Our Price","File Price","Suggested Price"]);
   const FIN_EXTRA = new Set(["COP","Margin","Auto Margin","Auto %","Manual Margin","Manual Settlement","Max Step %","Amazon Add Rs","Tax %","Packaging","Final COP","Expected Settlement","Suggested Settlement","Expected Profit","Suggested Profit","Profit % rev","Profit % cost","Profit % of COP","Margin %COP"]);
   const canFin = () => !window.CA || !CA.access || CA.can("skuwise.financial", "view");
-  const finHidden = (c) => !canFin() && !FIN_KEEP.has(c) && (FIN_EXTRA.has(c) || colKind(c) === "value");
+  // Per-column employee permission (Uploads > Employees > SKU-wise data · columns).
+  // An explicit None hides the column, View / Edit shows it even if it is a money
+  // column; a column never set keeps the old rule (Financial data).
+  const colPermOf = (c) => (window.CA && CA.access && CA.colPerm) ? CA.colPerm(c) : "edit";
+  const finHidden = (c) => {
+    const cp = colPermOf(c);
+    if (cp !== null) return cp === "";
+    return !canFin() && !FIN_KEEP.has(c) && (FIN_EXTRA.has(c) || colKind(c) === "value");
+  };
+  // Edit: owner always; employee only on a column set to Edit. A column never set
+  // keeps the old rule - employees could not type into cells, only pick Priority
+  // with SKU Master edit.
+  function canEditCol(c) {
+    if (!window.CA || !CA.access || CA.access.is_owner) return true;
+    const cp = colPermOf(c);
+    if (cp !== null) return cp === "edit";
+    return c === "Priority" && CA.can("skuwise.sku_master", "edit");
+  }
   const FIN_RAW = /price|amount|settle|value|profit|cost|revenue|margin|fee|charge|tax|gst|total|payment|payout|commission|\brs\b|₹|mrp|discount|invoice/i;
   const kindHidden = (c) => {
     if (ALWAYS_ON.has(c)) return false;
@@ -3604,7 +3621,7 @@
       if (c === "Priority") {
         const cur = String((r.listing_data || {})[c] || "");
         const o = [""].concat(TAG_COLS[c]).map(x => `<option value="${x}"${x === cur ? " selected" : ""}>${x || "\u2014"}</option>`).join("");
-        return `<td class="edcell"><select class="prio${cur ? " set" : ""}" data-col="Priority" data-id="${r.id}">${o}</select></td>`;
+        return `<td class="edcell"><select class="prio${cur ? " set" : ""}" data-col="Priority" data-id="${r.id}"${canEditCol("Priority") ? "" : " disabled"}>${o}</select></td>`;
       }
       // Return cost per order: the return charges the platform actually billed
       // over the last 90 days (RTO excluded), spread across Net sales (the units
