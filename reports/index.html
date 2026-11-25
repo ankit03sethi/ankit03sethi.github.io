@@ -164,7 +164,7 @@ tr.rowred td{background:#ffecec}
   <section class="section" id="secPricing" style="display:none">
     <div class="section-head"><h2>Pricing</h2><div class="rule"></div><span class="cnt" id="cntPricing"></span></div>
     <div class="card">
-      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Upar ke Company aur Platform chips se select karo (All = sabka data). Sirf woh SKUs aayenge jinka target price current live price se alag hai. Phir Excel download karo &mdash; Meesho ke liye seedha panel-upload template, Amazon/Flipkart/Myntra ke liye SKU + ID + New Price list.</p></div></div>
+      <div class="card-head" style="cursor:default"><div><h3>Price update file</h3><p class="desc">Upar ke Company aur Platform chips se select karo (All = sabka data). Sirf master SKU data (SKU-wise data) wale rows aayenge jo latest inventory file mein bhi hain &mdash; master mein nahi hai ya COP blank hai to file mein nahi aayega. Phir Excel download karo &mdash; Meesho ke liye seedha panel-upload template, Amazon/Flipkart/Myntra ke liye SKU + ID + New Price list.</p></div></div>
       <div class="body open" style="display:block">
         <div class="controls">
           <button class="ghost" id="prPreview">Preview</button>
@@ -1210,7 +1210,7 @@ function initPricing() {
     const missSup = (window.__prMode||"meesho")==="meesho" && rows.some((r) => !r.supplier_id);
     if (cnt) cnt.textContent = rows.length + " SKU" + (rows.length===1?"":"s") + " to update";
     const cos = [...new Set(rows.map((r) => titleCase(r.company)))];
-    stEl.textContent = rows.length + " SKUs (latest inventory) · " + (cos.length ? cos.join(", ") : "-") + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
+    stEl.textContent = rows.length + " SKUs (master SKU rows in latest inventory) · " + (cos.length ? cos.join(", ") : "-") + (missSup ? " · kuch companies ka Supplier ID set nahi hai" : "");
     if (!rows.length) { wrap.innerHTML = '<div class="note">Is company ki inventory / settlement data nahi mila. Upar Company/Platform chip badal ke dekho.</div>'; return; }
     if ((window.__prMode||"meesho") !== "meesho") {
       let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>Platform</th><th>ASIN / FSN / Style ID</th><th>SKU</th><th>Master Code</th><th class="num">Current Selling Price</th><th class="num">New Selling Price</th><th class="num">Min (Amazon)</th><th class="num">Max / MRP (Amazon)</th></tr></thead><tbody>';
