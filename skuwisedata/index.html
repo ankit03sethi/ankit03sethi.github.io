@@ -4031,6 +4031,8 @@
           tip = "Amazon Add Rs: typed wins, else courier on the last non-returned order, else 65. Now: " + Math.round(eff.val) + " (" + eff.src + "). Click the pencil to override.";
           return editCell("tagnum", c, r.id, cur, null, ph, tip);
         }
+        // Courier Add On is an Amazon-only cost: blank (not editable) on every other platform.
+        if (c === "Amazon Add Rs") return '<td style="color:#cbd5e1">' + DASH + "</td>";
         return editCell("tagnum", c, r.id, cur, null, ph, tip);
       }
       let v = shownVal(r, i, c);
