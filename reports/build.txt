@@ -1,2 +1,2 @@
-1795683542
-2026-11-26n amazon-yourprice-mrp
+1795689484
+2026-11-26n exclude-promotions-tab

@@ -176,6 +176,22 @@ tr.rowred td{background:#ffecec}
       </div>
     </div>
   </section>
+
+  <section class="section" id="secExclPromo" style="display:none">
+    <div class="section-head"><h2>Exclude Promotions</h2><div class="rule"></div><span class="cnt" id="cntExclPromo"></span></div>
+    <div class="card">
+      <div class="card-head" style="cursor:default"><div><h3>Flipkart promotion opt-out file</h3><p class="desc">Flipkart listings jinka price SKU-wise page par fixed hai (Manual Settlement bhara hai) &mdash; in par promotion discount nahi chahiye. Upar Company chip se company select karo aur Download karo: Flipkart ka opt-in/opt-out upload format (&quot;Enter Listing IDs from row 3&quot; / ListingIDs) unhi Listing IDs ke saath aata hai. Listing ID latest Flipkart listing file se aata hai.</p></div></div>
+      <div class="body open" style="display:block">
+        <div class="controls">
+          <button class="ghost" id="xpPreview">Preview</button>
+          <button class="primary" id="xpDownload">Download</button>
+          <span id="xpSel" class="muted" style="font-size:12px;font-weight:700"></span>
+          <span id="xpStatus" class="muted" style="font-size:12px"></span>
+        </div>
+        <div id="xpWrap"></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <script src="/analyst-access.js?v=21"></script>
@@ -564,6 +580,7 @@ for (const r of REPORTS) state.ui[r.id] = { open: false, sort: { ...r.sort }, th
   $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
   await load(false);
   try { initPricing(); } catch (e) { console.error("pricing", e); }
+  try { initExclPromo(); } catch (e) { console.error("exclpromo", e); }
 })();
 
 async function load(force) {
@@ -698,7 +715,7 @@ function buildChips() {
       const c = document.createElement("span");
       c.className = "chip" + (state[key] === val ? " active" : "");
       c.textContent = label;
-      c.addEventListener("click", () => { state[key] = val; buildChips(); renderAll(); if (window.__prSel) window.__prSel(); });
+      c.addEventListener("click", () => { state[key] = val; buildChips(); renderAll(); if (window.__prSel) window.__prSel(); if (window.__xpSel) window.__xpSel(); });
       host.appendChild(c);
     };
     mk("", allLabel);
@@ -1140,7 +1157,8 @@ const REPORT_TABS = [
   { id: "secPayments", label: "Payments", sec: "Payments" },
   { id: "secReturns", label: "Returns", sec: "Returns" },
   { id: "secMissings", label: "Missings", sec: "Missings" },
-  { id: "secPricing", label: "Pricing", perm: "reports.pricing" }
+  { id: "secPricing", label: "Pricing", perm: "reports.pricing" },
+  { id: "secExclPromo", label: "Exclude Promotions", perm: "reports.pricing" }
 ];
 function showTab(id) {
   document.querySelectorAll("main > section.section").forEach((el) => { el.style.display = "none"; });
@@ -1149,6 +1167,7 @@ function showTab(id) {
   const host = document.querySelector("#repTabs");
   if (host) [...host.children].forEach((c) => c.classList.toggle("active", c.dataset.sec === id));
   try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
+  if (id === "secExclPromo" && window.__xpLoad) window.__xpLoad();
 }
 function buildTabs() {
   const host = document.querySelector("#repTabs");
@@ -1167,6 +1186,51 @@ function buildTabs() {
   });
   REPORT_TABS.forEach((t) => { const el = document.getElementById(t.id); if (el) el.style.display = "none"; });
   if (avail.length) showTab(avail[0].id);
+}
+
+// Exclude Promotions: Flipkart listings with a fixed manual price (Manual Settlement),
+// downloaded in Flipkart's opt-in/opt-out upload format:
+//   **** Instructions: Enter Listing IDs from row 3 (Don't edit the first 2 rows)  ****
+//   ListingIDs
+//   LST...
+function initExclPromo() {
+  const stEl = document.querySelector("#xpStatus"), wrap = document.querySelector("#xpWrap");
+  const cnt = document.querySelector("#cntExclPromo"), selEl = document.querySelector("#xpSel");
+  const ck = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  let rows = [];
+  const selNote = () => { if (selEl) selEl.textContent = "Selected: " + titleCase(state.co || "All companies") + " / Flipkart"; };
+  async function load() {
+    selNote();
+    stEl.innerHTML = '<span class="spin"></span> loading&hellip;';
+    const { data, error } = await sb.rpc("flipkart_exclude_promo_json", { p_company: state.co || "" });
+    if (error) { stEl.textContent = "Error: " + error.message; return null; }
+    rows = (Array.isArray(data) ? data : []).filter((r) => !state.co || ck(r.company) === ck(state.co));
+    const withId = rows.filter((r) => r.listing_id).length;
+    stEl.textContent = rows.length + " listings with a fixed manual price" + (withId < rows.length ? " (" + (rows.length - withId) + " without a Listing ID - not in the latest Flipkart listing file)" : "");
+    if (cnt) cnt.textContent = rows.length + " listings";
+    if (!rows.length) { wrap.innerHTML = '<div class="note">Is company mein koi Flipkart listing ka Manual Settlement nahi bhara hai.</div>'; return rows; }
+    let h = '<div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;margin-top:10px"><table><thead><tr><th>Company</th><th>SKU</th><th>Master SKU</th><th>FSN</th><th>Listing ID</th><th class="num">Manual Settlement</th><th class="num">Selling Price</th><th class="num">Settlement</th></tr></thead><tbody>';
+    for (const r of rows) h += "<tr><td>" + esc(titleCase(r.company)) + "</td><td>" + esc(r.sku) + "</td><td>" + esc(r.master_sku) + "</td><td>" + esc(r.fsn) + "</td><td>" + (r.listing_id ? esc(r.listing_id) : '<span class="muted">\u2014</span>') + '</td><td class="num">' + esc(r.manual_settlement) + '</td><td class="num">' + (r.price == null ? "\u2014" : esc(r.price)) + '</td><td class="num">' + (r.settle == null ? "\u2014" : esc(r.settle)) + "</td></tr>";
+    wrap.innerHTML = h + "</tbody></table></div>";
+    return rows;
+  }
+  window.__xpLoad = () => { load(); };
+  window.__xpSel = () => { selNote(); const s = document.getElementById("secExclPromo"); if (s && s.style.display !== "none") load(); };
+  document.querySelector("#xpPreview").addEventListener("click", load);
+  document.querySelector("#xpDownload").addEventListener("click", async () => {
+    const d = await load(); if (!d) return;
+    const cos = [...new Set(d.map((r) => ck(r.company)))];
+    if (cos.length > 1) { stEl.textContent = "Flipkart file ek company (seller account) ke liye banti hai - upar Company chip select karo."; return; }
+    const ids = [...new Set(d.map((r) => r.listing_id).filter(Boolean))];
+    if (!ids.length) { stEl.textContent = "Koi Listing ID nahi mila - download karne ko kuch nahi."; return; }
+    const lines = ["**** Instructions: Enter Listing IDs from row 3 (Don't edit the first 2 rows)  ****", "ListingIDs"].concat(ids);
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+    const tag = d.length ? titleCase(d[0].company).replace(/\s+/g, "") : "Company";
+    const nm = "ExcludePromotions_Flipkart_" + tag + "_" + new Date().toISOString().slice(0, 10) + ".csv";
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nm; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    stEl.textContent = "Downloaded " + ids.length + " Listing IDs -> " + nm + ". Flipkart promotion mein opt-out ke liye ye file upload karo.";
+  });
 }
 
 function initPricing() {
