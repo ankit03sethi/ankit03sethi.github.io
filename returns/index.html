@@ -136,6 +136,7 @@
     <div class="stat wl" id="wlUnk" data-w="unknown" aria-selected="false" title="Orders file says RTO, but it is not in any returns file yet"><div class="n"><span class="wln">0</span></div><div class="l">Unknown</div></div>
     <div class="stat" id="fAll" data-f="all" aria-selected="false"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
     <div class="stat ok" id="fOk" data-f="ok" aria-selected="false"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
+    <div class="stat" id="wlRed" title="Red (still to scan) of Undelivered + Cancelled + Unknown"><div class="n" id="cRed" style="color:#dc2626">0</div><div class="l">Total pending</div></div>
     <div class="stat bad" id="fBad" data-f="notfound" aria-selected="false"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
   </div>
 
@@ -491,6 +492,8 @@
     if ($("#wlAll")) $("#wlAll").querySelector(".wln").textContent = (wlUnd.length + wlDel.length);
     if ($("#wlCan")) { const cp=wlCan.filter(r=>!r.scanned).length; $("#wlCan").querySelector(".wln").innerHTML = ps(cp, wlCan.length-cp); }
     if ($("#wlUnk")) { const kp=wlUnk.filter(r=>!r.scanned).length; $("#wlUnk").querySelector(".wln").innerHTML = ps(kp, wlUnk.length-kp); }
+    // Total pending = red of Undelivered + Cancelled + Unknown
+    if ($("#cRed")) $("#cRed").textContent = undP.length + wlCan.filter(r=>!r.scanned).length + wlUnk.filter(r=>!r.scanned).length;
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
     if ($("#wlAll")) $("#wlAll").setAttribute("aria-selected", wlMode==="all"?"true":"false");
