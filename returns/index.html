@@ -397,12 +397,11 @@
   }
   function render(){
     const base = allRows.filter(r => inDate(r.scanned_at));
-    // Scanned / Matched count the green rows of the Delivered + Undelivered lists (same date
-    // range), so Scanned == green(Delivered) + green(Undelivered). Not found = scans with no match.
-    const greenDel = wlDel.filter(r=>r.scanned).length, greenUnd = wlUnd.filter(r=>r.scanned).length;
-    counts.ok = greenDel + greenUnd;
-    counts.bad = base.filter(r=>r.status!=="OK").length;
-    counts.total = counts.ok + counts.bad;
+    // Scanned = scans made in the selected dates (same rows as the Scans table below);
+    // Matched = those found in an orders/returns file; Not found = the rest. Scanned = Matched + Not found.
+    counts.ok = base.filter(r=>r.status==="OK").length;
+    counts.bad = base.length - counts.ok;
+    counts.total = base.length;
     counts.fault = base.filter(isFault).length;
     setCounts();
     let rows = base.filter(statusMatch);
