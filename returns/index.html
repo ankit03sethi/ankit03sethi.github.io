@@ -389,6 +389,12 @@
     await changeCondition(awb, "Damaged", chosen);
   });
 
+  // Draw at most PAGE_ROWS rows at a time - drawing 15,000 rows at once froze the page.
+  const PAGE_ROWS = 300; let listLimit = PAGE_ROWS, expLimit = PAGE_ROWS, loadSeq = 0;
+  function moreRow(total, shown, id, cols){
+    if (total <= shown) return "";
+    return "<tr><td colspan='"+cols+"' style='padding:12px;text-align:center'><button class='ghostbtn' id='"+id+"'>Aur dikhao ("+(total-shown)+" baaki)</button></td></tr>";
+  }
   function render(){
     const base = allRows.filter(r => inDate(r.scanned_at));
     // Scanned / Matched count the green rows of the Delivered + Undelivered lists (same date
@@ -409,9 +415,11 @@
       nfBox.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ nfReasonFilter=b.dataset.nf; render(); }));
       if (nfReasonFilter!=="all") rows = rows.filter(r=>nfReasonOf(r)===nfReasonFilter);
     } else if (nfBox){ nfBox.style.display="none"; }
-    $("#rows").innerHTML = rows.length ? rows.map(rowHtml).join("")
+    const shownRows = rows.slice(0, listLimit);
+    $("#rows").innerHTML = rows.length ? shownRows.map(rowHtml).join("") + moreRow(rows.length, shownRows.length, "moreScans", 10)
       : "<tr><td colspan='10' class='muted' style='padding:16px'>Is filter mein koi scan nahi.</td></tr>";
     $("#listNote").textContent = rows.length ? ("("+rows.length+" dikha rahe)") : "";
+    const ms = $("#moreScans"); if (ms) ms.addEventListener("click", () => { listLimit += PAGE_ROWS; render(); });
     $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => onPick(sel.dataset.awb, sel.dataset.sku, sel.value)));
   }
 
@@ -425,7 +433,7 @@
   function normCourier(c){ const s=String(c==null?"-":c).trim(); const k=s.toLowerCase().replace(/[^a-z0-9]/g,""); const map={xpressbees:"XpressBees",expressbees:"XpressBees",delhivery:"Delhivery",eke2e:"Ekart",ekart:"Ekart",flipkartlogistics:"Ekart",shadowfax:"Shadowfax",valmo:"Valmo",pocketship:"PocketShip",ats:"ATS",firstcry:"Firstcry",flipkart:"Flipkart",amazon:"Amazon",meesho:"Meesho",myntra:"Myntra"}; return map[k]||s||"-"; }
   let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all", wlPlatform = "all", wlView = "pending";
   let wlCan = [];
-  async function loadExpected(){
+  async function loadExpected(seq){
     const {from,to}=dateRange();
     // The API returns at most 1000 rows per call, so page through until a short page.
     // One call returns the whole list as JSON (no 1000-row cap, no repeated round trips).
@@ -435,6 +443,7 @@
     }
     async function fetchCancelled(){ const { data, error } = await sb.rpc("return_cancelled_json",{p_from:from,p_to:to}); return (error || !Array.isArray(data)) ? [] : data; }
     const [d,u,c] = await Promise.all([fetchAll("delivered"), fetchAll("undelivered"), fetchCancelled()]);
+    if (seq && seq !== loadSeq) return;
     wlDel = d; wlUnd = u; wlCan = c;
     renderExpected(); render();
   }
@@ -460,8 +469,10 @@
     filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.t,v=b.dataset.v; if(t==="pf"){ wlPlatform=v; wlCompany="all"; } else wlCompany=v; renderExpected(); }));
     let rows=pfRows; if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
     $("#expNote").textContent = rows.length ? (rows.length + " cancelled" + (view==="scanned"?" (scanned)":" (pending)")) : "Koi cancelled nahi.";
+    const rowsAll = rows; rows = rows.slice(0, expLimit);
     $("#expRows").innerHTML = rows.length ? rows.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.order_id||r.awb||"-")+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td class='muted'>"+esc(r.src==='manifest'?'CSV/Manifest':'Order file')+"</td><td class='muted'>"+esc((r.o_status||'').slice(0,30))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Koi cancelled nahi.</td></tr>";
+    if (rowsAll.length > rows.length) { $("#expRows").insertAdjacentHTML("beforeend", moreRow(rowsAll.length, rows.length, "moreExp", 8)); $("#moreExp").addEventListener("click", () => { expLimit += PAGE_ROWS; renderExpected(); }); }
   }
 
   function renderExpected(){
@@ -509,9 +520,10 @@
     let rows=pfRows;
     if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
     $("#expNote").textContent = rows.length ? (rows.length + (wlMode==="all" ? " returns" : (wlView==="scanned" ? " scanned" : " pending scan"))) : (wlView==="scanned" ? "Abhi koi scan nahi." : "Sab scan ho gaye.");
-    const show = rows;
+    const show = rows.slice(0, expLimit);
     $("#expRows").innerHTML = show.length ? show.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.awb)+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td>"+esc(normCourier(r.courier))+"</td><td class='muted'>"+esc((r.return_reason||"").slice(0,40))+(r.sub_reason?" &middot; "+esc(String(r.sub_reason).slice(0,40)):"")+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
       : "<tr><td colspan='8' class='muted' style='padding:16px'>Sab scan ho gaye.</td></tr>";
+    if (rows.length > show.length) { $("#expRows").insertAdjacentHTML("beforeend", moreRow(rows.length, show.length, "moreExp", 8)); $("#moreExp").addEventListener("click", () => { expLimit += PAGE_ROWS; renderExpected(); }); }
   }
 
   function scanRange(){
@@ -525,12 +537,17 @@
     return { p_from: null, p_to: null };
   }
   async function loadList(){
-    // API caps a call at 1000 rows — page through so every scan is loaded, no 1000 lock.
+    // One call returns every scan as JSON. loadSeq drops answers from an older date click.
+    const my = ++loadSeq; listLimit = PAGE_ROWS; expLimit = PAGE_ROWS;
+    $("#listNote").textContent = "(loading…)";
     const rg = scanRange(); const { data, error } = await sb.rpc("return_scan_list_json", rg);
-    allRows = (error || !Array.isArray(data)) ? [] : data;
+    if (my !== loadSeq) return;
+    if (error) { $("#listNote").textContent = "(load nahi hua - dobara try karo)"; return; }
+    allRows = Array.isArray(data) ? data : [];
     await loadNfReasons();
+    if (my !== loadSeq) return;
     render();
-    loadExpected();
+    loadExpected(my);
   }
 
   document.querySelectorAll(".stat").forEach(c => c.addEventListener("click", () => {
