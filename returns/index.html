@@ -154,12 +154,17 @@
   </div>
 
   <div class="card">
+    <div class="counts" id="typeCards" style="margin-bottom:12px">
+      <div class="stat tcard" data-t="all" aria-selected="true"><div class="n" id="tAll">0</div><div class="l">All</div></div>
+      <div class="stat tcard" data-t="RTO" aria-selected="false"><div class="n" id="tRto">0</div><div class="l">RTO</div></div>
+      <div class="stat tcard" data-t="Customer Return" aria-selected="false"><div class="n" id="tCr">0</div><div class="l">Customer Returns</div></div>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>Scans</b><span class="muted" id="listNote"></span><button id="recheckBtn" class="ghostbtn" style="margin-left:auto">&#8635; Recheck not-found</button><button id="delNfBtn" class="ghostbtn" style="margin-left:8px;color:#b91c1c">&#128465; Delete not-found</button></div>
     <div class="tabbar"><span class="muted" style="align-self:center;font-weight:700;font-size:13px">Condition:</span><button class="ctab" data-c="Good" aria-selected="false">Good</button><button class="ctab" data-c="Damaged" aria-selected="false">Damaged</button><button class="ctab" data-c="Wrong" aria-selected="false">Wrong</button><button class="ctab" data-c="fault" aria-selected="false">Our Fault</button></div>
     <div id="nfReasons" style="margin:8px 0;display:none"></div>
     <div class="scroll">
       <table>
-        <thead><tr><th>Time</th><th>AWB</th><th>Order ID</th><th>Other ID</th><th>Status</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Condition</th></tr></thead>
+        <thead><tr><th>Time</th><th>AWB</th><th>Order ID</th><th>Other ID</th><th>Status</th><th>Type</th><th>SKU</th><th>Platform</th><th>Company</th><th>Reason</th><th>Condition</th></tr></thead>
         <tbody id="rows"><tr><td colspan="8" class="muted" style="padding:16px">Loading...</td></tr></tbody>
       </table>
     </div>
@@ -206,7 +211,10 @@
   }
   function matchCard(r){ if(cardFilter==="ok") return r.status==="OK"; if(cardFilter==="notfound") return r.status!=="OK"; return true; }
   function matchCond(r){ if(condFilter==="all") return true; if(condFilter==="fault") return isFault(r); return (r.condition||"Good")===condFilter; }
-  function statusMatch(r){ return matchCard(r) && matchCond(r); }
+  // RTO / Customer Return, as the marketplace returns file states it (r.rtype from the server)
+  let typeFilter = "all";
+  function matchType(r){ return typeFilter==="all" || r.rtype===typeFilter; }
+  function statusMatch(r){ return matchCard(r) && matchCond(r) && matchType(r); }
   function dmgText(r){ if(!r.damaged_items||!r.damaged_items.length) return ""; return r.damaged_items.map(d=>esc(d.name||d.code)+" x"+esc(d.qty)).join(", "); }
   function fmtTime(ts){ try { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
   function setCounts(){ $("#cTotal").textContent=counts.total; $("#cOk").textContent=counts.ok; $("#cBad").textContent=counts.bad; }
@@ -244,6 +252,7 @@
       "<td class='mono'>"+esc(r.order_id||"-")+"</td>"+
       "<td class='mono'>"+esc(r.order_id2||"-")+"</td>"+
       "<td><span class='badge "+(ok?"ok":"bad")+"'>"+(ok?"OK":"NOT FOUND")+"</span></td>"+
+      "<td>"+(r.rtype==="RTO"?"<b style='color:#b45309'>RTO</b>":(r.rtype?"<b style='color:#1d4ed8'>Customer Return</b>":"<span class='muted'>-</span>"))+"</td>"+
       "<td class='mono'>"+esc(r.sku||"-")+"</td>"+
       "<td>"+esc(r.platform||"-")+"</td>"+
       "<td>"+esc(r.company_name||"-")+"</td>"+
@@ -406,6 +415,12 @@
     counts.total = base.length;
     counts.fault = base.filter(isFault).length;
     setCounts();
+    if ($("#tAll")) {
+      $("#tAll").textContent = base.length;
+      $("#tRto").textContent = base.filter(r=>r.rtype==="RTO").length;
+      $("#tCr").textContent = base.filter(r=>r.rtype==="Customer Return").length;
+      document.querySelectorAll(".tcard").forEach(x => x.setAttribute("aria-selected", x.dataset.t===typeFilter ? "true" : "false"));
+    }
     let rows = base.filter(statusMatch);
     const nfBox = document.getElementById("nfReasons");
     if (cardFilter==="notfound" && nfBox){
@@ -417,8 +432,8 @@
       if (nfReasonFilter!=="all") rows = rows.filter(r=>nfReasonOf(r)===nfReasonFilter);
     } else if (nfBox){ nfBox.style.display="none"; }
     const shownRows = rows.slice(0, listLimit);
-    $("#rows").innerHTML = rows.length ? shownRows.map(rowHtml).join("") + moreRow(rows.length, shownRows.length, "moreScans", 10)
-      : "<tr><td colspan='10' class='muted' style='padding:16px'>Is filter mein koi scan nahi.</td></tr>";
+    $("#rows").innerHTML = rows.length ? shownRows.map(rowHtml).join("") + moreRow(rows.length, shownRows.length, "moreScans", 11)
+      : "<tr><td colspan='11' class='muted' style='padding:16px'>Is filter mein koi scan nahi.</td></tr>";
     $("#listNote").textContent = rows.length ? ("("+rows.length+" dikha rahe)") : "";
     const ms = $("#moreScans"); if (ms) ms.addEventListener("click", () => { listLimit += PAGE_ROWS; render(); });
     $("#rows").querySelectorAll(".condsel").forEach(sel => sel.addEventListener("change", () => onPick(sel.dataset.awb, sel.dataset.sku, sel.value)));
@@ -573,6 +588,9 @@
     condFilter = (condFilter===c) ? "all" : c;
     document.querySelectorAll(".ctab").forEach(x => x.setAttribute("aria-selected", (x.dataset.c===condFilter) ? "true":"false"));
     render();
+  }));
+  document.querySelectorAll(".tcard").forEach(b => b.addEventListener("click", () => {
+    typeFilter = b.dataset.t; listLimit = PAGE_ROWS; render();
   }));
   document.querySelectorAll(".dchip").forEach(b => b.addEventListener("click", () => {
     dateFilter = b.dataset.d;
