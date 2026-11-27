@@ -133,6 +133,7 @@
     <div class="stat wl" id="wlUnd" data-w="undelivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Undelivered</div></div>
     <div class="stat wl" id="wlDel" data-w="delivered" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Delivered</div></div>
     <div class="stat wl" id="wlCan" data-w="cancelled" aria-selected="false"><div class="n"><span class="wln">0</span></div><div class="l">Cancelled</div></div>
+    <div class="stat wl" id="wlUnk" data-w="unknown" aria-selected="false" title="Orders file says RTO, but it is not in any returns file yet"><div class="n"><span class="wln">0</span></div><div class="l">Unknown</div></div>
     <div class="stat" id="fAll" data-f="all" aria-selected="false"><div class="n" id="cTotal">0</div><div class="l">Scanned</div></div>
     <div class="stat ok" id="fOk" data-f="ok" aria-selected="false"><div class="n" id="cOk">0</div><div class="l">Matched (OK)</div></div>
     <div class="stat bad" id="fBad" data-f="notfound" aria-selected="false"><div class="n" id="cBad">0</div><div class="l">Not found</div></div>
@@ -431,7 +432,7 @@
     return {from:"2000-01-01",to:"2999-12-31"}; }
   function normCourier(c){ const s=String(c==null?"-":c).trim(); const k=s.toLowerCase().replace(/[^a-z0-9]/g,""); const map={xpressbees:"XpressBees",expressbees:"XpressBees",delhivery:"Delhivery",eke2e:"Ekart",ekart:"Ekart",flipkartlogistics:"Ekart",shadowfax:"Shadowfax",valmo:"Valmo",pocketship:"PocketShip",ats:"ATS",firstcry:"Firstcry",flipkart:"Flipkart",amazon:"Amazon",meesho:"Meesho",myntra:"Myntra"}; return map[k]||s||"-"; }
   let wlDel = [], wlUnd = [], wlMode = null, wlCompany = "all", wlCourier = "all", wlPlatform = "all", wlView = "pending";
-  let wlCan = [];
+  let wlCan = [], wlUnk = [];
   async function loadExpected(seq){
     const {from,to}=dateRange();
     // The API returns at most 1000 rows per call, so page through until a short page.
@@ -441,14 +442,17 @@
       return (error || !Array.isArray(data)) ? [] : data;
     }
     async function fetchCancelled(){ const { data, error } = await sb.rpc("return_cancelled_json",{p_from:from,p_to:to}); return (error || !Array.isArray(data)) ? [] : data; }
-    const [d,u,c] = await Promise.all([fetchAll("delivered"), fetchAll("undelivered"), fetchCancelled()]);
+    async function fetchUnknown(){ const { data, error } = await sb.rpc("return_unknown_json",{p_from:from,p_to:to}); return (error || !Array.isArray(data)) ? [] : data; }
+    const [d,u,c,k] = await Promise.all([fetchAll("delivered"), fetchAll("undelivered"), fetchCancelled(), fetchUnknown()]);
     if (seq && seq !== loadSeq) return;
-    wlDel = d; wlUnd = u; wlCan = c;
+    wlDel = d; wlUnd = u; wlCan = c; wlUnk = k;
     renderExpected(); render();
   }
-  function renderCancelled(){
-    $("#wlTitle").textContent = "Cancelled";
-    const pool = wlCan;
+  function renderCancelled(){ renderSideList(wlCan, "Cancelled", "cancelled"); }
+  function renderUnknown(){ renderSideList(wlUnk, "Unknown (RTO, not in returns file yet)", "unknown"); }
+  function renderSideList(listPool, title, noun){
+    $("#wlTitle").textContent = title;
+    const pool = listPool;
     const view = wlView;
     const all = pool.filter(r => view==="scanned" ? r.scanned : !r.scanned);
     if ($("#wlPend")) { $("#wlPend").setAttribute("aria-selected", view==="pending"?"true":"false"); $("#wlScan").setAttribute("aria-selected", view==="scanned"?"true":"false"); }
@@ -467,10 +471,10 @@
     filt.innerHTML = "<div style='margin-bottom:6px'><b class='muted' style='margin-right:6px'>Platform:</b>"+pfChips+"</div><div><b class='muted' style='margin-right:6px'>Company:</b>"+coChips+"</div>";
     filt.querySelectorAll(".wlchip").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.t,v=b.dataset.v; if(t==="pf"){ wlPlatform=v; wlCompany="all"; } else wlCompany=v; renderExpected(); }));
     let rows=pfRows; if(wlCompany!=="all") rows=rows.filter(r=>(r.company_name||"-")===wlCompany);
-    $("#expNote").textContent = rows.length ? (rows.length + " cancelled" + (view==="scanned"?" (scanned)":" (pending)")) : "Koi cancelled nahi.";
+    $("#expNote").textContent = rows.length ? (rows.length + " " + noun + (view==="scanned"?" (scanned)":" (pending)")) : ("Koi " + noun + " nahi.");
     const rowsAll = rows; rows = rows.slice(0, expLimit);
     $("#expRows").innerHTML = rows.length ? rows.map(r => "<tr"+(r.scanned?"":" style='background:#fff7ed'")+"><td>"+(r.scanned?"<span class='badge ok'>SCANNED</span>":"<span class='badge bad'>PENDING</span>")+"</td><td class='mono'>"+esc(r.order_id||r.awb||"-")+"</td><td class='mono'>"+esc(r.sku||"-")+"</td><td>"+esc(r.platform||"-")+"</td><td>"+esc(r.company_name||"-")+"</td><td class='muted'>"+esc(r.src==='manifest'?'CSV/Manifest':'Order file')+"</td><td class='muted'>"+esc((r.o_status||'').slice(0,30))+"</td><td class='muted'>"+esc(r.use_date||"-")+"</td></tr>").join("")
-      : "<tr><td colspan='8' class='muted' style='padding:16px'>Koi cancelled nahi.</td></tr>";
+      : "<tr><td colspan='8' class='muted' style='padding:16px'>Koi " + noun + " nahi.</td></tr>";
     if (rowsAll.length > rows.length) { $("#expRows").insertAdjacentHTML("beforeend", moreRow(rowsAll.length, rows.length, "moreExp", 8)); $("#moreExp").addEventListener("click", () => { expLimit += PAGE_ROWS; renderExpected(); }); }
   }
 
@@ -486,13 +490,16 @@
     $("#wlDel").querySelector(".wln").innerHTML = ps(delP.length, wlDel.length-delP.length);
     if ($("#wlAll")) $("#wlAll").querySelector(".wln").textContent = (wlUnd.length + wlDel.length);
     if ($("#wlCan")) { const cp=wlCan.filter(r=>!r.scanned).length; $("#wlCan").querySelector(".wln").innerHTML = ps(cp, wlCan.length-cp); }
+    if ($("#wlUnk")) { const kp=wlUnk.filter(r=>!r.scanned).length; $("#wlUnk").querySelector(".wln").innerHTML = ps(kp, wlUnk.length-kp); }
     $("#wlUnd").setAttribute("aria-selected", wlMode==="undelivered"?"true":"false");
     $("#wlDel").setAttribute("aria-selected", wlMode==="delivered"?"true":"false");
     if ($("#wlAll")) $("#wlAll").setAttribute("aria-selected", wlMode==="all"?"true":"false");
     if ($("#wlCan")) $("#wlCan").setAttribute("aria-selected", wlMode==="cancelled"?"true":"false");
+    if ($("#wlUnk")) $("#wlUnk").setAttribute("aria-selected", wlMode==="unknown"?"true":"false");
     const card = $("#expCard");
     if (!wlMode){ if(card) card.hidden=true; return; }
     if (wlMode==="cancelled"){ if(card) card.hidden=false; renderCancelled(); return; }
+    if (wlMode==="unknown"){ if(card) card.hidden=false; renderUnknown(); return; }
     if (card) card.hidden=false;
     const pool = (wlMode==="all") ? wlUnd.concat(wlDel) : (wlMode==="delivered"?wlDel:wlUnd);
     const all = (wlMode==="all") ? pool : pool.filter(r => wlView==="scanned" ? r.scanned : !r.scanned);
@@ -579,6 +586,7 @@
   $("#wlUnd").addEventListener("click", () => { wlMode = (wlMode==="undelivered")?null:"undelivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
   $("#wlDel").addEventListener("click", () => { wlMode = (wlMode==="delivered")?null:"delivered"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
   if ($("#wlCan")) $("#wlCan").addEventListener("click", () => { wlMode = (wlMode==="cancelled")?null:"cancelled"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
+  if ($("#wlUnk")) $("#wlUnk").addEventListener("click", () => { wlMode = (wlMode==="unknown")?null:"unknown"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
   if ($("#wlAll")) $("#wlAll").addEventListener("click", () => { wlMode = (wlMode==="all")?null:"all"; wlCompany="all"; wlCourier="all"; wlPlatform="all"; renderExpected(); });
 
   const inp = $("#awb");
